@@ -234,6 +234,24 @@ export interface CollaborationThread {
   updatedAt: string;
 }
 
+export interface InboxThread {
+  id: string;
+  continuationId: string;
+  /** @nullable */
+  seedId: string | null;
+  sourceProjectTitle: string;
+  partnerId: string;
+  partnerName: string;
+  /** @nullable */
+  lastMessage: string | null;
+  /** @nullable */
+  lastMessageAt: string | null;
+  messageCount: number;
+  unread: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CollaborationMessageInput {
   /**
      * @minLength 1

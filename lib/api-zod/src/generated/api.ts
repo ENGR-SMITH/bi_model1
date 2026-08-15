@@ -1428,6 +1428,42 @@ export const GetCollaborationInboxResponse = zod.array(GetCollaborationInboxResp
 
 
 /**
+ * @summary List the viewer's collaboration threads with latest message preview
+ */
+export const ListCollaborationThreadsResponseItem = zod.object({
+  "id": zod.string(),
+  "continuationId": zod.string(),
+  "seedId": zod.string().nullable(),
+  "sourceProjectTitle": zod.string(),
+  "partnerId": zod.string(),
+  "partnerName": zod.string(),
+  "lastMessage": zod.string().nullable(),
+  "lastMessageAt": zod.string().nullable(),
+  "messageCount": zod.number().int(),
+  "unread": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListCollaborationThreadsResponse = zod.array(ListCollaborationThreadsResponseItem)
+
+
+/**
+ * @summary List account-wide collaboration activity for the authenticated user
+ */
+export const ListAccountActivityResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string().nullable(),
+  "seedId": zod.string().nullable(),
+  "actorId": zod.string(),
+  "eventType": zod.string(),
+  "summary": zod.string(),
+  "resourceId": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAccountActivityResponse = zod.array(ListAccountActivityResponseItem)
+
+
+/**
  * @summary Mark a collaboration notification as read
  */
 

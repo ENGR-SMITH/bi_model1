@@ -677,4 +677,62 @@ describe("stable-range continuation annotations", () => {
       .send({ rangeStart: 0, rangeEnd: 5, body: "Intruder note." });
     expect(write.status).toBe(403);
   });
+
+  it("lists account-wide activity only for the viewer's rooms", async () => {
+    const { submission } = await submittedFlow();
+    state.userId = "creator-1";
+    const feed = await request(API).get("/api/collaborations/activity");
+    expect(feed.status).toBe(200);
+    const types = feed.body.map((event: any) => event.eventType);
+    // Publishing a seed and receiving a submission are both in the creator's trail.
+    expect(types).toContain("seed_published");
+    expect(types).toContain("continuation_submitted");
+    // The writer's own submission event appears in their feed too.
+    state.userId = "writer-1";
+    const writerFeed = await request(API).get("/api/collaborations/activity");
+    expect(writerFeed.status).toBe(200);
+    expect(writerFeed.body.map((event: any) => event.eventType)).toContain("continuation_submitted");
+    // A stranger sees nothing about the room.
+    state.userId = "stranger-1";
+    const strangerFeed = await request(API).get("/api/collaborations/activity");
+    expect(strangerFeed.status).toBe(200);
+    expect(strangerFeed.body).toHaveLength(0);
+    expect(submission.id).toBeTruthy();
+  });
+
+  it("lists the viewer's threads with latest message preview and unread state", async () => {
+    const { submission } = await submittedFlow();
+    state.userId = "creator-1";
+    const started = await request(API).post(`/api/collaborations/continuations/${submission.id}/thread`);
+    expect(started.status).toBe(201);
+    const threadId = started.body.id;
+    const sent = await request(API)
+      .post(`/api/collaborations/threads/${threadId}/messages`)
+      .send({ body: "Welcome to the room — let's find the first turn together." });
+    expect(sent.status).toBe(201);
+
+    // The respondent sees the thread with the unread message.
+    state.userId = "writer-1";
+    const writerThreads = await request(API).get("/api/collaborations/threads");
+    expect(writerThreads.status).toBe(200);
+    expect(writerThreads.body).toHaveLength(1);
+    expect(writerThreads.body[0].id).toBe(threadId);
+    expect(writerThreads.body[0].sourceProjectTitle).toBe(SEED_BODY.sourceProjectTitle);
+    expect(writerThreads.body[0].lastMessage).toContain("Welcome to the room");
+    expect(writerThreads.body[0].messageCount).toBe(1);
+    expect(writerThreads.body[0].unread).toBe(true);
+    expect(writerThreads.body[0].partnerName).toBe("Author");
+
+    // The creator sees the same thread, read from their side.
+    state.userId = "creator-1";
+    const creatorThreads = await request(API).get("/api/collaborations/threads");
+    expect(creatorThreads.body).toHaveLength(1);
+    expect(creatorThreads.body[0].unread).toBe(false);
+    expect(creatorThreads.body[0].partnerName).toBe("Writer One");
+
+    // A stranger is not a participant.
+    state.userId = "stranger-1";
+    const strangerThreads = await request(API).get("/api/collaborations/threads");
+    expect(strangerThreads.body).toHaveLength(0);
+  });
 });

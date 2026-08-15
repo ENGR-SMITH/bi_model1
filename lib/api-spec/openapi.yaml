@@ -1136,6 +1136,32 @@ paths:
               schema:
                 type: array
                 items: { $ref: "#/components/schemas/CollaborationNotification" }
+  /collaborations/threads:
+    get:
+      operationId: listCollaborationThreads
+      tags: [collaborations]
+      summary: List the viewer's collaboration threads with latest message preview
+      responses:
+        "200":
+          description: Threads for the authenticated user
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InboxThread" }
+  /collaborations/activity:
+    get:
+      operationId: listAccountActivity
+      tags: [collaborations]
+      summary: List account-wide collaboration activity for the authenticated user
+      responses:
+        "200":
+          description: Account activity events
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ActivityEvent" }
   /collaborations/notifications/{notificationId}/read:
     post:
       operationId: markCollaborationNotificationRead
@@ -1381,6 +1407,22 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
       required: [id, continuationId, creatorId, respondentId, messages, createdAt, updatedAt]
+    InboxThread:
+      type: object
+      properties:
+        id: { type: string }
+        continuationId: { type: string }
+        seedId: { type: ["string", "null"] }
+        sourceProjectTitle: { type: string }
+        partnerId: { type: string }
+        partnerName: { type: string }
+        lastMessage: { type: ["string", "null"] }
+        lastMessageAt: { type: ["string", "null"] }
+        messageCount: { type: integer }
+        unread: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, continuationId, seedId, sourceProjectTitle, partnerId, partnerName, lastMessage, lastMessageAt, messageCount, unread, createdAt, updatedAt]
     CollaborationMessageInput:
       type: object
       properties:

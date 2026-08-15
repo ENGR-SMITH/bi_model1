@@ -39,6 +39,7 @@ export * from './errorResponse';
 export * from './genealogyEntry';
 export * from './genreQueryParameter';
 export * from './healthStatus';
+export * from './inboxThread';
 export * from './languageQueryParameter';
 export * from './listCollaborationSeedsParams';
 export * from './oracleChatInput';

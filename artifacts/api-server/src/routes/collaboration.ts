@@ -5,6 +5,8 @@ import {
   desc,
   eq,
   inArray,
+  isNull,
+  or,
 } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
@@ -1556,6 +1558,137 @@ router.post("/collaborations/notifications/:notificationId/read", async (req, re
   const notificationId = parseParam(req.params.notificationId);
   await db.update(collaborationNotificationsTable).set({ readAt: new Date() }).where(and(eq(collaborationNotificationsTable.id, notificationId), eq(collaborationNotificationsTable.recipientId, recipientId)));
   res.sendStatus(204);
+});
+
+// Account-wide activity feed: every privacy-safe event where the viewer is
+// involved — as the actor, as a participant in the related project, or as the
+// creator of the related seed. This powers the top-level /activity page so the
+// account reflects the major activities across all collaboration rooms.
+router.get("/collaborations/activity", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+
+  const [myProjects, mySeeds] = await Promise.all([
+    db
+      .select({ id: collaborationProjectsTable.id })
+      .from(collaborationProjectsTable)
+      .where(or(
+        eq(collaborationProjectsTable.creatorId, viewerId),
+        eq(collaborationProjectsTable.respondentId, viewerId),
+      )),
+    db
+      .select({ id: collaborationSeedsTable.id })
+      .from(collaborationSeedsTable)
+      .where(eq(collaborationSeedsTable.creatorId, viewerId)),
+  ]);
+  const projectIds = myProjects.map((row) => row.id);
+  const seedIds = mySeeds.map((row) => row.id);
+
+  const conditions = [eq(collaborationActivityEventsTable.actorId, viewerId)];
+  if (projectIds.length) {
+    conditions.push(inArray(collaborationActivityEventsTable.projectId, projectIds));
+  }
+  if (seedIds.length) {
+    conditions.push(inArray(collaborationActivityEventsTable.seedId, seedIds));
+  }
+  const events = await db
+    .select()
+    .from(collaborationActivityEventsTable)
+    .where(or(...conditions))
+    .orderBy(desc(collaborationActivityEventsTable.createdAt))
+    .limit(200);
+
+  res.json(events.map((event) => ({
+    ...event,
+    projectId: event.projectId ?? null,
+    seedId: event.seedId ?? null,
+    resourceId: event.resourceId ?? null,
+    createdAt: event.createdAt.toISOString(),
+  })));
+});
+
+// Inbox threads: every private conversation the viewer participates in, with
+// the latest message preview and whether the other side has written since the
+// viewer last read the room (derived from the unread message notification).
+router.get("/collaborations/threads", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+
+  const threads = await db
+    .select()
+    .from(collaborationThreadsTable)
+    .where(or(
+      eq(collaborationThreadsTable.creatorId, viewerId),
+      eq(collaborationThreadsTable.respondentId, viewerId),
+    ))
+    .orderBy(desc(collaborationThreadsTable.updatedAt));
+  if (!threads.length) {
+    res.json([]);
+    return;
+  }
+
+  const continuationIds = threads.map((thread) => thread.continuationId);
+  const submissions = await db
+    .select({
+      id: continuationSubmissionsTable.id,
+      seedId: continuationSubmissionsTable.seedId,
+      sourceProjectTitle: continuationSubmissionsTable.sourceProjectTitle,
+      creatorId: continuationSubmissionsTable.creatorId,
+      respondentName: continuationSubmissionsTable.respondentName,
+    })
+    .from(continuationSubmissionsTable)
+    .where(inArray(continuationSubmissionsTable.id, continuationIds));
+  const submissionById = new Map(submissions.map((s) => [s.id, s]));
+
+  const threadIds = threads.map((thread) => thread.id);
+  const [messages, unreadThreads] = await Promise.all([
+    db
+      .select()
+      .from(collaborationMessagesTable)
+      .where(inArray(collaborationMessagesTable.threadId, threadIds))
+      .orderBy(asc(collaborationMessagesTable.createdAt)),
+    db
+      .select({ threadId: collaborationNotificationsTable.resourceId })
+      .from(collaborationNotificationsTable)
+      .where(and(
+        eq(collaborationNotificationsTable.recipientId, viewerId),
+        eq(collaborationNotificationsTable.category, "collaboration_message"),
+        isNull(collaborationNotificationsTable.readAt),
+        inArray(collaborationNotificationsTable.resourceId, threadIds),
+      )),
+  ]);
+  const unreadSet = new Set(
+    unreadThreads.map((row) => row.threadId).filter((id): id is string => Boolean(id)),
+  );
+  const messagesByThread = new Map<string, typeof messages>();
+  for (const message of messages) {
+    const list = messagesByThread.get(message.threadId) ?? [];
+    list.push(message);
+    messagesByThread.set(message.threadId, list);
+  }
+
+  res.json(threads.map((thread) => {
+    const submission = submissionById.get(thread.continuationId);
+    const threadMessages = messagesByThread.get(thread.id) ?? [];
+    const last = threadMessages[threadMessages.length - 1] ?? null;
+    const partnerId = thread.creatorId === viewerId ? thread.respondentId : thread.creatorId;
+    return {
+      id: thread.id,
+      continuationId: thread.continuationId,
+      seedId: submission?.seedId ?? null,
+      sourceProjectTitle: submission?.sourceProjectTitle ?? "Private conversation",
+      partnerId,
+      partnerName: thread.creatorId === viewerId
+        ? (submission?.respondentName ?? "Your collaborator")
+        : "Author",
+      lastMessage: last?.body ?? null,
+      lastMessageAt: last?.createdAt.toISOString() ?? null,
+      messageCount: threadMessages.length,
+      unread: unreadSet.has(thread.id),
+      createdAt: thread.createdAt.toISOString(),
+      updatedAt: thread.updatedAt.toISOString(),
+    };
+  }));
 });
 
 export default router;

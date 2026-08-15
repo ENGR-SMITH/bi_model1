@@ -41,6 +41,7 @@ import type {
   ErrorResponse,
   GenealogyEntry,
   HealthStatus,
+  InboxThread,
   ListCollaborationSeedsParams,
   OracleChatInput,
   OracleResult,
@@ -3858,6 +3859,160 @@ export function useGetCollaborationInbox<TData = Awaited<ReturnType<typeof getCo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetCollaborationInboxQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListCollaborationThreadsUrl = () => {
+
+
+
+
+  return `/api/collaborations/threads`
+}
+
+/**
+ * @summary List the viewer's collaboration threads with latest message preview
+ */
+export const listCollaborationThreads = async ( options?: Parameters<typeof customFetch>[1]): Promise<InboxThread[]> => {
+
+  return customFetch<InboxThread[]>(getListCollaborationThreadsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCollaborationThreadsQueryKey = () => {
+    return [
+    `/api/collaborations/threads`
+    ] as const;
+    }
+
+
+export const getListCollaborationThreadsQueryOptions = <TData = Awaited<ReturnType<typeof listCollaborationThreads>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCollaborationThreads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCollaborationThreadsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCollaborationThreads>>> = ({ signal }) => listCollaborationThreads({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCollaborationThreads>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCollaborationThreadsQueryResult = NonNullable<Awaited<ReturnType<typeof listCollaborationThreads>>>
+export type ListCollaborationThreadsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List the viewer's collaboration threads with latest message preview
+ */
+
+export function useListCollaborationThreads<TData = Awaited<ReturnType<typeof listCollaborationThreads>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCollaborationThreads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCollaborationThreadsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListAccountActivityUrl = () => {
+
+
+
+
+  return `/api/collaborations/activity`
+}
+
+/**
+ * @summary List account-wide collaboration activity for the authenticated user
+ */
+export const listAccountActivity = async ( options?: Parameters<typeof customFetch>[1]): Promise<ActivityEvent[]> => {
+
+  return customFetch<ActivityEvent[]>(getListAccountActivityUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAccountActivityQueryKey = () => {
+    return [
+    `/api/collaborations/activity`
+    ] as const;
+    }
+
+
+export const getListAccountActivityQueryOptions = <TData = Awaited<ReturnType<typeof listAccountActivity>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccountActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAccountActivityQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAccountActivity>>> = ({ signal }) => listAccountActivity({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAccountActivity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAccountActivityQueryResult = NonNullable<Awaited<ReturnType<typeof listAccountActivity>>>
+export type ListAccountActivityQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List account-wide collaboration activity for the authenticated user
+ */
+
+export function useListAccountActivity<TData = Awaited<ReturnType<typeof listAccountActivity>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAccountActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAccountActivityQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
