@@ -72,6 +72,13 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // Dev-only: mirror the production router, which sends /api to the API
+    // server. The proxy never affects builds.
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+      },
+    },
   },
   preview: {
     port,

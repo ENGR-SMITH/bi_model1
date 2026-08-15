@@ -72,6 +72,17 @@ export default defineConfig({
     fs: {
       strict: true,
     },
+    // Dev-only: mirror the production router, which sends /api to the API
+    // server, /authors-den to the Author Den app, and everything else to
+    // this app. Proxies never affect builds.
+    proxy: {
+      '/api': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+      },
+      '/authors-den': {
+        target: process.env.VITE_AUTHORS_DEN_PROXY_TARGET || 'http://localhost:5174',
+      },
+    },
   },
   preview: {
     port,

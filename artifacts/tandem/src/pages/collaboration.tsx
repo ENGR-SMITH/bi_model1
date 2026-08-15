@@ -1,13 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, CircleAlert, Download, FileText, History, Hourglass, Inbox, LockKeyhole, MessageCircle, PenLine, Search, Sparkles, Users } from 'lucide-react';
-import { Link, useLocation, useParams } from 'wouter';
+import { Link, Redirect, useLocation, useParams } from 'wouter';
 import { useUser } from '@clerk/react';
 import {
   getGetCollaborationProjectQueryKey, getGetCollaborationSeedQueryKey, getGetContinuationAdvisoryQueryKey, getGetContinuationQueryKey, getGetContinuationThreadQueryKey, getGetContinuationWriterProfileQueryKey, getGetCollaborationThreadQueryKey, getGetSeedApplicationQueryKey,
-  getGetSeedSelectionQueryKey, getListCollaborationActivityQueryKey, getListCollaborationSeedsQueryKey, getListCollaborationStoryBibleQueryKey, getListCollaborationWorkBlocksQueryKey, getListContinuationsQueryKey,
+  getGetSeedSelectionQueryKey, getListCollaborationActivityQueryKey, getListCollaborationGenealogyQueryKey, getListCollaborationSeedsQueryKey, getListCollaborationStoryBibleQueryKey, getListCollaborationWorkBlocksQueryKey, getListContinuationAnnotationsQueryKey, getListContinuationsQueryKey,
   useApproveCollaborationContract, useApproveCollaborationWorkBlock, useCreateApplicationAdvisory, useCreateCollaborationSeed, useCreateCollaborationStoryBibleEntry, useCreateCollaborationWorkBlock, useCreateSeedApplication, useDeclineContinuation, useGetCollaborationInbox,
-  useGetCollaborationProject, useGetCollaborationSeed, useGetContinuation, useGetSeedApplication, useGetSeedSelection, useListCollaborationActivity, useListCollaborationProjects,
-  useGetContinuationAdvisory, useGetContinuationThread, useGetContinuationWriterProfile, useGetCollaborationThread, useListCollaborationSeeds, useListCollaborationStoryBible, useListCollaborationWorkBlocks, useListContinuations, useMarkCollaborationNotificationRead, useSaveCollaborationWorkBlockDraft, useSaveSeedApplicationDraft,
+  useGetCollaborationProject, useGetCollaborationSeed, useGetContinuation, useGetSeedApplication, useGetSeedSelection, useListCollaborationActivity, useListCollaborationGenealogy, useListCollaborationProjects,
+  useGetContinuationAdvisory, useGetContinuationThread, useGetContinuationWriterProfile, useGetCollaborationThread, useListCollaborationSeeds, useListCollaborationStoryBible, useListCollaborationWorkBlocks, useListContinuationAnnotations, useListContinuations, useCreateContinuationAnnotation, useMarkCollaborationNotificationRead, useSaveCollaborationWorkBlockDraft, useSaveSeedApplicationDraft,
   useSelectContinuation, useSendCollaborationMessage, useStartContinuationThread, useSubmitCollaborationWorkBlock, useSubmitSeedApplication,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -65,7 +65,7 @@ function CreateSeed() {
   const [draft] = useState(() => {
     try {
       const raw = localStorage.getItem('tandem-seed-draft');
-      return raw ? JSON.parse(raw) as { sourceProjectId?: string; sourceProjectTitle?: string; seedText?: string } : {};
+      return raw ? JSON.parse(raw) as { sourceProjectId?: string; sourceProjectTitle?: string; sourceSceneId?: string | null; sourceVersion?: number; seedText?: string } : {};
     } catch {
       return {};
     }
@@ -73,6 +73,8 @@ function CreateSeed() {
   const [form, setForm] = useState({
     sourceProjectId: draft.sourceProjectId || 'authors-den-project',
     sourceProjectTitle: draft.sourceProjectTitle || '',
+    sourceSceneId: draft.sourceSceneId ?? null,
+    sourceVersion: draft.sourceVersion ?? 1,
     seedText: draft.seedText || '',
     unitType: 'scene',
     protocol: 'Continue from the final line',
@@ -188,6 +190,8 @@ function Respond() {
   const [text, setText] = useState('');
   const [comments, setComments] = useState('');
   const [advisoryResult, setAdvisoryResult] = useState<any>(null);
+  const [submitError, setSubmitError] = useState('');
+  const qc = useQueryClient();
   const rememberClone = (application: { id: string; seedId: string; sourceProjectTitle: string; status: string }) => {
     try {
       const current = JSON.parse(localStorage.getItem('tandem-continuation-clones') || '[]') as Array<Record<string, string>>;
@@ -210,7 +214,26 @@ function Respond() {
     create.mutate({ seedId: seedId || '', data: { respondentName: 'Writer' } }, { onSuccess: a => { setApplicationId(a.id); rememberClone(a); after?.(a.id); } });
   };
   const saveDraft = () => ensure(id => save.mutate({ applicationId: id, data: { draftText: text, draftComments: comments } }));
-  const submitDraft = () => ensure(id => submit.mutate({ applicationId: id }, { onSuccess: submission => rememberClone({ id, seedId: submission.seedId, sourceProjectTitle: submission.sourceProjectTitle, status: submission.status }) }));
+  // The server submits the saved draft, so Submit always persists the latest
+  // text first, then submits, then refreshes the seed so the page flips to the
+  // “in review” state. Errors are surfaced inline instead of failing silently.
+  const submitDraft = () => ensure(id => {
+    setSubmitError('');
+    save.mutate(
+      { applicationId: id, data: { draftText: text, draftComments: comments } },
+      {
+        onSuccess: () => submit.mutate({ applicationId: id }, {
+          onSuccess: submission => {
+            rememberClone({ id, seedId: submission.seedId, sourceProjectTitle: submission.sourceProjectTitle, status: submission.status });
+            qc.invalidateQueries({ queryKey: getGetCollaborationSeedQueryKey(seedId || '') });
+            qc.invalidateQueries({ queryKey: getGetSeedApplicationQueryKey(id) });
+          },
+          onError: (e: any) => setSubmitError(e?.message || 'The submission could not be sent. Your draft is still here.'),
+        }),
+        onError: (e: any) => setSubmitError(e?.message || 'Your draft could not be saved before submitting.'),
+      },
+    );
+  });
   const runAdvisory = () => ensure(id => advisory.mutate({ applicationId: id }, { onSuccess: result => setAdvisoryResult(result) }));
   const count = text.trim() ? text.trim().split(/\s+/).length : 0;
   const locked = Boolean(seedQ.data?.myApplicationStatus && seedQ.data.myApplicationStatus !== 'DRAFT');
@@ -225,7 +248,8 @@ function Respond() {
         <label className="mt-6 block font-mono-ui text-[10px] uppercase tracking-[.18em] text-[#e55b4c]" htmlFor="draft-comments">A note for the creator</label>
         <textarea id="draft-comments" data-testid="input-draft-comments" value={comments} disabled={locked} onChange={e => setComments(e.target.value)} className="mt-3 min-h-[90px] w-full rounded-xl border border-[#d6cbb9] bg-[#f2e7d8] p-4 text-sm outline-none focus:border-[#e55b4c] disabled:cursor-not-allowed disabled:opacity-70" />
         <p className="mt-2 text-xs leading-relaxed text-[#77717a]">Voice-note attachments are not enabled in the current studio, so this private handoff uses text comments only.</p>
-        {!locked && <div className="mt-6 flex flex-wrap gap-3"><button data-testid="button-advisory-check" onClick={runAdvisory} disabled={advisory.isPending || create.isPending || !text.trim()} className="focus-house inline-flex items-center gap-2 rounded-full border-2 border-[#3e8074] px-5 py-3 text-sm font-bold text-[#2f675e]">{advisory.isPending ? 'Checking…' : <><Sparkles className="h-4 w-4" />Advisory check</>}</button><button onClick={saveDraft} disabled={save.isPending || create.isPending || !text.trim()} className="focus-house rounded-full border-2 border-[#292b45] px-5 py-3 text-sm font-bold">{save.isPending ? 'Saving…' : 'Save draft'}</button><button onClick={submitDraft} disabled={!text.trim() || submit.isPending || create.isPending} className="focus-house rounded-full bg-[#e55b4c] px-5 py-3 text-sm font-bold text-[#fff4e6]">{submit.isPending ? 'Submitting…' : 'Submit continuation'}</button></div>}
+        {!locked && <div className="mt-6 flex flex-wrap gap-3"><button data-testid="button-advisory-check" onClick={runAdvisory} disabled={advisory.isPending || create.isPending || !text.trim()} className="focus-house inline-flex items-center gap-2 rounded-full border-2 border-[#3e8074] px-5 py-3 text-sm font-bold text-[#2f675e]">{advisory.isPending ? 'Checking…' : <><Sparkles className="h-4 w-4" />Advisory check</>}</button><button onClick={saveDraft} disabled={save.isPending || create.isPending || !text.trim()} className="focus-house rounded-full border-2 border-[#292b45] px-5 py-3 text-sm font-bold">{save.isPending ? 'Saving…' : 'Save draft'}</button><button onClick={submitDraft} disabled={!text.trim() || save.isPending || submit.isPending || create.isPending} className="focus-house rounded-full bg-[#e55b4c] px-5 py-3 text-sm font-bold text-[#fff4e6]">{submit.isPending ? 'Submitting…' : 'Submit continuation'}</button></div>}
+        {submitError && <p role="alert" className="mt-4 rounded-xl bg-[#fff0e7] p-3 text-sm text-[#a94437]">{submitError}</p>}
         {advisoryResult && <div data-testid="panel-advisory-result" className="mt-6 rounded-2xl border-2 border-[#d6cbb9] bg-[#f2e7d8] p-5"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-[#e55b4c]">Advisory observations</p><span className="rounded-full bg-[#3e8074] px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#fff4e6]">{advisoryResult.source === 'oracle' ? 'Story Oracle' : 'Local checks'}</span></div><p className="mt-2 text-xs leading-relaxed text-[#77717a]">{advisoryResult.disclaimer}</p>{advisoryResult.note && <p className="mt-2 text-xs leading-relaxed text-[#77717a]">{advisoryResult.note}</p>}<div className="mt-4 space-y-3">{advisoryResult.signals.map((signal: any) => <div key={`${signal.category}-${signal.title}`} className="rounded-xl bg-[#fff4e6] p-4"><div className="flex justify-between gap-3 text-sm font-bold"><span>{signal.title}</span><span className="font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#e55b4c]">{signal.level}</span></div><p className="mt-2 text-xs leading-relaxed text-[#625f6d]">{signal.detail}</p></div>)}</div><p className="mt-4 text-xs leading-relaxed text-[#77717a]">This check never decides for you. Submitting is always yours — ignore or act on these notes as you see fit.</p></div>}
       </div>
     </div>
@@ -263,18 +287,57 @@ function SelectionRoom() {
     {q.isLoading ? <Loading /> : q.isError ? <ErrorState retry={q.refetch} /> : rows.length ? <div className="mt-8 grid gap-5 lg:grid-cols-2">{rows.map((c) => <article key={c.id} className="rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-7"><div className="flex items-start justify-between gap-4"><div><Pill>{c.status}</Pill><h2 className="mt-4 font-display text-3xl italic">{c.respondentName}</h2><p className="mt-1 text-xs text-[#77717a]">Submitted {new Date(c.submittedAt).toLocaleDateString()}</p></div><span className="rounded-full bg-[#f0c85c] px-3 py-1 text-[10px] font-bold uppercase tracking-[.12em]">Human choice</span></div>{view === 'text' && <p className="mt-7 whitespace-pre-wrap font-display text-xl leading-relaxed text-[#292b45]">{c.continuationText}</p>}{view === 'comments' && <div className="mt-7 rounded-xl bg-[#f2e7d8] p-5 text-sm leading-relaxed text-[#625f6d]">{c.comments || 'This writer left no separate note.'}</div>}{view === 'voice' && <div className="mt-7 rounded-xl border border-dashed border-[#d6cbb9] p-5 text-sm leading-relaxed text-[#77717a]">No voice-note attachment is available in the current studio.</div>}<div className="mt-7 flex flex-wrap gap-3 border-t border-[#d6cbb9] pt-5"><Link href={`/authors/collaborations/continuation/${c.id}`} className="focus-house rounded-full border border-[#d6cbb9] px-4 py-2 text-xs font-bold">Open read-only preview</Link><button disabled={c.status !== 'UNDER_REVIEW' || select.isPending} onClick={() => select.mutate({ continuationId: c.id }, { onSuccess: project => setLocation(`/authors/tandem/${project.id}/contract`) })} className="focus-house rounded-full bg-[#3e8074] px-4 py-2 text-xs font-bold text-[#fff4e6] disabled:cursor-not-allowed disabled:opacity-40">{c.status === 'UNDER_REVIEW' ? 'Select & open contract' : 'Selection unavailable'}</button></div></article>)}</div> : <Empty title="No submitted continuations yet." body="The selection room will fill when writers submit responses to this seed." href="/authors/collaborations/continuations" action="Back to review desk" />}
   </Frame>;
 }
+function AnnotatedText({ text, annotations }: { text: string; annotations: any[] }) {
+  const sorted = [...annotations].sort((a, b) => a.rangeStart - b.rangeStart);
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  for (const ann of sorted) {
+    if (ann.rangeStart > cursor) parts.push(text.slice(cursor, ann.rangeStart));
+    if (ann.rangeEnd > ann.rangeStart) {
+      parts.push(<mark key={ann.id} title={ann.body} className="rounded bg-[#f0c85c]/70 px-0.5">{text.slice(ann.rangeStart, ann.rangeEnd)}</mark>);
+    }
+    cursor = Math.max(cursor, ann.rangeEnd);
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return <>{parts}</>;
+}
 function ContinuationDetail() {
   const { continuationId = '' } = useParams<{ continuationId: string }>(); const [, setLocation] = useLocation(); const qc = useQueryClient();
   const q = useGetContinuation(continuationId, { query: { enabled: Boolean(continuationId), queryKey: getGetContinuationQueryKey(continuationId) } });
   const profile = useGetContinuationWriterProfile(continuationId, { query: { enabled: Boolean(continuationId), queryKey: getGetContinuationWriterProfileQueryKey(continuationId) } });
   const advisory = useGetContinuationAdvisory(continuationId, { query: { enabled: Boolean(continuationId), queryKey: getGetContinuationAdvisoryQueryKey(continuationId) } });
   const thread = useGetContinuationThread(continuationId, { query: { enabled: Boolean(continuationId), queryKey: getGetContinuationThreadQueryKey(continuationId) } });
+  const annotationsQ = useListContinuationAnnotations(continuationId, { query: { enabled: Boolean(continuationId), queryKey: getListContinuationAnnotationsQueryKey(continuationId) } });
+  const createAnnotation = useCreateContinuationAnnotation();
+  const [sel, setSel] = useState<{ start: number; end: number } | null>(null);
+  const [annBody, setAnnBody] = useState('');
   const start = useStartContinuationThread(); const select = useSelectContinuation(); const decline = useDeclineContinuation();
   if (q.isLoading) return <Frame title="Opening continuation"><Loading /></Frame>; if (q.isError || !q.data) return <Frame title="Unavailable"><ErrorState retry={q.refetch} /></Frame>;
   const c: any = q.data; const p: any = profile.data; const a: any = advisory.data; const existingThread: any = thread.data;
+  const annotations: any[] = annotationsQ.data || [];
+  // Capture a text selection as stable plain-text offsets (rangeStart/rangeEnd)
+  // so annotations anchor to the immutable submission, never to DOM state.
+  const handleSelect = (e: React.MouseEvent) => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount < 1) { setSel(null); return; }
+    const el = e.currentTarget as HTMLElement;
+    const range = selection.getRangeAt(0);
+    if (!el.contains(range.startContainer) || !el.contains(range.endContainer)) { setSel(null); return; }
+    const pre = range.cloneRange();
+    pre.selectNodeContents(el);
+    pre.setEnd(range.startContainer, range.startOffset);
+    setSel({ start: pre.toString().length, end: pre.toString().length + range.toString().length });
+  };
+  const saveAnnotation = () => {
+    if (!sel || !annBody.trim()) return;
+    createAnnotation.mutate({ continuationId, data: { rangeStart: sel.start, rangeEnd: sel.end, body: annBody.trim() } }, {
+      onSuccess: () => { setSel(null); setAnnBody(''); qc.invalidateQueries({ queryKey: getListContinuationAnnotationsQueryKey(continuationId) }); },
+    });
+  };
+  const authorLabel = (authorId: string) => authorId === c.creatorId ? 'Creator' : c.respondentName;
   const openThread = () => start.mutate({ continuationId }, { onSuccess: t => { qc.invalidateQueries({ queryKey: getGetContinuationThreadQueryKey(continuationId) }); setLocation(`/authors/collaborations/thread/${t.id}`); } });
   return <Frame eyebrow="Review desk / read only" title={c.sourceProjectTitle} intro={`A response from ${c.respondentName}. The seed and its answer stay side by side. Nothing here changes the submitted text.`}>
-    <div className="mt-10 grid gap-5 lg:grid-cols-[1.1fr_.9fr]"><div className="space-y-5"><div className="rounded-[1.5rem] bg-[#f0c85c] p-8"><Pill>Frozen seed</Pill><p data-testid="text-frozen-seed" className="mt-8 whitespace-pre-wrap font-display text-2xl leading-[1.35]">{c.seedText}</p></div><div className="rounded-[1.5rem] bg-[#fff4e6] p-8 shadow-[8px_10px_0_rgba(41,43,69,.07)]"><Pill>Continuation</Pill><p data-testid="text-continuation" className="mt-8 whitespace-pre-wrap font-display text-2xl leading-[1.35]">{c.continuationText}</p><div className="mt-8 border-t border-[#d6cbb9] pt-5 text-sm leading-relaxed text-[#625f6d]"><strong className="text-[#292b45]">A note from the writer</strong><p className="mt-2">{c.comments || 'No separate note was left.'}</p></div></div></div>
+    <div className="mt-10 grid gap-5 lg:grid-cols-[1.1fr_.9fr]"><div className="space-y-5"><div className="rounded-[1.5rem] bg-[#f0c85c] p-8"><Pill>Frozen seed</Pill><p data-testid="text-frozen-seed" className="mt-8 whitespace-pre-wrap font-display text-2xl leading-[1.35]">{c.seedText}</p></div><div className="rounded-[1.5rem] bg-[#fff4e6] p-8 shadow-[8px_10px_0_rgba(41,43,69,.07)]"><Pill>Continuation</Pill><p data-testid="text-continuation" onMouseUp={handleSelect} className="mt-8 select-text whitespace-pre-wrap font-display text-2xl leading-[1.35]"><AnnotatedText text={c.continuationText} annotations={annotations} /></p><p className="mt-3 text-xs text-[#77717a]">Select any passage to annotate it. Annotations are anchored to the submitted text and never edit it.</p>{sel && <div className="mt-4 rounded-xl border-2 border-[#f0c85c] bg-[#f2e7d8] p-4"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-[#e55b4c]">Annotate characters {sel.start}–{sel.end}</p><textarea value={annBody} onChange={e => setAnnBody(e.target.value)} placeholder="A note for the writer about this passage…" className="mt-3 min-h-[70px] w-full rounded-xl border border-[#d6cbb9] bg-[#fff4e6] p-3 text-sm outline-none focus:border-[#e55b4c]" /><div className="mt-3 flex gap-2"><button data-testid="button-save-annotation" onClick={saveAnnotation} disabled={createAnnotation.isPending || !annBody.trim()} className="focus-house rounded-full bg-[#292b45] px-4 py-2 text-xs font-bold text-[#fff4e6] disabled:opacity-40">{createAnnotation.isPending ? 'Saving…' : 'Save annotation'}</button><button onClick={() => { setSel(null); setAnnBody(''); }} className="focus-house rounded-full border border-[#d6cbb9] px-4 py-2 text-xs font-bold text-[#77717a]">Cancel</button></div></div>}<div className="mt-6 space-y-3">{annotations.length ? annotations.map(ann => <div key={ann.id} data-testid={`annotation-${ann.id}`} className="rounded-xl border border-[#d6cbb9] bg-[#f2e7d8] p-4 text-sm"><p className="font-bold">{authorLabel(ann.authorId)} <span className="font-normal text-[#77717a]">· characters {ann.rangeStart}–{ann.rangeEnd}</span></p><p className="mt-1 leading-relaxed text-[#625f6d]">“{c.continuationText.slice(ann.rangeStart, ann.rangeEnd)}”</p><p className="mt-2 text-[#292b45]">{ann.body}</p></div>) : <p className="text-xs text-[#98909a]">No annotations yet.</p>}</div><div className="mt-8 border-t border-[#d6cbb9] pt-5 text-sm leading-relaxed text-[#625f6d]"><strong className="text-[#292b45]">A note from the writer</strong><p className="mt-2">{c.comments || 'No separate note was left.'}</p></div></div></div>
       <aside className="space-y-5"><section className="rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-6"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#3e8074] text-lg font-bold text-[#fff4e6]">{(p?.displayName || c.respondentName || 'W').slice(0,1)}</span><div><p className="font-bold">{p?.displayName || c.respondentName}</p><p className="text-xs text-[#77717a]">Writer profile</p></div></div>{p ? <><p className="mt-5 text-sm leading-relaxed text-[#625f6d]">{p.bio || 'This writer has not added a biography yet.'}</p><div className="mt-5 flex flex-wrap gap-2">{[...(p.genres || []), ...(p.tones || [])].map((x: string) => <Pill key={x}>{x}</Pill>)}</div><dl className="mt-6 grid grid-cols-3 gap-2 border-t border-[#d6cbb9] pt-5 text-center"><div><dt className="font-mono-ui text-[9px] uppercase text-[#77717a]">Sent</dt><dd className="mt-1 text-xl font-bold">{p.submittedCount}</dd></div><div><dt className="font-mono-ui text-[9px] uppercase text-[#77717a]">Accepted</dt><dd className="mt-1 text-xl font-bold">{p.acceptedCount}</dd></div><div><dt className="font-mono-ui text-[9px] uppercase text-[#77717a]">Completed</dt><dd className="mt-1 text-xl font-bold">{p.completedCount}</dd></div></dl></> : <div className="mt-5 h-20 animate-pulse rounded-xl bg-[#f2e7d8]" />}</section>
         {a && <section className="rounded-[1.5rem] bg-[#3e8074] p-6 text-[#fff4e6]"><div className="flex items-center justify-between gap-3"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-[#f0c85c]">Advisory signals</p><span className="rounded-full bg-[#2f675e] px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#f0c85c]">{a.source === 'oracle' ? 'Story Oracle' : 'Local checks'}</span></div><p className="mt-3 text-xs leading-relaxed text-[#d9e7df]">{a.disclaimer}</p>{a.note && <p className="mt-2 text-xs leading-relaxed text-[#d9e7df]">{a.note}</p>}<div className="mt-5 space-y-3">{a.signals.map((s: any) => <div key={`${s.category}-${s.title}`} className="rounded-xl bg-[#2f675e] p-4"><div className="flex justify-between gap-3 text-sm font-bold"><span>{s.title}</span><span className="font-mono-ui text-[9px] uppercase text-[#f0c85c]">{s.level}</span></div><p className="mt-2 text-xs leading-relaxed text-[#d9e7df]">{s.detail}</p></div>)}</div></section>}
         <section className="rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#f2e7d8] p-6"><div className="flex items-center gap-3"><MessageCircle className="text-[#e55b4c]" /><div><p className="font-bold">Private conversation</p><p className="text-xs text-[#77717a]">Only the two people in this room can read it.</p></div></div><button data-testid="button-open-thread" onClick={() => existingThread ? setLocation(`/authors/collaborations/thread/${existingThread.id}`) : openThread()} disabled={start.isPending} className="focus-house mt-5 w-full rounded-full bg-[#292b45] px-4 py-3 text-sm font-bold text-[#fff4e6]">{start.isPending ? 'Opening…' : existingThread ? 'Open private thread' : 'Start private thread'}</button></section>
@@ -298,6 +361,14 @@ function ThreadPage() {
 }
 
 function InboxPage() { const q = useGetCollaborationInbox({ query: { queryKey: ['collaboration-inbox'] } }); const mark = useMarkCollaborationNotificationRead(); const [, setLocation] = useLocation(); const notes: any[] = q.data || []; return <Frame title="A quiet inbox." intro="Notifications reveal only what belongs to you. No project details leak into the hallway."><div className="mt-10 space-y-3">{q.isLoading ? <Loading /> : q.isError ? <ErrorState retry={q.refetch} /> : notes.length ? notes.map(n => <button key={n.id} data-testid={`notification-${n.id}`} onClick={() => { mark.mutate({ notificationId: n.id }); if (n.deepLink) setLocation(n.deepLink); }} className={`focus-house flex w-full items-start gap-4 rounded-[1.25rem] border-2 p-5 text-left ${n.read ? 'border-[#d6cbb9] bg-[#f2e7d8]' : 'border-[#e55b4c]/40 bg-[#fff4e6]'}`}><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#e55b4c]" /><span><span className="block font-bold">{n.title}</span><span className="mt-1 block text-sm leading-relaxed text-[#77717a]">{n.body}</span><span className="mt-2 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#98909a]">{n.category}</span></span></button>) : <Empty title="The hallway is still." body="Private collaboration notes, selections, and contract turns will appear here when they need your attention." href="/authors/atrium" action="Return to the atrium" />}</div></Frame>; }
+function WorkSolo() { return <Redirect to="/authors-den/" />; }
+function RequestsPage() {
+  const q = useGetCollaborationInbox({ query: { queryKey: ['collaboration-requests'] } });
+  const mark = useMarkCollaborationNotificationRead(); const [, setLocation] = useLocation();
+  const notes: any[] = (q.data || []).filter((n: any) => ['contract_action_required', 'contract_locked', 'respondent_selected'].includes(n.category));
+  return <Frame eyebrow="Collaboration / requests" title="Requests waiting on you." intro="Partner invitations, contract approvals, and selection decisions — gathered in one place.">{q.isLoading ? <Loading /> : q.isError ? <ErrorState retry={q.refetch} /> : notes.length ? <div className="mt-10 space-y-3">{notes.map(n => <button key={n.id} data-testid={`request-${n.id}`} onClick={() => { mark.mutate({ notificationId: n.id }); if (n.deepLink) setLocation(n.deepLink); }} className="focus-house flex w-full items-start gap-4 rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5 text-left"><span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#e55b4c]" /><span><span className="block font-bold">{n.title}</span><span className="mt-1 block text-sm leading-relaxed text-[#77717a]">{n.body}</span><span className="mt-2 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#98909a]">{n.category.replaceAll('_', ' ')}</span></span></button>)}</div> : <Empty title="Nothing needs your answer." body="Contract approvals and selection requests will land here when they need your decision." href="/authors/collaborations/continuations" action="Back to review desk" />}</Frame>; }
+function SystemPage() {
+  return <Frame eyebrow="Collaboration / system" title="The quiet room." intro="Guardian alerts, reminders, and reveal-ready events are advisory in this release — nothing here ever blocks your work."><div className="mt-10 rounded-[1.75rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-8 sm:p-10"><Sparkles className="h-7 w-7 text-[#e55b4c]" /><p className="mt-7 font-display text-4xl italic">No alerts are active.</p><p className="mt-3 max-w-xl text-sm leading-[1.8] text-[#77717a]">Automated guardian alerts, reminders, and delta reports are future scope. Advisory observations for continuations already appear inside the review desk when you open a submission.</p><Link href="/authors/collaborations/continuations" className="focus-house mt-7 inline-flex items-center gap-2 rounded-full bg-[#292b45] px-5 py-3 text-sm font-bold text-[#fff4e6]">Open review desk <ArrowRight className="h-4 w-4" /></Link></div></Frame>; }
 function Work() { const q = useListCollaborationProjects(); return <Frame title="Work in motion." intro="A home for the pieces you make alone and the rooms you build with another writer."><div className="mt-10 grid gap-5 md:grid-cols-2"><a href="/authors-den/" className="soft-lift focus-house rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-8"><PenLine className="text-[#e55b4c]" /><h2 className="mt-12 font-display text-4xl italic">Solo Work</h2><p className="mt-3 text-sm leading-relaxed text-[#77717a]">Return to the Author&apos;s Den for your private manuscripts.</p><span className="mt-7 inline-flex items-center gap-2 text-sm font-bold">Open the Den <ArrowRight className="h-4 w-4" /></span></a><Link href="/authors/work/tandems" className="soft-lift focus-house rounded-[1.5rem] bg-[#292b45] p-8 text-[#fff4e6]"><Users className="text-[#f0c85c]" /><h2 className="mt-12 font-display text-4xl italic">Tandem Projects</h2><p className="mt-3 text-sm leading-relaxed text-[#d9d2cb]">{q.data?.length || 0} shared rooms in motion.</p><span className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-[#f0c85c]">See projects <ArrowRight className="h-4 w-4" /></span></Link></div></Frame>; }
 function Tandems() { const q = useListCollaborationProjects(); const ps: any[] = q.data || []; return <Frame title="Tandem projects" intro="The work after the yes. Shared rooms with a clear record of who brought what through the door.">{q.isLoading ? <Loading /> : q.isError ? <ErrorState retry={q.refetch} /> : ps.length ? <div className="mt-10 grid gap-5 md:grid-cols-2">{ps.map(p => <Link key={p.id} href={`/authors/tandem/${p.id}`} className="soft-lift focus-house rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-7"><Pill>{p.status}</Pill><h2 className="mt-7 font-display text-3xl italic">{p.title}</h2><p className="mt-2 text-sm text-[#77717a]">{p.creatorName} and {p.respondentName}</p><div className="mt-8 flex items-center justify-between border-t border-[#d6cbb9] pt-4 text-xs text-[#77717a]"><span>Turn: {p.currentTurn}</span><ArrowRight className="h-4 w-4 text-[#e55b4c]" /></div></Link>)}</div> : <Empty title="No shared rooms yet." body="When a creator selects your continuation, or you select an answer to your seed, the new project will settle here." href="/authors/pitch-board" action="Find a seed" />}</Frame>; }
 function ownerName(p: any, ownerId: string) { return ownerId === p.creatorId ? p.creatorName : p.respondentName; }
@@ -338,7 +409,7 @@ function ProjectTabs({ projectId, active, threadId }: { projectId: string; activ
     ['/waiting', 'Waiting room'],
   ];
   if (threadId) tabs.push(['messages', 'Messages']);
-  return <nav className="mt-8 flex flex-wrap gap-2">{tabs.map(([suffix, label]) => <Link key={suffix} href={suffix === 'messages' ? `/authors/collaborations/thread/${threadId}` : `${base}${suffix}`} className={`focus-house rounded-full px-4 py-2 text-xs font-bold ${active === suffix ? 'bg-[#292b45] text-[#fff4e6]' : 'border-2 border-[#d6cbb9] bg-[#fff4e6] text-[#77717a]'}`}>{label}</Link>)}</nav>;
+  return <nav className="mt-8 flex flex-wrap gap-2" aria-label="Project pages">{tabs.map(([suffix, label]) => <Link key={suffix} href={suffix === 'messages' ? `/authors/collaborations/thread/${threadId}` : `${base}${suffix}`} aria-current={active === suffix ? 'page' : undefined} className={`focus-house rounded-full px-4 py-2 text-xs font-bold ${active === suffix ? 'bg-[#292b45] text-[#fff4e6]' : 'border-2 border-[#d6cbb9] bg-[#fff4e6] text-[#77717a]'}`}>{label}</Link>)}</nav>;
 }
 function WaitingRoom() {
   const { projectId } = useParams<{ projectId: string }>();
@@ -364,6 +435,7 @@ function ProjectDetail() {
   const { projectId = '' } = useParams<{ projectId: string }>(); const { user } = useUser(); const qc = useQueryClient();
   const q = useGetCollaborationProject(projectId, { query: { queryKey: getGetCollaborationProjectQueryKey(projectId) } });
   const blocksQ = useListCollaborationWorkBlocks(projectId, { query: { enabled: Boolean(projectId), queryKey: getListCollaborationWorkBlocksQueryKey(projectId) } });
+  const genealogyQ = useListCollaborationGenealogy(projectId, { query: { enabled: Boolean(projectId), queryKey: getListCollaborationGenealogyQueryKey(projectId) } });
   const create = useCreateCollaborationWorkBlock(); const save = useSaveCollaborationWorkBlockDraft(); const submit = useSubmitCollaborationWorkBlock(); const approveBlock = useApproveCollaborationWorkBlock();
   const [draftText, setDraftText] = useState('');
   if (q.isLoading) return <Frame title="Entering room"><Loading /></Frame>;
@@ -407,6 +479,7 @@ function ProjectDetail() {
       <aside className="h-fit space-y-5">
         <section className="rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-6"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-[#e55b4c]">The room</p><dl className="mt-5 space-y-4 text-sm"><div><dt className="opacity-60">Status</dt><dd className="mt-1 font-bold">{p.status.replaceAll('_', ' ')}</dd></div><div><dt className="opacity-60">Current turn</dt><dd className="mt-1 font-bold">{roleLabel(p, p.currentTurn)}</dd></div><div><dt className="opacity-60">Next action</dt><dd className="mt-1 text-xs leading-relaxed text-[#77717a]">{p.status === 'CONTRACT_PENDING' ? 'Approve the contract' : p.status === 'ACTIVE' ? (isMyTurn ? 'Write your pass' : 'Wait for the next pass') : p.status.replaceAll('_', ' ')}</dd></div><div><dt className="opacity-60">Protocol</dt><dd className="mt-1 font-bold">Continue from the final line</dd></div><div><dt className="opacity-60">Visibility</dt><dd className="mt-1 font-bold">Private to participants</dd></div></dl></section>
         <section className="rounded-[1.5rem] bg-[#3e8074] p-6 text-[#fff4e6]"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-[#f0c85c]">Manuscript</p><p className="mt-3 text-sm leading-relaxed text-[#d9e7df]">{ordered.length} block(s) carry the shared text. Approved passes are locked; drafts live only in their author’s desk until submitted.</p><button onClick={() => downloadManuscript(p, blocks)} className="focus-house mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#fff4e6] px-4 py-3 text-sm font-bold text-[#292b45]"><Download className="h-4 w-4" />Export manuscript (.md)</button></section>
+        <section className="rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-6"><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-[#e55b4c]">Attribution trail</p><p className="mt-3 text-xs leading-relaxed text-[#77717a]">Who wrote what, and what each pass continues from. Never editable, always present.</p>{genealogyQ.isLoading ? <div className="mt-4 h-16 animate-pulse rounded-xl bg-[#f2e7d8]" /> : <ol className="mt-4 space-y-2.5">{(genealogyQ.data || []).length ? (genealogyQ.data as any[]).map((g) => <li key={g.id} className="flex items-center gap-2 text-xs"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#3e8074]" /><span className="font-bold">{g.contributorName}</span><span className="text-[#77717a]">— {kindLabel(g.kind)}</span>{g.parentBlockId && <span className="text-[#98909a]">· continues a pass</span>}</li>) : <li className="text-xs text-[#77717a]">Nothing recorded yet.</li>}</ol>}</section>
       </aside>
     </div>
   </Frame>;
@@ -437,10 +510,12 @@ export default function CollaborationPage() {
   if (location.includes('/collaborations/seed/')) return <SeedDetail />;
   if (location.includes('/pitch-board/seed/')) return <SeedDetail />;
   if (location === '/authors/collaborations/continuations') return <Continuations />;
-  if (location.includes('/collaborations/continuation/')) return <ContinuationDetail />;
+  if (location.includes('/collaborations/continuation/') || location.includes('/collaborations/selection/')) return <ContinuationDetail />;
   if (location.includes('/collaborations/thread/')) return <ThreadPage />;
   if (location === '/authors/collaborations/inbox') return <InboxPage />;
-  if (location === '/authors/work' || location === '/authors/work/tandems') return location.endsWith('tandems') ? <Tandems /> : <Work />;
+  if (location === '/authors/collaborations/requests') return <RequestsPage />;
+  if (location === '/authors/collaborations/system') return <SystemPage />;
+  if (location === '/authors/work' || location === '/authors/work/tandems' || location === '/authors/work/solo') return location.endsWith('tandems') ? <Tandems /> : location.endsWith('solo') ? <WorkSolo /> : <Work />;
   if (location.endsWith('/story-bible')) return <StoryBiblePage />;
   if (location.endsWith('/activity')) return <ProjectActivityPage />;
   if (location.endsWith('/contract')) return <ContractRoom />;

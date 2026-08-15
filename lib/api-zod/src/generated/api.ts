@@ -388,7 +388,10 @@ export const ListCollaborationSeedsResponseItem = zod.object({
   "id": zod.string(),
   "creatorId": zod.string(),
   "creatorName": zod.string(),
+  "sourceProjectId": zod.string(),
   "sourceProjectTitle": zod.string(),
+  "sourceSceneId": zod.string().nullable(),
+  "sourceVersion": zod.number().int(),
   "seedText": zod.string(),
   "unitType": zod.string(),
   "protocol": zod.string(),
@@ -414,6 +417,7 @@ export const ListCollaborationSeedsResponse = zod.array(ListCollaborationSeedsRe
  */
 
 
+
 export const createCollaborationSeedBodySeedTextMax = 12000;
 
 
@@ -427,6 +431,8 @@ export const createCollaborationSeedBodySeedTextMax = 12000;
 export const CreateCollaborationSeedBody = zod.object({
   "sourceProjectId": zod.string().min(1),
   "sourceProjectTitle": zod.string().min(1),
+  "sourceSceneId": zod.string().nullish(),
+  "sourceVersion": zod.number().int().min(1).optional(),
   "seedText": zod.string().min(1).max(createCollaborationSeedBodySeedTextMax),
   "unitType": zod.string().min(1),
   "protocol": zod.string().min(1),
@@ -443,7 +449,10 @@ export const CreateCollaborationSeedResponse = zod.object({
   "id": zod.string(),
   "creatorId": zod.string(),
   "creatorName": zod.string(),
+  "sourceProjectId": zod.string(),
   "sourceProjectTitle": zod.string(),
+  "sourceSceneId": zod.string().nullable(),
+  "sourceVersion": zod.number().int(),
   "seedText": zod.string(),
   "unitType": zod.string(),
   "protocol": zod.string(),
@@ -477,7 +486,10 @@ export const GetCollaborationSeedResponse = zod.object({
   "id": zod.string(),
   "creatorId": zod.string(),
   "creatorName": zod.string(),
+  "sourceProjectId": zod.string(),
   "sourceProjectTitle": zod.string(),
+  "sourceSceneId": zod.string().nullable(),
+  "sourceVersion": zod.number().int(),
   "seedText": zod.string(),
   "unitType": zod.string(),
   "protocol": zod.string(),
@@ -531,7 +543,10 @@ export const UpdateCollaborationSeedResponse = zod.object({
   "id": zod.string(),
   "creatorId": zod.string(),
   "creatorName": zod.string(),
+  "sourceProjectId": zod.string(),
   "sourceProjectTitle": zod.string(),
+  "sourceSceneId": zod.string().nullable(),
+  "sourceVersion": zod.number().int(),
   "seedText": zod.string(),
   "unitType": zod.string(),
   "protocol": zod.string(),
@@ -816,6 +831,62 @@ export const GetContinuationAdvisoryResponse = zod.object({
   "modelId": zod.string().nullable(),
   "note": zod.string().nullable(),
   "generatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List stable-range annotations on a submitted continuation
+ */
+
+
+
+export const ListContinuationAnnotationsParams = zod.object({
+  "continuationId": zod.coerce.string().min(1)
+})
+
+export const ListContinuationAnnotationsResponseItem = zod.object({
+  "id": zod.string(),
+  "continuationId": zod.string(),
+  "authorId": zod.string(),
+  "rangeStart": zod.number().int(),
+  "rangeEnd": zod.number().int(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListContinuationAnnotationsResponse = zod.array(ListContinuationAnnotationsResponseItem)
+
+
+/**
+ * @summary Add a stable-range annotation to a submitted continuation
+ */
+
+
+
+export const CreateContinuationAnnotationParams = zod.object({
+  "continuationId": zod.coerce.string().min(1)
+})
+
+export const createContinuationAnnotationBodyRangeStartMin = 0;
+
+
+export const createContinuationAnnotationBodyBodyMax = 2000;
+
+
+
+export const CreateContinuationAnnotationBody = zod.object({
+  "rangeStart": zod.number().int().min(createContinuationAnnotationBodyRangeStartMin),
+  "rangeEnd": zod.number().int().min(1),
+  "body": zod.string().min(1).max(createContinuationAnnotationBodyBodyMax)
+})
+
+export const CreateContinuationAnnotationResponse = zod.object({
+  "id": zod.string(),
+  "continuationId": zod.string(),
+  "authorId": zod.string(),
+  "rangeStart": zod.number().int(),
+  "rangeEnd": zod.number().int(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date()
 })
 
 
@@ -1314,6 +1385,30 @@ export const ListCollaborationActivityResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListCollaborationActivityResponse = zod.array(ListCollaborationActivityResponseItem)
+
+
+/**
+ * @summary List the immutable contribution genealogy for a shared project
+ */
+
+
+
+export const ListCollaborationGenealogyParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const ListCollaborationGenealogyResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "blockId": zod.string().nullable(),
+  "parentBlockId": zod.string().nullable(),
+  "contributorId": zod.string(),
+  "contributorName": zod.string(),
+  "role": zod.string(),
+  "kind": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListCollaborationGenealogyResponse = zod.array(ListCollaborationGenealogyResponseItem)
 
 
 /**

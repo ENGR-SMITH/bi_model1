@@ -9,6 +9,7 @@ import {
 import { Router, type IRouter, type Request, type Response } from "express";
 import {
   collaborationActivityEventsTable,
+  collaborationGenealogyTable,
   collaborationNotificationsTable,
   collaborationProjectsTable,
   collaborationSeedsTable,
@@ -16,12 +17,15 @@ import {
   collaborationStoryBibleEntriesTable,
   collaborationThreadsTable,
   collaborationWorkBlocksTable,
+  continuationAnnotationsTable,
   continuationSubmissionsTable,
   db,
   seedApplicationsTable,
 } from "@workspace/db";
 import {
   ApproveCollaborationWorkBlockParams,
+  CreateContinuationAnnotationBody,
+  CreateContinuationAnnotationParams,
   CreateCollaborationSeedBody,
   CreateCollaborationStoryBibleEntryBody,
   CreateCollaborationStoryBibleEntryParams,
@@ -33,6 +37,8 @@ import {
   GetCollaborationThreadParams,
   GetCollaborationSeedParams,
   GetSeedApplicationParams,
+  ListCollaborationGenealogyParams,
+  ListContinuationAnnotationsParams,
   GetContinuationParams,
   GetContinuationAdvisoryParams,
   GetContinuationWriterProfileParams,
@@ -82,7 +88,10 @@ function seedView(
     id: seed.id,
     creatorId: seed.creatorId,
     creatorName: "Author",
+    sourceProjectId: seed.sourceProjectId,
     sourceProjectTitle: seed.sourceProjectTitle,
+    sourceSceneId: seed.sourceSceneId ?? null,
+    sourceVersion: seed.sourceVersion,
     seedText: seed.seedText,
     unitType: seed.unitType,
     protocol: seed.protocol,
@@ -145,6 +154,38 @@ async function recordActivity(event: {
     eventType: event.eventType,
     summary: event.summary,
     resourceId: event.resourceId ?? null,
+  });
+}
+
+// Immutable contribution genealogy: one row per contribution that entered the
+// project (seed, accepted continuation, each approved pass). Idempotent per
+// block so re-runs (e.g. approving after a retry) never duplicate rows.
+async function recordGenealogy(entry: {
+  projectId: string;
+  blockId?: string | null;
+  parentBlockId?: string | null;
+  contributorId: string;
+  contributorName: string;
+  role: "CREATOR" | "RESPONDENT";
+  kind: "SEED" | "CONTINUATION" | "BLOCK";
+}) {
+  const [existing] = entry.blockId
+    ? await db
+        .select({ id: collaborationGenealogyTable.id })
+        .from(collaborationGenealogyTable)
+        .where(eq(collaborationGenealogyTable.blockId, entry.blockId))
+        .limit(1)
+    : [];
+  if (existing) return;
+  await db.insert(collaborationGenealogyTable).values({
+    id: crypto.randomUUID(),
+    projectId: entry.projectId,
+    blockId: entry.blockId ?? null,
+    parentBlockId: entry.parentBlockId ?? null,
+    contributorId: entry.contributorId,
+    contributorName: entry.contributorName,
+    role: entry.role,
+    kind: entry.kind,
   });
 }
 
@@ -729,6 +770,72 @@ async function getThreadForViewer(threadId: string, viewerId: string, res: Respo
   return thread;
 }
 
+router.get("/collaborations/continuations/:continuationId/annotations", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const params = ListContinuationAnnotationsParams.safeParse({ continuationId: parseParam(req.params.continuationId) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const submission = await getPermittedSubmission(params.data.continuationId, viewerId, res);
+  if (!submission) return;
+  const rows = await db
+    .select()
+    .from(continuationAnnotationsTable)
+    .where(eq(continuationAnnotationsTable.continuationId, submission.id))
+    .orderBy(asc(continuationAnnotationsTable.rangeStart), asc(continuationAnnotationsTable.createdAt));
+  res.json(rows.map((row) => ({
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+  })));
+});
+
+router.post("/collaborations/continuations/:continuationId/annotations", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const params = CreateContinuationAnnotationParams.safeParse({ continuationId: parseParam(req.params.continuationId) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const parsed = CreateContinuationAnnotationBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const submission = await getPermittedSubmission(params.data.continuationId, viewerId, res);
+  if (!submission) return;
+  const { rangeStart, rangeEnd, body } = parsed.data;
+  if (rangeEnd <= rangeStart) {
+    res.status(400).json({ error: "The annotation range must end after it starts" });
+    return;
+  }
+  if (rangeEnd > submission.continuationText.length) {
+    res.status(400).json({ error: "The annotation range exceeds the submitted continuation" });
+    return;
+  }
+  const [annotation] = await db.insert(continuationAnnotationsTable).values({
+    id: crypto.randomUUID(),
+    continuationId: submission.id,
+    authorId: viewerId,
+    rangeStart,
+    rangeEnd,
+    body,
+  }).returning();
+  await recordActivity({
+    eventType: "continuation_annotated",
+    summary: `${viewerId === submission.creatorId ? "The creator" : "A writer"} annotated a submitted continuation.`,
+    actorId: viewerId,
+    seedId: submission.seedId,
+    resourceId: submission.id,
+  });
+  res.status(201).json({
+    ...annotation,
+    createdAt: annotation.createdAt.toISOString(),
+  });
+});
+
 router.get("/collaborations/continuations/:continuationId/thread", async (req, res): Promise<void> => {
   const viewerId = userId(req, res);
   if (!viewerId) return;
@@ -1005,9 +1112,11 @@ router.post("/collaborations/projects/:projectId/approve", async (req, res): Pro
       .where(eq(collaborationWorkBlocksTable.projectId, updated.id))
       .limit(1);
     if (!existingSeedBlock) {
+      const seedBlockId = crypto.randomUUID();
+      const continuationBlockId = crypto.randomUUID();
       await db.insert(collaborationWorkBlocksTable).values([
         {
-          id: crypto.randomUUID(),
+          id: seedBlockId,
           projectId: updated.id,
           ownerId: updated.creatorId,
           kind: "SEED",
@@ -1016,7 +1125,7 @@ router.post("/collaborations/projects/:projectId/approve", async (req, res): Pro
           turnOrder: 0,
         },
         {
-          id: crypto.randomUUID(),
+          id: continuationBlockId,
           projectId: updated.id,
           ownerId: updated.respondentId,
           kind: "CONTINUATION",
@@ -1025,6 +1134,24 @@ router.post("/collaborations/projects/:projectId/approve", async (req, res): Pro
           turnOrder: 1,
         },
       ]);
+      await recordGenealogy({
+        projectId: updated.id,
+        blockId: seedBlockId,
+        parentBlockId: null,
+        contributorId: updated.creatorId,
+        contributorName: updated.creatorName,
+        role: "CREATOR",
+        kind: "SEED",
+      });
+      await recordGenealogy({
+        projectId: updated.id,
+        blockId: continuationBlockId,
+        parentBlockId: seedBlockId,
+        contributorId: updated.respondentId,
+        contributorName: updated.respondentName,
+        role: "RESPONDENT",
+        kind: "CONTINUATION",
+      });
     }
     await recordActivity({
       eventType: "contract_locked",
@@ -1263,6 +1390,15 @@ router.post("/collaborations/projects/:projectId/blocks/:blockId/approve", async
     .set({ status: "APPROVED", updatedAt: new Date() })
     .where(eq(collaborationWorkBlocksTable.id, block.id))
     .returning();
+  await recordGenealogy({
+    projectId: project.id,
+    blockId: updated.id,
+    parentBlockId: updated.parentBlockId,
+    contributorId: updated.ownerId,
+    contributorName: updated.ownerId === project.creatorId ? project.creatorName : project.respondentName,
+    role: roleFor(updated.ownerId, project) ?? "RESPONDENT",
+    kind: "BLOCK",
+  });
   await notify(block.ownerId, "block_approved", "Your pass was approved", "Your collaborator approved your block. It is your turn to continue.", `/authors/tandem/${project.id}`, block.id);
   await recordActivity({
     eventType: "block_approved",
@@ -1372,6 +1508,29 @@ router.get("/collaborations/projects/:projectId/activity", async (req, res): Pro
     seedId: event.seedId ?? null,
     resourceId: event.resourceId ?? null,
     createdAt: event.createdAt.toISOString(),
+  })));
+});
+
+router.get("/collaborations/projects/:projectId/genealogy", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const params = ListCollaborationGenealogyParams.safeParse({ projectId: parseParam(req.params.projectId) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const project = await getPermittedProject(params.data.projectId, viewerId, res);
+  if (!project) return;
+  const rows = await db
+    .select()
+    .from(collaborationGenealogyTable)
+    .where(eq(collaborationGenealogyTable.projectId, project.id))
+    .orderBy(asc(collaborationGenealogyTable.createdAt));
+  res.json(rows.map((row) => ({
+    ...row,
+    blockId: row.blockId ?? null,
+    parentBlockId: row.parentBlockId ?? null,
+    createdAt: row.createdAt.toISOString(),
   })));
 });
 

@@ -55,6 +55,27 @@ export const collaborationStoryBibleEntriesTable = pgTable(
   },
 );
 
+// Immutable contribution genealogy: one row per authored contribution that
+// entered a project (the seed, the accepted continuation, and each approved
+// pass). Preserves human attribution and the parent/child chain so history and
+// exports can always say who wrote what and what it continues from.
+export const collaborationGenealogyTable = pgTable(
+  "collaboration_genealogy",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    blockId: text("block_id"),
+    parentBlockId: text("parent_block_id"),
+    contributorId: text("contributor_id").notNull(),
+    contributorName: text("contributor_name").notNull(),
+    // CREATOR | RESPONDENT — the contributor's role at the time of the pass
+    role: text("role").notNull(),
+    // SEED | CONTINUATION | BLOCK
+    kind: text("kind").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+);
+
 // Privacy-safe activity events for collaboration flows. Events only carry
 // permitted summaries and resource references, never hidden prose.
 export const collaborationActivityEventsTable = pgTable(
@@ -74,7 +95,9 @@ export const collaborationActivityEventsTable = pgTable(
 export const insertCollaborationWorkBlockSchema = createInsertSchema(collaborationWorkBlocksTable);
 export const insertCollaborationStoryBibleEntrySchema = createInsertSchema(collaborationStoryBibleEntriesTable);
 export const insertCollaborationActivityEventSchema = createInsertSchema(collaborationActivityEventsTable);
+export const insertCollaborationGenealogySchema = createInsertSchema(collaborationGenealogyTable);
 
 export type CollaborationWorkBlock = typeof collaborationWorkBlocksTable.$inferSelect;
 export type CollaborationStoryBibleEntry = typeof collaborationStoryBibleEntriesTable.$inferSelect;
 export type CollaborationActivityEvent = typeof collaborationActivityEventsTable.$inferSelect;
+export type CollaborationGenealogy = typeof collaborationGenealogyTable.$inferSelect;

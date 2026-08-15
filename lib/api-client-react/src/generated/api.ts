@@ -23,6 +23,8 @@ import type {
   ActivityEvent,
   AdminLoginInput,
   AdminSession,
+  CollaborationAnnotation,
+  CollaborationAnnotationInput,
   CollaborationMessage,
   CollaborationMessageInput,
   CollaborationNotification,
@@ -37,6 +39,7 @@ import type {
   ContinuityAuditInput,
   ContinuityAuditResult,
   ErrorResponse,
+  GenealogyEntry,
   HealthStatus,
   ListCollaborationSeedsParams,
   OracleChatInput,
@@ -2228,6 +2231,155 @@ export function useGetContinuationAdvisory<TData = Awaited<ReturnType<typeof get
 
 
 
+export const getListContinuationAnnotationsUrl = (continuationId: string,) => {
+
+
+
+
+  return `/api/collaborations/continuations/${continuationId}/annotations`
+}
+
+/**
+ * @summary List stable-range annotations on a submitted continuation
+ */
+export const listContinuationAnnotations = async (continuationId: string, options?: Parameters<typeof customFetch>[1]): Promise<CollaborationAnnotation[]> => {
+
+  return customFetch<CollaborationAnnotation[]>(getListContinuationAnnotationsUrl(continuationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListContinuationAnnotationsQueryKey = (continuationId: string,) => {
+    return [
+    `/api/collaborations/continuations/${continuationId}/annotations`
+    ] as const;
+    }
+
+
+export const getListContinuationAnnotationsQueryOptions = <TData = Awaited<ReturnType<typeof listContinuationAnnotations>>, TError = ErrorType<ErrorResponse>>(continuationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listContinuationAnnotations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListContinuationAnnotationsQueryKey(continuationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listContinuationAnnotations>>> = ({ signal }) => listContinuationAnnotations(continuationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: continuationId !== null && continuationId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listContinuationAnnotations>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListContinuationAnnotationsQueryResult = NonNullable<Awaited<ReturnType<typeof listContinuationAnnotations>>>
+export type ListContinuationAnnotationsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List stable-range annotations on a submitted continuation
+ */
+
+export function useListContinuationAnnotations<TData = Awaited<ReturnType<typeof listContinuationAnnotations>>, TError = ErrorType<ErrorResponse>>(
+ continuationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listContinuationAnnotations>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListContinuationAnnotationsQueryOptions(continuationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateContinuationAnnotationUrl = (continuationId: string,) => {
+
+
+
+
+  return `/api/collaborations/continuations/${continuationId}/annotations`
+}
+
+/**
+ * @summary Add a stable-range annotation to a submitted continuation
+ */
+export const createContinuationAnnotation = async (continuationId: string,
+    collaborationAnnotationInput: CollaborationAnnotationInput, options?: Parameters<typeof customFetch>[1]): Promise<CollaborationAnnotation> => {
+
+  return customFetch<CollaborationAnnotation>(getCreateContinuationAnnotationUrl(continuationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(collaborationAnnotationInput)
+  }
+);}
+
+
+
+
+
+export const getCreateContinuationAnnotationMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createContinuationAnnotation>>, TError,{continuationId: string;data: BodyType<CollaborationAnnotationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createContinuationAnnotation>>, TError,{continuationId: string;data: BodyType<CollaborationAnnotationInput>}, TContext> => {
+
+const mutationKey = ['createContinuationAnnotation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createContinuationAnnotation>>, {continuationId: string;data: BodyType<CollaborationAnnotationInput>}> = (props) => {
+          const {continuationId,data} = props ?? {};
+
+          return  createContinuationAnnotation(continuationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateContinuationAnnotationMutationResult = NonNullable<Awaited<ReturnType<typeof createContinuationAnnotation>>>
+    export type CreateContinuationAnnotationMutationBody = BodyType<CollaborationAnnotationInput>
+    export type CreateContinuationAnnotationMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Add a stable-range annotation to a submitted continuation
+ */
+export const useCreateContinuationAnnotation = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createContinuationAnnotation>>, TError,{continuationId: string;data: BodyType<CollaborationAnnotationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createContinuationAnnotation>>,
+        TError,
+        {continuationId: string;data: BodyType<CollaborationAnnotationInput>},
+        TContext
+      > => {
+      return useMutation(getCreateContinuationAnnotationMutationOptions(options));
+    }
+
 export const getGetContinuationThreadUrl = (continuationId: string,) => {
 
 
@@ -3552,6 +3704,83 @@ export function useListCollaborationActivity<TData = Awaited<ReturnType<typeof l
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListCollaborationActivityQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListCollaborationGenealogyUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/collaborations/projects/${projectId}/genealogy`
+}
+
+/**
+ * @summary List the immutable contribution genealogy for a shared project
+ */
+export const listCollaborationGenealogy = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<GenealogyEntry[]> => {
+
+  return customFetch<GenealogyEntry[]>(getListCollaborationGenealogyUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListCollaborationGenealogyQueryKey = (projectId: string,) => {
+    return [
+    `/api/collaborations/projects/${projectId}/genealogy`
+    ] as const;
+    }
+
+
+export const getListCollaborationGenealogyQueryOptions = <TData = Awaited<ReturnType<typeof listCollaborationGenealogy>>, TError = ErrorType<ErrorResponse>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCollaborationGenealogy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListCollaborationGenealogyQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listCollaborationGenealogy>>> = ({ signal }) => listCollaborationGenealogy(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listCollaborationGenealogy>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListCollaborationGenealogyQueryResult = NonNullable<Awaited<ReturnType<typeof listCollaborationGenealogy>>>
+export type ListCollaborationGenealogyQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the immutable contribution genealogy for a shared project
+ */
+
+export function useListCollaborationGenealogy<TData = Awaited<ReturnType<typeof listCollaborationGenealogy>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listCollaborationGenealogy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListCollaborationGenealogyQueryOptions(projectId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

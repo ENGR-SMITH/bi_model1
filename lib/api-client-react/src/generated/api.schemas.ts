@@ -9,7 +9,11 @@ export interface CollaborationSeed {
   id: string;
   creatorId: string;
   creatorName: string;
+  sourceProjectId: string;
   sourceProjectTitle: string;
+  /** @nullable */
+  sourceSceneId: string | null;
+  sourceVersion: number;
   seedText: string;
   unitType: string;
   protocol: string;
@@ -53,6 +57,10 @@ export interface CollaborationSeedInput {
   sourceProjectId: string;
   /** @minLength 1 */
   sourceProjectTitle: string;
+  /** @nullable */
+  sourceSceneId?: string | null;
+  /** @minimum 1 */
+  sourceVersion?: number;
   /**
      * @minLength 1
      * @maxLength 12000
@@ -347,6 +355,42 @@ export interface ActivityEvent {
   summary: string;
   /** @nullable */
   resourceId: string | null;
+  createdAt: string;
+}
+
+export interface CollaborationAnnotation {
+  id: string;
+  continuationId: string;
+  authorId: string;
+  rangeStart: number;
+  rangeEnd: number;
+  body: string;
+  createdAt: string;
+}
+
+export interface CollaborationAnnotationInput {
+  /** @minimum 0 */
+  rangeStart: number;
+  /** @minimum 1 */
+  rangeEnd: number;
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  body: string;
+}
+
+export interface GenealogyEntry {
+  id: string;
+  projectId: string;
+  /** @nullable */
+  blockId: string | null;
+  /** @nullable */
+  parentBlockId: string | null;
+  contributorId: string;
+  contributorName: string;
+  role: string;
+  kind: string;
   createdAt: string;
 }
 

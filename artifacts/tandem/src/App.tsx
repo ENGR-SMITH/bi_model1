@@ -147,8 +147,13 @@ function RouterWithAuth() {
       <Route path="/authors/collaborations/seed/:seedId/select" component={CollaborationRoute} />
       <Route path="/authors/collaborations/thread/:threadId" component={CollaborationRoute} />
       <Route path="/authors/collaborations/inbox" component={CollaborationRoute} />
+      <Route path="/authors/collaborations/requests" component={CollaborationRoute} />
+      <Route path="/authors/collaborations/system" component={CollaborationRoute} />
+      <Route path="/authors/collaborations/selection/:continuationId" component={CollaborationRoute} />
       <Route path="/authors/work" component={CollaborationRoute} />
+      <Route path="/authors/work/solo" component={CollaborationRoute} />
       <Route path="/authors/work/tandems" component={CollaborationRoute} />
+      <Route path="/authors/me" component={ProfileRoute} />
       <Route path="/authors/tandem/:projectId" component={CollaborationRoute} />
       <Route path="/authors/tandem/:projectId/contract" component={CollaborationRoute} />
       <Route path="/authors/tandem/:projectId/waiting" component={CollaborationRoute} />

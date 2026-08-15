@@ -144,10 +144,16 @@ function App() {
   };
   const deleteProject = (id: string) => { setProjects((items) => items.filter((item) => item.id !== id)); if (id === projectId) { setProjectId(projects.find((item) => item.id !== id)?.id ?? ""); setView("home"); } notify("Project deleted"); };
   const postProject = (item: Project) => {
+    const posted = item.scenes.find((scene) => scene.content.trim());
     localStorage.setItem("tandem-seed-draft", JSON.stringify({
       sourceProjectId: item.id,
       sourceProjectTitle: item.title,
-      seedText: stripHtml(item.scenes.find((scene) => scene.content.trim())?.content ?? item.premise ?? ""),
+      // Freeze the source version: which scene was posted and how many
+      // snapshots that scene had at publish time. Editing the Solo project
+      // later never mutates what respondents see.
+      sourceSceneId: posted?.id ?? null,
+      sourceVersion: posted ? item.revisions.filter((r) => r.sceneId === posted.id).length + 1 : 1,
+      seedText: stripHtml(posted?.content ?? item.premise ?? ""),
     }));
     window.location.href = "/authors/pitch-board/new";
   };

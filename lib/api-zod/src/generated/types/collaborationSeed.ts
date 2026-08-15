@@ -10,7 +10,11 @@ export interface CollaborationSeed {
   id: string;
   creatorId: string;
   creatorName: string;
+  sourceProjectId: string;
   sourceProjectTitle: string;
+  /** @nullable */
+  sourceSceneId: string | null;
+  sourceVersion: number;
   seedText: string;
   unitType: string;
   protocol: string;

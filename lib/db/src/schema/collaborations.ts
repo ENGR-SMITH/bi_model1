@@ -7,7 +7,9 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { z } from "zod/v4";
 
 export const collaborationSeedsTable = pgTable("collaboration_seeds", {
@@ -15,6 +17,11 @@ export const collaborationSeedsTable = pgTable("collaboration_seeds", {
   creatorId: text("creator_id").notNull(),
   sourceProjectId: text("source_project_id").notNull(),
   sourceProjectTitle: text("source_project_title").notNull(),
+  // Reference to the immutable Solo-project source this seed was frozen from:
+  // the scene id and its revision at publish time. Respondents always see this
+  // exact snapshot; editing the Solo project later never mutates the seed.
+  sourceSceneId: text("source_scene_id"),
+  sourceVersion: integer("source_version").notNull().default(1),
   seedText: text("seed_text").notNull(),
   unitType: text("unit_type").notNull(),
   protocol: text("protocol").notNull(),
@@ -48,11 +55,19 @@ export const seedApplicationsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  // A respondent may only hold ONE active application per seed. The route
+  // enforces this in code (blocking DRAFT/SUBMITTED/UNDER_REVIEW/
+  // ACCEPTED_PENDING_CONTRACT), so the index mirrors that rule: once a previous
+  // application is DECLINED or otherwise resolved, reapplying is allowed. A
+  // plain unique constraint would wrongly block reapplying after a decline.
   (table) => ({
-    seedRespondentUnique: unique("seed_application_seed_respondent_unique").on(
-      table.seedId,
-      table.respondentId,
-    ),
+    activeSeedRespondentUnique: uniqueIndex(
+      "seed_application_active_seed_respondent_unique",
+    )
+      .on(table.seedId, table.respondentId)
+      .where(
+        sql`${table.status} in ('DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED_PENDING_CONTRACT')`,
+      ),
   }),
 );
 

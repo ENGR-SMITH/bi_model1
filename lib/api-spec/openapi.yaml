@@ -669,6 +669,53 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/continuations/{continuationId}/annotations:
+    get:
+      operationId: listContinuationAnnotations
+      tags: [collaborations]
+      summary: List stable-range annotations on a submitted continuation
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "200":
+          description: Annotations anchored to plain-text ranges of the immutable submission
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CollaborationAnnotation" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createContinuationAnnotation
+      tags: [collaborations]
+      summary: Add a stable-range annotation to a submitted continuation
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CollaborationAnnotationInput" }
+      responses:
+        "201":
+          description: Annotation created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationAnnotation" }
+        "400":
+          description: Invalid range or body
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /collaborations/continuations/{continuationId}/thread:
     get:
       operationId: getContinuationThread
@@ -1056,6 +1103,26 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/genealogy:
+    get:
+      operationId: listCollaborationGenealogy
+      tags: [tandems]
+      summary: List the immutable contribution genealogy for a shared project
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Contribution genealogy (attribution and parent chain)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/GenealogyEntry" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /collaborations/inbox:
     get:
       operationId: getCollaborationInbox
@@ -1154,7 +1221,10 @@ components:
         id: { type: string }
         creatorId: { type: string }
         creatorName: { type: string }
+        sourceProjectId: { type: string }
         sourceProjectTitle: { type: string }
+        sourceSceneId: { type: ["string", "null"] }
+        sourceVersion: { type: integer }
         seedText: { type: string }
         unitType: { type: string }
         protocol: { type: string }
@@ -1171,12 +1241,14 @@ components:
         availability: { type: string }
         publishedAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
-      required: [id, creatorId, creatorName, sourceProjectTitle, seedText, unitType, protocol, genre, tone, language, plotConstraints, desiredRole, visibility, respondentLimit, respondentCount, myApplicationId, myApplicationStatus, availability, publishedAt, createdAt]
+      required: [id, creatorId, creatorName, sourceProjectId, sourceProjectTitle, sourceSceneId, sourceVersion, seedText, unitType, protocol, genre, tone, language, plotConstraints, desiredRole, visibility, respondentLimit, respondentCount, myApplicationId, myApplicationStatus, availability, publishedAt, createdAt]
     CollaborationSeedInput:
       type: object
       properties:
         sourceProjectId: { type: string, minLength: 1 }
         sourceProjectTitle: { type: string, minLength: 1 }
+        sourceSceneId: { type: ["string", "null"] }
+        sourceVersion: { type: integer, minimum: 1 }
         seedText: { type: string, minLength: 1, maxLength: 12000 }
         unitType: { type: string, minLength: 1 }
         protocol: { type: string, minLength: 1 }
@@ -1400,6 +1472,37 @@ components:
         resourceId: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
       required: [id, projectId, seedId, actorId, eventType, summary, resourceId, createdAt]
+    CollaborationAnnotation:
+      type: object
+      properties:
+        id: { type: string }
+        continuationId: { type: string }
+        authorId: { type: string }
+        rangeStart: { type: integer }
+        rangeEnd: { type: integer }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, continuationId, authorId, rangeStart, rangeEnd, body, createdAt]
+    CollaborationAnnotationInput:
+      type: object
+      properties:
+        rangeStart: { type: integer, minimum: 0 }
+        rangeEnd: { type: integer, minimum: 1 }
+        body: { type: string, minLength: 1, maxLength: 2000 }
+      required: [rangeStart, rangeEnd, body]
+    GenealogyEntry:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        blockId: { type: ["string", "null"] }
+        parentBlockId: { type: ["string", "null"] }
+        contributorId: { type: string }
+        contributorName: { type: string }
+        role: { type: string }
+        kind: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, projectId, blockId, parentBlockId, contributorId, contributorName, role, kind, createdAt]
     HealthStatus:
       type: object
       properties:

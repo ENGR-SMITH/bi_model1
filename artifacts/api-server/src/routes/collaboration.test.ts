@@ -56,9 +56,11 @@ async function resetDb() {
   const t = state.tables;
   await state.db.delete(t.oracleHealthEventsTable);
   await state.db.delete(t.oracleProvidersTable);
+  await state.db.delete(t.continuationAnnotationsTable);
   await state.db.delete(t.collaborationMessagesTable);
   await state.db.delete(t.collaborationThreadsTable);
   await state.db.delete(t.collaborationActivityEventsTable);
+  await state.db.delete(t.collaborationGenealogyTable);
   await state.db.delete(t.collaborationStoryBibleEntriesTable);
   await state.db.delete(t.collaborationWorkBlocksTable);
   await state.db.delete(t.collaborationNotificationsTable);
@@ -133,6 +135,28 @@ describe("authorization", () => {
     state.userId = "writer-1";
     const res = await request(API).patch(`/api/collaborations/seeds/${seed.id}`).send({ genre: "Speculative" });
     expect(res.status).toBe(403);
+  });
+
+  it("records the frozen source version and never mutates published seed content", async () => {
+    state.userId = "creator-1";
+    const res = await request(API)
+      .post("/api/collaborations/seeds")
+      .send({ ...SEED_BODY, sourceSceneId: "scene-12", sourceVersion: 7 });
+    expect(res.status).toBe(201);
+    expect(res.body.sourceVersion).toBe(7);
+    expect(res.body.sourceSceneId).toBe("scene-12");
+
+    // Version defaults to 1 when the client does not send one.
+    const plain = await request(API).post("/api/collaborations/seeds").send(SEED_BODY);
+    expect(plain.body.sourceVersion).toBe(1);
+
+    // The update schema has no seedText field: the frozen snapshot is immutable.
+    const patch = await request(API)
+      .patch(`/api/collaborations/seeds/${res.body.id}`)
+      .send({ seedText: "mutated", tone: "wry" });
+    expect(patch.status).toBe(200);
+    expect(patch.body.seedText).toBe(SEED_BODY.seedText);
+    expect(patch.body.tone).toBe("wry");
   });
 
   it("a writer cannot apply to their own seed", async () => {
@@ -241,6 +265,23 @@ describe("acceptance and contract transactions", () => {
     expect(appRow.status).toBe("DECLINED");
   });
 
+  it("a declined writer can reapply to the same seed (partial uniqueness)", async () => {
+    const seed = await publishSeed();
+    const application = await applyToSeed(seed.id, "writer-1");
+    await saveDraft(application.id, "Writer one's continuation begins here.", "writer-1");
+    const submission = await submitContinuation(application.id, "writer-1");
+    state.userId = "creator-1";
+    await request(API).delete(`/api/collaborations/continuations/${submission.id}`);
+
+    state.userId = "writer-1";
+    const reapply = await request(API)
+      .post(`/api/collaborations/seeds/${seed.id}/applications`)
+      .send({ respondentName: "Writer One" });
+    expect(reapply.status).toBe(201);
+    const [oldRow] = await state.db.select().from(state.tables.seedApplicationsTable).where(eq(state.tables.seedApplicationsTable.id, application.id));
+    expect(oldRow.status).toBe("DECLINED");
+  });
+
   it("acceptance closes the seed once, creates the project, and archives the rest", async () => {
     const seed = await publishSeed();
     const a1 = await applyToSeed(seed.id, "writer-1");
@@ -311,6 +352,56 @@ describe("acceptance and contract transactions", () => {
     state.userId = "creator-1";
     const third = await request(API).post(`/api/collaborations/projects/${projectId}/approve`);
     expect(third.status).toBe(409);
+  });
+
+  it("records contribution genealogy from lock through approved passes, scoped to participants", async () => {
+    const seed = await publishSeed();
+    const a = await applyToSeed(seed.id, "writer-1");
+    await saveDraft(a.id, "Writer one's continuation begins here.", "writer-1");
+    const s = await submitContinuation(a.id, "writer-1");
+    state.userId = "creator-1";
+    const select = await request(API).post(`/api/collaborations/continuations/${s.id}/select`);
+    const projectId = select.body.id;
+    await request(API).post(`/api/collaborations/projects/${projectId}/approve`);
+    state.userId = "writer-1";
+    await request(API).post(`/api/collaborations/projects/${projectId}/approve`);
+
+    // Contract lock records the seed (creator) and continuation (respondent).
+    let rows = await state.db.select().from(state.tables.collaborationGenealogyTable);
+    expect(rows.map((r: any) => r.kind).sort()).toEqual(["CONTINUATION", "SEED"]);
+    const seedRow = rows.find((r: any) => r.kind === "SEED");
+    const continuationRow = rows.find((r: any) => r.kind === "CONTINUATION");
+    expect(seedRow.contributorId).toBe("creator-1");
+    expect(seedRow.role).toBe("CREATOR");
+    expect(continuationRow.contributorId).toBe("writer-1");
+    expect(continuationRow.parentBlockId).toBe(seedRow.blockId);
+
+    // A submitted + approved pass records a BLOCK row chained to its parent.
+    state.userId = "creator-1";
+    const create = await request(API)
+      .post(`/api/collaborations/projects/${projectId}/blocks`)
+      .send({ content: "A new pass after the continuation." });
+    const blockId = create.body.id;
+    await request(API).post(`/api/collaborations/projects/${projectId}/blocks/${blockId}/submit`);
+    state.userId = "writer-1";
+    await request(API).post(`/api/collaborations/projects/${projectId}/blocks/${blockId}/approve`);
+
+    rows = await state.db.select().from(state.tables.collaborationGenealogyTable);
+    expect(rows).toHaveLength(3);
+    const blockRow = rows.find((r: any) => r.kind === "BLOCK");
+    expect(blockRow).toBeTruthy();
+    expect(blockRow.contributorId).toBe("creator-1");
+    expect(blockRow.blockId).toBe(blockId);
+    expect(blockRow.parentBlockId).toBe(continuationRow.blockId);
+
+    // Endpoint is participant-scoped: both participants can read it, an
+    // unrelated user cannot.
+    const asCreator = await request(API).get(`/api/collaborations/projects/${projectId}/genealogy`);
+    expect(asCreator.status).toBe(200);
+    expect(asCreator.body).toHaveLength(3);
+    state.userId = "stranger-1";
+    const asStranger = await request(API).get(`/api/collaborations/projects/${projectId}/genealogy`);
+    expect(asStranger.status).toBe(403);
   });
 
   it("a locked contract cannot be changed without an approved amendment", async () => {
@@ -522,5 +613,68 @@ describe("oracle advisory", () => {
     expect(advisory.body.source).toBe("local");
     const submit = await request(API).post(`/api/collaborations/applications/${a.id}/submit`);
     expect(submit.status).toBe(200);
+  });
+});
+
+describe("stable-range continuation annotations", () => {
+  const CONTINUATION_TEXT = "Ada followed the road past the salt pools, her lantern steady. The town hummed behind the dunes.";
+
+  async function submittedContinuation() {
+    const seed = await publishSeed();
+    const a = await applyToSeed(seed.id, "writer-1");
+    await saveDraft(a.id, CONTINUATION_TEXT, "writer-1");
+    return { seed, submission: await submitContinuation(a.id, "writer-1") };
+  }
+
+  it("creator and respondent can annotate stable ranges and read them", async () => {
+    const { submission } = await submittedContinuation();
+    state.userId = "creator-1";
+    const created = await request(API)
+      .post(`/api/collaborations/continuations/${submission.id}/annotations`)
+      .send({ rangeStart: 0, rangeEnd: 10, body: "Strong opening beat." });
+    expect(created.status).toBe(201);
+    expect(created.body.rangeStart).toBe(0);
+    expect(created.body.rangeEnd).toBe(10);
+    expect(created.body.authorId).toBe("creator-1");
+
+    state.userId = "writer-1";
+    const reply = await request(API)
+      .post(`/api/collaborations/continuations/${submission.id}/annotations`)
+      .send({ rangeStart: 40, rangeEnd: 52, body: "I can tighten this clause." });
+    expect(reply.status).toBe(201);
+
+    const list = await request(API).get(`/api/collaborations/continuations/${submission.id}/annotations`);
+    expect(list.status).toBe(200);
+    expect(list.body).toHaveLength(2);
+    expect(list.body[0].rangeStart).toBe(0);
+    expect(list.body[1].authorId).toBe("writer-1");
+  });
+
+  it("rejects out-of-range, inverted, and empty annotation bodies", async () => {
+    const { submission } = await submittedContinuation();
+    state.userId = "creator-1";
+    const inverted = await request(API)
+      .post(`/api/collaborations/continuations/${submission.id}/annotations`)
+      .send({ rangeStart: 20, rangeEnd: 5, body: "Nope." });
+    expect(inverted.status).toBe(400);
+    const tooLong = await request(API)
+      .post(`/api/collaborations/continuations/${submission.id}/annotations`)
+      .send({ rangeStart: 0, rangeEnd: CONTINUATION_TEXT.length + 50, body: "Nope." });
+    expect(tooLong.status).toBe(400);
+    const empty = await request(API)
+      .post(`/api/collaborations/continuations/${submission.id}/annotations`)
+      .send({ rangeStart: 0, rangeEnd: 5, body: "" });
+    expect(empty.status).toBe(400);
+  });
+
+  it("annotations are scoped to the participants", async () => {
+    const { submission } = await submittedContinuation();
+    state.userId = "stranger-1";
+    const read = await request(API).get(`/api/collaborations/continuations/${submission.id}/annotations`);
+    expect(read.status).toBe(403);
+    const write = await request(API)
+      .post(`/api/collaborations/continuations/${submission.id}/annotations`)
+      .send({ rangeStart: 0, rangeEnd: 5, body: "Intruder note." });
+    expect(write.status).toBe(403);
   });
 });

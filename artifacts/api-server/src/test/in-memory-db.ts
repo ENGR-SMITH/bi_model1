@@ -7,6 +7,7 @@ import {
   sqliteTable,
   text,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 const require = createRequire(import.meta.url);
@@ -19,6 +20,8 @@ export const collaborationSeedsTable = sqliteTable("collaboration_seeds", {
   creatorId: text("creator_id").notNull(),
   sourceProjectId: text("source_project_id").notNull(),
   sourceProjectTitle: text("source_project_title").notNull(),
+  sourceSceneId: text("source_scene_id"),
+  sourceVersion: integer("source_version").notNull().default(1),
   seedText: text("seed_text").notNull(),
   unitType: text("unit_type").notNull(),
   protocol: text("protocol").notNull(),
@@ -53,7 +56,11 @@ export const seedApplicationsTable = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    seedRespondentUnique: unique("seed_application_seed_respondent_unique").on(table.seedId, table.respondentId),
+    // Mirrors the pg schema: only one ACTIVE application per (seed, respondent);
+    // a declined/resolved application does not block reapplying.
+    activeSeedRespondentUnique: uniqueIndex("seed_application_active_seed_respondent_unique")
+      .on(table.seedId, table.respondentId)
+      .where(sql`${table.status} in ('DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'ACCEPTED_PENDING_CONTRACT')`),
   }),
 );
 
@@ -135,6 +142,16 @@ export const collaborationMessagesTable = sqliteTable("collaboration_messages", 
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
+export const continuationAnnotationsTable = sqliteTable("continuation_annotations", {
+  id: text("id").primaryKey(),
+  continuationId: text("continuation_id").notNull(),
+  authorId: text("author_id").notNull(),
+  rangeStart: integer("range_start").notNull(),
+  rangeEnd: integer("range_end").notNull(),
+  body: text("body").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const collaborationWorkBlocksTable = sqliteTable(
   "collaboration_work_blocks",
   {
@@ -177,6 +194,18 @@ export const collaborationActivityEventsTable = sqliteTable("collaboration_activ
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
+export const collaborationGenealogyTable = sqliteTable("collaboration_genealogy", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  blockId: text("block_id"),
+  parentBlockId: text("parent_block_id"),
+  contributorId: text("contributor_id").notNull(),
+  contributorName: text("contributor_name").notNull(),
+  role: text("role").notNull(),
+  kind: text("kind").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const oracleProvidersTable = sqliteTable("oracle_providers", {
   id: text("id").primaryKey(),
   baseUrl: text("base_url").notNull().default(""),
@@ -212,6 +241,7 @@ export async function buildInMemoryDb() {
     CREATE TABLE collaboration_seeds (
       id TEXT PRIMARY KEY NOT NULL, creator_id TEXT NOT NULL,
       source_project_id TEXT NOT NULL, source_project_title TEXT NOT NULL,
+      source_scene_id TEXT, source_version INTEGER NOT NULL DEFAULT 1,
       seed_text TEXT NOT NULL, unit_type TEXT NOT NULL, protocol TEXT NOT NULL,
       genre TEXT NOT NULL, tone TEXT NOT NULL, language TEXT NOT NULL,
       plot_constraints TEXT NOT NULL DEFAULT '', desired_role TEXT NOT NULL,
@@ -227,9 +257,11 @@ export async function buildInMemoryDb() {
       source_project_title TEXT NOT NULL, source_seed_text TEXT NOT NULL,
       draft_text TEXT NOT NULL DEFAULT '', draft_comments TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'DRAFT', submitted_at INTEGER,
-      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-      UNIQUE (seed_id, respondent_id)
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
+    CREATE UNIQUE INDEX seed_application_active_seed_respondent_unique
+      ON seed_applications (seed_id, respondent_id)
+      WHERE status IN ('DRAFT','SUBMITTED','UNDER_REVIEW','ACCEPTED_PENDING_CONTRACT');
     CREATE TABLE continuation_submissions (
       id TEXT PRIMARY KEY NOT NULL, application_id TEXT NOT NULL,
       seed_id TEXT NOT NULL, creator_id TEXT NOT NULL, respondent_id TEXT NOT NULL,
@@ -268,6 +300,11 @@ export async function buildInMemoryDb() {
       id TEXT PRIMARY KEY NOT NULL, thread_id TEXT NOT NULL,
       sender_id TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL
     );
+    CREATE TABLE continuation_annotations (
+      id TEXT PRIMARY KEY NOT NULL, continuation_id TEXT NOT NULL,
+      author_id TEXT NOT NULL, range_start INTEGER NOT NULL,
+      range_end INTEGER NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL
+    );
     CREATE TABLE collaboration_work_blocks (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       owner_id TEXT NOT NULL, kind TEXT NOT NULL, content TEXT NOT NULL,
@@ -286,6 +323,12 @@ export async function buildInMemoryDb() {
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT, seed_id TEXT,
       actor_id TEXT NOT NULL, event_type TEXT NOT NULL, summary TEXT NOT NULL,
       resource_id TEXT, created_at INTEGER NOT NULL
+    );
+    CREATE TABLE collaboration_genealogy (
+      id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
+      block_id TEXT, parent_block_id TEXT,
+      contributor_id TEXT NOT NULL, contributor_name TEXT NOT NULL,
+      role TEXT NOT NULL, kind TEXT NOT NULL, created_at INTEGER NOT NULL
     );
     CREATE TABLE oracle_providers (
       id TEXT PRIMARY KEY NOT NULL, base_url TEXT NOT NULL DEFAULT '',
@@ -333,9 +376,11 @@ export async function buildInMemoryDb() {
     collaborationNotificationsTable,
     collaborationThreadsTable,
     collaborationMessagesTable,
+    continuationAnnotationsTable,
     collaborationWorkBlocksTable,
     collaborationStoryBibleEntriesTable,
     collaborationActivityEventsTable,
+    collaborationGenealogyTable,
     oracleProvidersTable,
     oracleHealthEventsTable,
   };

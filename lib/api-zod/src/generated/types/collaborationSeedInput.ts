@@ -13,6 +13,10 @@ export interface CollaborationSeedInput {
   sourceProjectId: string;
   /** @minLength 1 */
   sourceProjectTitle: string;
+  /** @nullable */
+  sourceSceneId?: string | null;
+  /** @minimum 1 */
+  sourceVersion?: number;
   /**
      * @minLength 1
      * @maxLength 12000
