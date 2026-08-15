@@ -25,6 +25,7 @@ export * from './collaborationSeedUpdateRespondentLimit';
 export * from './collaborationSeedUpdateVisibility';
 export * from './collaborationThread';
 export * from './continuationAdvisory';
+export * from './continuationAdvisorySource';
 export * from './continuationDraftInput';
 export * from './continuationSubmission';
 export * from './continuityAuditInput';

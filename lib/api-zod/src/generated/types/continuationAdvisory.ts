@@ -6,9 +6,18 @@
  * OpenAPI spec version: 0.2.0
  */
 import type { AdvisorySignal } from './advisorySignal';
+import type { ContinuationAdvisorySource } from './continuationAdvisorySource';
 
 export interface ContinuationAdvisory {
   disclaimer: string;
   signals: AdvisorySignal[];
+  source: ContinuationAdvisorySource;
+  available: boolean;
+  /** @nullable */
+  providerId: string | null;
+  /** @nullable */
+  modelId: string | null;
+  /** @nullable */
+  note: string | null;
   generatedAt: Date;
 }

@@ -52,6 +52,7 @@ import {
   UpdateCollaborationSeedBody,
   UpdateCollaborationSeedParams,
 } from "@workspace/api-zod";
+import { observeCollaboration } from "../lib/oracle";
 
 const router: IRouter = Router();
 
@@ -422,6 +423,29 @@ router.patch("/collaborations/applications/:applicationId", async (req, res): Pr
   });
 });
 
+router.post("/collaborations/applications/:applicationId/advisory", async (req, res): Promise<void> => {
+  const respondentId = userId(req, res);
+  if (!respondentId) return;
+  const params = GetSeedApplicationParams.safeParse({ applicationId: parseParam(req.params.applicationId) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [application] = await db.select().from(seedApplicationsTable).where(eq(seedApplicationsTable.id, params.data.applicationId));
+  if (!application || application.respondentId !== respondentId) {
+    res.status(403).json({ error: "Only the respondent can request a pre-submit advisory check" });
+    return;
+  }
+  if (!application.draftText.trim()) {
+    res.status(409).json({ error: "Write a draft before running an advisory check" });
+    return;
+  }
+  res.json(await advisoryForMaterial({
+    seedText: application.sourceSeedText,
+    continuationText: application.draftText,
+  }));
+});
+
 router.post("/collaborations/applications/:applicationId/submit", async (req, res): Promise<void> => {
   const respondentId = userId(req, res);
   if (!respondentId) return;
@@ -590,19 +614,10 @@ router.get("/collaborations/continuations/:continuationId/profile", async (req, 
   });
 });
 
-router.get("/collaborations/continuations/:continuationId/advisory", async (req, res): Promise<void> => {
-  const viewerId = userId(req, res);
-  if (!viewerId) return;
-  const params = GetContinuationAdvisoryParams.safeParse({ continuationId: parseParam(req.params.continuationId) });
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-  const submission = await getPermittedSubmission(params.data.continuationId, viewerId, res);
-  if (!submission) return;
-  const continuationWordCount = submission.continuationText.trim().split(/\s+/).filter(Boolean).length;
-  const seedWordCount = submission.seedText.trim().split(/\s+/).filter(Boolean).length;
-  const signals = [
+function localAdvisorySignals(material: { seedText: string; continuationText: string }) {
+  const continuationWordCount = material.continuationText.trim().split(/\s+/).filter(Boolean).length;
+  const seedWordCount = material.seedText.trim().split(/\s+/).filter(Boolean).length;
+  return [
     {
       category: "completeness",
       level: continuationWordCount > 0 ? "positive" : "attention",
@@ -624,11 +639,58 @@ router.get("/collaborations/continuations/:continuationId/advisory", async (req,
       detail: "Compatibility notes are advisory. Only the creator can select a collaborator.",
     },
   ];
-  res.json({
-    disclaimer: "Advisory observations only. They do not rank writers, alter prose, or make selection decisions.",
-    signals,
-    generatedAt: new Date().toISOString(),
-  });
+}
+
+async function advisoryForMaterial(material: { seedText: string; continuationText: string }) {
+  try {
+    const result = await observeCollaboration(material.seedText, material.continuationText, AbortSignal.timeout(14_000));
+    if (!result.signals.length) {
+      return {
+        disclaimer: "Advisory observations only. They do not rank writers, alter prose, or make selection decisions.",
+        signals: localAdvisorySignals(material),
+        source: "local",
+        available: false,
+        note: "The Story Oracle found nothing supported to report. Local checks are shown instead.",
+        providerId: null,
+        modelId: null,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+    return {
+      disclaimer: "Story Oracle observations only. They do not rank writers, alter prose, or make selection decisions.",
+      signals: result.signals,
+      source: "oracle",
+      available: true,
+      note: null,
+      providerId: result.providerId,
+      modelId: result.modelId,
+      generatedAt: new Date().toISOString(),
+    };
+  } catch {
+    return {
+      disclaimer: "Advisory observations only. They do not rank writers, alter prose, or make selection decisions.",
+      signals: localAdvisorySignals(material),
+      source: "local",
+      available: false,
+      note: "The Story Oracle is not available right now. Local checks are shown instead.",
+      providerId: null,
+      modelId: null,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+}
+
+router.get("/collaborations/continuations/:continuationId/advisory", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const params = GetContinuationAdvisoryParams.safeParse({ continuationId: parseParam(req.params.continuationId) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const submission = await getPermittedSubmission(params.data.continuationId, viewerId, res);
+  if (!submission) return;
+  res.json(await advisoryForMaterial({ seedText: submission.seedText, continuationText: submission.continuationText }));
 });
 
 async function threadView(thread: typeof collaborationThreadsTable.$inferSelect) {

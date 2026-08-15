@@ -323,8 +323,8 @@ Required filters: genre, length/unit, language, protocol, visibility, and availa
 - [x] Add or update the API contract before implementing generated client calls. **Completed: collaboration seed, application, continuation, project, contract approval, inbox, and notification routes are defined in `lib/api-spec/openapi.yaml`.**
 - [x] Regenerate client types/hooks after every API contract change. **Completed: generated Orval React Query and Zod outputs are present and the workspace typecheck passes.**
 - [x] Validate request and response payloads on the server using the parent app’s existing validation convention. **Completed: every collaboration route parses and validates bodies/params/queries with `@workspace/api-zod` schemas (zod safeParse) before any write.**
-- [ ] Add authorization tests for every read/write route.
-- [ ] Add transactional tests for acceptance and contract lock.
+- [x] Add authorization tests for every read/write route. **Completed: 24 vitest route tests in `artifacts/api-server/src/routes/collaboration.test.ts` run against an in-memory SQLite mirror of the collaboration schema (real Drizzle queries, mocked `@workspace/db` + Clerk auth). Covers unauthenticated 401s, ownership 403s, duplicate/immutable 409s, selection-pool scoping, read-only preview, and turn/owner enforcement on work blocks.**
+- [x] Add transactional tests for acceptance and contract lock. **Completed: acceptance (select) is asserted to close the seed exactly once, archive other submissions, and create exactly one project; contract lock is asserted to require both approvals and refuse later mutations.**
 
 ## 10. Frontend implementation plan
 
@@ -378,18 +378,18 @@ Required filters: genre, length/unit, language, protocol, visibility, and availa
 
 The requirements describe Story Guardian as advisory and state that the existing Admin AI system should be reused if AI is implemented.
 
-- [ ] Locate the current Admin AI provider routing and context limit code in the parent app.
-- [ ] Reuse the provider route and safety/visibility filtering rather than adding a second AI integration.
-- [ ] Add advisory checks behind server-side authorization:
-  - tone/drift observation;
-  - continuity/plot observation;
-  - character/domain observation;
-  - compatibility guidance in the selection room;
-  - pre-submit warnings.
-- [ ] Present AI output as suggestions/observations, never as a collaborator ranking or automatic decision.
-- [ ] Support Fix in Editor, Submit Anyway when policy permits, and cancel without losing the user’s draft.
-- [ ] Identify generated bridge/remix text and retain provenance if future bridge/remix generation is enabled.
-- [ ] Do not block core collaboration flows if optional AI analysis is unavailable.
+- [x] Locate the current Admin AI provider routing and context limit code in the parent app. **Completed: `artifacts/api-server/src/lib/oracle.ts` (provider definitions, failover, `MAX_ORACLE_CONTEXT_CHARS`/`MAX_ORACLE_MESSAGE_CHARS` limits, health tracking) and `routes/oracle.ts`.**
+- [x] Reuse the provider route and safety/visibility filtering rather than adding a second AI integration. **Completed: the collaboration advisory surfaces call `observeCollaboration` → `askOracle`, so they use the same provider routing, context limits, and failover. Only the frozen seed and the submitted continuation — both already visible to the requesting participant — are sent; comments and other respondents’ content are never included.**
+- [x] Add advisory checks behind server-side authorization:
+  - tone/drift observation; **Completed: included in the `observeCollaboration` prompt.**
+  - continuity/plot observation; **Completed: included in the `observeCollaboration` prompt.**
+  - character/domain observation; **Completed: included in the `observeCollaboration` prompt.**
+  - compatibility guidance in the selection room; **Completed: `GET /collaborations/continuations/:continuationId/advisory` is now oracle-backed (with heuristic fallback) and requires creator/respondent permission.**
+  - pre-submit warnings. **Completed: `POST /collaborations/applications/:applicationId/advisory` runs the same oracle-backed observations on the respondent’s own draft; respondent-only and never blocks or changes submission.**
+- [x] Present AI output as suggestions/observations, never as a collaborator ranking or automatic decision. **Completed: every response carries an explicit advisory disclaimer, and no selection or submission path depends on AI output.**
+- [x] Support Fix in Editor, Submit Anyway when policy permits, and cancel without losing the user’s draft. **Completed: the advisory check is a non-blocking button in the continuation editor; the draft stays in the editor, submission remains always available, and running a check never clears or modifies the draft.**
+- [x] Identify generated bridge/remix text and retain provenance if future bridge/remix generation is enabled. **Completed as documented scope: bridge/remix generation is not enabled in this release; advisory responses carry `providerId`/`modelId` provenance so generated outputs can be attributed later.**
+- [x] Do not block core collaboration flows if optional AI analysis is unavailable. **Completed: the oracle pass is bounded by a 14s timeout; on failure the endpoints return local heuristic signals with `source: "local"`, `available: false`, and a human note, and every collaboration write path is untouched.**
 
 ## 12. Notifications and event behavior
 
@@ -430,22 +430,22 @@ It must not include hidden prose, private voice-note content, locked text, or un
 
 ### 13.1 Automated tests
 
-- [ ] Canonical identity is the same in Tandem and Author Den.
-- [ ] Unauthenticated users cannot access private collaboration data.
-- [ ] Respondents cannot edit the frozen seed.
-- [ ] Respondents cannot apply twice while an application is unresolved.
-- [ ] Submitted continuations are immutable and versioned updates notify affected users.
-- [ ] Creators can see only their own selection pools.
-- [ ] A creator preview cannot write or create a downloaded project copy.
-- [ ] Declining archives a continuation without creating a Tandem.
-- [ ] Acceptance closes the seed exactly once and creates the shared project transactionally.
-- [ ] Unselected submissions remain attributed and outside the official manuscript.
-- [ ] Contract lock requires all required approvals.
-- [ ] Locked contract rules cannot be changed without an approved amendment.
-- [ ] Partner-owned blocks are read-only unless contract permissions allow otherwise.
-- [ ] Waiting-room responses exclude hidden partner prose.
-- [ ] Notification payloads exclude protected content.
-- [ ] Solo mode behavior remains unchanged.
+- [ ] Canonical identity is the same in Tandem and Author Den. **Manual walkthrough item: Author Den is a separate local-first studio; identity is not testable via route tests.**
+- [x] Unauthenticated users cannot access private collaboration data. **Tested: unauthenticated writes and private reads return 401.**
+- [x] Respondents cannot edit the frozen seed. **Tested: a non-creator PATCH on an open seed returns 403.**
+- [x] Respondents cannot apply twice while an application is unresolved. **Tested: a second application returns 409.**
+- [x] Submitted continuations are immutable and versioned updates notify affected users. **Tested: draft PATCH and re-submit after submission return 409; the creator receives a `continuation_submitted` notification.**
+- [x] Creators can see only their own selection pools. **Tested: non-creators get 403 on the selection room; the continuation inbox is scoped to the creator.**
+- [x] A creator preview cannot write or create a downloaded project copy. **Tested: opening a continuation preview creates no project row and no extra application.**
+- [x] Declining archives a continuation without creating a Tandem. **Tested: decline returns 204, submission becomes ARCHIVED, application becomes DECLINED, zero projects.**
+- [x] Acceptance closes the seed exactly once and creates the shared project transactionally. **Tested: select creates exactly one project, seed becomes ACCEPTED, other submissions become ARCHIVED, and a second select returns 409.**
+- [x] Unselected submissions remain attributed and outside the official manuscript. **Tested: unselected submissions persist with their respondent attribution in ARCHIVED state.**
+- [x] Contract lock requires all required approvals. **Tested: one approval keeps CONTRACT_PENDING; both approvals produce ACTIVE with `lockedAt`; a third approval returns 409.**
+- [x] Locked contract rules cannot be changed without an approved amendment. **Tested: any approve call after lock returns 409 and `contractVersion` stays at 1 (no amendment endpoint in first release).**
+- [x] Partner-owned blocks are read-only unless contract permissions allow otherwise. **Tested: editing a partner’s draft returns 403, and a block cannot be approved by its owner.**
+- [x] Waiting-room responses exclude hidden partner prose. **Tested: project responses expose only permitted project fields to both participants.**
+- [x] Notification payloads exclude protected content. **Tested: notification body/title are safe summaries and never contain submitted prose.**
+- [ ] Solo mode behavior remains unchanged. **Manual regression item: Solo Author Den is a separate app and is not exercised by route tests.**
 
 ### 13.2 Manual acceptance walkthrough
 
@@ -537,18 +537,18 @@ Complete phases in order. Parallelize only independent work after the parent sou
 
 ### Phase 7 — Optional AI advisory layer
 
-- [ ] Existing Admin AI route and context controls reused.
-- [ ] Advisory pre-checks and selection guidance implemented where safe.
-- [ ] AI failures degrade gracefully without blocking writing flows.
-- [ ] Provenance and generated-text labeling documented if generation is enabled.
+- [x] Existing Admin AI route and context controls reused. **Completed: the Story Oracle provider routing in `lib/oracle.ts` powers collaboration advisory via `observeCollaboration`.**
+- [x] Advisory pre-checks and selection guidance implemented where safe. **Completed: oracle-backed selection-room advisory and a respondent pre-submit advisory check, both advisory-only.**
+- [x] AI failures degrade gracefully without blocking writing flows. **Completed: 14s oracle timeout with fallback to local heuristic signals; submission and selection flows never depend on the oracle.**
+- [x] Provenance and generated-text labeling documented if generation is enabled. **Completed: advisory responses include `providerId`/`modelId`; generation remains future scope and is labeled as such in the plan.**
 
 ### Phase 8 — Verification and handoff
 
-- [ ] Automated tests complete.
+- [x] Automated tests complete. **Completed: `pnpm --filter @workspace/api-server test` runs 24 vitest route tests (authorization, acceptance/contract transactions, work-block turn enforcement, privacy-safe notifications/activity, and oracle advisory fallback) against an in-memory SQLite mirror of the collaboration schema.**
 - [ ] Manual two-account walkthrough complete.
 - [ ] Mobile/desktop accessibility and responsive checks complete.
 - [ ] Solo mode regression checks complete.
-- [ ] Documentation, route map, schema notes, and this checklist updated.
+- [x] Documentation, route map, schema notes, and this checklist updated. **Completed for this slice: test command added to `replit.md`, completion log updated, §9.5 and §13.1 checkboxes marked.**
 - [ ] Final artifact/app preview presented.
 
 ## 15. Open decisions and deviations
@@ -575,3 +575,5 @@ Add one entry after each completed implementation. Keep entries short and link t
 | 2026-08-15 | Phase 6 / Data model | `collaboration_work_blocks`, `collaboration_story_bible_entries`, and `collaboration_activity_events` tables added to `lib/db/src/schema/collaboration-work.ts`; applied on deploy via the existing `drizzle push` post-merge step | `pnpm run typecheck:libs` |
 | 2026-08-15 | Phase 6 / API | Work-block list/create/draft/submit/approve with owner + current-turn + state enforcement, story bible list/create with shared/private scope, activity list, and project `threadId` added to `openapi.yaml` and `collaboration.ts` | `pnpm --filter @workspace/api-server run typecheck`; Orval codegen re-run |
 | 2026-08-15 | Phase 6 / Tandem pages | Data-driven Atrium urgent cards; turn-aware project detail with read-only partner blocks and manuscript export; contract room; waiting room; Story Bible; project activity; Messages tab wired into routes | `pnpm run typecheck` |
+| 2026-08-15 | Phase 7 / AI advisory layer | `observeCollaboration` oracle helper added to `lib/oracle.ts`; continuation advisory endpoint is now oracle-backed with local fallback; new respondent-only pre-submit advisory endpoint; `ContinuationAdvisory` schema extended with source/available/providerId/modelId/note; advisory UI in the continuation editor and selection room | `pnpm run typecheck`; Orval codegen re-run |
+| 2026-08-15 | Phase 8 / Automated tests | 24 vitest route tests for authorization, acceptance/contract transactions, work-block turn enforcement, privacy-safe notifications, and oracle advisory fallback; in-memory SQLite mirror (`src/test/in-memory-db.ts`) with the sql-js driver and an awaiting-transaction patch; vitest/supertest/sql.js dev deps; rollup Windows binary override restored for local runs | `pnpm --filter @workspace/api-server test` (24/24 pass); `pnpm run typecheck` |

@@ -1777,6 +1777,78 @@ export const useSaveSeedApplicationDraft = <TError = ErrorType<ErrorResponse>,
       return useMutation(getSaveSeedApplicationDraftMutationOptions(options));
     }
 
+export const getCreateApplicationAdvisoryUrl = (applicationId: string,) => {
+
+
+
+
+  return `/api/collaborations/applications/${applicationId}/advisory`
+}
+
+/**
+ * Advisory only. Running a check never blocks or changes submission.
+ * @summary Run an optional pre-submit advisory check on the respondent's own draft
+ */
+export const createApplicationAdvisory = async (applicationId: string, options?: Parameters<typeof customFetch>[1]): Promise<ContinuationAdvisory> => {
+
+  return customFetch<ContinuationAdvisory>(getCreateApplicationAdvisoryUrl(applicationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getCreateApplicationAdvisoryMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createApplicationAdvisory>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createApplicationAdvisory>>, TError,{applicationId: string}, TContext> => {
+
+const mutationKey = ['createApplicationAdvisory'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createApplicationAdvisory>>, {applicationId: string}> = (props) => {
+          const {applicationId} = props ?? {};
+
+          return  createApplicationAdvisory(applicationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateApplicationAdvisoryMutationResult = NonNullable<Awaited<ReturnType<typeof createApplicationAdvisory>>>
+
+    export type CreateApplicationAdvisoryMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Run an optional pre-submit advisory check on the respondent's own draft
+ */
+export const useCreateApplicationAdvisory = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createApplicationAdvisory>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createApplicationAdvisory>>,
+        TError,
+        {applicationId: string},
+        TContext
+      > => {
+      return useMutation(getCreateApplicationAdvisoryMutationOptions(options));
+    }
+
 export const getSubmitSeedApplicationUrl = (applicationId: string,) => {
 
 

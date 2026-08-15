@@ -514,6 +514,69 @@ const outlineModeInstructions: Record<OutlineAssistMode, string> = {
   chapter_breaks: "Review the selected scene sequence for pacing. Suggest natural chapter breaks, explaining the turning point at each break and whether the break creates enough forward pull. Do not invent scene events that are not supported by the context.",
 };
 
+export type CollaborationAdvisorySignal = {
+  category: string;
+  level: "positive" | "neutral" | "attention";
+  title: string;
+  detail: string;
+};
+
+function parseCollaborationAdvisorySignals(content: string): CollaborationAdvisorySignal[] {
+  const unfenced = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  const objectStart = unfenced.indexOf("{");
+  const objectEnd = unfenced.lastIndexOf("}");
+  if (objectStart < 0 || objectEnd <= objectStart) throw new Error("Advisory model returned an invalid result");
+  const parsed = JSON.parse(unfenced.slice(objectStart, objectEnd + 1)) as { signals?: unknown };
+  if (!Array.isArray(parsed.signals)) throw new Error("Advisory model returned no signal list");
+  return parsed.signals.flatMap((item, index): CollaborationAdvisorySignal[] => {
+    if (!item || typeof item !== "object") return [];
+    const value = item as Record<string, unknown>;
+    if (typeof value.title !== "string" || !value.title.trim() || typeof value.detail !== "string" || !value.detail.trim()) return [];
+    const levels = new Set<CollaborationAdvisorySignal["level"]>(["positive", "neutral", "attention"]);
+    const level = levels.has(value.level as CollaborationAdvisorySignal["level"]) ? value.level as CollaborationAdvisorySignal["level"] : "neutral";
+    return [{
+      category: typeof value.category === "string" && value.category ? value.category.slice(0, 40) : "observation",
+      level,
+      title: value.title.slice(0, 160),
+      detail: value.detail.slice(0, 600),
+    }];
+  }).slice(0, 5);
+}
+
+/**
+ * Optional, advisory-only observations comparing a frozen seed with a
+ * submitted continuation. Always advisory: it never ranks the writer and
+ * never decides selection. Throws when no Story Oracle provider is
+ * available so callers can degrade to local checks.
+ */
+export async function observeCollaboration(seedText: string, continuationText: string, signal?: AbortSignal) {
+  const result = await askOracle(
+    [{
+      role: "system",
+      content: [
+        "You are a careful, neutral fiction collaboration observer.",
+        "Compare the frozen seed (the opening the creator protects) with the submitted continuation.",
+        "Report only supported observations: tone drift, continuity conflicts, character or domain consistency, and whether the continuation opens rather than closes the story.",
+        "Never rank the writer, never recommend or decide selection, and never alter any prose. Keep every observation specific and human-reviewable.",
+        "Return JSON only, with this exact shape: {\"signals\":[{\"category\":\"tone|continuity|character|scope|compatibility\",\"level\":\"positive|neutral|attention\",\"title\":\"short title\",\"detail\":\"specific observation\"}]}",
+        "Use an empty signals array when there is nothing supported to report.",
+      ].join(" "),
+    }, {
+      role: "user",
+      content: "Observe this seed and continuation. Report at most five signals.",
+    }],
+    `Frozen seed:\n${seedText}\n\nSubmitted continuation:\n${continuationText}`,
+    0.2,
+    signal,
+  );
+  return {
+    signals: parseCollaborationAdvisorySignals(result.content),
+    providerId: result.providerId,
+    modelId: result.modelId,
+    attempted: result.attempted,
+  };
+}
+
 export async function assistOutline(mode: OutlineAssistMode, context: string, focus?: string | null, signal?: AbortSignal) {
   const result = await askOracle(
     [{

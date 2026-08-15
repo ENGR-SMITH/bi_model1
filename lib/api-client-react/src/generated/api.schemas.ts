@@ -186,9 +186,25 @@ export interface AdvisorySignal {
   detail: string;
 }
 
+export type ContinuationAdvisorySource = typeof ContinuationAdvisorySource[keyof typeof ContinuationAdvisorySource];
+
+
+export const ContinuationAdvisorySource = {
+  oracle: 'oracle',
+  local: 'local',
+} as const;
+
 export interface ContinuationAdvisory {
   disclaimer: string;
   signals: AdvisorySignal[];
+  source: ContinuationAdvisorySource;
+  available: boolean;
+  /** @nullable */
+  providerId: string | null;
+  /** @nullable */
+  modelId: string | null;
+  /** @nullable */
+  note: string | null;
   generatedAt: string;
 }
 

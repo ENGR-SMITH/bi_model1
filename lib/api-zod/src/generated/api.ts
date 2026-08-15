@@ -661,6 +661,34 @@ export const SaveSeedApplicationDraftResponse = zod.object({
 
 
 /**
+ * Advisory only. Running a check never blocks or changes submission.
+ * @summary Run an optional pre-submit advisory check on the respondent's own draft
+ */
+
+
+
+export const CreateApplicationAdvisoryParams = zod.object({
+  "applicationId": zod.coerce.string().min(1)
+})
+
+export const CreateApplicationAdvisoryResponse = zod.object({
+  "disclaimer": zod.string(),
+  "signals": zod.array(zod.object({
+  "category": zod.string(),
+  "level": zod.enum(['positive', 'neutral', 'attention']),
+  "title": zod.string(),
+  "detail": zod.string()
+})),
+  "source": zod.enum(['oracle', 'local']),
+  "available": zod.boolean(),
+  "providerId": zod.string().nullable(),
+  "modelId": zod.string().nullable(),
+  "note": zod.string().nullable(),
+  "generatedAt": zod.coerce.date()
+})
+
+
+/**
  * @summary Lock and submit an immutable continuation version
  */
 
@@ -782,6 +810,11 @@ export const GetContinuationAdvisoryResponse = zod.object({
   "title": zod.string(),
   "detail": zod.string()
 })),
+  "source": zod.enum(['oracle', 'local']),
+  "available": zod.boolean(),
+  "providerId": zod.string().nullable(),
+  "modelId": zod.string().nullable(),
+  "note": zod.string().nullable(),
   "generatedAt": zod.coerce.date()
 })
 

@@ -555,6 +555,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/applications/{applicationId}/advisory:
+    post:
+      operationId: createApplicationAdvisory
+      tags: [collaborations]
+      summary: Run an optional pre-submit advisory check on the respondent's own draft
+      description: Advisory only. Running a check never blocks or changes submission.
+      parameters:
+        - { $ref: "#/components/parameters/ApplicationId" }
+      responses:
+        "200":
+          description: Advisory observations for the current draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContinuationAdvisory" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Draft is empty
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /collaborations/applications/{applicationId}/submit:
     post:
       operationId: submitSeedApplication
@@ -1256,8 +1280,13 @@ components:
         signals:
           type: array
           items: { $ref: "#/components/schemas/AdvisorySignal" }
+        source: { type: string, enum: [oracle, local] }
+        available: { type: boolean }
+        providerId: { type: ["string", "null"] }
+        modelId: { type: ["string", "null"] }
+        note: { type: ["string", "null"] }
         generatedAt: { type: string, format: date-time }
-      required: [disclaimer, signals, generatedAt]
+      required: [disclaimer, signals, source, available, providerId, modelId, note, generatedAt]
     CollaborationMessage:
       type: object
       properties:
