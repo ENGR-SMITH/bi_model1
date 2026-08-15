@@ -1,0 +1,217 @@
+import {
+  AudioWaveform,
+  Brain,
+  Building2,
+  CalendarDays,
+  CircleDashed,
+  FileText,
+  GraduationCap,
+  HandHeart,
+  HeartHandshake,
+  Keyboard,
+  Layers3,
+  LineChart,
+  MapPin,
+  Music2,
+  PenTool,
+  Sparkles,
+  UsersRound,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+
+export type Room = {
+  slug: string;
+  name: string;
+  shortName: string;
+  eyebrow: string;
+  description: string;
+  category: string;
+  icon: LucideIcon;
+  tone: 'coral' | 'teal' | 'gold' | 'blue' | 'plum';
+  foundation?: boolean;
+};
+
+export const rooms: Room[] = [
+  {
+    slug: 'engine',
+    name: 'The Tandem Engine',
+    shortName: 'The Engine',
+    eyebrow: 'The house beneath the house',
+    description: 'The protocol for ideas that become more than one person could make alone.',
+    category: 'Foundation',
+    icon: CircleDashed,
+    tone: 'coral',
+    foundation: true,
+  },
+  {
+    slug: 'creators',
+    name: 'Tandem for Creators',
+    shortName: 'Creators',
+    eyebrow: 'Make with a missing piece',
+    description: 'A studio where the unseen half of a work can find its way in.',
+    category: 'Creative practice',
+    icon: PenTool,
+    tone: 'teal',
+  },
+  {
+    slug: 'blender-plugin',
+    name: 'Blender Plugin',
+    shortName: 'Blender',
+    eyebrow: 'Shape from the other side',
+    description: 'Model with a collaborator you cannot see, then meet in the reveal.',
+    category: 'Creative tools',
+    icon: Layers3,
+    tone: 'gold',
+  },
+  {
+    slug: 'ableton-logic-plugin',
+    name: 'Ableton / Logic Plugin',
+    shortName: 'Ableton / Logic',
+    eyebrow: 'Sound, in tandem',
+    description: 'Trade musical gestures before either of you knows the full song.',
+    category: 'Creative tools',
+    icon: AudioWaveform,
+    tone: 'plum',
+  },
+  {
+    slug: 'figma-plugin',
+    name: 'Figma Plugin',
+    shortName: 'Figma',
+    eyebrow: 'Design without the echo chamber',
+    description: 'Two visual instincts, one canvas, and a reveal worth waiting for.',
+    category: 'Creative tools',
+    icon: PenTool,
+    tone: 'coral',
+  },
+  {
+    slug: 'notion-google-docs',
+    name: 'Notion / Google Docs',
+    shortName: 'Notion / Docs',
+    eyebrow: 'Think beside someone',
+    description: 'Write in parallel. Let meaning arrive from both directions.',
+    category: 'Creative tools',
+    icon: FileText,
+    tone: 'blue',
+  },
+  {
+    slug: 'trading',
+    name: 'Tandem in Trading',
+    shortName: 'Trading',
+    eyebrow: 'A second set of eyes',
+    description: 'Surface the pattern another mind notices before the chart explains it.',
+    category: 'Systems & strategy',
+    icon: LineChart,
+    tone: 'teal',
+  },
+  {
+    slug: 'architecture',
+    name: 'Tandem in Architecture',
+    shortName: 'Architecture',
+    eyebrow: 'Build what no brief could hold',
+    description: 'A room for spatial thinking, shared indirectly and made tangible.',
+    category: 'Systems & strategy',
+    icon: Building2,
+    tone: 'gold',
+  },
+  {
+    slug: 'connection',
+    name: 'Tandem for Connection',
+    shortName: 'Connection',
+    eyebrow: 'Be met, not managed',
+    description: 'A slower kind of social space for the thoughts between the words.',
+    category: 'Human rooms',
+    icon: HeartHandshake,
+    tone: 'coral',
+  },
+  {
+    slug: 'therapy-grief',
+    name: 'Tandem in Therapy / Grief',
+    shortName: 'Therapy / Grief',
+    eyebrow: 'Hold what is hard to say',
+    description: 'A gentle container for witness, reflection, and the unseen work of healing.',
+    category: 'Human rooms',
+    icon: HandHeart,
+    tone: 'plum',
+  },
+  {
+    slug: 'generative-dating',
+    name: 'Generative Dating',
+    shortName: 'Generative Dating',
+    eyebrow: 'Let curiosity lead',
+    description: 'Meet through prompts that leave room for surprise instead of performance.',
+    category: 'Human rooms',
+    icon: UsersRound,
+    tone: 'blue',
+  },
+  {
+    slug: 'soul-mates',
+    name: 'Finding Soul Mates',
+    shortName: 'Soul Mates',
+    eyebrow: 'Find the rare frequency',
+    description: 'A different signal for the people whose inner weather feels familiar.',
+    category: 'Human rooms',
+    icon: Sparkles,
+    tone: 'gold',
+  },
+  {
+    slug: 'memory',
+    name: 'Tandem in Memory',
+    shortName: 'Memory',
+    eyebrow: 'Remember together',
+    description: 'Place your fragments beside another person’s and see the picture change.',
+    category: 'Human rooms',
+    icon: Brain,
+    tone: 'teal',
+  },
+  {
+    slug: 'keyboard',
+    name: 'Tandem Keyboard',
+    shortName: 'Keyboard',
+    eyebrow: 'Your hands, extended',
+    description: 'A small doorway into a much larger vocabulary of thought.',
+    category: 'Everyday tools',
+    icon: Keyboard,
+    tone: 'coral',
+  },
+  {
+    slug: 'tour-holiday-vacation',
+    name: 'Tour / Holiday / Vacation',
+    shortName: 'Travel',
+    eyebrow: 'Go somewhere in parallel',
+    description: 'Plan the trip around two ways of seeing, not one fixed itinerary.',
+    category: 'Everyday tools',
+    icon: MapPin,
+    tone: 'blue',
+  },
+  {
+    slug: 'education',
+    name: 'Tandem for Education',
+    shortName: 'Education',
+    eyebrow: 'Learn by contributing',
+    description: 'A classroom where the answer is allowed to be assembled between people.',
+    category: 'Everyday tools',
+    icon: GraduationCap,
+    tone: 'gold',
+  },
+  {
+    slug: 'blind-orchestra',
+    name: 'The Blind Orchestra',
+    shortName: 'Blind Orchestra',
+    eyebrow: 'Many hands, one becoming',
+    description: 'The flagship experiment: a collective piece made without a conductor.',
+    category: 'The far room',
+    icon: Music2,
+    tone: 'plum',
+  },
+];
+
+export function getRoom(slug?: string) {
+  return rooms.find((room) => room.slug === slug);
+}
+
+export const roomGroups = [
+  { label: 'Creative rooms', categories: ['Creative practice', 'Creative tools'] },
+  { label: 'Systems rooms', categories: ['Systems & strategy'] },
+  { label: 'Human rooms', categories: ['Human rooms'] },
+  { label: 'Everyday rooms', categories: ['Everyday tools', 'The far room'] },
+];

@@ -2,21 +2,30 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 0.2.0
+  description: Manuskript authoring and Story Oracle API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: waitlist
+    description: Category launch notification signups
+  - name: admin
+    description: Private Story Oracle administration
+  - name: oracle
+    description: Story Oracle requests
+  - name: collaborations
+    description: Author-to-author collaboration seeds, applications, and review
+  - name: tandems
+    description: Shared collaboration projects and contract state
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +33,1715 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /waitlist:
+    get:
+      operationId: listWaitlistEntries
+      tags: [waitlist]
+      summary: List the authenticated user's category waitlists
+      description: Returns the category launch notifications the authenticated user has joined.
+      responses:
+        "200":
+          description: The user's waitlist entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WaitlistEntry"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: createWaitlistEntry
+      tags: [waitlist]
+      summary: Join a category launch waitlist
+      description: Adds the authenticated user to the notification list for a category that is not yet available.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WaitlistInput"
+      responses:
+        "201":
+          description: Waitlist entry created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WaitlistEntry"
+        "409":
+          description: The user is already on this category waitlist
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /admin/session:
+    get:
+      operationId: getAdminSession
+      tags: [admin]
+      summary: Check private admin session
+      responses:
+        "200":
+          description: Session state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSession"
+  /admin/login:
+    post:
+      operationId: adminLogin
+      tags: [admin]
+      summary: Start a private admin session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginInput"
+      responses:
+        "200":
+          description: Authenticated session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSession"
+        "401":
+          description: Invalid access code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /admin/logout:
+    post:
+      operationId: adminLogout
+      tags: [admin]
+      summary: End a private admin session
+      responses:
+        "204":
+          description: Logged out
+  /admin/providers:
+    get:
+      operationId: listAdminProviders
+      tags: [admin]
+      summary: List provider and model health without secrets
+      responses:
+        "200":
+          description: Provider status list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderStatus"
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /admin/providers/{providerId}:
+    put:
+      operationId: updateAdminProvider
+      tags: [admin]
+      summary: Save provider credentials and routing options
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProviderUpdate"
+      responses:
+        "200":
+          description: Updated provider status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderStatus"
+        "400":
+          description: Invalid provider configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /admin/providers/{providerId}/check:
+    post:
+      operationId: checkAdminProvider
+      tags: [admin]
+      summary: Test provider connectivity
+      parameters:
+        - $ref: "#/components/parameters/ProviderId"
+      responses:
+        "200":
+          description: Provider health result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProviderStatus"
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /oracle/chat:
+    post:
+      operationId: oracleChat
+      tags: [oracle]
+      summary: Ask the Story Oracle with automatic provider failover
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OracleChatInput"
+      responses:
+        "200":
+          description: Oracle response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OracleResult"
+        "400":
+          description: Invalid Oracle request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: No configured provider is currently available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /oracle/continuity:
+    post:
+      operationId: continuityAudit
+      tags: [oracle]
+      summary: Audit selected project material for continuity conflicts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContinuityAuditInput"
+      responses:
+        "200":
+          description: Continuity findings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContinuityAuditResult"
+        "400":
+          description: Invalid continuity request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: No configured provider is currently available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /oracle/rewrite:
+    post:
+      operationId: toneRewrite
+      tags: [oracle]
+      summary: Rewrite selected text to match a bounded voice reference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ToneRewriteInput"
+      responses:
+        "200":
+          description: Rewritten text
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToneRewriteResult"
+        "400":
+          description: Invalid rewrite request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: No configured provider is currently available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /oracle/outline:
+    post:
+      operationId: outlineAssist
+      tags: [oracle]
+      summary: Generate bounded premise, scene, or pacing assistance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OutlineAssistInput"
+      responses:
+        "200":
+          description: Outline assistance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutlineAssistResult"
+        "400":
+          description: Invalid outline request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: No configured provider is currently available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /oracle/voice:
+    post:
+      operationId: voiceConsistencyCheck
+      tags: [oracle]
+      summary: Check a character's voice across selected scenes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoiceConsistencyInput"
+      responses:
+        "200":
+          description: Character voice consistency report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoiceConsistencyResult"
+        "400":
+          description: Invalid voice consistency request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: No configured provider is currently available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /oracle/world-bible:
+    post:
+      operationId: worldBibleExtract
+      tags: [oracle]
+      summary: Extract locations, items, and world rules from selected project material
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorldBibleExtractInput"
+      responses:
+        "200":
+          description: Extracted world bible entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorldBibleExtractResult"
+        "400":
+          description: Invalid world bible request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: No configured provider is currently available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /collaborations/seeds:
+    get:
+      operationId: listCollaborationSeeds
+      tags: [collaborations]
+      summary: List discoverable collaboration seeds
+      parameters:
+        - { $ref: "#/components/parameters/GenreQuery" }
+        - { $ref: "#/components/parameters/UnitQuery" }
+        - { $ref: "#/components/parameters/LanguageQuery" }
+        - { $ref: "#/components/parameters/ProtocolQuery" }
+        - { $ref: "#/components/parameters/AvailabilityQuery" }
+      responses:
+        "200":
+          description: Open seeds visible to the current user
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CollaborationSeed" }
+    post:
+      operationId: createCollaborationSeed
+      tags: [collaborations]
+      summary: Publish a frozen writing seed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CollaborationSeedInput" }
+      responses:
+        "201":
+          description: Published seed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationSeed" }
+        "400":
+          description: Invalid seed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/seeds/{seedId}:
+    get:
+      operationId: getCollaborationSeed
+      tags: [collaborations]
+      summary: Read a permitted seed snapshot
+      parameters:
+        - { $ref: "#/components/parameters/SeedId" }
+      responses:
+        "200":
+          description: Seed detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationSeed" }
+        "404":
+          description: Seed not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    patch:
+      operationId: updateCollaborationSeed
+      tags: [collaborations]
+      summary: Update an unpublished creator-owned seed
+      parameters:
+        - { $ref: "#/components/parameters/SeedId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CollaborationSeedUpdate" }
+      responses:
+        "200":
+          description: Updated seed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationSeed" }
+        "400":
+          description: Invalid update
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: closeCollaborationSeed
+      tags: [collaborations]
+      summary: Close a creator-owned seed
+      parameters:
+        - { $ref: "#/components/parameters/SeedId" }
+      responses:
+        "204": { description: Seed closed }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/seeds/{seedId}/applications:
+    post:
+      operationId: createSeedApplication
+      tags: [collaborations]
+      summary: Create a respondent-owned continuation clone
+      parameters:
+        - { $ref: "#/components/parameters/SeedId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SeedApplicationInput" }
+      responses:
+        "201":
+          description: Continuation application
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeedApplication" }
+        "400":
+          description: Invalid application
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Application already exists or seed is unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/applications/{applicationId}:
+    get:
+      operationId: getSeedApplication
+      tags: [collaborations]
+      summary: Read a permitted continuation application
+      parameters:
+        - { $ref: "#/components/parameters/ApplicationId" }
+      responses:
+        "200":
+          description: Application detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeedApplication" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    patch:
+      operationId: saveSeedApplicationDraft
+      tags: [collaborations]
+      summary: Save a respondent continuation draft
+      parameters:
+        - { $ref: "#/components/parameters/ApplicationId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ContinuationDraftInput" }
+      responses:
+        "200":
+          description: Saved draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeedApplication" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Draft is locked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/applications/{applicationId}/submit:
+    post:
+      operationId: submitSeedApplication
+      tags: [collaborations]
+      summary: Lock and submit an immutable continuation version
+      parameters:
+        - { $ref: "#/components/parameters/ApplicationId" }
+      responses:
+        "200":
+          description: Immutable submitted continuation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContinuationSubmission" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Already submitted or seed is unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/continuations:
+    get:
+      operationId: listContinuations
+      tags: [collaborations]
+      summary: List submitted continuations for the authenticated creator
+      responses:
+        "200":
+          description: Creator continuation inbox
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ContinuationSubmission" }
+  /collaborations/continuations/{continuationId}:
+    get:
+      operationId: getContinuation
+      tags: [collaborations]
+      summary: Open a selection-room continuation
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "200":
+          description: Continuation detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContinuationSubmission" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/continuations/{continuationId}/profile:
+    get:
+      operationId: getContinuationWriterProfile
+      tags: [collaborations]
+      summary: Read the permitted profile and collaboration statistics for a respondent
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "200":
+          description: Respondent profile and safe statistics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriterProfile" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/continuations/{continuationId}/advisory:
+    get:
+      operationId: getContinuationAdvisory
+      tags: [collaborations]
+      summary: Read advisory compatibility observations for a continuation
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "200":
+          description: Advisory observations that never decide selection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ContinuationAdvisory" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/continuations/{continuationId}/thread:
+    get:
+      operationId: getContinuationThread
+      tags: [collaborations]
+      summary: Read the private message thread for a continuation
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "200":
+          description: Private continuation thread
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationThread" }
+        "404":
+          description: No thread exists yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: startContinuationThread
+      tags: [collaborations]
+      summary: Start or reopen the private message thread for a continuation
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "201":
+          description: Private continuation thread
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationThread" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: declineContinuation
+      tags: [collaborations]
+      summary: Decline and archive a submitted continuation
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "204": { description: Continuation archived }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/continuations/{continuationId}/select:
+    post:
+      operationId: selectContinuation
+      tags: [collaborations]
+      summary: Select a continuation and open a contract
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "200":
+          description: Contract preview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationProject" }
+        "409":
+          description: Seed already selected or continuation unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/seeds/{seedId}/selection:
+    get:
+      operationId: getSeedSelection
+      tags: [collaborations]
+      summary: Read the creator's submitted continuation pool for a seed
+      parameters:
+        - { $ref: "#/components/parameters/SeedId" }
+      responses:
+        "200":
+          description: Submitted continuations available to the seed creator
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ContinuationSubmission" }
+        "403":
+          description: Only the seed creator can open the selection room
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/threads/{threadId}:
+    get:
+      operationId: getCollaborationThread
+      tags: [collaborations]
+      summary: Read a participant-scoped collaboration thread
+      parameters:
+        - { $ref: "#/components/parameters/ThreadId" }
+      responses:
+        "200":
+          description: Private collaboration thread
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationThread" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/threads/{threadId}/messages:
+    post:
+      operationId: sendCollaborationMessage
+      tags: [collaborations]
+      summary: Send a privacy-safe message in a collaboration thread
+      parameters:
+        - { $ref: "#/components/parameters/ThreadId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CollaborationMessageInput" }
+      responses:
+        "201":
+          description: Sent message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationMessage" }
+        "400":
+          description: Invalid message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects:
+    get:
+      operationId: listCollaborationProjects
+      tags: [tandems]
+      summary: List shared projects for the authenticated user
+      responses:
+        "200":
+          description: Shared projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CollaborationProject" }
+  /collaborations/projects/{projectId}:
+    get:
+      operationId: getCollaborationProject
+      tags: [tandems]
+      summary: Read a permitted shared project
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Shared project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationProject" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/approve:
+    post:
+      operationId: approveCollaborationContract
+      tags: [tandems]
+      summary: Approve the current contract preview
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationProject" }
+        "409":
+          description: Project is not awaiting approval
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/blocks:
+    get:
+      operationId: listCollaborationWorkBlocks
+      tags: [tandems]
+      summary: List manuscript work blocks visible to a project participant
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Ordered work blocks for the shared manuscript
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WorkBlock" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createCollaborationWorkBlock
+      tags: [tandems]
+      summary: Open a new draft block when it is your turn
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WorkBlockInput" }
+      responses:
+        "201":
+          description: New draft block
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkBlock" }
+        "400":
+          description: Invalid block
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Not your turn or a draft is already open
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/blocks/{blockId}:
+    patch:
+      operationId: saveCollaborationWorkBlockDraft
+      tags: [tandems]
+      summary: Save an owned draft block without submitting it
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { $ref: "#/components/parameters/BlockId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WorkBlockInput" }
+      responses:
+        "200":
+          description: Saved draft block
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkBlock" }
+        "400":
+          description: Invalid block
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Block is not an editable draft
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/blocks/{blockId}/submit:
+    post:
+      operationId: submitCollaborationWorkBlock
+      tags: [tandems]
+      summary: Submit an owned draft block and pass the turn
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { $ref: "#/components/parameters/BlockId" }
+      responses:
+        "200":
+          description: Submitted block
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkBlock" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Block is not a draft or it is not your turn
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/blocks/{blockId}/approve:
+    post:
+      operationId: approveCollaborationWorkBlock
+      tags: [tandems]
+      summary: Approve a partner-submitted block into the manuscript
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+        - { $ref: "#/components/parameters/BlockId" }
+      responses:
+        "200":
+          description: Approved block
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkBlock" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Block is not awaiting review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/story-bible:
+    get:
+      operationId: listCollaborationStoryBible
+      tags: [tandems]
+      summary: List story bible entries visible to a project participant
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Story bible entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/StoryBibleEntry" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createCollaborationStoryBibleEntry
+      tags: [tandems]
+      summary: Add a shared or owner-scoped story bible entry
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StoryBibleEntryInput" }
+      responses:
+        "201":
+          description: Created story bible entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoryBibleEntry" }
+        "400":
+          description: Invalid entry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/activity:
+    get:
+      operationId: listCollaborationActivity
+      tags: [tandems]
+      summary: List privacy-safe activity for a shared project
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Project activity events
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ActivityEvent" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/inbox:
+    get:
+      operationId: getCollaborationInbox
+      tags: [collaborations]
+      summary: Read privacy-safe collaboration notifications
+      responses:
+        "200":
+          description: Notifications for the authenticated user
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CollaborationNotification" }
+  /collaborations/notifications/{notificationId}/read:
+    post:
+      operationId: markCollaborationNotificationRead
+      tags: [collaborations]
+      summary: Mark a collaboration notification as read
+      parameters:
+        - { $ref: "#/components/parameters/NotificationId" }
+      responses:
+        "204": { description: Notification marked read }
 components:
+  parameters:
+    SeedId:
+      name: seedId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    ApplicationId:
+      name: applicationId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    ContinuationId:
+      name: continuationId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    NotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    BlockId:
+      name: blockId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    ThreadId:
+      name: threadId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    GenreQuery:
+      name: genre
+      in: query
+      required: false
+      schema: { type: string }
+    UnitQuery:
+      name: unit
+      in: query
+      required: false
+      schema: { type: string }
+    LanguageQuery:
+      name: language
+      in: query
+      required: false
+      schema: { type: string }
+    ProtocolQuery:
+      name: protocol
+      in: query
+      required: false
+      schema: { type: string }
+    AvailabilityQuery:
+      name: availability
+      in: query
+      required: false
+      schema: { type: string }
+    ProviderId:
+      name: providerId
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [groq, openrouter, ollama, lmstudio]
   schemas:
+    CollaborationSeed:
+      type: object
+      properties:
+        id: { type: string }
+        creatorId: { type: string }
+        creatorName: { type: string }
+        sourceProjectTitle: { type: string }
+        seedText: { type: string }
+        unitType: { type: string }
+        protocol: { type: string }
+        genre: { type: string }
+        tone: { type: string }
+        language: { type: string }
+        plotConstraints: { type: string }
+        desiredRole: { type: string }
+        visibility: { type: string }
+        respondentLimit: { type: integer }
+        respondentCount: { type: integer }
+        myApplicationId: { type: ["string", "null"] }
+        myApplicationStatus: { type: ["string", "null"] }
+        availability: { type: string }
+        publishedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, creatorId, creatorName, sourceProjectTitle, seedText, unitType, protocol, genre, tone, language, plotConstraints, desiredRole, visibility, respondentLimit, respondentCount, myApplicationId, myApplicationStatus, availability, publishedAt, createdAt]
+    CollaborationSeedInput:
+      type: object
+      properties:
+        sourceProjectId: { type: string, minLength: 1 }
+        sourceProjectTitle: { type: string, minLength: 1 }
+        seedText: { type: string, minLength: 1, maxLength: 12000 }
+        unitType: { type: string, minLength: 1 }
+        protocol: { type: string, minLength: 1 }
+        genre: { type: string, minLength: 1 }
+        tone: { type: string, minLength: 1 }
+        language: { type: string, minLength: 1 }
+        plotConstraints: { type: string }
+        desiredRole: { type: string, minLength: 1 }
+        visibility: { type: string, enum: [SEED_AND_BRIEF, SEED_ONLY] }
+        respondentLimit: { type: integer, enum: [3, 5, 10, 0] }
+      required: [sourceProjectId, sourceProjectTitle, seedText, unitType, protocol, genre, tone, language, plotConstraints, desiredRole, visibility, respondentLimit]
+    CollaborationSeedUpdate:
+      type: object
+      properties:
+        unitType: { type: string, minLength: 1 }
+        protocol: { type: string, minLength: 1 }
+        genre: { type: string, minLength: 1 }
+        tone: { type: string, minLength: 1 }
+        language: { type: string, minLength: 1 }
+        plotConstraints: { type: string }
+        desiredRole: { type: string, minLength: 1 }
+        visibility: { type: string, enum: [SEED_AND_BRIEF, SEED_ONLY] }
+        respondentLimit: { type: integer, enum: [3, 5, 10, 0] }
+    SeedApplicationInput:
+      type: object
+      properties:
+        respondentName: { type: string, minLength: 1 }
+      required: [respondentName]
+    SeedApplication:
+      type: object
+      properties:
+        id: { type: string }
+        seedId: { type: string }
+        respondentId: { type: string }
+        respondentName: { type: string }
+        sourceProjectTitle: { type: string }
+        sourceSeedText: { type: string }
+        draftText: { type: string }
+        draftComments: { type: string }
+        status: { type: string }
+        submittedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, seedId, respondentId, respondentName, sourceProjectTitle, sourceSeedText, draftText, draftComments, status, submittedAt, createdAt, updatedAt]
+    ContinuationDraftInput:
+      type: object
+      properties:
+        draftText: { type: string, maxLength: 20000 }
+        draftComments: { type: string, maxLength: 6000 }
+      required: [draftText, draftComments]
+    ContinuationSubmission:
+      type: object
+      properties:
+        id: { type: string }
+        applicationId: { type: string }
+        seedId: { type: string }
+        creatorId: { type: string }
+        respondentId: { type: string }
+        respondentName: { type: string }
+        sourceProjectTitle: { type: string }
+        seedText: { type: string }
+        continuationText: { type: string }
+        comments: { type: string }
+        notificationId: { type: ["string", "null"] }
+        read: { type: boolean }
+        status: { type: string }
+        submittedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, applicationId, seedId, creatorId, respondentId, respondentName, sourceProjectTitle, seedText, continuationText, comments, notificationId, read, status, submittedAt, createdAt]
+    WriterProfile:
+      type: object
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        bio: { type: string }
+        genres:
+          type: array
+          items: { type: string }
+        tones:
+          type: array
+          items: { type: string }
+        languages:
+          type: array
+          items: { type: string }
+        submittedCount: { type: integer }
+        acceptedCount: { type: integer }
+        completedCount: { type: integer }
+      required: [userId, displayName, bio, genres, tones, languages, submittedCount, acceptedCount, completedCount]
+    AdvisorySignal:
+      type: object
+      properties:
+        category: { type: string }
+        level: { type: string, enum: [positive, neutral, attention] }
+        title: { type: string }
+        detail: { type: string }
+      required: [category, level, title, detail]
+    ContinuationAdvisory:
+      type: object
+      properties:
+        disclaimer: { type: string }
+        signals:
+          type: array
+          items: { $ref: "#/components/schemas/AdvisorySignal" }
+        generatedAt: { type: string, format: date-time }
+      required: [disclaimer, signals, generatedAt]
+    CollaborationMessage:
+      type: object
+      properties:
+        id: { type: string }
+        threadId: { type: string }
+        senderId: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, threadId, senderId, body, createdAt]
+    CollaborationThread:
+      type: object
+      properties:
+        id: { type: string }
+        continuationId: { type: string }
+        creatorId: { type: string }
+        respondentId: { type: string }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/CollaborationMessage" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, continuationId, creatorId, respondentId, messages, createdAt, updatedAt]
+    CollaborationMessageInput:
+      type: object
+      properties:
+        body: { type: string, minLength: 1, maxLength: 4000 }
+      required: [body]
+    CollaborationProject:
+      type: object
+      properties:
+        id: { type: string }
+        seedId: { type: string }
+        title: { type: string }
+        creatorId: { type: string }
+        creatorName: { type: string }
+        respondentId: { type: string }
+        respondentName: { type: string }
+        seedText: { type: string }
+        continuationText: { type: string }
+        status: { type: string }
+        contractVersion: { type: integer }
+        creatorApproved: { type: boolean }
+        respondentApproved: { type: boolean }
+        currentTurn: { type: string }
+        threadId: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        lockedAt: { type: ["string", "null"], format: date-time }
+      required: [id, seedId, title, creatorId, creatorName, respondentId, respondentName, seedText, continuationText, status, contractVersion, creatorApproved, respondentApproved, currentTurn, threadId, createdAt, lockedAt]
+    CollaborationNotification:
+      type: object
+      properties:
+        id: { type: string }
+        category: { type: string }
+        title: { type: string }
+        body: { type: string }
+        deepLink: { type: string }
+        resourceId: { type: ["string", "null"] }
+        read: { type: boolean }
+        createdAt: { type: string, format: date-time }
+      required: [id, category, title, body, deepLink, resourceId, read, createdAt]
+    WorkBlock:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        ownerId: { type: string }
+        kind: { type: string }
+        content: { type: string }
+        status: { type: string }
+        parentBlockId: { type: ["string", "null"] }
+        turnOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, ownerId, kind, content, status, parentBlockId, turnOrder, createdAt, updatedAt]
+    WorkBlockInput:
+      type: object
+      properties:
+        content: { type: string, minLength: 1, maxLength: 20000 }
+        kind: { type: string, enum: [FOLLOWUP], default: FOLLOWUP }
+      required: [content]
+    StoryBibleEntry:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        kind: { type: string }
+        name: { type: string }
+        content: { type: string }
+        ownerId: { type: string }
+        shared: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, kind, name, content, ownerId, shared, createdAt, updatedAt]
+    StoryBibleEntryInput:
+      type: object
+      properties:
+        kind: { type: string, enum: [character, location, item, rule, note] }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        content: { type: string, minLength: 1, maxLength: 12000 }
+        shared: { type: boolean, default: false }
+      required: [kind, name, content]
+    ActivityEvent:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: ["string", "null"] }
+        seedId: { type: ["string", "null"] }
+        actorId: { type: string }
+        eventType: { type: string }
+        summary: { type: string }
+        resourceId: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, projectId, seedId, actorId, eventType, summary, resourceId, createdAt]
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
-
+      required: [status]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    WaitlistInput:
+      type: object
+      properties:
+        categorySlug:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+      required: [categorySlug, email]
+    WaitlistEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        email:
+          type: string
+          format: email
+        categorySlug:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, userId, email, categorySlug, createdAt]
+    AdminSession:
+      type: object
+      properties:
+        authenticated:
+          type: boolean
+      required: [authenticated]
+    AdminLoginInput:
+      type: object
+      properties:
+        accessCode:
+          type: string
+          minLength: 1
+      required: [accessCode]
+    ProviderModel:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        enabled:
+          type: boolean
+        priority:
+          type: number
+        status:
+          type: string
+          enum: [connected, not_configured, checking, rate_limited, unavailable, error, disabled]
+        lastCheckedAt:
+          type: ["string", "null"]
+        cooldownUntil:
+          type: ["string", "null"]
+        lastError:
+          type: ["string", "null"]
+      required: [id, label, enabled, priority, status, lastCheckedAt, cooldownUntil, lastError]
+    ProviderStatus:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        baseUrl:
+          type: string
+        configured:
+          type: boolean
+        keyHint:
+          type: ["string", "null"]
+        enabled:
+          type: boolean
+        priority:
+          type: number
+        status:
+          type: string
+          enum: [connected, not_configured, checking, rate_limited, unavailable, error, disabled]
+        lastCheckedAt:
+          type: ["string", "null"]
+        cooldownUntil:
+          type: ["string", "null"]
+        lastError:
+          type: ["string", "null"]
+        lastSuccessModelId:
+          type: ["string", "null"]
+        lastSuccessAt:
+          type: ["string", "null"]
+        isLastKnownGood:
+          type: boolean
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProviderModel"
+      required: [id, label, baseUrl, configured, keyHint, enabled, priority, status, lastCheckedAt, cooldownUntil, lastError, lastSuccessModelId, lastSuccessAt, isLastKnownGood, models]
+    ProviderUpdate:
+      type: object
+      properties:
+        apiKey:
+          type: ["string", "null"]
+        baseUrl:
+          type: ["string", "null"]
+        modelId:
+          type: ["string", "null"]
+        enabled:
+          type: boolean
+        priority:
+          type: number
+          minimum: 1
+      required: [enabled, priority]
+    OracleMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [system, user, assistant]
+        content:
+          type: string
+          maxLength: 4000
+      required: [role, content]
+    OracleChatInput:
+      type: object
+      properties:
+        messages:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/OracleMessage"
+        context:
+          type: ["string", "null"]
+          maxLength: 12000
+        temperature:
+          type: number
+          minimum: 0
+          maximum: 2
+      required: [messages]
+    OracleResult:
+      type: object
+      properties:
+        content:
+          type: string
+        providerId:
+          type: string
+        modelId:
+          type: string
+        attempted:
+          type: array
+          items:
+            type: string
+      required: [content, providerId, modelId, attempted]
+    ContinuityAuditInput:
+      type: object
+      properties:
+        context:
+          type: string
+          minLength: 1
+          maxLength: 12000
+        focus:
+          type: ["string", "null"]
+          maxLength: 500
+      required: [context]
+    ContinuityIssue:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+          enum: [character, timeline, location, world, plot, other]
+        severity:
+          type: string
+          enum: [high, medium, low]
+        claim:
+          type: string
+        evidence:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        explanation:
+          type: string
+        suggestion:
+          type: string
+      required: [id, category, severity, claim, evidence, explanation, suggestion]
+    ContinuityAuditResult:
+      type: object
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContinuityIssue"
+        providerId:
+          type: string
+        modelId:
+          type: string
+        attempted:
+          type: array
+          items:
+            type: string
+      required: [issues, providerId, modelId, attempted]
+    ToneRewriteInput:
+      type: object
+      properties:
+        selectedText:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        voiceReference:
+          type: string
+          minLength: 1
+          maxLength: 6000
+        instruction:
+          type: ["string", "null"]
+          maxLength: 500
+      required: [selectedText, voiceReference]
+    ToneRewriteResult:
+      type: object
+      properties:
+        content:
+          type: string
+        providerId:
+          type: string
+        modelId:
+          type: string
+        attempted:
+          type: array
+          items:
+            type: string
+      required: [content, providerId, modelId, attempted]
+    OutlineAssistInput:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [premise_expansion, scene_ideas, chapter_breaks]
+        context:
+          type: string
+          minLength: 1
+          maxLength: 12000
+        focus:
+          type: ["string", "null"]
+          maxLength: 700
+      required: [mode, context]
+    OutlineAssistResult:
+      type: object
+      properties:
+        content:
+          type: string
+        providerId:
+          type: string
+        modelId:
+          type: string
+        attempted:
+          type: array
+          items:
+            type: string
+      required: [content, providerId, modelId, attempted]
+    VoiceConsistencyInput:
+      type: object
+      properties:
+        characterProfile:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        context:
+          type: string
+          minLength: 1
+          maxLength: 12000
+        focus:
+          type: ["string", "null"]
+          maxLength: 700
+      required: [characterProfile, context]
+    VoiceConsistencyIssue:
+      type: object
+      properties:
+        id:
+          type: string
+        category:
+          type: string
+          enum: [diction, rhythm, worldview, knowledge, emotion, other]
+        severity:
+          type: string
+          enum: [high, medium, low]
+        claim:
+          type: string
+        evidence:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        explanation:
+          type: string
+        suggestion:
+          type: string
+      required: [id, category, severity, claim, evidence, explanation, suggestion]
+    VoiceConsistencyResult:
+      type: object
+      properties:
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/VoiceConsistencyIssue"
+        providerId:
+          type: string
+        modelId:
+          type: string
+        attempted:
+          type: array
+          items:
+            type: string
+      required: [issues, providerId, modelId, attempted]
+    WorldBibleExtractInput:
+      type: object
+      properties:
+        context:
+          type: string
+          minLength: 1
+          maxLength: 12000
+        focus:
+          type: ["string", "null"]
+          maxLength: 700
+      required: [context]
+    WorldBibleEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [location, item, rule]
+        name:
+          type: string
+        description:
+          type: string
+        evidence:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        suggestedWorldKind:
+          type: string
+          enum: [Place, Country, Culture, Object, System, Institution]
+      required: [id, kind, name, description, evidence, suggestedWorldKind]
+    WorldBibleExtractResult:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorldBibleEntry"
+        providerId:
+          type: string
+        modelId:
+          type: string
+        attempted:
+          type: array
+          items:
+            type: string
+      required: [entries, providerId, modelId, attempted]
