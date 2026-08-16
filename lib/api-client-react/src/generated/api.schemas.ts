@@ -450,6 +450,13 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface UserProfile {
+  userId: string;
+  displayName: string;
+  /** @nullable */
+  imageUrl: string | null;
+}
+
 export interface WaitlistInput {
   /** @minLength 1 */
   categorySlug: string;

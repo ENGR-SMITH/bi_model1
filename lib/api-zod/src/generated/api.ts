@@ -1649,3 +1649,21 @@ export const MarkCollaborationNotificationReadParams = zod.object({
 export const MarkCollaborationNotificationReadResponse = zod.void()
 
 
+/**
+ * Returns the display name and authentication profile image of a user (e.g. the co-writer in a collaboration thread) so the client can render their real avatar.
+ * @summary Read a user's public profile
+ */
+
+
+
+export const GetUserProfileParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const GetUserProfileResponse = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string(),
+  "imageUrl": zod.string().nullable()
+})
+
+

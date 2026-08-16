@@ -2,15 +2,15 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSPropert
 import { useMutation } from "@tanstack/react-query";
 import {
   AlertTriangle, Archive, ArrowLeft, ArrowRight, BookOpen, Bold, Check, CheckCircle2, ChevronDown, CircleHelp,
-  ClipboardList, Clock3, Code2, Copy, Download, Eraser, ExternalLink, FileDown, FileText, FolderOpen,
-  GitFork, Globe2, Heading1, Heading2, Highlighter, ImagePlus, Italic, Library, Link2, List,
-  ListOrdered, MapPin, Menu, MoreHorizontal, Move, PanelLeft, PenLine, Play, Plus,
+  ClipboardList, Clock3, Copy, Download, Eraser, ExternalLink, FileDown, FileText, FolderOpen,
+  GitFork, Globe2, Heading1, Heading2, Highlighter, ImagePlus,  Italic, Library, Link2, List,
+  ListOrdered, Lock, LockOpen, LogOut, MapPin, Menu, Move, PanelLeft, PenLine, Play, Plus,
   Quote, Redo2, RefreshCw, RotateCcw, Save, Search, Send, Settings, ShieldCheck, Sparkles, Strikethrough, Trash2,
-  Undo2, Upload, Users, WandSparkles, X, XCircle, Zap, MessageCircle
+  Type, Undo2, Upload, Users, WandSparkles, X, XCircle, Zap, MessageCircle
 } from "lucide-react";
 import { useUser } from "@clerk/react";
 import { Toaster } from "@/components/ui/toaster";
-import { continuityAudit, oracleChat, outlineAssist, toneRewrite, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
+import { continuityAudit, oracleChat, outlineAssist, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
 import {
   acceptContinuation,
   createSeedApplication,
@@ -23,6 +23,7 @@ import {
   getContinuation,
   getContinuationProject,
   getOrCreateProjectThread,
+  getUserProfile,
   markCollaborationProjectThreadRead,
   listCollaborationProjects,
   saveCollaborationProjectDocument,
@@ -78,6 +79,17 @@ function OracleRouteMeta({ providerId, modelId, attempted }: { providerId: strin
     <span className="oracle-route-kind">{route}</span>
     {attempted && attempted.length > 1 && <span className="oracle-route-failover">· failed over from {attempted.slice(0, -1).join(", ")}</span>}
   </small>;
+}
+
+// Profile avatar circle for the collaboration chat. When the account's profile
+// image is available (the signed-in user's Clerk picture) it renders the photo;
+// for the co-writer, whose profile image is not exposed by the API, it shows a
+// stable colored circle with their initial as the avatar.
+function ChatAvatar({ name, src }: { name: string; src?: string | null }) {
+  const label = (name || "C").slice(0, 1).toUpperCase();
+  const hue = [...(name || "C")].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
+  if (src) return <span className="den-chat-avatar"><img src={src} alt="" /></span>;
+  return <span className="den-chat-avatar" style={{ background: `hsl(${hue} 40% 42%)`, color: "#fff" }}>{label}</span>;
 }
 
 function sample(): Project {
@@ -162,6 +174,8 @@ function App() {
   const [sharedOpenError, setSharedOpenError] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatThread, setChatThread] = useState<{ id: string; creatorId: string; respondentId: string; creatorName: string; respondentName: string; projectId: string | null } | null>(null);
+  const [chatPartnerAvatar, setChatPartnerAvatar] = useState<string | null>(null);
+  const chatAvatarFetchedForRef = useRef<string | null>(null);
   const [chatMessages, setChatMessages] = useState<{ id: string; senderId: string; body: string; createdAt: string }[]>([]);
   const [chatText, setChatText] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
@@ -358,17 +372,31 @@ function App() {
   const openProject = (item: Project, next: View = "general", sceneId?: string) => { setProjectId(item.id); setEditorSceneId(sceneId ?? null); setView(next); setTutorialOpen(false); setMode(item.isTutorial ? "lesson" : "draft"); };
   // ---- Private thread (floating chat) — only for collaboration projects ----
   const isSharedProject = Boolean(project?.collaborationProjectId && !preview && view !== "home");
+  // The co-writer is whoever the current authenticated user is NOT: a creator
+  // talks to the respondent and a respondent talks back to the creator. The
+  // names come from their accounts (recorded on the thread at seed time).
   const chatPartnerName = chatThread
-    ? user?.id === chatThread.creatorId
+    ? (user?.id === chatThread.creatorId
       ? (chatThread.respondentName || "Your collaborator")
-      : (project?.author || chatThread.creatorName || "Author")
-    : project?.author || "Collaborator";
+      : (chatThread.creatorName || project?.author || "Author"))
+    : (project?.author || "Collaborator");
+  const chatOpenRef = useRef(false);
+  useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);
   const openChat = async () => {
-    if (!project?.collaborationProjectId) return;
+    if (!project?.collaborationProjectId || chatOpenRef.current || chatBusy) return;
     setChatBusy(true);
     try {
       const thread = await getOrCreateProjectThread(project.collaborationProjectId);
       setChatThread(thread);
+      // Fetch the co-writer's authentication profile picture so the chat avatar
+      // shows their real photo (falls back to their initial avatar on error).
+      const partnerId = user?.id === thread.creatorId ? thread.respondentId : thread.creatorId;
+      if (partnerId && chatAvatarFetchedForRef.current !== partnerId) {
+        chatAvatarFetchedForRef.current = partnerId;
+        getUserProfile(partnerId)
+          .then((profile) => setChatPartnerAvatar(profile.imageUrl ?? null))
+          .catch(() => { /* keep the initial-letter avatar */ });
+      }
       setChatMessages((thread.messages ?? []) as any[]);
       markCollaborationProjectThreadRead(project.collaborationProjectId).catch(() => {});
       setChatUnread(0);
@@ -380,6 +408,45 @@ function App() {
     } finally {
       setChatBusy(false);
     }
+  };
+  // The chat only opens when the user clicks or hovers the widget. A deep link
+  // (?chat=1) may open it once per project, but closing it must stay closed —
+  // the guard ref stops the effect from re-opening it right after a close.
+  const chatAutoOpenedForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (intent.chat && project?.collaborationProjectId && !chatOpen && chatAutoOpenedForRef.current !== project.collaborationProjectId) {
+      chatAutoOpenedForRef.current = project.collaborationProjectId;
+      openChat();
+    }
+  }, [intent.chat, project?.collaborationProjectId, chatOpen]);
+  // Dragging: the whole chat widget (panel + FAB) can be moved anywhere on the
+  // page by grabbing its header; the position is clamped to the viewport.
+  const [chatPos, setChatPos] = useState<{ x: number; y: number } | null>(null);
+  const chatDragRef = useRef<{ startX: number; startY: number; origLeft: number; origTop: number } | null>(null);
+  const chatShellRef = useRef<HTMLDivElement>(null);
+  const chatDragMove = (event: globalThis.PointerEvent) => {
+    const drag = chatDragRef.current;
+    const shell = chatShellRef.current;
+    if (!drag || !shell) return;
+    const maxX = Math.max(0, window.innerWidth - shell.offsetWidth - 8);
+    const maxY = Math.max(0, window.innerHeight - shell.offsetHeight - 8);
+    setChatPos({
+      x: Math.min(Math.max(8, drag.origLeft + event.clientX - drag.startX), maxX),
+      y: Math.min(Math.max(8, drag.origTop + event.clientY - drag.startY), maxY),
+    });
+  };
+  const chatDragEnd = () => {
+    chatDragRef.current = null;
+    document.removeEventListener("pointermove", chatDragMove);
+    document.removeEventListener("pointerup", chatDragEnd);
+  };
+  const chatDragStart = (event: PointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest(".icon-btn, .den-chat-compose, .den-chat-messages")) return;
+    const shell = chatShellRef.current;
+    if (!shell) return;
+    chatDragRef.current = { startX: event.clientX, startY: event.clientY, origLeft: chatPos?.x ?? window.innerWidth - shell.offsetWidth - 26, origTop: chatPos?.y ?? window.innerHeight - shell.offsetHeight - 26 };
+    document.addEventListener("pointermove", chatDragMove);
+    document.addEventListener("pointerup", chatDragEnd);
   };
   const closeChat = () => {
     // Anything that arrived while the panel was open counts as seen: mark it
@@ -428,10 +495,6 @@ function App() {
       setChatBusy(false);
     }
   };
-  // Open the chat automatically when the inbox notification deep-links here.
-  useEffect(() => {
-    if (intent.chat && project?.collaborationProjectId && !chatOpen) openChat();
-  }, [intent.chat, project?.collaborationProjectId, chatOpen]);
   // Refresh messages while the chat is open, and mark anything seen as read so
   // the badge (and the Tandem inbox) reflect what the user has actually opened.
   useEffect(() => {
@@ -453,7 +516,11 @@ function App() {
   // A message arriving while the chat is collapsed pops a subtle alert + chime.
   // Mark the unread state unknown whenever the open project changes, so a
   // pre-existing unread message doesn't chime on first poll.
-  useEffect(() => { prevUnreadRef.current = -1; }, [project?.collaborationProjectId]);
+  useEffect(() => {
+    prevUnreadRef.current = -1;
+    chatAvatarFetchedForRef.current = null;
+    setChatPartnerAvatar(null);
+  }, [project?.collaborationProjectId]);
   useEffect(() => {
     if (!isSharedProject || !user || !project?.collaborationProjectId) return;
     const projectId = project.collaborationProjectId;
@@ -634,12 +701,12 @@ function App() {
         {view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
       {tutorialOpen && <TutorialDock step={tutorialStep} onNext={nextLesson} onDismiss={() => setTutorialOpen(false)} />}
     </main>
-    {isSharedProject && <div className={`den-chat ${chatOpen ? "den-chat-open" : ""}`}>
+    {isSharedProject && <div ref={chatShellRef} className={`den-chat ${chatOpen ? "den-chat-open" : ""} ${chatDragRef.current ? "den-chat-dragging" : ""}`} style={chatPos ? { left: chatPos.x, top: chatPos.y, right: "auto", bottom: "auto" } : undefined} onMouseEnter={openChat} onMouseLeave={closeChat}>
       {chatOpen ? <div className="den-chat-panel">
-        <div className="den-chat-head"><span className="den-chat-avatar">{(chatPartnerName || "C").slice(0, 1).toUpperCase()}</span><div><b>Private thread</b><small>with {chatPartnerName}</small></div><button className="icon-btn" aria-label="Close private thread" onClick={closeChat}><X size={16} /></button></div>
+        <div className="den-chat-head" onPointerDown={chatDragStart} title="Drag to move the chat"><ChatAvatar name={chatPartnerName} src={chatPartnerAvatar} /><div><b>{chatPartnerName || "Private thread"}</b><small>Private thread with {chatPartnerName || "your co-writer"}</small></div><button className="icon-btn" aria-label="Close private thread" onClick={closeChat}><X size={16} /></button></div>
         <div className="den-chat-messages">{chatMessages.length ? chatMessages.map((message) => <div key={message.id} className={`den-chat-msg ${message.senderId === user?.id ? "mine" : ""}`}><p>{message.body}</p><time>{new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time></div>) : <div className="den-chat-empty">No messages yet — say hello to your co-writer.</div>}</div>
         <div className="den-chat-compose"><textarea value={chatText} onChange={(event) => setChatText(event.target.value)} placeholder="Write to your co-writer…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") sendChat(); }} disabled={chatBusy} /><button className="den-chat-send" onClick={sendChat} disabled={chatBusy || !chatText.trim()}><Send size={14} /> Send</button></div>
-      </div> : <><div className="den-chat-fab-wrap">{incomingAlert && <div className="den-chat-alert"><span className="den-chat-avatar">{(chatPartnerName || "C").slice(0, 1).toUpperCase()}</span><button className="den-chat-alert-body" onClick={openChat}><b>New message</b><small>from {incomingAlert}</small></button><button className="den-chat-alert-close" aria-label="Dismiss" onClick={() => setIncomingAlert(null)}><X size={13} /></button></div>}<button className="den-chat-fab" aria-label="Open private thread" title={`Private thread with ${chatPartnerName}`} onClick={openChat}><span className="den-chat-avatar">{(chatPartnerName || "C").slice(0, 1).toUpperCase()}</span><MessageCircle size={20} />{chatUnread > 0 && <span className="den-chat-badge">{chatUnread}</span>}</button></div></>}
+      </div> : <><div className="den-chat-fab-wrap" onMouseEnter={openChat}>{incomingAlert && <div className="den-chat-alert"><ChatAvatar name={chatPartnerName} src={chatPartnerAvatar} /><button className="den-chat-alert-body" onClick={openChat}><b>New message</b><small>from {incomingAlert}</small></button><button className="den-chat-alert-close" aria-label="Dismiss" onClick={() => setIncomingAlert(null)}><X size={13} /></button></div>}<button className="den-chat-fab" aria-label="Open private thread" title={`Private thread with ${chatPartnerName}`} onClick={openChat}><ChatAvatar name={chatPartnerName} src={chatPartnerAvatar} /><MessageCircle size={20} />{chatUnread > 0 && <span className="den-chat-badge">{chatUnread}</span>}</button></div></>}
     </div>}
     {modal === "project" && <ProjectModal onClose={() => setModal(null)} onCreate={createProject} />}
     {modal === "import" && <ImportModal onClose={() => setModal(null)} onImport={importFile} />}
@@ -661,7 +728,7 @@ function Sidebar({ view, setView, project, projects, openProject, openEditor, mo
    const aux: [View, string, ReactNode][] = [["search", "Search", <Search size={17} />], ["revisions", "Revisions", <Archive size={17} />], ["oracle", "Oracle", <WandSparkles size={17} />], ["tools", "Tools", <Zap size={17} />], ["settings", "Settings", <Settings size={17} />]];
   const gated = mode === "draft" && !hasUserProject;
   const go = (id: View) => { if (gated) { notify("Create a project first to open your current work"); return; } if (id === "editor") openEditor(); else setView(id); close(); };
-   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><div className="brand-row"><div className="brand-mark">A</div><div className="brand-copy"><div className="brand-name">Authors Den</div><div className="brand-sub">writing studio</div></div><button className="icon-btn sidebar-close mobile-only" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
+   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><a className="tandem-back-btn" href="/" title="Back to Tandem"><LogOut size={15} /><span>Back to Tandem</span></a><div className="brand-row"><div className="brand-mark">A</div><div className="brand-copy"><div className="brand-name">Authors Den</div><div className="brand-sub">writing studio</div></div><button className="icon-btn sidebar-close mobile-only" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
      <div className="workspace-switch-wrap" onPointerLeave={() => setWorkspaceOpen(false)}><button className={`workspace-switch ${workspaceOpen ? "open" : ""}`} onClick={() => setWorkspaceOpen(!workspaceOpen)}><span className="workspace-icon"><Library size={14} /></span><span className="workspace-copy"><small>WORKSPACE</small><strong>My writing desk</strong></span><ChevronDown size={14} /></button>{workspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setWorkspaceOpen(false); }} onNew={() => { onNew(); setWorkspaceOpen(false); }} />}</div>
     <button className={`nav-item ${view === "home" ? "active" : ""}`} onClick={() => { setView("home"); close(); }}><FolderOpen size={17} /><span>Projects</span><span className="nav-count">{projects.length}</span></button>
      <div className="nav-label">CURRENT WORK</div>{project ? nav.map(([id, label, icon]) => <button key={id} className={`nav-item ${view === id ? "active" : ""} ${gated ? "nav-item-gated" : ""}`} onClick={() => go(id)} disabled={gated} title={gated ? "Create a project first before opening current work" : undefined}>{icon}<span>{label}</span>{id === "outline" && <span className="nav-count">{project.scenes.length}</span>}{gated && <span className="nav-lock">Create first</span>}</button>) : <div className="empty-sidebar">Open a project to begin.</div>}
@@ -673,7 +740,7 @@ function Sidebar({ view, setView, project, projects, openProject, openEditor, mo
 function Home({ projects, collaborationClones, openProject, onNew, onDuplicate, onDelete, onImport, onExport, onTutorial, onPost, onSubmitClone, highlightNew }: { projects: Project[]; collaborationClones: CollaborationClone[]; openProject: (project: Project, view?: View) => void; onNew: () => void; onDuplicate: (project: Project) => void; onDelete: (id: string) => void; onImport: () => void; onExport: (format: "json" | "md" | "txt" | "html") => void; onTutorial: () => void; onPost: (project: Project) => void; onSubmitClone: (project: Project) => void; highlightNew?: boolean }) {
   return <div className="page home-page"><PageGuide label="YOUR LIBRARY" text="Every project starts here. Open a project to shape the story." /><div className="home-hero"><div><div className="eyebrow"><span className="eyebrow-line" /> PRIVATE WRITING DESK</div><h1>Keep the whole<br /><em>story</em> in reach.</h1><p>A quiet place for premise, people, plot, and pages.<br />Everything you need to carry a work from first thought to final draft.</p></div><div className="hero-orbit"><div className="orbit-center">A</div><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" /><span className="orbit-word word-a">PREMISE</span><span className="orbit-word word-b">DRAFT</span><span className="orbit-word word-c">WORLD</span></div></div>
      <div className="section-head"><div><div className="eyebrow">YOUR LIBRARY</div><h2>Recent projects</h2><button className={`new-library-btn ${highlightNew ? "wave-nudge" : ""}`} onClick={onNew}><span className="new-project-plus"><Plus size={25} strokeWidth={3} /></span><span><b>New project</b><small>Create a project to unlock your desk</small></span></button></div></div>
-     {projects.length ? <div className="project-grid">{projects.map((item, index) => <article className={`project-card ${index === 0 ? "featured" : ""}`} key={item.id}><div className="project-card-top">{item.isClone && !item.collaborationProjectId ? <span className="clone-badge"><GitFork size={11} /> Fork of a seed</span> : item.collaborationProjectId ? <span className="sync-badge"><RefreshCw size={11} /> Shared project</span> : <span className="template-tag">{item.template}</span>}<button className="more-btn" aria-label={`Duplicate ${item.title}`} onClick={() => onDuplicate(item)}><MoreHorizontal size={18} /></button></div><button className="project-open" onClick={() => openProject(item)}><h3>{item.title}</h3><p>{item.author}</p>{item.isClone && !item.collaborationProjectId && <p className="clone-source"><GitFork size={11} /> Forked from a seed ad — edit, then submit it to the creator</p>}{item.collaborationProjectId && <p className="clone-source shared"><RefreshCw size={11} /> Synced with your collaborator — edits appear in both studios</p>}<div className="card-rule" /><div className="project-meta"><span><FileText size={13} /> {item.scenes.length} scenes</span><span>{new Date(item.updated).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></div></button><div className="card-actions">{item.isClone && !item.collaborationProjectId && (item.cloneStatus === "SUBMITTED" || item.cloneStatus === "UNDER_REVIEW") ? <span className="clone-status in-review"><Clock3 size={13} /> In review</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "ACCEPTED" ? <span className="clone-status accepted"><Check size={13} /> Accepted</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "DECLINED" ? <span className="clone-status declined"><XCircle size={13} /> Declined — edit and resubmit</span> : null}{!item.isClone && <button onClick={() => onPost(item)}><Send size={13} /> Post on Pitch Board</button>}{item.isClone && !item.collaborationProjectId && (!item.cloneStatus || item.cloneStatus === "DRAFT" || item.cloneStatus === "DECLINED") && <button className="submit-clone-btn" onClick={() => onSubmitClone(item)}><Send size={13} /> Submit</button>}<button onClick={() => onDuplicate(item)}><Copy size={13} /> Duplicate</button><button onClick={() => onDelete(item.id)}><Trash2 size={13} /> Delete</button></div></article>)}</div> : <Empty icon={<BookOpen size={28} />} title="A blank desk, waiting" text="Create your first project and give the next idea somewhere to land." action={<button className="primary-btn" onClick={onNew}><Plus size={16} /> New project</button>} />}
+     {projects.length ? <div className="project-grid">{projects.map((item, index) => <article className={`project-card ${index === 0 ? "featured" : ""}`} key={item.id}><div className="project-card-top">{item.isClone && !item.collaborationProjectId ? <span className="clone-badge"><GitFork size={11} /> Fork of a seed</span> : item.collaborationProjectId ? <span className="sync-badge"><RefreshCw size={11} /> Shared project</span> : <span className="template-tag">{item.template}</span>}</div><button className="project-open" onClick={() => openProject(item)}><h3>{item.title}</h3><p>{item.author}</p>{item.isClone && !item.collaborationProjectId && <p className="clone-source"><GitFork size={11} /> Forked from a seed ad — edit, then submit it to the creator</p>}{item.collaborationProjectId && <p className="clone-source shared"><RefreshCw size={11} /> Synced with your collaborator — edits appear in both studios</p>}<div className="card-rule" /><div className="project-meta"><span><FileText size={13} /> {item.scenes.length} scenes</span><span>{new Date(item.updated).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></div></button><div className="card-actions">{item.isClone && !item.collaborationProjectId && (item.cloneStatus === "SUBMITTED" || item.cloneStatus === "UNDER_REVIEW") ? <span className="clone-status in-review"><Clock3 size={13} /> In review</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "ACCEPTED" ? <span className="clone-status accepted"><Check size={13} /> Accepted</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "DECLINED" ? <span className="clone-status declined"><XCircle size={13} /> Declined — edit and resubmit</span> : null}{!item.isClone && <button className="card-action-btn post-btn" onClick={() => onPost(item)}><Send size={13} /> Post on Pitch Board</button>}{item.isClone && !item.collaborationProjectId && (!item.cloneStatus || item.cloneStatus === "DRAFT" || item.cloneStatus === "DECLINED") && <button className="card-action-btn submit-clone-btn" onClick={() => onSubmitClone(item)}><Send size={13} /> Submit</button>}<button className="card-action-btn duplicate-btn" onClick={() => onDuplicate(item)}><Copy size={13} /> Duplicate</button><button className="card-action-btn delete-btn" onClick={() => onDelete(item.id)}><Trash2 size={13} /> Delete</button></div></article>)}</div> : <Empty icon={<BookOpen size={28} />} title="A blank desk, waiting" text="Create your first project and give the next idea somewhere to land." action={<button className="primary-btn" onClick={onNew}><Plus size={16} /> New project</button>} />}
      {collaborationClones.length > 0 && <section className="home-lower" aria-label="Collaboration clones"><div className="quick-start"><span className="eyebrow">COLLABORATION CLONES</span><h3>Responses you have in motion.</h3><p>These private forks stay linked to their frozen source seeds until you submit or withdraw them.</p><div className="quick-actions">{collaborationClones.slice(0, 3).map((clone) => <a className="secondary-btn" key={clone.applicationId} href={`/authors-den/?answer=${clone.seedId}`}><MessageCircle size={15} /> {clone.sourceProjectTitle}<small>{clone.status.replaceAll("_", " ").toLowerCase()}</small></a>)}</div></div></section>}
     <div className="home-lower"><div className="quick-start"><span className="eyebrow">START SOMEWHERE</span><h3>Bring in work from another desk.</h3><p>Import a project or plain text draft, then keep going.</p><div className="quick-actions"><button className="secondary-btn" onClick={onImport}><Upload size={15} /> Import file</button><button className="link-btn" onClick={onTutorial}><Play size={14} /> Take the tutorial</button></div></div><div className="portable"><div><Check size={18} /><b>Local by design</b></div><p>Your projects live in this browser. Export anytime.</p><button className="link-btn" onClick={() => onExport("json")}><Download size={14} /> Export a portable project</button></div></div>
   </div>;
@@ -690,7 +757,7 @@ function Workspace({ view, project, editorSceneId, updateProject, setView, openE
   if (view === "plots") return <Plots project={project} update={updateProject} notify={notify} />;
   if (view === "world") return <World project={project} update={updateProject} notify={notify} />;
   if (view === "outline") return <Outline project={project} update={updateProject} openEditor={openEditor} notify={notify} />;
-     if (view === "editor") return <div className="draft-workspace"><Editor project={project} editorSceneId={editorSceneId} update={updateProject} setView={setView} notify={notify} /><ToneRewritePanel project={project} sceneId={editorSceneId ?? project.scenes[0]?.id ?? null} notify={notify} /></div>;
+     if (view === "editor") return <div className="draft-workspace"><Editor project={project} editorSceneId={editorSceneId} update={updateProject} setView={setView} notify={notify} /><ToneRewritePanel project={project} sceneId={editorSceneId ?? project.scenes[0]?.id ?? null} /></div>;
   if (view === "search") return <SearchPage project={project.isTutorial ? undefined : project} openEditor={openEditor} />;
   if (view === "revisions") return <Revisions project={project} update={updateProject} notify={notify} />;
    if (view === "oracle") return <OraclePage project={project} updateProject={updateProject} notify={notify} />;
@@ -731,14 +798,14 @@ function CharacterNetwork({ project }: { project: Project }) {
   return <section className="paper-card character-network"><div className="card-heading"><div><span className="eyebrow"><Users size={13} /> RELATIONSHIP WEB</span><h2>See who the story keeps together.</h2><p>Connections are inferred locally from shared scene and plot mentions. They are signals, not canon.</p></div><div className="network-count"><b>{edges.length}</b><span>connections</span></div></div>{orphaned.length > 0 && <div className="orphan-warning"><AlertTriangle size={15} /><span><b>{orphaned.length} character{orphaned.length === 1 ? "" : "s"} may be orphaned:</b> {orphaned.map((character) => character.name).join(", ")} has no matching mention in a scene or plot thread yet.</span></div>}<div className="network-content"><div className="network-nodes">{project.characters.map((character) => <div className={`network-node ${mentions.get(character.id) ? "" : "unmentioned"}`} key={character.id}><span className="person-dot" style={{ background: character.color }}>{character.name.slice(0, 1)}</span><span><b>{character.name}</b><small>{mentions.get(character.id) ?? 0} mention{mentions.get(character.id) === 1 ? "" : "s"}</small></span></div>)}</div>{edges.length ? <div className="relationship-list">{edges.map((edge) => <div className="relationship-row" key={`${edge.left.id}-${edge.right.id}`}><span className="relationship-people"><b>{edge.left.name}</b><span>↔</span><b>{edge.right.name}</b></span><small>{edge.detail} · {edge.strength} signal{edge.strength === 1 ? "" : "s"}</small></div>)}</div> : <div className="panel-empty">Shared scene and plot connections will appear as the draft gains names.</div>}</div></section>;
 }
 
-function Plots({ project, update, notify }: { project: Project; update: (patch: Partial<Project>) => void; notify: (message: string) => void }) { const [selected, setSelected] = useState<string | null>(project.plots[0]?.id ?? null); const current = project.plots.find((plot) => plot.id === selected); const patch = (value: Partial<Plot>) => current && update({ plots: project.plots.map((plot) => plot.id === current.id ? { ...plot, ...value } : plot) }); const add = () => { const plot: Plot = { id: uid(), name: "New plot thread", role: "Subplot", status: "Seeded", description: "", notes: "", steps: [], characters: "" }; update({ plots: [...project.plots, plot] }); setSelected(plot.id); }; return <div className="page"><PageHeader eyebrow="STORY ARCHITECTURE" title="Plots" description="See the threads beneath the scenes. Keep momentum without flattening the mystery." guide="Plot threads reveal the pressure moving underneath each scene." action={<button className="primary-btn" onClick={add}><Plus size={15} /> Add plot</button>} /><div className="plot-grid">{project.plots.map((plot) => <button className={`plot-card ${selected === plot.id ? "selected" : ""}`} key={plot.id} onClick={() => setSelected(plot.id)}><span className="plot-card-mark"><Sparkles size={15} /></span><div><span className="template-tag">{plot.role}</span><h3>{plot.name}</h3><p>{plot.description || "No description yet."}</p></div><span className="status-pill">{plot.status}</span></button>)}<button className="add-dashed" onClick={add}><Plus size={20} /><span>Add a thread</span></button></div>{current && <section className="paper-card plot-editor"><div className="detail-heading"><div><span className="eyebrow">THREAD NOTES</span><h2>{current.name}</h2></div><button className="danger-icon" onClick={() => { update({ plots: project.plots.filter((plot) => plot.id !== current.id) }); setSelected(null); notify("Plot deleted"); }}><Trash2 size={16} /></button></div><div className="two-fields"><TextField label="Plot name" value={current.name} onChange={(value) => patch({ name: value })} /><label className="field"><span>Status</span><select value={current.status} onChange={(event) => patch({ status: event.target.value })}>{["Seeded", "Developing", "Climax", "Resolved", "On hold"].map((value) => <option key={value}>{value}</option>)}</select></label></div><TextField label="Description" area value={current.description} onChange={(value) => patch({ description: value })} /><div className="steps-section"><div className="inline-heading"><span className="eyebrow">ORDERED STEPS</span><button className="text-btn" onClick={() => patch({ steps: [...current.steps, "New plot step"] })}><Plus size={14} /> Add step</button></div>{current.steps.map((step, index) => <div className="step-row" key={`${step}-${index}`}><span>{String(index + 1).padStart(2, "0")}</span><input value={step} onChange={(event) => { const steps = [...current.steps]; steps[index] = event.target.value; patch({ steps }); }} /><button onClick={() => patch({ steps: current.steps.filter((_, rowIndex) => rowIndex !== index) })}><X size={14} /></button></div>)}</div><TextField label="Linked characters" value={current.characters} onChange={(value) => patch({ characters: value })} /><TextField label="Notes" area value={current.notes} onChange={(value) => patch({ notes: value })} /></section>}</div>; }
+function Plots({ project, update, notify }: { project: Project; update: (patch: Partial<Project>) => void; notify: (message: string) => void }) { const [selected, setSelected] = useState<string | null>(project.plots[0]?.id ?? null); const current = project.plots.find((plot) => plot.id === selected); const patch = (value: Partial<Plot>) => current && update({ plots: project.plots.map((plot) => plot.id === current.id ? { ...plot, ...value } : plot) }); const add = () => { const plot: Plot = { id: uid(), name: "New plot thread", role: "Subplot", status: "Seeded", description: "", notes: "", steps: [], characters: "" }; update({ plots: [...project.plots, plot] }); setSelected(plot.id); }; return <div className="page"><PageHeader eyebrow="STORY ARCHITECTURE" title="Plots" description="See the threads beneath the scenes. Keep momentum without flattening the mystery." guide="Plot threads reveal the pressure moving underneath each scene." action={<button className="primary-btn" onClick={add}><Plus size={15} /> Add plot</button>} /><div className="plot-split"><div className="plot-panel"><div className="list-toolbar"><span>{project.plots.length} threads</span><Search size={15} /></div>{project.plots.map((plot) => <button className={`list-row ${selected === plot.id ? "selected" : ""}`} key={plot.id} onClick={() => setSelected(plot.id)}><span className="plot-card-mark"><Sparkles size={14} /></span><span><b>{plot.name}</b><small>{plot.role} · {plot.status}</small></span><ChevronDown size={14} /></button>)}<button className="add-dashed" onClick={add}><Plus size={18} /><span>Add a thread</span></button></div>{current ? <section className="paper-card plot-editor"><div className="detail-heading"><div><span className="eyebrow">THREAD NOTES</span><h2>{current.name}</h2></div><button className="danger-icon" onClick={() => { update({ plots: project.plots.filter((plot) => plot.id !== current.id) }); setSelected(null); notify("Plot deleted"); }}><Trash2 size={16} /></button></div><div className="two-fields"><TextField label="Plot name" value={current.name} onChange={(value) => patch({ name: value })} /><label className="field"><span>Status</span><select value={current.status} onChange={(event) => patch({ status: event.target.value })}>{["Seeded", "Developing", "Climax", "Resolved", "On hold"].map((value) => <option key={value}>{value}</option>)}</select></label></div><TextField label="Description" area value={current.description} onChange={(value) => patch({ description: value })} /><div className="steps-section"><div className="inline-heading"><span className="eyebrow">ORDERED STEPS</span><button className="text-btn" onClick={() => patch({ steps: [...current.steps, "New plot step"] })}><Plus size={14} /> Add step</button></div>{current.steps.map((step, index) => <div className="step-row" key={`${step}-${index}`}><span>{String(index + 1).padStart(2, "0")}</span><input value={step} onChange={(event) => { const steps = [...current.steps]; steps[index] = event.target.value; patch({ steps }); }} /><button onClick={() => patch({ steps: current.steps.filter((_, rowIndex) => rowIndex !== index) })}><X size={14} /></button></div>)}</div><TextField label="Linked characters" value={current.characters} onChange={(value) => patch({ characters: value })} /><TextField label="Notes" area value={current.notes} onChange={(value) => patch({ notes: value })} /></section> : <Empty icon={<Sparkles size={27} />} title="Make a thread" text="Add a plot thread to see its notes here." action={<button className="primary-btn" onClick={add}>Add first thread</button>} />}</div></div>; }
 
 function World({ project, update, notify }: { project: Project; update: (patch: Partial<Project>) => void; notify: (message: string) => void }) {
   const [selected, setSelected] = useState<string | null>(project.world[0]?.id ?? null); const current = project.world.find((item) => item.id === selected); const kinds = ["Place", "Country", "Culture", "Object", "System", "Institution"]; const patch = (value: Partial<WorldItem>) => current && update({ world: project.world.map((item) => item.id === current.id ? { ...item, ...value } : item) }); const add = (kind = "Place") => { const item: WorldItem = { id: uid(), name: `New ${kind.toLowerCase()}`, kind, description: "", notes: "", fantasy: "", mapUrl: "" }; update({ world: [...project.world, item] }); setSelected(item.id); }; const upload = (event: ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file || !current) return; const reader = new FileReader(); reader.onload = () => { patch({ image: String(reader.result), imageName: file.name }); notify("World image added"); }; reader.readAsDataURL(file); };
   return <div className="page"><PageHeader eyebrow="WORLD-BUILDING" title="World" description="Give the setting a clear working surface: place, image, map point, and the fantasy that makes it yours." guide="World holds the places, countries, customs, and impossible details around the story." action={<button className="primary-btn" onClick={() => add()}><Plus size={15} /> Add entry</button>} /><div className="world-categories">{kinds.map((kind, index) => <button key={kind} onClick={() => add(kind)}><span className={`category-icon ci-${index}`}>{kind === "Country" ? <MapPin size={16} /> : <Globe2 size={16} />}</span><span><b>{kind}</b><small>{project.world.filter((item) => item.kind === kind).length} entries</small></span><Plus size={14} /></button>)}</div><div className="split-layout world-split"><div className="list-panel world-list">{project.world.map((item) => <button className={`list-row ${selected === item.id ? "selected" : ""}`} key={item.id} onClick={() => setSelected(item.id)}><span className="world-symbol">{item.image ? <img src={item.image} alt="" /> : <Globe2 size={15} />}</span><span><b>{item.name}</b><small>{item.kind}</small></span></button>)}{!project.world.length && <div className="panel-empty">Start with a place, country, custom, or impossible object.</div>}</div>{current ? <section className="paper-card detail-card world-detail"><div className="detail-heading"><div><span className="eyebrow">{current.kind.toUpperCase()}</span><h2>{current.name}</h2></div><button className="danger-icon" onClick={() => { update({ world: project.world.filter((item) => item.id !== current.id) }); setSelected(null); notify("World entry deleted"); }}><Trash2 size={16} /></button></div><div className="two-fields"><TextField label="Name" value={current.name} onChange={(value) => patch({ name: value })} /><label className="field"><span>Kind</span><select value={current.kind} onChange={(event) => patch({ kind: event.target.value })}>{kinds.map((kind) => <option key={kind}>{kind}</option>)}</select></label></div><div className="world-form-grid"><div className="world-image-upload">{current.image ? <img src={current.image} alt={current.imageName ?? current.name} /> : <div><ImagePlus size={22} /><span>Upload a reference image</span></div>}<label className="secondary-btn"><Upload size={14} /> {current.image ? "Replace image" : "Choose image"}<input type="file" accept="image/*" hidden onChange={upload} /></label></div><div className="map-card"><div className="map-lines" /><MapPin size={20} /><b>Map point</b><span>Pin this country or place with a Google Maps link.</span><input value={current.mapUrl} onChange={(event) => patch({ mapUrl: event.target.value })} placeholder="Paste a Google Maps link or search URL" />{current.mapUrl && <a href={current.mapUrl} target="_blank" rel="noreferrer">Open map point <ArrowRight size={13} /></a>}</div></div><TextField label="Description" area value={current.description} onChange={(value) => patch({ description: value })} placeholder="What can the reader touch, hear, or get lost in?" /><TextField label="Fantasy of this place" area value={current.fantasy} onChange={(value) => patch({ fantasy: value })} placeholder="What makes this country or place impossible to mistake for our world?" /><TextField label="Private notes" area value={current.notes} onChange={(value) => patch({ notes: value })} /></section> : <Empty icon={<Globe2 size={27} />} title="Build the room around the story" text="Places, countries, customs, and systems — start with one specific detail." />}</div></div>;
 }
 
-function Outline({ project, update, openEditor, notify }: { project: Project; update: (patch: Partial<Project>) => void; openEditor: (sceneId?: string) => void; notify: (message: string) => void }) { const [query, setQuery] = useState(""); const [filter, setFilter] = useState("All"); const scenes = project.scenes.filter((scene) => (filter === "All" || scene.status === filter) && `${scene.title} ${scene.synopsis} ${scene.labels}`.toLowerCase().includes(query.toLowerCase())); const change = (id: string, patch: Partial<Scene>) => update({ scenes: project.scenes.map((scene) => scene.id === id ? { ...scene, ...patch } : scene) }); const add = () => { const scene: Scene = { id: uid(), title: "Untitled scene", synopsis: "", content: "", status: "Idea", compile: true, target: 800, pov: "", labels: "", notes: "", media: [] }; update({ scenes: [...project.scenes, scene] }); notify("Scene added"); }; const move = (index: number, direction: number) => { const actual = project.scenes.findIndex((scene) => scene.id === scenes[index].id); const target = actual + direction; if (target < 0 || target >= project.scenes.length) return; const items = [...project.scenes]; [items[actual], items[target]] = [items[target], items[actual]]; update({ scenes: items }); }; return <div className="page"><PageHeader eyebrow="STRUCTURE" title="Outline" description="A movable map of scenes. Find the shape before you lose yourself in the sentence." guide="Outline is the map of the pages: reorder scenes, then open one to draft." action={<button className="primary-btn" onClick={add}><Plus size={15} /> Add scene</button>} /><div className="outline-tools"><label className="search-field"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search scenes, labels, synopsis" /></label><div className="filter-tabs">{["All", "Idea", "Outline", "Draft", "Revised"].map((value) => <button className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>{value}</button>)}</div><span className="mono-label">{scenes.length} / {project.scenes.length}</span></div><div className="outline-list">{scenes.map((scene, index) => <article className="scene-row" key={scene.id}><div className="scene-number">{String(project.scenes.indexOf(scene) + 1).padStart(2, "0")}</div><div className="scene-main"><div className="scene-title-line"><button className="scene-title" onClick={() => openEditor(scene.id)}>{scene.title}</button><span className={`scene-status status-${scene.status.toLowerCase()}`}>{scene.status}</span>{scene.compile && <span className="compile-check"><Check size={11} /></span>}</div><p>{scene.synopsis || "Add a synopsis to remember what this scene is carrying."}</p><div className="scene-tags">{scene.pov && <span>{scene.pov}</span>}{scene.labels.split(",").filter(Boolean).map((label) => <span key={label}>{label.trim()}</span>)}<span className="target-tag">{scene.target} words</span></div></div><div className="scene-actions"><button onClick={() => move(index, -1)} aria-label="Move scene up"><ArrowLeft size={14} /></button><button onClick={() => move(index, 1)} aria-label="Move scene down"><ArrowRight size={14} /></button><button onClick={() => { update({ scenes: [...project.scenes, { ...scene, id: uid(), title: `${scene.title} copy` }] }); notify("Scene duplicated"); }} aria-label="Duplicate scene"><Copy size={14} /></button><button onClick={() => { update({ scenes: project.scenes.filter((item) => item.id !== scene.id) }); notify("Scene deleted"); }} aria-label="Delete scene"><Trash2 size={14} /></button></div><div className="scene-quick-edit"><input value={scene.synopsis} onChange={(event) => change(scene.id, { synopsis: event.target.value })} placeholder="Synopsis" /><select value={scene.status} onChange={(event) => change(scene.id, { status: event.target.value })}>{["Idea", "Outline", "Draft", "Revised"].map((value) => <option key={value}>{value}</option>)}</select><label className="compile-toggle"><input type="checkbox" checked={scene.compile} onChange={(event) => change(scene.id, { compile: event.target.checked })} /> Compile</label><button className="edit-scene-btn" onClick={() => openEditor(scene.id)}><PenLine size={13} /> Edit draft</button></div></article>)}</div>{!scenes.length && <Empty icon={<Search size={27} />} title="Nothing in this view" text="Try another filter, or make a new scene." action={<button className="secondary-btn" onClick={add}>Add scene</button>} />}</div>; }
+function Outline({ project, update, openEditor, notify }: { project: Project; update: (patch: Partial<Project>) => void; openEditor: (sceneId?: string) => void; notify: (message: string) => void }) { const [query, setQuery] = useState(""); const [filter, setFilter] = useState("All"); const [relationshipSceneId, setRelationshipSceneId] = useState<string | null>(null); const [relationshipResults, setRelationshipResults] = useState<Record<string, SceneRelationship | null>>({}); const scenes = project.scenes.filter((scene) => (filter === "All" || scene.status === filter) && `${scene.title} ${scene.synopsis} ${scene.labels}`.toLowerCase().includes(query.toLowerCase())); const change = (id: string, patch: Partial<Scene>) => update({ scenes: project.scenes.map((scene) => scene.id === id ? { ...scene, ...patch } : scene) }); const add = () => { const scene: Scene = { id: uid(), title: "Untitled scene", synopsis: "", content: "", status: "Idea", compile: true, target: 800, pov: "", labels: "", notes: "", media: [] }; update({ scenes: [...project.scenes, scene] }); notify("Scene added"); }; const move = (index: number, direction: number) => { const actual = project.scenes.findIndex((scene) => scene.id === scenes[index].id); const target = actual + direction; if (target < 0 || target >= project.scenes.length) return; const items = [...project.scenes]; [items[actual], items[target]] = [items[target], items[actual]]; update({ scenes: items }); }; return <div className="page"><PageHeader eyebrow="STRUCTURE" title="Outline" description="A movable map of scenes. Find the shape before you lose yourself in the sentence." guide="Outline is the map of the pages: reorder scenes, then open one to draft." action={<button className="primary-btn" onClick={add}><Plus size={15} /> Add scene</button>} /><div className="outline-tools"><label className="search-field"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search scenes, labels, synopsis" /></label><div className="filter-tabs">{["All", "Idea", "Outline", "Draft", "Revised"].map((value) => <button className={filter === value ? "active" : ""} onClick={() => setFilter(value)} key={value}>{value}</button>)}</div><span className="mono-label">{scenes.length} / {project.scenes.length}</span></div><div className="outline-list">{scenes.map((scene, index) => <article className="scene-row" key={scene.id}><div className="scene-number">{String(project.scenes.indexOf(scene) + 1).padStart(2, "0")}</div><div className="scene-main"><div className="scene-title-line"><button className="scene-title" onClick={() => openEditor(scene.id)}>{scene.title}</button><span className={`scene-status status-${scene.status.toLowerCase()}`}>{scene.status}</span>{scene.compile && <span className="compile-check"><Check size={11} /></span>}</div><p>{scene.synopsis || "Add a synopsis to remember what this scene is carrying."}</p><div className="scene-tags">{scene.pov && <span>{scene.pov}</span>}{scene.labels.split(",").filter(Boolean).map((label) => <span key={label}>{label.trim()}</span>)}<span className="target-tag">{scene.target} words</span></div></div><div className="scene-actions"><button onClick={() => move(index, -1)} aria-label="Move scene up"><ArrowLeft size={14} /></button><button onClick={() => move(index, 1)} aria-label="Move scene down"><ArrowRight size={14} /></button><button onClick={() => { update({ scenes: [...project.scenes, { ...scene, id: uid(), title: `${scene.title} copy` }] }); notify("Scene duplicated"); }} aria-label="Duplicate scene"><Copy size={14} /></button><button onClick={() => { update({ scenes: project.scenes.filter((item) => item.id !== scene.id) }); notify("Scene deleted"); }} aria-label="Delete scene"><Trash2 size={14} /></button><button className={`${relationshipSceneId === scene.id ? "toggled" : ""}`} onClick={() => setRelationshipSceneId(relationshipSceneId === scene.id ? null : scene.id)} aria-label="Scene relationships" title="Scene relationships"><Sparkles size={14} /></button></div><div className="scene-quick-edit"><input value={scene.synopsis} onChange={(event) => change(scene.id, { synopsis: event.target.value })} placeholder="Synopsis" /><select value={scene.status} onChange={(event) => change(scene.id, { status: event.target.value })}>{["Idea", "Outline", "Draft", "Revised"].map((value) => <option key={value}>{value}</option>)}</select><label className="compile-toggle"><input type="checkbox" checked={scene.compile} onChange={(event) => change(scene.id, { compile: event.target.checked })} /> Compile</label><button className="edit-scene-btn" onClick={() => openEditor(scene.id)}><PenLine size={13} /> Edit draft</button></div>{relationshipSceneId === scene.id && <div className="scene-relationship-wrap"><SceneRelationshipPanel key={scene.id} project={project} scene={scene} cached={relationshipResults[scene.id]} onCache={(value) => setRelationshipResults((prev) => ({ ...prev, [scene.id]: value }))} /></div>}</article>)}</div>{!scenes.length && <Empty icon={<Search size={27} />} title="Nothing in this view" text="Try another filter, or make a new scene." action={<button className="secondary-btn" onClick={add}>Add scene</button>} />}</div>; }
 
 function LegacyEditor({ project, editorSceneId, update, setView, notify }: { project: Project; editorSceneId: string | null; update: (patch: Partial<Project>) => void; setView: (view: View) => void; notify: (message: string) => void }) {
   const [sceneId, setSceneId] = useState(editorSceneId ?? project.scenes[0]?.id ?? ""); const scene = project.scenes.find((item) => item.id === sceneId) ?? project.scenes[0]; const [content, setContent] = useState(scene?.content ?? ""); const [focus, setFocus] = useState(false); const [settings, setSettings] = useState(false); const [coWritingEnabled, setCoWritingEnabled] = useState(false); const [coWritingSuggestion, setCoWritingSuggestion] = useState<{ content: string; providerId: string; modelId: string; attempted: string[] } | null>(null); const coWritingAbortController = useRef<AbortController | null>(null); const editorRef = useRef<HTMLDivElement>(null); const mediaInput = useRef<HTMLInputElement>(null);
@@ -789,7 +856,7 @@ function LegacyEditor({ project, editorSceneId, update, setView, notify }: { pro
     notify("Co-writing suggestion accepted");
   };
   if (!scene) return <div className="page"><Empty icon={<BookOpen size={28} />} title="No scenes yet" text="Add a scene in your outline, then come here to draft." action={<button className="primary-btn" onClick={() => setView("outline")}>Open outline</button>} /></div>;
-  return <div className={`editor-page ${focus ? "focus-editor" : ""}`}><PageGuide label="DRAFT" text="Write here with real rich text formatting. Images stay simple, square, movable, and resizable." /><div className="editor-head"><div><div className="eyebrow">DRAFT / SCENE {String(sceneIndex + 1).padStart(2, "0")}</div><input className="editor-title-input" value={scene.title} onChange={(event) => updateScene({ title: event.target.value })} aria-label="Scene title" /></div><div className="editor-head-actions"><span className="save-indicator"><span className="pulse-dot" /> Autosaved</span><button className={`icon-btn ${focus ? "toggled" : ""}`} onClick={() => setFocus(!focus)} aria-label="Toggle focus mode"><PanelLeft size={17} /></button><button className={`icon-btn ${settings ? "toggled" : ""}`} onClick={() => setSettings(!settings)} aria-label="Editor settings"><Settings size={17} /></button></div></div>{!focus && <div className="editor-scene-nav"><button onClick={() => go(sceneIndex - 1)} disabled={sceneIndex <= 0}><ArrowLeft size={14} /> Previous</button><label className="scene-picker"><span>Scene</span><select value={scene.id} onChange={(event) => setSceneId(event.target.value)}>{project.scenes.map((item, index) => <option key={item.id} value={item.id}>{String(index + 1).padStart(2, "0")} · {item.title}</option>)}</select></label><span>{sceneIndex + 1} of {project.scenes.length}</span><button onClick={() => go(sceneIndex + 1)} disabled={sceneIndex >= project.scenes.length - 1}>Next <ArrowRight size={14} /></button></div>}<div className="editor-layout"><div className="editor-column"><div className="format-bar"><button onClick={() => command("undo")} aria-label="Undo"><Undo2 size={16} /></button><button onClick={() => command("redo")} aria-label="Redo"><Redo2 size={16} /></button><span className="bar-divider" /><button onClick={() => command("bold")} aria-label="Bold"><Bold size={16} /></button><button onClick={() => command("italic")} aria-label="Italic"><Italic size={16} /></button><button onClick={() => command("strikeThrough")} aria-label="Strikethrough"><Strikethrough size={16} /></button><button onClick={() => command("formatBlock", "h1")} aria-label="Title heading"><Heading1 size={16} /></button><button onClick={() => command("formatBlock", "h2")} aria-label="Heading"><Heading2 size={16} /></button><button onClick={() => command("insertUnorderedList")} aria-label="Bulleted list"><List size={16} /></button><button onClick={() => command("insertOrderedList")} aria-label="Numbered list"><ListOrdered size={16} /></button><button onClick={() => command("formatBlock", "blockquote")} aria-label="Quote"><Quote size={16} /></button><button onClick={() => { const url = window.prompt("Link URL"); if (url) command("createLink", url); }} aria-label="Link"><Link2 size={16} /></button><button onClick={() => command("removeFormat")} aria-label="Clear formatting"><Eraser size={16} /></button><button onClick={() => command("formatBlock", "pre")} aria-label="Code"><Code2 size={16} /></button><span className="toolbar-spacer" /><button className="media-import-btn" onClick={() => mediaInput.current?.click()}><ImagePlus size={15} /> Add image</button><input ref={mediaInput} type="file" accept="image/*" hidden onChange={addMedia} /></div><div ref={editorRef} className="draft-area rich-editor" contentEditable suppressContentEditableWarning onKeyDown={(event) => { if (event.key === "Tab" && coWritingSuggestion && coWritingEnabled) { event.preventDefault(); acceptCoWriting(); } if (event.key === "Escape" && coWritingSuggestion) setCoWritingSuggestion(null); }} onInput={(event) => setContent(event.currentTarget.innerHTML)} data-placeholder="Begin where the pressure is..." /><MediaBoard scene={scene} updateScene={updateScene} /><section className="co-writing-bar"><div className="co-writing-top"><label className="co-writing-toggle"><input type="checkbox" checked={coWritingEnabled} onChange={(event) => { setCoWritingEnabled(event.target.checked); setCoWritingSuggestion(null); }} /><span><b>Opt-in co-writing</b><small>Off until you choose it</small></span></label><span className="co-writing-scope"><ShieldCheck size={13} /> Current scene ending only</span></div><div className="co-writing-actions"><button className="secondary-btn" onClick={coWriting.isPending ? cancelCoWriting : suggestNext} disabled={!coWritingEnabled && !coWriting.isPending}>{coWriting.isPending ? <><X size={14} /> Cancel suggestion</> : <><Sparkles size={14} /> Suggest next beat</>}</button><small>One or two sentences · press Tab to accept · Esc to dismiss</small></div>{coWriting.isError && <div className="oracle-error"><X size={14} />The suggestion could not reach a working model. Try again when the provider signal is ready.</div>}{coWritingSuggestion && <div className="co-writing-suggestion"><div><span className="eyebrow">SUGGESTED CONTINUATION</span><p>{coWritingSuggestion.content}</p><OracleRouteMeta providerId={coWritingSuggestion.providerId} modelId={coWritingSuggestion.modelId} attempted={coWritingSuggestion.attempted} /></div><button className="primary-btn" onClick={acceptCoWriting}><Check size={14} /> Accept <kbd>Tab</kbd></button></div>}</section></div>{settings && <aside className="editor-settings"><span className="eyebrow">DESK SETTINGS</span><h3>Reading room</h3><label className="field"><span>Typeface</span><select><option>Libre Baskerville</option><option>DM Sans</option><option>DM Mono</option></select></label><label className="field"><span>Text size</span><input type="range" min="15" max="28" defaultValue="19" /></label><label className="field"><span>Line spacing</span><input type="range" min="1.3" max="2.2" step=".1" defaultValue="1.8" /></label></aside>}</div><div className="editor-footer"><span><b>{words(content)}</b> words</span><span><b>{stripHtml(content).length}</b> characters</span><span><b>{stripHtml(content).split(/\n/).filter(Boolean).length}</b> paragraphs</span><span className="footer-spacer" /><button onClick={save}><Save size={14} /> Save snapshot</button></div></div>;
+  return <div className={`editor-page ${focus ? "focus-editor" : ""}`}><PageGuide label="DRAFT" text="Write here with real rich text formatting. Images stay simple, square, movable, and resizable." /><div className="editor-head"><div><div className="eyebrow">DRAFT / SCENE {String(sceneIndex + 1).padStart(2, "0")}</div><input className="editor-title-input" value={scene.title} onChange={(event) => updateScene({ title: event.target.value })} aria-label="Scene title" /></div><div className="editor-head-actions"><span className="save-indicator"><span className="pulse-dot" /> Autosaved</span><button className={`icon-btn ${focus ? "toggled" : ""}`} onClick={() => setFocus(!focus)} aria-label="Toggle focus mode"><PanelLeft size={17} /></button><button className={`icon-btn ${settings ? "toggled" : ""}`} onClick={() => setSettings(!settings)} aria-label="Editor settings"><Settings size={17} /></button></div></div>{!focus && <div className="editor-scene-nav"><button onClick={() => go(sceneIndex - 1)} disabled={sceneIndex <= 0}><ArrowLeft size={14} /> Previous</button><label className="scene-picker"><span>Scene</span><select value={scene.id} onChange={(event) => setSceneId(event.target.value)}>{project.scenes.map((item, index) => <option key={item.id} value={item.id}>{String(index + 1).padStart(2, "0")} · {item.title}</option>)}</select></label><span>{sceneIndex + 1} of {project.scenes.length}</span><button onClick={() => go(sceneIndex + 1)} disabled={sceneIndex >= project.scenes.length - 1}>Next <ArrowRight size={14} /></button></div>}<div className="editor-layout"><div className="editor-column"><div className="format-bar"><button onClick={() => command("undo")} aria-label="Undo"><Undo2 size={16} /></button><button onClick={() => command("redo")} aria-label="Redo"><Redo2 size={16} /></button><span className="bar-divider" /><button onClick={() => command("bold")} aria-label="Bold"><Bold size={16} /></button><button onClick={() => command("italic")} aria-label="Italic"><Italic size={16} /></button><button onClick={() => command("strikeThrough")} aria-label="Strikethrough"><Strikethrough size={16} /></button><button onClick={() => command("formatBlock", "h1")} aria-label="Title heading"><Heading1 size={16} /></button><button onClick={() => command("formatBlock", "h2")} aria-label="Heading"><Heading2 size={16} /></button><button onClick={() => command("insertUnorderedList")} aria-label="Bulleted list"><List size={16} /></button><button onClick={() => command("insertOrderedList")} aria-label="Numbered list"><ListOrdered size={16} /></button><button onClick={() => command("formatBlock", "blockquote")} aria-label="Quote"><Quote size={16} /></button><button onClick={() => { const url = window.prompt("Link URL"); if (url) command("createLink", url); }} aria-label="Link"><Link2 size={16} /></button><button onClick={() => command("removeFormat")} aria-label="Clear formatting"><Eraser size={16} /></button><span className="toolbar-spacer" /><button className="media-import-btn" onClick={() => mediaInput.current?.click()}><ImagePlus size={15} /> Add image</button><input ref={mediaInput} type="file" accept="image/*" hidden onChange={addMedia} /></div><div ref={editorRef} className="draft-area rich-editor" contentEditable suppressContentEditableWarning onKeyDown={(event) => { if (event.key === "Tab" && coWritingSuggestion && coWritingEnabled) { event.preventDefault(); acceptCoWriting(); } if (event.key === "Escape" && coWritingSuggestion) setCoWritingSuggestion(null); }} onInput={(event) => setContent(event.currentTarget.innerHTML)} data-placeholder="Begin where the pressure is..." /><MediaBoard scene={scene} updateScene={updateScene} /><section className="co-writing-bar"><div className="co-writing-top"><label className="co-writing-toggle"><input type="checkbox" checked={coWritingEnabled} onChange={(event) => { setCoWritingEnabled(event.target.checked); setCoWritingSuggestion(null); }} /><span><b>Opt-in co-writing</b><small>Off until you choose it</small></span></label><span className="co-writing-scope"><ShieldCheck size={13} /> Current scene ending only</span></div><div className="co-writing-actions"><button className="secondary-btn" onClick={coWriting.isPending ? cancelCoWriting : suggestNext} disabled={!coWritingEnabled && !coWriting.isPending}>{coWriting.isPending ? <><X size={14} /> Cancel suggestion</> : <><Sparkles size={14} /> Suggest next beat</>}</button><small>One or two sentences · press Tab to accept · Esc to dismiss</small></div>{coWriting.isError && <div className="oracle-error"><X size={14} />The suggestion could not reach a working model. Try again when the provider signal is ready.</div>}{coWritingSuggestion && <div className="co-writing-suggestion"><div><span className="eyebrow">SUGGESTED CONTINUATION</span><p>{coWritingSuggestion.content}</p><OracleRouteMeta providerId={coWritingSuggestion.providerId} modelId={coWritingSuggestion.modelId} attempted={coWritingSuggestion.attempted} /></div><button className="primary-btn" onClick={acceptCoWriting}><Check size={14} /> Accept <kbd>Tab</kbd></button></div>}</section></div>{settings && <aside className="editor-settings"><span className="eyebrow">DESK SETTINGS</span><h3>Reading room</h3><label className="field"><span>Typeface</span><select><option>Libre Baskerville</option><option>DM Sans</option><option>DM Mono</option></select></label><label className="field"><span>Text size</span><input type="range" min="15" max="28" defaultValue="19" /></label><label className="field"><span>Line spacing</span><input type="range" min="1.3" max="2.2" step=".1" defaultValue="1.8" /></label></aside>}</div><div className="editor-footer"><span><b>{words(content)}</b> words</span><span><b>{stripHtml(content).length}</b> characters</span><span><b>{stripHtml(content).split(/\n/).filter(Boolean).length}</b> paragraphs</span><span className="footer-spacer" /><button onClick={save}><Save size={14} /> Save snapshot</button></div></div>;
 }
 
 function Editor({ project, editorSceneId, update, setView, notify }: { project: Project; editorSceneId: string | null; update: (patch: Partial<Project>) => void; setView: (view: View) => void; notify: (message: string) => void }) {
@@ -797,11 +864,11 @@ function Editor({ project, editorSceneId, update, setView, notify }: { project: 
   const scene = project.scenes.find((item) => item.id === sceneId) ?? project.scenes[0];
   const [content, setContent] = useState(scene?.content ?? "");
   const [focus, setFocus] = useState(false);
-  const [settings, setSettings] = useState(false);
   const [typeface, setTypeface] = useState("Libre Baskerville");
   const [textSize, setTextSize] = useState(20);
   const [lineSpacing, setLineSpacing] = useState(1.9);
   const [coWritingEnabled, setCoWritingEnabled] = useState(false);
+  const [coWritingDirection, setCoWritingDirection] = useState("");
   const [coWritingSuggestion, setCoWritingSuggestion] = useState<{ content: string; providerId: string; modelId: string; attempted: string[] } | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const mediaInput = useRef<HTMLInputElement>(null);
@@ -809,15 +876,30 @@ function Editor({ project, editorSceneId, update, setView, notify }: { project: 
   const coWriting = useMutation({
     mutationFn: (data: Parameters<typeof oracleChat>[0]) => oracleChat(data),
   });
+  // Tone-rewrite floating trigger + modal (replaces the old inline TONE REWRITE section).
+  const [rewriteAnchor, setRewriteAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [rewriteOpen, setRewriteOpen] = useState(false);
+  const [rewriteText, setRewriteText] = useState("");
+  const [rewriteInstruction, setRewriteInstruction] = useState("");
+  const [rewriteReferenceId, setRewriteReferenceId] = useState(() => project.scenes.find((item) => words(item.content) > 0)?.id ?? project.scenes[0]?.id ?? "");
+  const [rewriteOptions, setRewriteOptions] = useState<{ tone: string; content: string }[] | null>(null);
+  const [rewritePending, setRewritePending] = useState(false);
+  const [rewriteError, setRewriteError] = useState(false);
+  const selectionRangeRef = useRef<Range | null>(null);
+  const rewriteAbort = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (editorSceneId && editorSceneId !== sceneId) setSceneId(editorSceneId);
   }, [editorSceneId, sceneId]);
 
+  // Only re-sync the DOM when the scene changes. Re-syncing on `scene?.content`
+  // re-assigned innerHTML after every autosave, which reset the caret to the
+  // start of the page while typing.
   useEffect(() => {
     setContent(scene?.content ?? "");
     if (editorRef.current) editorRef.current.innerHTML = scene?.content ?? "";
-  }, [sceneId, scene?.content]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sceneId]);
 
   useEffect(() => {
     if (!scene || content === scene.content) return;
@@ -833,6 +915,36 @@ function Editor({ project, editorSceneId, update, setView, notify }: { project: 
     coWriting.reset();
     setCoWritingEnabled(false);
   }, [sceneId]);
+
+  // Track a live selection inside the rich editor so the floating TONE REWRITE
+  // trigger can appear above the highlighted text.
+  useEffect(() => {
+    const capture = () => {
+      if (rewriteOpen) return;
+      const selection = window.getSelection();
+      const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+      const editor = range?.commonAncestorContainer.parentElement?.closest(".rich-editor");
+      if (!range || !editor || !selection?.toString().trim()) {
+        setRewriteAnchor(null);
+        return;
+      }
+      const rect = range.getBoundingClientRect();
+      if (!rect.width && !rect.height) {
+        setRewriteAnchor(null);
+        return;
+      }
+      selectionRangeRef.current = range.cloneRange();
+      setRewriteAnchor({ top: rect.top, left: rect.left + rect.width / 2 });
+    };
+    document.addEventListener("selectionchange", capture);
+    document.addEventListener("mouseup", capture);
+    document.addEventListener("keyup", capture);
+    return () => {
+      document.removeEventListener("selectionchange", capture);
+      document.removeEventListener("mouseup", capture);
+      document.removeEventListener("keyup", capture);
+    };
+  }, [rewriteOpen]);
 
   const updateScene = (patch: Partial<Scene>) => {
     if (scene) update({ scenes: project.scenes.map((item) => item.id === scene.id ? { ...item, ...patch } : item) });
@@ -869,12 +981,13 @@ function Editor({ project, editorSceneId, update, setView, notify }: { project: 
   const suggestNext = () => {
     if (!scene || !coWritingEnabled || coWriting.isPending) return;
     setCoWritingSuggestion(null);
+    const direction = coWritingDirection.trim();
     coWriting.mutate({
       messages: [
         { role: "system", content: "You are an opt-in fiction co-writing assistant. Suggest one or two sentences that could follow the current ending. Match the passage's point of view and tone, preserve established facts, and return only the suggested continuation." },
-        { role: "user", content: `Scene synopsis:\n${scene.synopsis || "No synopsis provided."}\n\nCurrent scene ending:\n${stripHtml(content).slice(-5000)}` },
+        { role: "user", content: `Scene synopsis:\n${scene.synopsis || "No synopsis provided."}${direction ? `\n\nOptional direction from the author:\n${direction}` : ""}\n\nCurrent scene ending:\n${stripHtml(content).slice(-5000)}` },
       ],
-      context: `Current scene only: ${scene.title}\nSynopsis: ${scene.synopsis}\nEnding: ${stripHtml(content).slice(-5000)}`.slice(0, 6000),
+      context: `Current scene only: ${scene.title}\nSynopsis: ${scene.synopsis}${direction ? `\nAuthor direction: ${direction}` : ""}\nEnding: ${stripHtml(content).slice(-5000)}`.slice(0, 6000),
       temperature: 0.55,
     }, { onSuccess: (result) => setCoWritingSuggestion(result) });
   };
@@ -891,6 +1004,65 @@ function Editor({ project, editorSceneId, update, setView, notify }: { project: 
     setCoWritingSuggestion(null);
     notify("Co-writing suggestion accepted");
   };
+  const openRewrite = () => {
+    const selection = window.getSelection();
+    const text = selection?.toString().trim().slice(0, 4000) ?? "";
+    if (!text || !selectionRangeRef.current) return;
+    setRewriteText(text);
+    setRewriteOpen(true);
+    setRewriteAnchor(null);
+  };
+  const closeRewrite = () => {
+    rewriteAbort.current?.abort();
+    rewriteAbort.current = null;
+    setRewriteOpen(false);
+    setRewriteOptions(null);
+    setRewriteError(false);
+    setRewritePending(false);
+    setRewriteInstruction("");
+    setRewriteAnchor(null);
+    selectionRangeRef.current = null;
+  };
+  const generateRewrites = () => {
+    if (!rewriteText.trim() || rewritePending) return;
+    setRewriteOptions(null);
+    setRewriteError(false);
+    const referenceScene = project.scenes.find((item) => item.id === rewriteReferenceId);
+    const controller = new AbortController();
+    rewriteAbort.current = controller;
+    setRewritePending(true);
+    oracleChat({
+      messages: [
+        { role: "system", content: "You are a fiction tone-rewrite assistant. Rewrite the user's selected passage in three clearly distinct tones, following the voice reference and optional direction. Return ONLY a JSON array with exactly 3 objects, each shaped {\"tone\": \"short tone name\", \"content\": \"the rewritten passage\"}. No markdown fences, no commentary." },
+        { role: "user", content: `Passage:\n${rewriteText}\n\nVoice reference:\n${stripHtml(referenceScene?.content ?? "").slice(0, 6000)}\n\nOptional direction:\n${rewriteInstruction.trim() || "none"}` },
+      ],
+      context: `Tone rewrite. Passage (${rewriteText.length} chars). Voice reference: ${referenceScene?.title ?? "none"}. Direction: ${rewriteInstruction.trim() || "none"}.`,
+      temperature: 0.8,
+    }, { signal: controller.signal }).then((result) => {
+      const parsed = (() => {
+        try {
+          const raw = result.content.replace(/```json|```/g, "").trim();
+          const start = raw.indexOf("[");
+          const end = raw.lastIndexOf("]");
+          const arr = JSON.parse(raw.slice(start, end + 1));
+          if (!Array.isArray(arr)) return null;
+          return arr.filter((item) => item && typeof item.content === "string").map((item) => ({ tone: String(item.tone ?? "Rewrite"), content: String(item.content) })).slice(0, 3);
+        } catch { return null; }
+      })();
+      if (parsed && parsed.length) setRewriteOptions(parsed);
+      else setRewriteError(true);
+    }).catch(() => { if (!controller.signal.aborted) setRewriteError(true); }).finally(() => { rewriteAbort.current = null; setRewritePending(false); });
+  };
+  const applyRewrite = (content: string) => {
+    if (!selectionRangeRef.current || !editorRef.current) return;
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(selectionRangeRef.current);
+    document.execCommand("insertText", false, content);
+    editorRef.current.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: content }));
+    closeRewrite();
+    notify("Tone rewrite applied to the draft");
+  };
   if (!scene) return <div className="page"><Empty icon={<BookOpen size={28} />} title="No scenes yet" text="Add a scene in your outline, then come here to draft." action={<button className="primary-btn" onClick={() => setView("outline")}>Open outline</button>} /></div>;
 
   const editorStyle = {
@@ -901,106 +1073,157 @@ function Editor({ project, editorSceneId, update, setView, notify }: { project: 
 
   return <div className={`editor-page ${focus ? "focus-editor" : ""}`}>
     {!focus && <PageGuide label="DRAFT" text="Write here with real rich text formatting. Images stay simple, square, movable, and resizable." />}
-    {!focus && <div className="editor-head"><div><div className="eyebrow editor-scene-eyebrow">DRAFT / SCENE {String(sceneIndex + 1).padStart(2, "0")}<label className="scene-picker scene-picker-inline"><span>Scene</span><select value={scene.id} onChange={(event) => setSceneId(event.target.value)} aria-label="Current scene">{project.scenes.map((item, index) => <option key={item.id} value={item.id}>{String(index + 1).padStart(2, "0")} · {item.title}</option>)}</select></label></div><input className="editor-title-input" value={scene.title} onChange={(event) => updateScene({ title: event.target.value })} aria-label="Scene title" /></div><div className="editor-head-actions"><span className="save-indicator"><span className="pulse-dot" /> Autosaved</span><button className={`icon-btn ${focus ? "toggled" : ""}`} onClick={() => setFocus(!focus)} aria-label="Toggle focus mode"><PanelLeft size={17} /></button><button className={`icon-btn ${settings ? "toggled" : ""}`} onClick={() => setSettings(!settings)} aria-label="Editor settings"><Settings size={17} /></button></div></div>}
-    {focus && <button className="focus-exit icon-btn toggled" onClick={() => setFocus(false)} aria-label="Exit focus mode"><PanelLeft size={17} /><span>Exit focus</span></button>}
-    {!focus && <div className="editor-scene-nav"><span className="scene-counter">{sceneIndex + 1} of {project.scenes.length}</span></div>}
+    {!focus && <div className="editor-head"><div><div className="eyebrow editor-scene-eyebrow">DRAFT / SCENE {String(sceneIndex + 1).padStart(2, "0")}<label className="scene-picker scene-picker-inline"><span>Scene</span><select value={scene.id} onChange={(event) => setSceneId(event.target.value)} aria-label="Current scene">{project.scenes.map((item, index) => <option key={item.id} value={item.id}>{String(index + 1).padStart(2, "0")} · {item.title}</option>)}</select></label></div><div className="editor-title-row"><input className="editor-title-input" value={scene.title} onChange={(event) => updateScene({ title: event.target.value })} aria-label="Scene title" /><span className="scene-counter">{sceneIndex + 1} of {project.scenes.length}</span></div></div><div className="editor-head-actions"><span className="save-indicator"><span className="pulse-dot" /> Autosaved</span><button className="lock-mode-btn" onClick={() => setFocus(true)} aria-label="Enter lock mode"><LockOpen size={18} /><span>Enter Lock Mode</span></button></div></div>}
+    {focus && <button className="focus-exit" onClick={() => setFocus(false)} aria-label="Exit lock mode"><Lock size={20} /><span>Exit Lock Mode</span></button>}
     <div className="editor-layout"><button className="scene-side-nav scene-side-prev" onClick={() => go(sceneIndex - 1)} disabled={sceneIndex <= 0} aria-label="Previous scene"><ArrowLeft size={18} /></button><div className="editor-column" style={editorStyle}>
-      {!focus && <section className="co-writing-bar"><div className="co-writing-top"><label className="co-writing-toggle"><input type="checkbox" checked={coWritingEnabled} onChange={(event) => { setCoWritingEnabled(event.target.checked); setCoWritingSuggestion(null); }} /><span><b>Opt-in co-writing</b></span></label><div className="co-writing-actions"><button className="secondary-btn" onClick={coWriting.isPending ? () => { coWriting.reset(); setCoWritingSuggestion(null); } : suggestNext} disabled={!coWritingEnabled && !coWriting.isPending}>{coWriting.isPending ? <><X size={14} /> Cancel suggestion</> : <><Sparkles size={14} /> Suggest next beat</>}</button></div></div>{coWriting.isError && <div className="oracle-error"><X size={14} /> The suggestion could not reach a working model. Try again when the provider signal is ready.</div>}{coWritingSuggestion && <div className="co-writing-suggestion"><div><span className="eyebrow">SUGGESTED CONTINUATION</span><p>{coWritingSuggestion.content}</p></div><button className="primary-btn" onClick={acceptCoWriting}><Check size={14} /> Accept <kbd>Tab</kbd></button></div>}</section>}
-      <div className="format-bar"><button onMouseDown={keepSelection} onClick={() => command("undo")} aria-label="Undo"><Undo2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("redo")} aria-label="Redo"><Redo2 size={16} /></button><span className="bar-divider" /><button onMouseDown={keepSelection} onClick={() => command("bold")} aria-label="Bold"><Bold size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("italic")} aria-label="Italic"><Italic size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("strikeThrough")} aria-label="Strikethrough"><Strikethrough size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h1")} aria-label="Title heading"><Heading1 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h2")} aria-label="Heading"><Heading2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertUnorderedList")} aria-label="Bulleted list"><List size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertOrderedList")} aria-label="Numbered list"><ListOrdered size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "blockquote")} aria-label="Quote"><Quote size={16} /></button><button onMouseDown={keepSelection} onClick={() => { const url = window.prompt("Link URL"); if (url) command("createLink", url); }} aria-label="Link"><Link2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("removeFormat")} aria-label="Clear formatting"><Eraser size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "pre")} aria-label="Code"><Code2 size={16} /></button><span className="toolbar-spacer" /><button className="media-import-btn" onMouseDown={keepSelection} onClick={() => mediaInput.current?.click()} aria-label="Add image"><ImagePlus size={15} /> Add image</button><input ref={mediaInput} type="file" accept="image/*" hidden onChange={addMedia} /></div>
+      {!focus && <section className="co-writing-bar"><div className="co-writing-top"><div className="co-writing-controls"><label className="co-writing-toggle"><input type="checkbox" checked={coWritingEnabled} onChange={(event) => { setCoWritingEnabled(event.target.checked); setCoWritingSuggestion(null); }} /><span><b>Opt-in co-writing</b></span></label><label className="co-writing-direction"><span>Optional direction</span><input value={coWritingDirection} onChange={(event) => setCoWritingDirection(event.target.value.slice(0, 300))} placeholder="e.g. keep it quiet, more sensory" /></label></div><div className="co-writing-actions"><button className="secondary-btn" onClick={coWriting.isPending ? () => { coWriting.reset(); setCoWritingSuggestion(null); } : suggestNext} disabled={!coWritingEnabled && !coWriting.isPending}>{coWriting.isPending ? <><X size={14} /> Cancel suggestion</> : <><Sparkles size={14} /> Suggest next beat</>}</button></div></div>{coWriting.isError && <div className="oracle-error"><X size={14} /> The suggestion could not reach a working model. Try again when the provider signal is ready.</div>}{coWritingSuggestion && <div className="co-writing-suggestion"><div><span className="eyebrow">SUGGESTED CONTINUATION</span><p>{coWritingSuggestion.content}</p></div><button className="primary-btn" onClick={acceptCoWriting}><Check size={14} /> Accept <kbd>Tab</kbd></button></div>}</section>}
+      <div className="format-bar"><button onMouseDown={keepSelection} onClick={() => command("undo")} aria-label="Undo"><Undo2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("redo")} aria-label="Redo"><Redo2 size={16} /></button><span className="bar-divider" /><button onMouseDown={keepSelection} onClick={() => command("bold")} aria-label="Bold"><Bold size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("italic")} aria-label="Italic"><Italic size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("strikeThrough")} aria-label="Strikethrough"><Strikethrough size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h1")} aria-label="Title heading"><Heading1 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h2")} aria-label="Heading"><Heading2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertUnorderedList")} aria-label="Bulleted list"><List size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertOrderedList")} aria-label="Numbered list"><ListOrdered size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "blockquote")} aria-label="Quote"><Quote size={16} /></button><button onMouseDown={keepSelection} onClick={() => { const url = window.prompt("Link URL"); if (url) command("createLink", url); }} aria-label="Link"><Link2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("removeFormat")} aria-label="Clear formatting"><Eraser size={16} /></button><span className="bar-divider" /><label className="toolbar-setting toolbar-typeface"><Type size={13} /><select value={typeface} onChange={(event) => setTypeface(event.target.value)} aria-label="Typeface"><option>Libre Baskerville</option><option>DM Sans</option><option>DM Mono</option></select></label><label className="toolbar-setting" title={`Text size · ${textSize}px`}><span className="toolbar-setting-label">Aa</span><input type="range" min="15" max="28" value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} aria-label="Text size" /><em>{textSize}px</em></label><label className="toolbar-setting" title={`Line spacing · ${lineSpacing}`}><span className="toolbar-setting-label">≡</span><input type="range" min="1.3" max="2.2" step=".1" value={lineSpacing} onChange={(event) => setLineSpacing(Number(event.target.value))} aria-label="Line spacing" /><em>{lineSpacing}</em></label><span className="toolbar-spacer" /><button className="media-import-btn" onMouseDown={keepSelection} onClick={() => mediaInput.current?.click()} aria-label="Add image"><ImagePlus size={15} /> Add image</button><input ref={mediaInput} type="file" accept="image/*" hidden onChange={addMedia} /></div>
       <div ref={editorRef} className="draft-area rich-editor" contentEditable suppressContentEditableWarning onKeyDown={(event) => { if (event.key === "Tab" && coWritingSuggestion && coWritingEnabled) { event.preventDefault(); acceptCoWriting(); } if (event.key === "Escape" && coWritingSuggestion) setCoWritingSuggestion(null); }} onInput={(event) => setContent(event.currentTarget.innerHTML)} data-placeholder="Begin where the pressure is..." />
       <MediaBoard scene={scene} updateScene={updateScene} />
-      {settings && !focus && <aside className="editor-settings"><span className="eyebrow">DESK SETTINGS</span><h3>Reading room</h3><label className="field"><span>Typeface · {typeface}</span><select value={typeface} onChange={(event) => setTypeface(event.target.value)}><option>Libre Baskerville</option><option>DM Sans</option><option>DM Mono</option></select></label><label className="field"><span>Text size · {textSize}px</span><input type="range" min="15" max="28" value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} /></label><label className="field"><span>Line spacing · {lineSpacing}</span><input type="range" min="1.3" max="2.2" step=".1" value={lineSpacing} onChange={(event) => setLineSpacing(Number(event.target.value))} /></label></aside>}
     </div><button className="scene-side-nav scene-side-next" onClick={() => go(sceneIndex + 1)} disabled={sceneIndex >= project.scenes.length - 1} aria-label="Next scene"><ArrowRight size={18} /></button></div>
     {!focus && <div className="editor-footer"><span><b>{words(content)}</b> words</span><span><b>{stripHtml(content).length}</b> characters</span><span><b>{stripHtml(content).split(/\n/).filter(Boolean).length}</b> paragraphs</span><span className="footer-spacer" /><button onClick={save}><Save size={14} /> Save snapshot</button></div>}
+    {rewriteAnchor && !rewriteOpen && <button className="tone-rewrite-float" style={{ top: Math.max(120, rewriteAnchor.top - 50), left: rewriteAnchor.left }} onMouseDown={(event) => event.preventDefault()} onClick={openRewrite} aria-label="Tone rewrite"><span className="tone-rewrite-float-icon"><PenLine size={13} /><Sparkles size={9} className="tone-rewrite-float-spark" /></span> TONE REWRITE</button>}
+    {rewriteOpen && <div className="modal-backdrop" onMouseDown={closeRewrite}><div className="modal tone-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true"><button className="modal-close" onClick={closeRewrite} aria-label="Close"><X size={17} /></button><span className="eyebrow"><PenLine size={12} /> TONE REWRITE</span><h2>Rephrase the selection.</h2><p>Three tonal options, generated from your voice reference. Pick the one to replace the highlighted text.</p><label className="field"><span>Optional direction</span><input value={rewriteInstruction} onChange={(event) => setRewriteInstruction(event.target.value.slice(0, 500))} placeholder="e.g. quieter, more tactile, keep the sentence length" /></label><label className="field"><span>Voice reference</span><select value={rewriteReferenceId} onChange={(event) => setRewriteReferenceId(event.target.value)} disabled={!project.scenes.length}>{project.scenes.map((item) => <option key={item.id} value={item.id}>{item.title}{item.id === scene?.id ? " · current" : ""}</option>)}</select></label><button className="primary-btn tone-run-btn" onClick={rewritePending ? () => { rewriteAbort.current?.abort(); rewriteAbort.current = null; setRewritePending(false); setRewriteError(false); } : generateRewrites} disabled={!rewriteText.trim() && !rewritePending}>{rewritePending ? <><X size={15} /> Cancel</> : <><WandSparkles size={15} /> Rephrase</>}</button><div className="oracle-footnote"><span><ShieldCheck size={13} /> Sends only the selected passage and up to 6,000 characters of one voice reference</span></div>{rewriteError && !rewritePending && <div className="oracle-error"><X size={14} /> The rewrite could not reach a working model. Try again when the provider signal is ready.</div>}{rewriteOptions && <div className="tone-options">{rewriteOptions.map((option, index) => <button className="tone-option" key={`${option.tone}-${index}`} onClick={() => applyRewrite(option.content)}><b>{option.tone}</b><p>{option.content}</p><span>Use this <Check size={13} /></span></button>)}</div>}</div></div>}
   </div>;
 }
 
-function ToneRewritePanel({ project, sceneId, notify }: { project: Project; sceneId: string | null; notify: (message: string) => void }) {
-  const [selectedText, setSelectedText] = useState("");
-  const [instruction, setInstruction] = useState("");
-  const [referenceId, setReferenceId] = useState(() => project.scenes.find((scene) => words(scene.content) > 0)?.id ?? project.scenes[0]?.id ?? "");
-  const [rewrite, setRewrite] = useState<{ content: string; providerId: string; modelId: string; attempted: string[] } | null>(null);
-  const [cancelled, setCancelled] = useState(false);
-  const selectionRef = useRef<Range | null>(null);
-  const abortController = useRef<AbortController | null>(null);
-  const mutation = useMutation({
-    mutationFn: (data: Parameters<typeof toneRewrite>[0]) => {
+type SceneRelationship = { summary: string; characterIds: string[]; worldIds: string[]; plotIds: string[] };
+
+// AI scene-relationship summary shared between the draft RECAP panel and the
+// outline: what the scene does, how it connects to the cast, world, and plot
+// pages, plus separate rows for the characters, worlds, and plots present.
+// `cached`/`onCache` let a parent (the outline) keep results per scene so
+// re-expanding a scene shows the summary instantly instead of re-asking the AI.
+function SceneRelationshipPanel({ project, scene, autoRun = true, cached, onCache }: {
+  project: Project;
+  scene?: Scene;
+  autoRun?: boolean;
+  cached?: SceneRelationship | null;
+  onCache?: (value: SceneRelationship | null) => void;
+}) {
+  const sceneAbortController = useRef<AbortController | null>(null);
+  const sceneContextRanForRef = useRef<string | null>(null);
+  const [sceneContext, setSceneContext] = useState<SceneRelationship | null>(cached ?? null);
+  const [sceneContextError, setSceneContextError] = useState(false);
+  const sceneContextMutation = useMutation({
+    mutationFn: (data: Parameters<typeof oracleChat>[0]) => {
       const controller = new AbortController();
-      abortController.current = controller;
-      return toneRewrite(data, { signal: controller.signal });
+      sceneAbortController.current = controller;
+      return oracleChat(data, { signal: controller.signal });
     },
-    onSettled: () => { abortController.current = null; },
+    onSettled: () => { sceneAbortController.current = null; },
   });
-  const referenceScene = project.scenes.find((scene) => scene.id === referenceId) ?? project.scenes.find((scene) => words(scene.content) > 0);
-  const currentScene = project.scenes.find((scene) => scene.id === sceneId);
-  useEffect(() => {
-    const captureSelection = () => {
-      const selection = window.getSelection();
-      const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-      const editor = range?.commonAncestorContainer.parentElement?.closest(".rich-editor");
-      if (!range || !editor || !selection?.toString().trim()) return;
-      selectionRef.current = range.cloneRange();
-      setSelectedText(selection.toString().trim().slice(0, 4000));
-      setRewrite(null);
-      setCancelled(false);
+  // Local name-matching fills the presence rows instantly and doubles as the
+  // fallback when the model is unreachable; the AI pass refines both summary
+  // and presence together against the character, world, and plot pages.
+  const localPresence = useMemo(() => {
+    if (!scene) return { characterIds: [] as string[], worldIds: [] as string[], plotIds: [] as string[] };
+    const material = `${scene.title}\n${scene.synopsis}\n${stripHtml(scene.content)}\n${scene.pov}\n${scene.labels}\n${scene.notes}`.toLowerCase();
+    const matches = (name: string) => Boolean(name) && material.includes(name.toLowerCase());
+    return {
+      characterIds: project.characters.filter((character) => matches(character.name)).map((character) => character.id),
+      worldIds: project.world.filter((item) => matches(item.name)).map((item) => item.id),
+      plotIds: project.plots.filter((plot) => matches(plot.name) || matches(plot.characters)).map((plot) => plot.id),
     };
-    document.addEventListener("selectionchange", captureSelection);
-    return () => document.removeEventListener("selectionchange", captureSelection);
-  }, []);
-  useEffect(() => {
-    if (referenceId && project.scenes.some((scene) => scene.id === referenceId)) return;
-    setReferenceId(project.scenes.find((scene) => words(scene.content) > 0)?.id ?? project.scenes[0]?.id ?? "");
-  }, [project.scenes, referenceId]);
-  const run = () => {
-    if (!selectedText || !referenceScene || mutation.isPending) return;
-    setCancelled(false);
-    setRewrite(null);
-    mutation.mutate({
-      selectedText,
-      voiceReference: stripHtml(referenceScene.content).slice(0, 6000),
-      instruction: instruction.trim() || null,
+  }, [project.characters, project.world, project.plots, scene]);
+  const runSceneContext = (target: Scene) => {
+    if (!target || sceneContextMutation.isPending) return;
+    setSceneContextError(false);
+    setSceneContext(null);
+    const chapterSoFar = project.scenes
+      .filter((item) => project.scenes.indexOf(item) <= project.scenes.indexOf(target))
+      .map((item) => `${item.title}${item.synopsis ? ` — ${item.synopsis}` : ""}\n${stripHtml(item.content).slice(0, 900)}`)
+      .join("\n\n");
+    const cast = project.characters.map((character) => `${character.name} (${character.role}): ${character.description}`).join("\n");
+    const world = project.world.map((item) => `${item.name} (${item.kind}): ${item.description}`).join("\n");
+    const plots = project.plots.map((plot) => `${plot.name} (${plot.role}): ${plot.description}`).join("\n");
+    const context = `Project: ${project.title}\nPremise: ${project.premise}\n\nCharacters (from the character page):\n${cast}\n\nWorld entries (from the world page):\n${world}\n\nPlot threads (from the plot page):\n${plots}\n\nScene to analyze:\n${target.title}\nSynopsis: ${target.synopsis}\nScene text:\n${stripHtml(target.content).slice(0, 5000)}\n\nChapter so far — this scene and everything before it:\n${chapterSoFar}`.slice(0, 14000);
+    sceneContextMutation.mutate({
+      messages: [
+        { role: "system", content: `You are a story-continuity analyst. Analyze the given scene and return ONLY a JSON object (no markdown fences, no commentary) shaped exactly like:\n{\n  "summary": "A precise, direct relationship summary: what this scene does, how it connects to the project's characters, world entries, and plot threads, and where it leaves the chapter so far. 2-4 concrete sentences, no hedging.",\n  "characterIds": ["<character id>", ...],\n  "worldIds": ["<world id>", ...],\n  "plotIds": ["<plot id>", ...]\n}\nUse ONLY ids from the provided lists. Include an id only when that person, place, or thread is actually present in or clearly driving this scene. Never invent ids or names.` },
+        { role: "user", content: `Analyze the scene against the project's character, world, and plot pages. Return the JSON object only.` },
+      ],
+      context,
+      temperature: 0.3,
+    }, {
+      onSuccess: (result) => {
+        const value: SceneRelationship = (() => {
+          try {
+            const raw = result.content.replace(/```json|```/g, "").trim();
+            const start = raw.indexOf("{");
+            const end = raw.lastIndexOf("}");
+            const parsed = JSON.parse(raw.slice(start, end + 1));
+            const valid = (ids: unknown): string[] => Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
+            const characterIds = valid(parsed.characterIds).filter((id) => project.characters.some((character) => character.id === id));
+            const worldIds = valid(parsed.worldIds).filter((id) => project.world.some((item) => item.id === id));
+            const plotIds = valid(parsed.plotIds).filter((id) => project.plots.some((plot) => plot.id === id));
+            return {
+              summary: String(parsed.summary ?? "").trim(),
+              characterIds: characterIds.length ? characterIds : localPresence.characterIds,
+              worldIds: worldIds.length ? worldIds : localPresence.worldIds,
+              plotIds: plotIds.length ? plotIds : localPresence.plotIds,
+            };
+          } catch {
+            return { summary: result.content, characterIds: localPresence.characterIds, worldIds: localPresence.worldIds, plotIds: localPresence.plotIds };
+          }
+        })();
+        setSceneContext(value);
+        onCache?.(value);
+      },
+      onError: () => setSceneContextError(true),
     });
   };
-  const cancel = () => {
-    abortController.current?.abort();
-    setCancelled(true);
-    mutation.reset();
-  };
-  const apply = () => {
-    if (!rewrite?.content || !selectionRef.current) return;
-    const selection = window.getSelection();
-    const editor = selectionRef.current.commonAncestorContainer.parentElement?.closest(".rich-editor");
-    if (!editor) return;
-    selection?.removeAllRanges();
-    selection?.addRange(selectionRef.current);
-    document.execCommand("insertText", false, rewrite.content);
-    editor.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: rewrite.content }));
-    setSelectedText("");
-    setRewrite(null);
-    selectionRef.current = null;
-    notify("Tone-matched rewrite applied to the draft");
-  };
-  const errorMessage = mutation.error instanceof Error ? mutation.error.message.replace(/^HTTP \d+ [^:]+:\s*/, "") : "The rewrite could not reach a working model. Try again after checking the provider signal.";
+  // Refresh the relationship summary when the scene changes, or adopt a cached
+  // result (outline re-expansion) without asking the model again.
+  useEffect(() => {
+    if (cached) {
+      setSceneContext(cached);
+      setSceneContextError(false);
+      return;
+    }
+    setSceneContext(null);
+    setSceneContextError(false);
+    if (!scene || !autoRun) return;
+    if (sceneContextRanForRef.current === scene.id) return;
+    sceneContextRanForRef.current = scene.id;
+    const timer = setTimeout(() => runSceneContext(scene), 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene?.id, cached, autoRun]);
+  if (!scene) {
+    return <div className="tone-scene-context"><div className="tone-scene-context-head"><span className="eyebrow">SCENE RELATIONSHIP</span></div><div className="tone-presence-empty">Select a scene to see its connections to your cast, world, and plot pages.</div></div>;
+  }
+  const charactersPresent = (sceneContext ? sceneContext.characterIds : localPresence.characterIds)
+    .map((id) => project.characters.find((character) => character.id === id))
+    .filter((character): character is Character => Boolean(character));
+  const worldsPresent = (sceneContext ? sceneContext.worldIds : localPresence.worldIds)
+    .map((id) => project.world.find((item) => item.id === id))
+    .filter((item): item is WorldItem => Boolean(item));
+  const plotsPresent = (sceneContext ? sceneContext.plotIds : localPresence.plotIds)
+    .map((id) => project.plots.find((plot) => plot.id === id))
+    .filter((plot): plot is Plot => Boolean(plot));
+  return <div className="tone-scene-context">
+    <div className="tone-scene-context-head"><span className="eyebrow">SCENE RELATIONSHIP</span><button className="text-btn" onClick={() => runSceneContext(scene)} disabled={sceneContextMutation.isPending}><RefreshCw size={13} className={sceneContextMutation.isPending ? "spin" : ""} /> Latest RECAP</button></div>
+    {sceneContextMutation.isPending && !sceneContext && <div className="tone-scene-loading"><RefreshCw size={15} className="spin" /> Reading this scene against your cast, world, and plot pages…</div>}
+    {sceneContextError && !sceneContext && <div className="oracle-error"><X size={14} /> The scene summary could not reach a working model — showing locally detected connections.</div>}
+    {sceneContext?.summary && <p className="tone-scene-summary">{sceneContext.summary}</p>}
+    <div className="tone-presence">
+      <div className="tone-presence-row"><span className="tone-presence-label"><Users size={13} /> Characters in this scene</span><div className="tone-presence-items">{charactersPresent.length ? charactersPresent.map((character) => <span className="tone-presence-chip" key={character.id} title={character.description}><span className="person-dot" style={{ background: character.color }}>{character.name.slice(0, 1)}</span>{character.name}</span>) : <span className="tone-presence-empty">None detected</span>}</div></div>
+      <div className="tone-presence-row"><span className="tone-presence-label"><Globe2 size={13} /> Worlds in this scene</span><div className="tone-presence-items">{worldsPresent.length ? worldsPresent.map((item) => <span className="tone-presence-chip" key={item.id} title={item.description}>{item.name}<small>{item.kind}</small></span>) : <span className="tone-presence-empty">None detected</span>}</div></div>
+      <div className="tone-presence-row"><span className="tone-presence-label"><Sparkles size={13} /> Plots in this scene</span><div className="tone-presence-items">{plotsPresent.length ? plotsPresent.map((plot) => <span className="tone-presence-chip" key={plot.id} title={plot.description}>{plot.name}<small>{plot.role}</small></span>) : <span className="tone-presence-empty">None detected</span>}</div></div>
+    </div>
+    <div className="oracle-footnote"><span><ShieldCheck size={13} /> Uses this scene, the chapter so far, and the cast, world, and plot pages · capped at 14,000 characters</span></div>
+  </div>;
+}
+
+function ToneRewritePanel({ project, sceneId }: { project: Project; sceneId: string | null }) {
+  const currentScene = project.scenes.find((scene) => scene.id === sceneId) ?? project.scenes[0];
   return <section className="tone-rewrite-shell">
     <div className="paper-card tone-rewrite-panel">
       <div className="card-heading tone-rewrite-heading">
-        <div><span className="eyebrow"><WandSparkles size={13} /> TONE MATCH</span><h2>Let the passage borrow a voice.</h2></div>
+        <div><span className="eyebrow"><WandSparkles size={13} /> RECAP</span><h2>See the scene's connections.</h2><p>The relationship between this scene and the cast, world, and plot threads you set up in your project pages.</p></div>
       </div>
-      <div className="tone-rewrite-grid">
-        <div>
-          <label className="field"><span>Selected passage</span><textarea value={selectedText} onChange={(event) => setSelectedText(event.target.value.slice(0, 4000))} placeholder="Select text in the draft, or paste a passage here." /></label>
-          <label className="field"><span>Optional direction</span><input value={instruction} onChange={(event) => setInstruction(event.target.value.slice(0, 500))} placeholder="e.g. quieter, more tactile, keep the sentence length" /></label>
-        </div>
-        <div>
-          <label className="field"><span>Voice reference</span><select value={referenceId} onChange={(event) => setReferenceId(event.target.value)} disabled={!project.scenes.length}>{project.scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.title}{scene.id === currentScene?.id ? " · current" : ""}</option>)}</select></label>
-          <div className="tone-reference-card"><span className="eyebrow">REFERENCE EXCERPT</span><p>{referenceScene ? (stripHtml(referenceScene.content).slice(0, 420) || "This scene has no drafted text yet.") : "Add a scene with drafted text to use its voice."}</p></div>
-          <button className="primary-btn tone-run-btn" onClick={mutation.isPending ? cancel : run} disabled={(!selectedText.trim() || !referenceScene) && !mutation.isPending}>{mutation.isPending ? <><X size={15} /> Cancel rewrite</> : <><WandSparkles size={15} /> Rewrite in this voice</>}</button>
-        </div>
-      </div>
-      <div className="oracle-footnote"><span><ShieldCheck size={13} /> Sends only the selected passage and up to 6,000 characters of one voice reference</span><span>{selectedText.length.toLocaleString()} / 4,000 characters</span></div>
-      {cancelled && <div className="oracle-error"><X size={15} />Rewrite canceled before a response was returned.</div>}
-      {mutation.isError && !cancelled && <div className="oracle-error"><X size={15} />{errorMessage}</div>}
-       {rewrite && <div className="tone-result"><div className="oracle-answer-meta"><span><WandSparkles size={13} /> Suggested rewrite</span><OracleRouteMeta providerId={rewrite.providerId} modelId={rewrite.modelId} attempted={rewrite.attempted} /></div><p>{rewrite.content}</p><div className="tone-result-actions"><button className="secondary-btn" onClick={apply}><Check size={15} /> Apply to selection</button><button className="text-btn" onClick={() => setRewrite(null)}>Keep original</button></div></div>}
+      <SceneRelationshipPanel project={project} scene={currentScene} />
     </div>
   </section>;
 }

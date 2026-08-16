@@ -67,6 +67,7 @@ export * from './threadUnread';
 export * from './toneRewriteInput';
 export * from './toneRewriteResult';
 export * from './unitQueryParameter';
+export * from './userProfile';
 export * from './voiceConsistencyInput';
 export * from './voiceConsistencyIssue';
 export * from './voiceConsistencyIssueCategory';

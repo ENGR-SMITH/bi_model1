@@ -20,6 +20,8 @@ tags:
     description: Author-to-author collaboration seeds, applications, and review
   - name: tandems
     description: Shared collaboration projects and contract state
+  - name: users
+    description: Public profile lookups for collaborators
 paths:
   /healthz:
     get:
@@ -1338,6 +1340,30 @@ paths:
         - { $ref: "#/components/parameters/NotificationId" }
       responses:
         "204": { description: Notification marked read }
+  /users/{userId}/profile:
+    get:
+      operationId: getUserProfile
+      tags: [users]
+      summary: Read a user's public profile
+      description: Returns the display name and authentication profile image of a user (e.g. the co-writer in a collaboration thread) so the client can render their real avatar.
+      parameters:
+        - { $ref: "#/components/parameters/UserId" }
+      responses:
+        "200":
+          description: Public user profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserProfile" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: User not found or profile unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 components:
   parameters:
     SeedId:
@@ -1372,6 +1398,11 @@ components:
       schema: { type: string, minLength: 1 }
     ThreadId:
       name: threadId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    UserId:
+      name: userId
       in: path
       required: true
       schema: { type: string, minLength: 1 }
@@ -1759,6 +1790,13 @@ components:
         error:
           type: string
       required: [error]
+    UserProfile:
+      type: object
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        imageUrl: { type: ["string", "null"] }
+      required: [userId, displayName, imageUrl]
     WaitlistInput:
       type: object
       properties:
