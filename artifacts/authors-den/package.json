@@ -75,6 +75,9 @@
     "zod": "catalog:"
   },
   "dependencies": {
-    "@clerk/react": "^6.14.1"
+    "@clerk/react": "^6.14.1",
+    "docx": "^9.7.1",
+    "jspdf": "^4.2.1",
+    "jszip": "^3.10.1"
   }
 }
