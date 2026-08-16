@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, CircleAlert, Download, FileText, History, Hourglass, Inbox, LockKeyhole, MessageCircle, PenLine, Search, Sparkles, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpen, Check, CircleAlert, Download, FileText, History, Hourglass, LockKeyhole, MessageCircle, PenLine, Sparkles, Users } from 'lucide-react';
 import { Link, Redirect, useLocation, useParams } from 'wouter';
 import { useUser } from '@clerk/react';
 import {
@@ -31,30 +31,6 @@ function ErrorState({ retry }: { retry?: () => void }) { return <div className="
 function Empty({ title, body, href, action }: { title: string; body: string; href?: string; action?: string }) { return <div className="mt-10 rounded-[1.75rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-8 shadow-[8px_10px_0_rgba(41,43,69,.07)] sm:p-10"><Sparkles className="h-7 w-7 text-[#e55b4c]" /><p className="mt-7 font-display text-4xl italic">{title}</p><p className="mt-3 max-w-xl text-sm leading-[1.8] text-[#77717a]">{body}</p>{href && <Link href={href} className="focus-house mt-7 inline-flex items-center gap-2 rounded-full bg-[#292b45] px-5 py-3 text-sm font-bold text-[#fff4e6]">{action}<ArrowRight className="h-4 w-4" /></Link>}</div>; }
 function Pill({ children }: { children: ReactNode }) { return <span className="rounded-full border border-[#d6cbb9] bg-[#f2e7d8] px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#625f6d]">{children}</span>; }
 function SeedCard({ seed, isOwn }: { seed: any; isOwn?: boolean }) { return <Link href={`/authors/pitch-board/seed/${seed.id}`} className="soft-lift focus-house group block rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-6"><div className="flex items-start justify-between gap-4"><Pill>{seed.genre || 'Open brief'}</Pill><span className="font-mono-ui text-[10px] text-[#98909a]">{seed.respondentCount}/{seed.respondentLimit || '∞'} voices</span></div><h2 className="mt-7 font-display text-3xl italic leading-none">{seed.sourceProjectTitle}</h2><p className="mt-4 line-clamp-3 text-sm leading-[1.8] text-[#625f6d]">{seed.seedText}</p><div className="mt-7 flex items-center justify-between border-t border-[#d6cbb9] pt-4 text-xs text-[#77717a]">{isOwn ? <span className="rounded-full bg-[#f0c85c] px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#292b45]">Your seed</span> : <span>{seed.creatorName} · {seed.tone}</span>}<ArrowUpRight className="h-4 w-4 text-[#e55b4c] transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" /></div></Link>; }
-function Atrium() {
-  const { user } = useUser();
-  const firstName = user?.firstName || 'writer';
-  return <Frame eyebrow="Author collaboration / the room" title="Two voices. One room." intro="A considered way to find the right creative counterpart. Seeds stay frozen; the work that follows stays visible.">
-    <div className="reveal reveal-1 mt-10 grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
-      <Link href="/authors/pitch-board" className="soft-lift focus-house group relative overflow-hidden rounded-[1.75rem] bg-[#292b45] p-8 text-[#fff4e6] sm:p-10">
-        <span className="absolute -right-14 -top-14 h-44 w-44 rounded-full border border-[#f0c85c]/30 transition-transform duration-500 group-hover:scale-125" />
-        <Search className="h-7 w-7 text-[#f0c85c]" />
-        <p className="mt-14 font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#f0c85c]">01 · The pitch board</p>
-        <h2 className="mt-3 max-w-[10ch] text-5xl font-extrabold leading-[.9] tracking-[-.07em]">Find a seed worth answering.</h2>
-        <p className="mt-5 max-w-sm text-sm leading-relaxed text-[#d9d2cb]">Read the brief. Listen for the opening. Respond only when the work asks for your voice.</p>
-        <span className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#e55b4c] px-5 py-3 text-sm font-bold">Browse seeds <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></span>
-      </Link>
-      <div className="grid gap-5">
-        <Link href="/authors/collaborations/continuations" className="soft-lift focus-house group rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-7"><div className="flex items-center justify-between"><Inbox className="text-[#3e8074]" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-[#98909a]">02</span></div><h2 className="mt-8 font-display text-3xl italic">Your review desk</h2><p className="mt-2 text-sm text-[#77717a]">Continuations waiting on your eye, side by side with the seed that called them.</p></Link>
-        <Link href="/authors/work" className="soft-lift focus-house group rounded-[1.5rem] border-2 border-[#f0c85c] bg-[#f0c85c] p-7"><div className="flex items-center justify-between"><Users className="text-[#292b45]" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-[#292b45]/60">03</span></div><h2 className="mt-8 font-display text-3xl italic">Work in motion</h2><p className="mt-2 text-sm text-[#292b45]/80">Solo pieces and Tandem projects, together in one room.</p></Link>
-      </div>
-    </div>
-    <div className="reveal reveal-1 mt-5 grid gap-5 sm:grid-cols-2">
-      <Link href="/inbox" className="soft-lift focus-house group rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-7"><div className="flex items-center justify-between"><MessageCircle className="text-[#e55b4c]" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-[#98909a]">04</span></div><h2 className="mt-6 font-display text-3xl italic">Your inbox</h2><p className="mt-2 text-sm text-[#77717a]">Urgent work, private threads, and room notes — everything that needs you lives there.</p></Link>
-      <Link href="/activity" className="soft-lift focus-house group rounded-[1.5rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-7"><div className="flex items-center justify-between"><FileText className="text-[#3e8074]" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-[#98909a]">05</span></div><h2 className="mt-6 font-display text-3xl italic">Your trail</h2><p className="mt-2 text-sm text-[#77717a]">Every publish, submission, selection, and approved pass across your rooms.</p></Link>
-    </div>
-    <div className="reveal reveal-2 mt-10 flex flex-wrap items-center gap-3 border-t-2 border-[#d6cbb9] pt-6 text-sm text-[#77717a]"><LockKeyhole className="h-4 w-4 text-[#e55b4c]" />Private by design · visible only to the people in the room · welcome, {firstName}</div></Frame>;
-}
 function CreateSeed() {
   const [, setLocation] = useLocation();
   const create = useCreateCollaborationSeed();
@@ -155,7 +131,7 @@ function Board() {
       <label className="sr-only" htmlFor="filter-protocol">Filter by protocol</label>
       <select id="filter-protocol" data-testid="select-filter-protocol" value={filters.protocol} onChange={e => setFilter('protocol', e.target.value)} className="rounded-full border-2 border-[#d6cbb9] bg-[#fff4e6] px-4 py-3 text-sm"><option value="">Any protocol</option><option value="Continue from the final line">Continue from the final line</option><option value="Write the next scene">Write the next scene</option></select>
       <button onClick={() => { window.location.href = '/authors-den/?publish=1'; }} className="focus-house inline-flex items-center gap-2 rounded-full bg-[#e55b4c] px-4 py-3 text-sm font-bold text-[#fff4e6]"><PenLine className="h-4 w-4" />Publish a seed</button>
-      <Link href="/authors/atrium" className="focus-house inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm font-bold text-[#77717a]"><ArrowLeft className="h-4 w-4" />Atrium</Link>
+      <Link href="/categories/authors" className="focus-house inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm font-bold text-[#77717a]"><ArrowLeft className="h-4 w-4" />Authors room</Link>
     </div>
     {q.isLoading ? <Loading /> : q.isError ? <ErrorState retry={q.refetch} /> : seeds.length ? <div className="mt-8 grid gap-5 md:grid-cols-2">{seeds.map(seed => <SeedCard key={seed.id} seed={seed} isOwn={seed.creatorId === user?.id} />)}</div> : <div className="mt-10 rounded-[1.75rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-8 shadow-[8px_10px_0_rgba(41,43,69,.07)] sm:p-10"><Sparkles className="h-7 w-7 text-[#e55b4c]" /><p className="mt-7 font-display text-4xl italic">The board is between offerings.</p><p className="mt-3 max-w-xl text-sm leading-[1.8] text-[#77717a]">No open seeds match those filters yet. Clear a filter or open your Author Den and publish the first seed from a project.</p><button onClick={() => { window.location.href = '/authors-den/?publish=1'; }} className="focus-house mt-7 inline-flex items-center gap-2 rounded-full bg-[#292b45] px-5 py-3 text-sm font-bold text-[#fff4e6]">Publish the first seed<ArrowRight className="h-4 w-4" /></button></div>}
   </Frame>;
@@ -267,7 +243,7 @@ function Continuations() {
       <article key={c.id} data-testid={`continuation-row-${c.id}`} className={`soft-lift rounded-[1.5rem] border-2 p-6 ${unread.has(c.id) || !c.read ? 'border-[#e55b4c]/50 bg-[#fff4e6]' : 'border-[#d6cbb9] bg-[#fff4e6]'}`}>
         <div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap gap-2"><Pill>{c.status.replaceAll('_', ' ')}</Pill>{(!c.read || unread.has(c.id)) && <span className="rounded-full bg-[#e55b4c] px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#fff4e6]">New</span>}</div><h2 className="mt-4 font-display text-3xl italic">{c.sourceProjectTitle}</h2><p className="mt-1 text-sm text-[#77717a]">From {c.respondentName} · submitted {new Date(c.submittedAt).toLocaleDateString()}</p></div><button data-testid={`link-read-continuation-${c.id}`} disabled={c.status !== 'UNDER_REVIEW'} onClick={() => window.location.assign(`/authors-den/?preview=${c.id}`)} className="focus-house inline-flex items-center gap-1 rounded-full border-2 border-[#3e8074] px-4 py-2 text-sm font-bold text-[#2f675e] disabled:cursor-not-allowed disabled:opacity-40">Read in Author Den <ArrowRight className="ml-1 inline h-4 w-4" /></button></div>
         <p className="mt-5 line-clamp-2 text-sm leading-relaxed text-[#625f6d]">{c.continuationText}</p><div className="mt-5 flex flex-wrap gap-2"><span className="text-xs leading-relaxed text-[#77717a]">Open it in Author Den to read the full project — approve merges it into both studios, or decline it here.</span><button data-testid={`button-decline-${c.id}`} disabled={decline.isPending || c.status !== 'UNDER_REVIEW'} onClick={() => decline.mutate({ continuationId: c.id }, { onSuccess: refresh })} className="focus-house rounded-full border border-[#d6cbb9] px-4 py-2 text-xs font-bold text-[#77717a] disabled:opacity-40">{decline.isPending ? 'Archiving…' : 'Decline & archive'}</button></div>
-      </article>) : <Empty title="Nothing is waiting on you." body="When a writer answers one of your seeds, their work will arrive here with the seed that called it forward." href="/authors/atrium" action="Back to collaboration" />}</div>
+      </article>) : <Empty title="Nothing is waiting on you." body="When a writer answers one of your seeds, their work will arrive here with the seed that called it forward." href="/categories/authors" action="Back to authors room" />}</div>
   </Frame>;
 }
 function SelectionRoom() {
@@ -504,7 +480,6 @@ function ProjectActivityPage() {
 
 export default function CollaborationPage() {
   const [location] = useLocation();
-  if (location === '/authors/atrium') return <Atrium />;
   if (location === '/authors/pitch-board/new') return <DenRedirect to="/authors-den/?publish=1" />;
   if (location === '/authors/pitch-board') return <Board />;
   if (location.endsWith('/respond')) {

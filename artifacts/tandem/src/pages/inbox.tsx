@@ -177,8 +177,8 @@ export default function InboxPage() {
       <div className="reveal reveal-2 mt-10 flex flex-wrap items-center gap-3 border-t-2 border-[#d6cbb9] pt-6 text-sm text-[#77717a]">
         <Users className="h-4 w-4 text-[#3e8074]" />
         <span>Everything here is private to you — urgent work, notes, and conversations from your rooms only.</span>
-        <Link href="/authors/atrium" className="focus-house ml-auto inline-flex items-center gap-2 rounded-full bg-[#292b45] px-4 py-2 text-xs font-bold text-[#fff4e6]">
-          Collaboration home <ArrowRight className="h-3.5 w-3.5" />
+        <Link href="/categories/authors" className="focus-house ml-auto inline-flex items-center gap-2 rounded-full bg-[#292b45] px-4 py-2 text-xs font-bold text-[#fff4e6]">
+          Authors room <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
     </div>

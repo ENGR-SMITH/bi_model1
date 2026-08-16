@@ -5,7 +5,6 @@ import {
   ChevronRight,
   DoorOpen,
   Inbox,
-  Handshake,
   LayoutGrid,
   LogOut,
   Settings2,
@@ -17,14 +16,12 @@ import { TandemLogo } from '@/components/tandem-house';
 
 const desktopNav = [
   { href: '/dashboard', label: 'Atrium', icon: LayoutGrid },
-  { href: '/authors/atrium', label: 'Collaboration', icon: Handshake },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
 ];
 
 const mobileNav = [
   { href: '/dashboard', label: 'Atrium', icon: LayoutGrid },
-  { href: '/authors/atrium', label: 'Collab', icon: Handshake },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
   { href: '/profile', label: 'Profile', icon: UserRound },
