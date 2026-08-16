@@ -15,6 +15,9 @@ import { z } from "zod/v4";
 export const collaborationSeedsTable = pgTable("collaboration_seeds", {
   id: text("id").primaryKey(),
   creatorId: text("creator_id").notNull(),
+  // Display name of the creator at publish time (set by the Author Den app;
+  // older seeds fall back to “Author”).
+  creatorName: text("creator_name"),
   sourceProjectId: text("source_project_id").notNull(),
   sourceProjectTitle: text("source_project_title").notNull(),
   // Reference to the immutable Solo-project source this seed was frozen from:
@@ -32,6 +35,9 @@ export const collaborationSeedsTable = pgTable("collaboration_seeds", {
   desiredRole: text("desired_role").notNull(),
   visibility: text("visibility").notNull().default("SEED_AND_BRIEF"),
   respondentLimit: integer("respondent_limit").notNull().default(3),
+  // Full Author Den project snapshot at publish time. Respondents fork this
+  // document when they answer; creators merge against it on accept.
+  projectDocument: jsonb("project_document"),
   availability: text("availability").notNull().default("OPEN"),
   publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
   closedAt: timestamp("closed_at", { withTimezone: true }),
@@ -50,6 +56,9 @@ export const seedApplicationsTable = pgTable(
     sourceSeedText: text("source_seed_text").notNull(),
     draftText: text("draft_text").notNull().default(""),
     draftComments: text("draft_comments").notNull().default(""),
+    // The respondent's working fork of the seed project. Saved as they edit
+    // and carried into the submitted continuation for the creator's preview.
+    projectDocument: jsonb("project_document"),
     status: text("status").notNull().default("DRAFT"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -84,6 +93,9 @@ export const continuationSubmissionsTable = pgTable(
     seedText: text("seed_text").notNull(),
     continuationText: text("continuation_text").notNull(),
     comments: text("comments").notNull().default(""),
+    // Read-only copy of the respondent's submitted project, used by the
+    // creator to preview the fork in their own Author Den before deciding.
+    projectDocument: jsonb("project_document"),
     version: integer("version").notNull().default(1),
     status: text("status").notNull().default("UNDER_REVIEW"),
     submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
@@ -112,6 +124,9 @@ export const collaborationProjectsTable = pgTable("collaboration_projects", {
   creatorApproved: boolean("creator_approved").notNull().default(false),
   respondentApproved: boolean("respondent_approved").notNull().default(false),
   currentTurn: text("current_turn").notNull().default("CREATOR"),
+  // The shared Author Den document both participants keep in sync after the
+  // creator accepts a fork (the "merge" of a pull request).
+  document: jsonb("document"),
   lockedAt: timestamp("locked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -39,11 +39,11 @@ export default function InboxPage() {
     const myRole = p.creatorId === user?.id ? 'CREATOR' : 'RESPONDENT';
     const myApproved = p.creatorId === user?.id ? p.creatorApproved : p.respondentApproved;
     if (p.status === 'CONTRACT_PENDING' && !myApproved) {
-      urgent.push({ kind: 'contract', label: 'Contract action required', body: `Approve the contract for “${p.title}” so the room can open.`, href: `/authors/tandem/${p.id}/contract`, icon: <FileText className="h-4 w-4" /> });
+      urgent.push({ kind: 'contract', label: 'Contract action required', body: `Approve the contract for “${p.title}” so the room can open.`, href: `/authors-den/?project=${p.id}`, icon: <FileText className="h-4 w-4" /> });
     } else if (p.status === 'ACTIVE' && p.currentTurn === myRole) {
-      urgent.push({ kind: 'turn', label: 'Your turn', body: `The next pass in “${p.title}” is yours to write.`, href: `/authors/tandem/${p.id}`, icon: <PenLine className="h-4 w-4" /> });
+      urgent.push({ kind: 'turn', label: 'Your turn', body: `The next pass in “${p.title}” is yours to write.`, href: `/authors-den/?project=${p.id}`, icon: <PenLine className="h-4 w-4" /> });
     } else if (p.status === 'ACTIVE') {
-      urgent.push({ kind: 'waiting', label: 'Waiting on partner', body: `${roleLabel(p, p.currentTurn)} is carrying “${p.title}”.`, href: `/authors/tandem/${p.id}/waiting`, icon: <Hourglass className="h-4 w-4" /> });
+      urgent.push({ kind: 'waiting', label: 'Waiting on partner', body: `${roleLabel(p, p.currentTurn)} is carrying “${p.title}”.`, href: `/authors-den/?project=${p.id}`, icon: <Hourglass className="h-4 w-4" /> });
     }
   });
   if (pendingReviews.length) {
@@ -56,15 +56,23 @@ export default function InboxPage() {
 
   const openNote = (n: any) => {
     mark.mutate({ notificationId: n.id });
-    if (n.deepLink) setLocation(n.deepLink);
+    // Reading a submitted project always happens in Author Den — never on a Tandem read page.
+    if (n.category === 'continuation_submitted' && n.resourceId) {
+      window.location.href = `/authors-den/?preview=${n.resourceId}`;
+      return;
+    }
+    if (n.deepLink) {
+      if (n.deepLink.startsWith('/authors-den')) window.location.href = n.deepLink;
+      else setLocation(n.deepLink);
+    }
   };
 
   return (
-    <div className="mx-auto max-w-[980px]">
+    <div className="mx-auto max-w-[1180px]">
       <div className="reveal flex flex-col justify-between gap-5 border-b-2 border-[#d6cbb9] pb-9 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>Messages / inbox</SectionEyebrow>
-          <h1 className="mt-5 text-6xl font-extrabold leading-[.88] tracking-[-0.08em] text-[#292b45] sm:text-8xl">
+          <h1 className="mt-5 max-w-[12ch] text-6xl font-extrabold leading-[.86] tracking-[-0.08em] text-[#292b45] sm:text-8xl">
             Your inbox.
           </h1>
         </div>
@@ -107,16 +115,19 @@ export default function InboxPage() {
             {threadsQ.isLoading ? (
               <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-28 animate-pulse rounded-[1.25rem] bg-[#e5d7c5]" />)}</div>
             ) : threads.length ? threads.map((t) => (
-              <button key={t.id} data-testid={`inbox-thread-${t.id}`} onClick={() => setLocation(`/authors/collaborations/thread/${t.id}`)}
-                className={`focus-house flex w-full items-start gap-4 rounded-[1.25rem] border-2 p-5 text-left ${t.unread ? 'border-[#e55b4c]/50 bg-[#fff4e6]' : 'border-[#d6cbb9] bg-[#f2e7d8]'}`}>
-                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${t.unread ? 'bg-[#e55b4c]' : 'bg-[#d6cbb9]'}`} />
+              <button key={t.id} data-testid={`inbox-thread-${t.id}`} onClick={() => t.projectId ? window.location.href = `/authors-den/?project=${t.projectId}&chat=1` : setLocation(`/authors/collaborations/thread/${t.id}`)}
+                className={`focus-house soft-lift flex w-full items-start gap-4 rounded-[1.25rem] border-2 p-5 text-left ${t.unread ? 'border-[#e55b4c]/50 bg-[#fff4e6]' : 'border-[#d6cbb9] bg-[#f2e7d8]'}`}>
+                <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#292b45] font-mono-ui text-[11px] font-medium uppercase text-[#fff4e6]">{(t.partnerName || 'W').slice(0, 1)}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="block truncate font-bold">{t.sourceProjectTitle}</span>
-                    {t.unread && <span className="rounded-full bg-[#e55b4c] px-2 py-0.5 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#fff4e6]">New</span>}
+                    <span className="block truncate text-sm font-bold text-[#292b45]">{t.sourceProjectTitle}</span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      <span className="text-[10px] font-bold text-[#77717a]">{t.messageCount} msg{t.messageCount === 1 ? '' : 's'}</span>
+                      {t.unread && <span className="rounded-full bg-[#e55b4c] px-2 py-0.5 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#fff4e6]">New</span>}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block text-xs text-[#77717a]">with {t.partnerName} · {t.messageCount} message{t.messageCount === 1 ? '' : 's'}</span>
-                  <span className="mt-2 block truncate text-sm leading-relaxed text-[#625f6d]">{t.lastMessage ? `“${t.lastMessage}”` : 'No messages yet — start the conversation.'}</span>
+                  <span className="mt-0.5 block text-xs text-[#77717a]">with {t.partnerName}</span>
+                  <span className={`mt-2 block truncate text-sm leading-relaxed ${t.unread ? 'font-semibold text-[#292b45]' : 'text-[#625f6d]'}`}>{t.lastMessage ? `“${t.lastMessage}”` : 'No messages yet — start the conversation.'}</span>
                   {t.lastMessageAt && <span className="mt-2 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#98909a]">{new Date(t.lastMessageAt).toLocaleString()}</span>}
                 </span>
               </button>
@@ -141,15 +152,18 @@ export default function InboxPage() {
             {inboxQ.isLoading ? (
               <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-24 animate-pulse rounded-[1.25rem] bg-[#e5d7c5]" />)}</div>
             ) : notes.length ? notes.map((n) => (
-              <button key={n.id} data-testid={`inbox-note-${n.id}`} onClick={() => openNote(n)}
-                className={`focus-house flex w-full items-start gap-3 rounded-[1.25rem] border-2 p-4 text-left ${n.read ? 'border-[#d6cbb9] bg-[#f2e7d8]' : 'border-[#e55b4c]/40 bg-[#fff4e6]'}`}>
+              <div key={n.id} data-testid={`inbox-note-${n.id}`} onClick={() => openNote(n)}
+                className={`focus-house flex w-full cursor-pointer items-start gap-3 rounded-[1.25rem] border-2 p-4 text-left ${n.read ? 'border-[#d6cbb9] bg-[#f2e7d8]' : 'border-[#e55b4c]/40 bg-[#fff4e6]'}`}>
                 <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read ? 'bg-[#d6cbb9]' : 'bg-[#e55b4c]'}`} />
-                <span className="min-w-0">
+                <span className="min-w-0 flex-1">
                   <span className="block text-sm font-bold leading-snug">{n.title}</span>
                   <span className="mt-1 block text-xs leading-relaxed text-[#77717a]">{n.body}</span>
                   <span className="mt-2 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#98909a]">{n.category} · {new Date(n.createdAt).toLocaleDateString()}</span>
+                  {n.category === 'continuation_submitted' && n.resourceId && (
+                    <button onClick={(e) => { e.stopPropagation(); window.location.href = `/authors-den/?preview=${n.resourceId}`; }} className="focus-house mt-3 inline-flex items-center gap-2 rounded-full border-2 border-[#3e8074] px-3 py-1.5 text-xs font-bold text-[#2f675e]">Preview in Author Den <ArrowRight className="h-3.5 w-3.5" /></button>
+                  )}
                 </span>
-              </button>
+              </div>
             )) : (
               <div className="rounded-[1.25rem] border-2 border-dashed border-[#d6cbb9] bg-[#fff4e6] p-6">
                 <p className="font-display text-2xl italic text-[#292b45]">The hallway is still.</p>

@@ -22,14 +22,18 @@ export default function ActivityPage() {
   const events: any[] = q.data || [];
 
   return (
-    <div className="mx-auto max-w-[900px]">
-      <SectionEyebrow>Your trail / activity</SectionEyebrow>
-      <h1 className="mt-5 max-w-[10ch] text-6xl font-extrabold leading-[.88] tracking-[-0.08em] text-[#292b45] sm:text-8xl">
-        A clear record.
-      </h1>
-      <p className="mt-5 max-w-md border-l-2 border-[#d6cbb9] pl-5 text-sm leading-[1.8] text-[#625f6d]">
-        Every room you are part of — seeds you published, continuations you received or sent, contracts locked, passes approved. Summaries only; hidden prose never enters this log.
-      </p>
+    <div className="mx-auto max-w-[1180px]">
+      <div className="reveal flex flex-col justify-between gap-5 border-b-2 border-[#d6cbb9] pb-9 md:flex-row md:items-end">
+        <div>
+          <SectionEyebrow>Your trail / activity</SectionEyebrow>
+          <h1 className="mt-5 max-w-[12ch] text-6xl font-extrabold leading-[.86] tracking-[-0.08em] text-[#292b45] sm:text-8xl">
+            A clear record.
+          </h1>
+        </div>
+        <p className="max-w-sm border-l-2 border-[#d6cbb9] pl-5 text-sm leading-[1.8] text-[#625f6d]">
+          Every room you are part of — seeds you published, continuations you received or sent, contracts locked, passes approved. Summaries only; hidden prose never enters this log.
+        </p>
+      </div>
 
       <div className="mt-12">
         {q.isLoading ? (
@@ -48,24 +52,37 @@ export default function ActivityPage() {
             </button>
           </div>
         ) : events.length ? (
-          <div className="space-y-3">
-            {events.map((event) => {
-              const tone = eventTone[event.eventType] ?? 'bg-[#f2e7d8] text-[#292b45]';
-              return (
-                <div key={event.id} data-testid={`account-activity-${event.id}`} className="flex items-start gap-4 rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-                  <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tone}`}>
-                    <History className="h-4 w-4" />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold leading-relaxed">{event.summary}</p>
-                    <span className="mt-1 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#98909a]">
-                      {event.eventType.replaceAll('_', ' ')} · {new Date(event.createdAt).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          (() => {
+            // Group events by calendar day so the trail reads like a journal.
+            const groups = new Map<string, any[]>();
+            for (const event of events) {
+              const day = new Date(event.createdAt).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+              const list = groups.get(day) ?? [];
+              list.push(event);
+              groups.set(day, list);
+            }
+            return <div className="space-y-10">{[...groups.entries()].map(([day, dayEvents]) => (
+              <section key={day} aria-label={day}>
+                <div className="flex items-center gap-4"><h2 className="font-display text-2xl italic text-[#292b45]">{day}</h2><span className="h-px flex-1 bg-[#d6cbb9]" /></div>
+                <div className="mt-5 space-y-3">{dayEvents.map((event) => {
+                  const tone = eventTone[event.eventType] ?? 'bg-[#f2e7d8] text-[#292b45]';
+                  return (
+                    <div key={event.id} data-testid={`account-activity-${event.id}`} className="soft-lift flex items-start gap-4 rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
+                      <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tone}`}>
+                        <History className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold leading-relaxed text-[#292b45]">{event.summary}</p>
+                        <span className="mt-1 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#98909a]">
+                          {event.eventType.replaceAll('_', ' ')} · {new Date(event.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}</div>
+              </section>
+            ))}</div>;
+          })()
         ) : (
           <div className="rounded-[1.75rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-7 shadow-[8px_10px_0_rgba(41,43,69,0.08)] sm:p-10">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#292b45] text-[#f0c85c]">

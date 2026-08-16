@@ -511,7 +511,7 @@ describe("notifications and activity", () => {
     expect(inbox.status).toBe(200);
     const notice = inbox.body.find((n: any) => n.category === "continuation_submitted");
     expect(notice).toBeTruthy();
-    expect(notice.deepLink).toContain(submission.id);
+    expect(notice.deepLink).toContain(`/authors-den/?preview=${submission.id}`);
     expect(notice.body).not.toContain(submission.continuationText.slice(0, 20));
     expect(notice.title).toBeTruthy();
   });
@@ -700,6 +700,221 @@ describe("stable-range continuation annotations", () => {
     expect(submission.id).toBeTruthy();
   });
 
+  it("exposes the frozen project snapshot behind a seed to its participants", async () => {
+    const seedDocument = { title: "The Salt Road", scenes: [{ id: "s1", title: "Seed scene" }], characters: [{ id: "c1", name: "Ada" }] };
+    state.userId = "creator-1";
+    const published = await request(API).post("/api/collaborations/seeds").send({ ...SEED_BODY, projectDocument: seedDocument });
+    expect(published.status).toBe(201);
+    const seedId = published.body.id;
+
+    // The respondent who forked the seed can read the frozen project.
+    const application = await applyToSeed(seedId, "writer-1");
+    state.userId = "writer-1";
+    const forkRead = await request(API).get(`/api/collaborations/seeds/${seedId}/project`);
+    expect(forkRead.status).toBe(200);
+    expect(forkRead.body.title).toBe("The Salt Road");
+    expect(forkRead.body.scenes).toHaveLength(1);
+
+    // The creator can read it back too.
+    state.userId = "creator-1";
+    const creatorRead = await request(API).get(`/api/collaborations/seeds/${seedId}/project`);
+    expect(creatorRead.status).toBe(200);
+    expect(creatorRead.body.characters[0].name).toBe("Ada");
+
+    // A stranger cannot fork the project.
+    state.userId = "stranger-1";
+    const strangerRead = await request(API).get(`/api/collaborations/seeds/${seedId}/project`);
+    expect(strangerRead.status).toBe(403);
+    expect(application.id).toBeTruthy();
+  });
+
+  it("carries the fork document through save, submit, and creator preview", async () => {
+    const seedDocument = { title: "The Salt Road", scenes: [{ id: "s1", title: "Seed scene" }] };
+    const forkDocument = { title: "The Salt Road", scenes: [{ id: "s1", title: "Seed scene" }, { id: "s2", title: "Fork scene", content: "The salt pools swallowed the moon." }] };
+    state.userId = "creator-1";
+    const published = await request(API).post("/api/collaborations/seeds").send({ ...SEED_BODY, projectDocument: seedDocument });
+    const seedId = published.body.id;
+    const application = await applyToSeed(seedId, "writer-1");
+
+    state.userId = "writer-1";
+    const saved = await request(API)
+      .patch(`/api/collaborations/applications/${application.id}`)
+      .send({ draftText: "Ada followed the road past the salt pools.", draftComments: "I added a second scene.", projectDocument: forkDocument });
+    expect(saved.status).toBe(200);
+    expect(saved.body.projectDocument.scenes).toHaveLength(2);
+
+    const submission = await submitContinuation(application.id, "writer-1");
+    expect(submission.projectDocument.scenes).toHaveLength(2);
+
+    // The creator can preview the submitted fork read-only.
+    state.userId = "creator-1";
+    const preview = await request(API).get(`/api/collaborations/continuations/${submission.id}/project`);
+    expect(preview.status).toBe(200);
+    expect(preview.body.scenes.map((scene: any) => scene.title)).toContain("Fork scene");
+
+    // The respondent cannot preview their own fork through the creator endpoint.
+    state.userId = "writer-1";
+    const writerPreview = await request(API).get(`/api/collaborations/continuations/${submission.id}/project`);
+    expect(writerPreview.status).toBe(403);
+
+    // A stranger cannot preview it either.
+    state.userId = "stranger-1";
+    const strangerPreview = await request(API).get(`/api/collaborations/continuations/${submission.id}/project`);
+    expect(strangerPreview.status).toBe(403);
+  });
+
+  it("accepts a fork, merges its document, and shares it between both authors", async () => {
+    const seedDocument = { title: "The Salt Road", scenes: [{ id: "s1", title: "Seed scene" }], characters: [{ id: "c1", name: "Ada" }], plots: [{ id: "p1", name: "The salt road" }] };
+    const forkDocument = { title: "The Salt Road", scenes: [{ id: "s1", title: "Seed scene" }, { id: "s2", title: "Fork scene" }], characters: [{ id: "c1", name: "Ada" }, { id: "c2", name: "Iria" }] };
+    state.userId = "creator-1";
+    const published = await request(API).post("/api/collaborations/seeds").send({ ...SEED_BODY, projectDocument: seedDocument });
+    const seedId = published.body.id;
+    const application = await applyToSeed(seedId, "writer-1");
+    state.userId = "writer-1";
+    await request(API)
+      .patch(`/api/collaborations/applications/${application.id}`)
+      .send({ draftText: "Ada reached the salt pools.", draftComments: "Here is my fork.", projectDocument: forkDocument });
+    const submission = await submitContinuation(application.id, "writer-1");
+
+    // The creator accepts — the fork is merged into a shared project.
+    state.userId = "creator-1";
+    const accepted = await request(API).post(`/api/collaborations/continuations/${submission.id}/accept`);
+    expect(accepted.status).toBe(200);
+    expect(accepted.body.documentAvailable).toBe(true);
+    expect(accepted.body.respondentId).toBe("writer-1");
+    const projectId = accepted.body.id;
+
+    // Both authors can read the merged document.
+    const creatorDoc = await request(API).get(`/api/collaborations/projects/${projectId}/document`);
+    expect(creatorDoc.status).toBe(200);
+    const merged = creatorDoc.body.document;
+    expect(merged.scenes.map((scene: any) => scene.title)).toEqual(["Seed scene", "Fork scene"]);
+    expect(merged.characters.map((character: any) => character.name)).toEqual(["Ada", "Iria"]);
+    expect(merged.plots).toHaveLength(1);
+
+    state.userId = "writer-1";
+    const respondentDoc = await request(API).get(`/api/collaborations/projects/${projectId}/document`);
+    expect(respondentDoc.status).toBe(200);
+    expect(respondentDoc.body.document.scenes).toHaveLength(2);
+
+    // A stranger cannot read the shared document.
+    state.userId = "stranger-1";
+    const strangerDoc = await request(API).get(`/api/collaborations/projects/${projectId}/document`);
+    expect(strangerDoc.status).toBe(403);
+
+    // The seed is closed and the respondent was notified.
+    state.userId = "creator-1";
+    const closedSeed = await request(API).get(`/api/collaborations/seeds/${seedId}`);
+    expect(closedSeed.body.availability).toBe("ACCEPTED");
+    state.userId = "writer-1";
+    const notes = await request(API).get("/api/collaborations/inbox");
+    expect(notes.body.map((note: any) => note.category)).toContain("respondent_accepted");
+  });
+
+  it("opens a private thread for the shared project and deep-links messages into Author Den", async () => {
+    const seedDocument = { title: "The Salt Road", scenes: [{ id: "s1", title: "Seed scene" }] };
+    state.userId = "creator-1";
+    const published = await request(API).post("/api/collaborations/seeds").send({ ...SEED_BODY, creatorName: "Ada", projectDocument: seedDocument });
+    const application = await applyToSeed(published.body.id, "writer-1");
+    state.userId = "writer-1";
+    await request(API)
+      .patch(`/api/collaborations/applications/${application.id}`)
+      .send({ draftText: "Ada reached the salt pools.", draftComments: "", projectDocument: { title: "The Salt Road", scenes: [{ id: "s2", title: "Fork scene" }] } });
+    const submission = await submitContinuation(application.id, "writer-1");
+
+    // Accepting the fork also opens the private room for the shared project.
+    state.userId = "creator-1";
+    const accepted = await request(API).post(`/api/collaborations/continuations/${submission.id}/accept`);
+    const projectId = accepted.body.id;
+    expect(accepted.body.threadId).toBeTruthy();
+
+    // Both participants can get-or-create the project's thread.
+    const thread = await request(API).post(`/api/collaborations/projects/${projectId}/thread`);
+    expect(thread.status).toBe(200);
+    expect(thread.body.id).toBe(accepted.body.threadId);
+    expect(thread.body.projectId).toBe(projectId);
+    expect(thread.body.creatorName).toBe("Ada");
+    expect(thread.body.respondentName).toBe("Writer One");
+    state.userId = "writer-1";
+    const respondentThread = await request(API).post(`/api/collaborations/projects/${projectId}/thread`);
+    expect(respondentThread.status).toBe(200);
+    expect(respondentThread.body.id).toBe(accepted.body.threadId);
+
+    // A stranger cannot open the project's thread.
+    state.userId = "stranger-1";
+    const strangerThread = await request(API).post(`/api/collaborations/projects/${projectId}/thread`);
+    expect(strangerThread.status).toBe(403);
+
+    // A message notifies the respondent with a deep link into the Author Den project.
+    state.userId = "creator-1";
+    await request(API).post(`/api/collaborations/threads/${thread.body.id}/messages`).send({ body: "Welcome to the shared room." });
+    state.userId = "writer-1";
+    const notes = await request(API).get("/api/collaborations/inbox");
+    const messageNote = notes.body.find((note: any) => note.category === "collaboration_message");
+    expect(messageNote).toBeTruthy();
+    expect(messageNote.deepLink).toBe(`/authors-den/?project=${projectId}&chat=1`);
+
+    // The chat FAB badge is driven by the server's unread state for the viewer.
+    const unread = await request(API).get(`/api/collaborations/projects/${projectId}/thread/unread`);
+    expect(unread.status).toBe(200);
+    expect(unread.body).toEqual({ unread: true, count: 1 });
+
+    // The creator has no unread messages in their own thread.
+    state.userId = "creator-1";
+    const creatorUnread = await request(API).get(`/api/collaborations/projects/${projectId}/thread/unread`);
+    expect(creatorUnread.body).toEqual({ unread: false, count: 0 });
+
+    // Opening the chat marks the respondent's messages read.
+    state.userId = "writer-1";
+    const marked = await request(API).post(`/api/collaborations/projects/${projectId}/thread/read`);
+    expect(marked.status).toBe(204);
+    const afterRead = await request(API).get(`/api/collaborations/projects/${projectId}/thread/unread`);
+    expect(afterRead.body).toEqual({ unread: false, count: 0 });
+
+    // A stranger cannot read the unread state.
+    state.userId = "stranger-1";
+    const strangerUnread = await request(API).get(`/api/collaborations/projects/${projectId}/thread/unread`);
+    expect(strangerUnread.status).toBe(403);
+
+    // The inbox threads list exposes the project so the inbox can deep-link.
+    state.userId = "creator-1";
+    const threads = await request(API).get("/api/collaborations/threads");
+    expect(threads.body[0].projectId).toBe(projectId);
+    expect(threads.body[0].partnerName).toBe("Writer One");
+  });
+
+  it("lets participants push document updates and blocks strangers", async () => {
+    const seedDocument = { title: "The Salt Road", scenes: [{ id: "s1", title: "Seed scene" }] };
+    state.userId = "creator-1";
+    const published = await request(API).post("/api/collaborations/seeds").send({ ...SEED_BODY, projectDocument: seedDocument });
+    const application = await applyToSeed(published.body.id, "writer-1");
+    state.userId = "writer-1";
+    await request(API)
+      .patch(`/api/collaborations/applications/${application.id}`)
+      .send({ draftText: "A draft.", draftComments: "", projectDocument: { title: "The Salt Road", scenes: [{ id: "s2", title: "Fork scene" }] } });
+    const submission = await submitContinuation(application.id, "writer-1");
+    state.userId = "creator-1";
+    const accepted = await request(API).post(`/api/collaborations/continuations/${submission.id}/accept`);
+    const projectId = accepted.body.id;
+
+    // The respondent pushes an updated draft.
+    const pushed = { title: "The Salt Road", scenes: [{ id: "s2", title: "Fork scene" }, { id: "s3", title: "Third scene" }] };
+    state.userId = "writer-1";
+    const push = await request(API).put(`/api/collaborations/projects/${projectId}/document`).send({ document: pushed });
+    expect(push.status).toBe(200);
+    expect(push.body.document.scenes).toHaveLength(2);
+
+    // The creator sees the pushed update.
+    state.userId = "creator-1";
+    const after = await request(API).get(`/api/collaborations/projects/${projectId}/document`);
+    expect(after.body.document.scenes.map((scene: any) => scene.title)).toContain("Third scene");
+
+    // A stranger cannot push.
+    state.userId = "stranger-1";
+    const strangerPush = await request(API).put(`/api/collaborations/projects/${projectId}/document`).send({ document: { title: "Hijacked" } });
+    expect(strangerPush.status).toBe(403);
+  });
+
   it("lists the viewer's threads with latest message preview and unread state", async () => {
     const { submission } = await submittedFlow();
     state.userId = "creator-1";
@@ -734,5 +949,98 @@ describe("stable-range continuation annotations", () => {
     state.userId = "stranger-1";
     const strangerThreads = await request(API).get("/api/collaborations/threads");
     expect(strangerThreads.body).toHaveLength(0);
+  });
+
+  it("legacy rooms without a merged document open via a synthesized document from work blocks", async () => {
+    const { seed } = await submittedFlow();
+    const t = state.tables;
+    const projectId = "legacy-room-1";
+    // A room created under the old turn/contract model: approved work blocks,
+    // shared story bible entries, but no merged document column.
+    await state.db.insert(t.collaborationProjectsTable).values({
+      id: projectId,
+      seedId: seed.id,
+      title: "The Legacy Room",
+      creatorId: "creator-1",
+      creatorName: "Ada",
+      respondentId: "writer-1",
+      respondentName: "Writer One",
+      seedText: seed.seedText,
+      continuationText: "",
+      status: "ACTIVE",
+      contractVersion: 1,
+      creatorApproved: true,
+      respondentApproved: true,
+      currentTurn: "CREATOR",
+      document: null,
+      lockedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await state.db.insert(t.collaborationWorkBlocksTable).values({
+      id: "legacy-block-1",
+      projectId,
+      ownerId: "creator-1",
+      kind: "SEED",
+      content: "The road began where the maps stopped.",
+      status: "APPROVED",
+      parentBlockId: null,
+      turnOrder: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await state.db.insert(t.collaborationWorkBlocksTable).values({
+      id: "legacy-block-2",
+      projectId,
+      ownerId: "writer-1",
+      kind: "CONTINUATION",
+      content: "Ada carried one lantern and a debt older than the town.",
+      status: "APPROVED",
+      parentBlockId: "legacy-block-1",
+      turnOrder: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await state.db.insert(t.collaborationStoryBibleEntriesTable).values({
+      id: "legacy-bible-1",
+      projectId,
+      kind: "location",
+      name: "The Salt Pools",
+      content: "Low basins where the tide leaves a white crust behind.",
+      ownerId: "creator-1",
+      shared: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Both participants can list the room, and it now reports as openable.
+    state.userId = "creator-1";
+    const list = await request(API).get("/api/collaborations/projects");
+    expect(list.status).toBe(200);
+    const row = list.body.find((p: any) => p.id === projectId);
+    expect(row).toBeTruthy();
+    expect(row.documentAvailable).toBe(true);
+
+    // The document endpoint synthesizes a document from the blocks + bible.
+    state.userId = "creator-1";
+    const doc = await request(API).get(`/api/collaborations/projects/${projectId}/document`);
+    expect(doc.status).toBe(200);
+    expect(doc.body.document.title).toBe("The Legacy Room");
+    expect(doc.body.document.author).toBe("Ada");
+    expect(doc.body.document.scenes).toHaveLength(2);
+    expect(doc.body.document.scenes[0].content).toContain("The road began");
+    expect(doc.body.document.scenes[1].title).toBe("Continuation");
+    expect(doc.body.document.world[0].name).toBe("The Salt Pools");
+
+    // The respondent gets the same synthesized document.
+    state.userId = "writer-1";
+    const respondentDoc = await request(API).get(`/api/collaborations/projects/${projectId}/document`);
+    expect(respondentDoc.status).toBe(200);
+    expect(respondentDoc.body.document.scenes).toHaveLength(2);
+
+    // A stranger is still blocked.
+    state.userId = "stranger-1";
+    const strangerDoc = await request(API).get(`/api/collaborations/projects/${projectId}/document`);
+    expect(strangerDoc.status).toBe(403);
   });
 });

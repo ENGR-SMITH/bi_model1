@@ -23,6 +23,7 @@ import type {
   ActivityEvent,
   AdminLoginInput,
   AdminSession,
+  AuthorProjectDocument,
   CollaborationAnnotation,
   CollaborationAnnotationInput,
   CollaborationMessage,
@@ -47,12 +48,15 @@ import type {
   OracleResult,
   OutlineAssistInput,
   OutlineAssistResult,
+  ProjectDocument,
   ProviderStatus,
   ProviderUpdate,
+  SaveCollaborationProjectDocumentInput,
   SeedApplication,
   SeedApplicationInput,
   StoryBibleEntry,
   StoryBibleEntryInput,
+  ThreadUnread,
   ToneRewriteInput,
   ToneRewriteResult,
   VoiceConsistencyInput,
@@ -616,7 +620,7 @@ export function useListAdminProviders<TData = Awaited<ReturnType<typeof listAdmi
 
 
 
-export const getUpdateAdminProviderUrl = (providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio',) => {
+export const getUpdateAdminProviderUrl = (providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff',) => {
 
 
 
@@ -627,7 +631,7 @@ export const getUpdateAdminProviderUrl = (providerId: 'groq' | 'openrouter' | 'o
 /**
  * @summary Save provider credentials and routing options
  */
-export const updateAdminProvider = async (providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio',
+export const updateAdminProvider = async (providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff',
     providerUpdate: ProviderUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ProviderStatus> => {
 
   return customFetch<ProviderStatus>(getUpdateAdminProviderUrl(providerId),
@@ -644,8 +648,8 @@ export const updateAdminProvider = async (providerId: 'groq' | 'openrouter' | 'o
 
 
 export const getUpdateAdminProviderMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio';data: BodyType<ProviderUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof updateAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio';data: BodyType<ProviderUpdate>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff';data: BodyType<ProviderUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff';data: BodyType<ProviderUpdate>}, TContext> => {
 
 const mutationKey = ['updateAdminProvider'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -657,7 +661,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminProvider>>, {providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio';data: BodyType<ProviderUpdate>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminProvider>>, {providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff';data: BodyType<ProviderUpdate>}> = (props) => {
           const {providerId,data} = props ?? {};
 
           return  updateAdminProvider(providerId,data,requestOptions)
@@ -678,17 +682,17 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Save provider credentials and routing options
  */
 export const useUpdateAdminProvider = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio';data: BodyType<ProviderUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff';data: BodyType<ProviderUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateAdminProvider>>,
         TError,
-        {providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio';data: BodyType<ProviderUpdate>},
+        {providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff';data: BodyType<ProviderUpdate>},
         TContext
       > => {
       return useMutation(getUpdateAdminProviderMutationOptions(options));
     }
 
-export const getCheckAdminProviderUrl = (providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio',) => {
+export const getCheckAdminProviderUrl = (providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff',) => {
 
 
 
@@ -699,7 +703,7 @@ export const getCheckAdminProviderUrl = (providerId: 'groq' | 'openrouter' | 'ol
 /**
  * @summary Test provider connectivity
  */
-export const checkAdminProvider = async (providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio', options?: Parameters<typeof customFetch>[1]): Promise<ProviderStatus> => {
+export const checkAdminProvider = async (providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff', options?: Parameters<typeof customFetch>[1]): Promise<ProviderStatus> => {
 
   return customFetch<ProviderStatus>(getCheckAdminProviderUrl(providerId),
   {
@@ -715,8 +719,8 @@ export const checkAdminProvider = async (providerId: 'groq' | 'openrouter' | 'ol
 
 
 export const getCheckAdminProviderMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio'}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof checkAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio'}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff'}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof checkAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff'}, TContext> => {
 
 const mutationKey = ['checkAdminProvider'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -728,7 +732,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkAdminProvider>>, {providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio'}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof checkAdminProvider>>, {providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff'}> = (props) => {
           const {providerId} = props ?? {};
 
           return  checkAdminProvider(providerId,requestOptions)
@@ -749,11 +753,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Test provider connectivity
  */
 export const useCheckAdminProvider = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio'}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof checkAdminProvider>>, TError,{providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff'}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof checkAdminProvider>>,
         TError,
-        {providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio'},
+        {providerId: 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff'},
         TContext
       > => {
       return useMutation(getCheckAdminProviderMutationOptions(options));
@@ -1560,6 +1564,84 @@ export const useCloseCollaborationSeed = <TError = ErrorType<ErrorResponse>,
       return useMutation(getCloseCollaborationSeedMutationOptions(options));
     }
 
+export const getGetCollaborationSeedProjectUrl = (seedId: string,) => {
+
+
+
+
+  return `/api/collaborations/seeds/${seedId}/project`
+}
+
+/**
+ * The creator or any active respondent can fetch the full project snapshot this seed was published from, so answers can fork it in their own studio.
+ * @summary Read the frozen Author Den project behind a seed
+ */
+export const getCollaborationSeedProject = async (seedId: string, options?: Parameters<typeof customFetch>[1]): Promise<AuthorProjectDocument> => {
+
+  return customFetch<AuthorProjectDocument>(getGetCollaborationSeedProjectUrl(seedId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCollaborationSeedProjectQueryKey = (seedId: string,) => {
+    return [
+    `/api/collaborations/seeds/${seedId}/project`
+    ] as const;
+    }
+
+
+export const getGetCollaborationSeedProjectQueryOptions = <TData = Awaited<ReturnType<typeof getCollaborationSeedProject>>, TError = ErrorType<ErrorResponse>>(seedId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaborationSeedProject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCollaborationSeedProjectQueryKey(seedId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCollaborationSeedProject>>> = ({ signal }) => getCollaborationSeedProject(seedId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: seedId !== null && seedId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCollaborationSeedProject>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCollaborationSeedProjectQueryResult = NonNullable<Awaited<ReturnType<typeof getCollaborationSeedProject>>>
+export type GetCollaborationSeedProjectQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the frozen Author Den project behind a seed
+ */
+
+export function useGetCollaborationSeedProject<TData = Awaited<ReturnType<typeof getCollaborationSeedProject>>, TError = ErrorType<ErrorResponse>>(
+ seedId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaborationSeedProject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCollaborationSeedProjectQueryOptions(seedId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getCreateSeedApplicationUrl = (seedId: string,) => {
 
 
@@ -2066,6 +2148,84 @@ export function useGetContinuation<TData = Awaited<ReturnType<typeof getContinua
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetContinuationQueryOptions(continuationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetContinuationProjectUrl = (continuationId: string,) => {
+
+
+
+
+  return `/api/collaborations/continuations/${continuationId}/project`
+}
+
+/**
+ * The seed creator opens this to preview the respondent's submitted project in their own Author Den without importing it. Read-only by design.
+ * @summary Read the submitted project fork for a read-only preview
+ */
+export const getContinuationProject = async (continuationId: string, options?: Parameters<typeof customFetch>[1]): Promise<AuthorProjectDocument> => {
+
+  return customFetch<AuthorProjectDocument>(getGetContinuationProjectUrl(continuationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetContinuationProjectQueryKey = (continuationId: string,) => {
+    return [
+    `/api/collaborations/continuations/${continuationId}/project`
+    ] as const;
+    }
+
+
+export const getGetContinuationProjectQueryOptions = <TData = Awaited<ReturnType<typeof getContinuationProject>>, TError = ErrorType<ErrorResponse>>(continuationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getContinuationProject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetContinuationProjectQueryKey(continuationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getContinuationProject>>> = ({ signal }) => getContinuationProject(continuationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: continuationId !== null && continuationId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getContinuationProject>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetContinuationProjectQueryResult = NonNullable<Awaited<ReturnType<typeof getContinuationProject>>>
+export type GetContinuationProjectQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the submitted project fork for a read-only preview
+ */
+
+export function useGetContinuationProject<TData = Awaited<ReturnType<typeof getContinuationProject>>, TError = ErrorType<ErrorResponse>>(
+ continuationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getContinuationProject>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetContinuationProjectQueryOptions(continuationId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -2600,6 +2760,78 @@ export const useDeclineContinuation = <TError = ErrorType<ErrorResponse>,
       return useMutation(getDeclineContinuationMutationOptions(options));
     }
 
+export const getAcceptContinuationUrl = (continuationId: string,) => {
+
+
+
+
+  return `/api/collaborations/continuations/${continuationId}/accept`
+}
+
+/**
+ * The creator approves the submitted fork. The seed project and the submitted fork are merged into a shared document that both authors keep in sync in their Author Den studios.
+ * @summary Accept a submission as a collaborator and merge its fork
+ */
+export const acceptContinuation = async (continuationId: string, options?: Parameters<typeof customFetch>[1]): Promise<CollaborationProject> => {
+
+  return customFetch<CollaborationProject>(getAcceptContinuationUrl(continuationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAcceptContinuationMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptContinuation>>, TError,{continuationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acceptContinuation>>, TError,{continuationId: string}, TContext> => {
+
+const mutationKey = ['acceptContinuation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptContinuation>>, {continuationId: string}> = (props) => {
+          const {continuationId} = props ?? {};
+
+          return  acceptContinuation(continuationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcceptContinuationMutationResult = NonNullable<Awaited<ReturnType<typeof acceptContinuation>>>
+
+    export type AcceptContinuationMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Accept a submission as a collaborator and merge its fork
+ */
+export const useAcceptContinuation = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptContinuation>>, TError,{continuationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof acceptContinuation>>,
+        TError,
+        {continuationId: string},
+        TContext
+      > => {
+      return useMutation(getAcceptContinuationMutationOptions(options));
+    }
+
 export const getSelectContinuationUrl = (continuationId: string,) => {
 
 
@@ -3050,6 +3282,374 @@ export function useGetCollaborationProject<TData = Awaited<ReturnType<typeof get
 
 
 
+
+export const getGetCollaborationProjectDocumentUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/collaborations/projects/${projectId}/document`
+}
+
+/**
+ * @summary Read the shared Author Den document both participants keep in sync
+ */
+export const getCollaborationProjectDocument = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<ProjectDocument> => {
+
+  return customFetch<ProjectDocument>(getGetCollaborationProjectDocumentUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCollaborationProjectDocumentQueryKey = (projectId: string,) => {
+    return [
+    `/api/collaborations/projects/${projectId}/document`
+    ] as const;
+    }
+
+
+export const getGetCollaborationProjectDocumentQueryOptions = <TData = Awaited<ReturnType<typeof getCollaborationProjectDocument>>, TError = ErrorType<ErrorResponse>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaborationProjectDocument>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCollaborationProjectDocumentQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCollaborationProjectDocument>>> = ({ signal }) => getCollaborationProjectDocument(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCollaborationProjectDocument>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCollaborationProjectDocumentQueryResult = NonNullable<Awaited<ReturnType<typeof getCollaborationProjectDocument>>>
+export type GetCollaborationProjectDocumentQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the shared Author Den document both participants keep in sync
+ */
+
+export function useGetCollaborationProjectDocument<TData = Awaited<ReturnType<typeof getCollaborationProjectDocument>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaborationProjectDocument>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCollaborationProjectDocumentQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSaveCollaborationProjectDocumentUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/collaborations/projects/${projectId}/document`
+}
+
+/**
+ * @summary Push an updated Author Den document into the shared project
+ */
+export const saveCollaborationProjectDocument = async (projectId: string,
+    saveCollaborationProjectDocumentInput: SaveCollaborationProjectDocumentInput, options?: Parameters<typeof customFetch>[1]): Promise<ProjectDocument> => {
+
+  return customFetch<ProjectDocument>(getSaveCollaborationProjectDocumentUrl(projectId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(saveCollaborationProjectDocumentInput)
+  }
+);}
+
+
+
+
+
+export const getSaveCollaborationProjectDocumentMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCollaborationProjectDocument>>, TError,{projectId: string;data: BodyType<SaveCollaborationProjectDocumentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveCollaborationProjectDocument>>, TError,{projectId: string;data: BodyType<SaveCollaborationProjectDocumentInput>}, TContext> => {
+
+const mutationKey = ['saveCollaborationProjectDocument'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveCollaborationProjectDocument>>, {projectId: string;data: BodyType<SaveCollaborationProjectDocumentInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  saveCollaborationProjectDocument(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveCollaborationProjectDocumentMutationResult = NonNullable<Awaited<ReturnType<typeof saveCollaborationProjectDocument>>>
+    export type SaveCollaborationProjectDocumentMutationBody = BodyType<SaveCollaborationProjectDocumentInput>
+    export type SaveCollaborationProjectDocumentMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Push an updated Author Den document into the shared project
+ */
+export const useSaveCollaborationProjectDocument = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveCollaborationProjectDocument>>, TError,{projectId: string;data: BodyType<SaveCollaborationProjectDocumentInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveCollaborationProjectDocument>>,
+        TError,
+        {projectId: string;data: BodyType<SaveCollaborationProjectDocumentInput>},
+        TContext
+      > => {
+      return useMutation(getSaveCollaborationProjectDocumentMutationOptions(options));
+    }
+
+export const getGetOrCreateProjectThreadUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/collaborations/projects/${projectId}/thread`
+}
+
+/**
+ * @summary Get or create the private thread for a shared project (open after a fork is accepted)
+ */
+export const getOrCreateProjectThread = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<CollaborationThread> => {
+
+  return customFetch<CollaborationThread>(getGetOrCreateProjectThreadUrl(projectId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrCreateProjectThreadMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getOrCreateProjectThread>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof getOrCreateProjectThread>>, TError,{projectId: string}, TContext> => {
+
+const mutationKey = ['getOrCreateProjectThread'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof getOrCreateProjectThread>>, {projectId: string}> = (props) => {
+          const {projectId} = props ?? {};
+
+          return  getOrCreateProjectThread(projectId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type GetOrCreateProjectThreadMutationResult = NonNullable<Awaited<ReturnType<typeof getOrCreateProjectThread>>>
+
+    export type GetOrCreateProjectThreadMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Get or create the private thread for a shared project (open after a fork is accepted)
+ */
+export const useGetOrCreateProjectThread = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof getOrCreateProjectThread>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof getOrCreateProjectThread>>,
+        TError,
+        {projectId: string},
+        TContext
+      > => {
+      return useMutation(getGetOrCreateProjectThreadMutationOptions(options));
+    }
+
+export const getGetCollaborationProjectThreadUnreadUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/collaborations/projects/${projectId}/thread/unread`
+}
+
+/**
+ * @summary Read the viewer's unread message count for a shared project's private thread
+ */
+export const getCollaborationProjectThreadUnread = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<ThreadUnread> => {
+
+  return customFetch<ThreadUnread>(getGetCollaborationProjectThreadUnreadUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCollaborationProjectThreadUnreadQueryKey = (projectId: string,) => {
+    return [
+    `/api/collaborations/projects/${projectId}/thread/unread`
+    ] as const;
+    }
+
+
+export const getGetCollaborationProjectThreadUnreadQueryOptions = <TData = Awaited<ReturnType<typeof getCollaborationProjectThreadUnread>>, TError = ErrorType<ErrorResponse>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaborationProjectThreadUnread>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCollaborationProjectThreadUnreadQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCollaborationProjectThreadUnread>>> = ({ signal }) => getCollaborationProjectThreadUnread(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCollaborationProjectThreadUnread>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCollaborationProjectThreadUnreadQueryResult = NonNullable<Awaited<ReturnType<typeof getCollaborationProjectThreadUnread>>>
+export type GetCollaborationProjectThreadUnreadQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the viewer's unread message count for a shared project's private thread
+ */
+
+export function useGetCollaborationProjectThreadUnread<TData = Awaited<ReturnType<typeof getCollaborationProjectThreadUnread>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaborationProjectThreadUnread>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCollaborationProjectThreadUnreadQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getMarkCollaborationProjectThreadReadUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/collaborations/projects/${projectId}/thread/read`
+}
+
+/**
+ * @summary Mark the viewer's unread messages read for a shared project's private thread
+ */
+export const markCollaborationProjectThreadRead = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getMarkCollaborationProjectThreadReadUrl(projectId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getMarkCollaborationProjectThreadReadMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markCollaborationProjectThreadRead>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markCollaborationProjectThreadRead>>, TError,{projectId: string}, TContext> => {
+
+const mutationKey = ['markCollaborationProjectThreadRead'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markCollaborationProjectThreadRead>>, {projectId: string}> = (props) => {
+          const {projectId} = props ?? {};
+
+          return  markCollaborationProjectThreadRead(projectId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkCollaborationProjectThreadReadMutationResult = NonNullable<Awaited<ReturnType<typeof markCollaborationProjectThreadRead>>>
+
+    export type MarkCollaborationProjectThreadReadMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Mark the viewer's unread messages read for a shared project's private thread
+ */
+export const useMarkCollaborationProjectThreadRead = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markCollaborationProjectThreadRead>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markCollaborationProjectThreadRead>>,
+        TError,
+        {projectId: string},
+        TContext
+      > => {
+      return useMutation(getMarkCollaborationProjectThreadReadMutationOptions(options));
+    }
 
 export const getApproveCollaborationContractUrl = (projectId: string,) => {
 

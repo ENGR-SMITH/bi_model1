@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/oracle-admin/"
+title = "Oracle Admin"
+description = "A private administration surface for configuring Story Oracle providers, model priority, credentials, and live connection health without exposing those controls in the author app."
+version = "1.0.0"
+id = "artifacts/oracle-admin"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/oracle-admin/" ]
+localPort = 22985
+
+[services.development]
+run = "pnpm --filter @workspace/oracle-admin run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/oracle-admin", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/oracle-admin/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22985"
+BASE_PATH = "/oracle-admin/"

@@ -482,6 +482,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/seeds/{seedId}/project:
+    get:
+      operationId: getCollaborationSeedProject
+      tags: [collaborations]
+      summary: Read the frozen Author Den project behind a seed
+      description: The creator or any active respondent can fetch the full project snapshot this seed was published from, so answers can fork it in their own studio.
+      parameters:
+        - { $ref: "#/components/parameters/SeedId" }
+      responses:
+        "200":
+          description: Frozen project document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthorProjectDocument" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Seed has no project snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /collaborations/seeds/{seedId}/applications:
     post:
       operationId: createSeedApplication
@@ -633,6 +657,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/continuations/{continuationId}/project:
+    get:
+      operationId: getContinuationProject
+      tags: [collaborations]
+      summary: Read the submitted project fork for a read-only preview
+      description: The seed creator opens this to preview the respondent's submitted project in their own Author Den without importing it. Read-only by design.
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "200":
+          description: Submitted project document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthorProjectDocument" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Submission carries no project snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /collaborations/continuations/{continuationId}/profile:
     get:
       operationId: getContinuationWriterProfile
@@ -769,6 +817,30 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/continuations/{continuationId}/accept:
+    post:
+      operationId: acceptContinuation
+      tags: [collaborations]
+      summary: Accept a submission as a collaborator and merge its fork
+      description: The creator approves the submitted fork. The seed project and the submitted fork are merged into a shared document that both authors keep in sync in their Author Den studios.
+      parameters:
+        - { $ref: "#/components/parameters/ContinuationId" }
+      responses:
+        "200":
+          description: Shared project created with the merged document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationProject" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Continuation is no longer available
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /collaborations/continuations/{continuationId}/select:
     post:
       operationId: selectContinuation
@@ -879,6 +951,101 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/CollaborationProject" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/document:
+    get:
+      operationId: getCollaborationProjectDocument
+      tags: [tandems]
+      summary: Read the shared Author Den document both participants keep in sync
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Shared document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectDocument" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    put:
+      operationId: saveCollaborationProjectDocument
+      tags: [tandems]
+      summary: Push an updated Author Den document into the shared project
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveCollaborationProjectDocumentInput" }
+      responses:
+        "200":
+          description: Updated shared document
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectDocument" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/thread:
+    post:
+      operationId: getOrCreateProjectThread
+      tags: [tandems]
+      summary: Get or create the private thread for a shared project (open after a fork is accepted)
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: The project's private thread
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationThread" }
+        "201":
+          description: Created the project's private thread
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationThread" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/thread/unread:
+    get:
+      operationId: getCollaborationProjectThreadUnread
+      tags: [tandems]
+      summary: Read the viewer's unread message count for a shared project's private thread
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "200":
+          description: Unread message state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ThreadUnread" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/projects/{projectId}/thread/read:
+    post:
+      operationId: markCollaborationProjectThreadRead
+      tags: [tandems]
+      summary: Mark the viewer's unread messages read for a shared project's private thread
+      parameters:
+        - { $ref: "#/components/parameters/ProjectId" }
+      responses:
+        "204": { description: Marked read }
         "403":
           description: Not allowed
           content:
@@ -1239,7 +1406,7 @@ components:
       required: true
       schema:
         type: string
-        enum: [groq, openrouter, ollama, lmstudio]
+        enum: [groq, openrouter, ollama, lmstudio, freebuff]
   schemas:
     CollaborationSeed:
       type: object
@@ -1273,6 +1440,8 @@ components:
       properties:
         sourceProjectId: { type: string, minLength: 1 }
         sourceProjectTitle: { type: string, minLength: 1 }
+        # Display name of the creator at publish time (optional; falls back to “Author”).
+        creatorName: { type: string }
         sourceSceneId: { type: ["string", "null"] }
         sourceVersion: { type: integer, minimum: 1 }
         seedText: { type: string, minLength: 1, maxLength: 12000 }
@@ -1285,6 +1454,10 @@ components:
         desiredRole: { type: string, minLength: 1 }
         visibility: { type: string, enum: [SEED_AND_BRIEF, SEED_ONLY] }
         respondentLimit: { type: integer, enum: [3, 5, 10, 0] }
+        # The full Author Den project snapshot this seed was frozen from.
+        # Respondents fork this document when they answer; the creator merges
+        # against it when accepting a fork.
+        projectDocument: { $ref: "#/components/schemas/AuthorProjectDocument" }
       required: [sourceProjectId, sourceProjectTitle, seedText, unitType, protocol, genre, tone, language, plotConstraints, desiredRole, visibility, respondentLimit]
     CollaborationSeedUpdate:
       type: object
@@ -1324,7 +1497,25 @@ components:
       properties:
         draftText: { type: string, maxLength: 20000 }
         draftComments: { type: string, maxLength: 6000 }
+        # The respondent's working fork of the seed project, saved as they
+        # edit and carried into the submission for the creator's preview.
+        projectDocument: { $ref: "#/components/schemas/AuthorProjectDocument" }
       required: [draftText, draftComments]
+    AuthorProjectDocument:
+      type: object
+      additionalProperties: true
+      description: A serialized Author Den project (title, scenes, characters, plots, world).
+    ProjectDocument:
+      type: object
+      properties:
+        document: { $ref: "#/components/schemas/AuthorProjectDocument" }
+        updatedAt: { type: ["string", "null"], format: date-time }
+      required: [document, updatedAt]
+    SaveCollaborationProjectDocumentInput:
+      type: object
+      properties:
+        document: { $ref: "#/components/schemas/AuthorProjectDocument" }
+      required: [document]
     ContinuationSubmission:
       type: object
       properties:
@@ -1401,17 +1592,27 @@ components:
         continuationId: { type: string }
         creatorId: { type: string }
         respondentId: { type: string }
+        projectId: { type: ["string", "null"] }
+        creatorName: { type: string }
+        respondentName: { type: string }
         messages:
           type: array
           items: { $ref: "#/components/schemas/CollaborationMessage" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, continuationId, creatorId, respondentId, messages, createdAt, updatedAt]
+      required: [id, continuationId, creatorId, respondentId, projectId, creatorName, respondentName, messages, createdAt, updatedAt]
+    ThreadUnread:
+      type: object
+      properties:
+        unread: { type: boolean }
+        count: { type: integer }
+      required: [unread, count]
     InboxThread:
       type: object
       properties:
         id: { type: string }
         continuationId: { type: string }
+        projectId: { type: ["string", "null"] }
         seedId: { type: ["string", "null"] }
         sourceProjectTitle: { type: string }
         partnerId: { type: string }
@@ -1422,7 +1623,7 @@ components:
         unread: { type: boolean }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, continuationId, seedId, sourceProjectTitle, partnerId, partnerName, lastMessage, lastMessageAt, messageCount, unread, createdAt, updatedAt]
+      required: [id, continuationId, projectId, seedId, sourceProjectTitle, partnerId, partnerName, lastMessage, lastMessageAt, messageCount, unread, createdAt, updatedAt]
     CollaborationMessageInput:
       type: object
       properties:
@@ -1446,9 +1647,10 @@ components:
         respondentApproved: { type: boolean }
         currentTurn: { type: string }
         threadId: { type: ["string", "null"] }
+        documentAvailable: { type: boolean }
         createdAt: { type: string, format: date-time }
         lockedAt: { type: ["string", "null"], format: date-time }
-      required: [id, seedId, title, creatorId, creatorName, respondentId, respondentName, seedText, continuationText, status, contractVersion, creatorApproved, respondentApproved, currentTurn, threadId, createdAt, lockedAt]
+      required: [id, seedId, title, creatorId, creatorName, respondentId, respondentName, seedText, continuationText, status, contractVersion, creatorApproved, respondentApproved, currentTurn, threadId, documentAvailable, createdAt, lockedAt]
     CollaborationNotification:
       type: object
       properties:

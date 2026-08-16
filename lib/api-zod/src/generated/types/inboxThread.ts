@@ -10,6 +10,8 @@ export interface InboxThread {
   id: string;
   continuationId: string;
   /** @nullable */
+  projectId: string | null;
+  /** @nullable */
   seedId: string | null;
   sourceProjectTitle: string;
   partnerId: string;

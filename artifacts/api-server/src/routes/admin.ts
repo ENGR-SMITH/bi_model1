@@ -11,14 +11,18 @@ import { checkProvider, listProviderStatuses, updateProvider, type ProviderId } 
 const router: IRouter = Router();
 const COOKIE_NAME = "oracle_admin_session";
 
+// The default admin access code keeps the admin page usable out of the box;
+// set ADMIN_ACCESS_CODE in .env to change it.
+const adminAccessCode = (): string => process.env.ADMIN_ACCESS_CODE ?? "TANDEM_123";
+
 function sessionValue(): string {
   return crypto.createHmac("sha256", process.env.SESSION_SECRET ?? "manuskript-development-key")
-    .update(process.env.ADMIN_ACCESS_CODE ?? "")
+    .update(adminAccessCode())
     .digest("base64url");
 }
 
 function isAuthenticated(req: Request): boolean {
-  return req.cookies?.[COOKIE_NAME] === sessionValue() && Boolean(process.env.ADMIN_ACCESS_CODE);
+  return req.cookies?.[COOKIE_NAME] === sessionValue();
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
@@ -35,7 +39,7 @@ router.get("/admin/session", (req, res) => {
 
 router.post("/admin/login", (req, res): void => {
   const parsed = AdminLoginBody.safeParse(req.body);
-  if (!parsed.success || !process.env.ADMIN_ACCESS_CODE || parsed.data.accessCode !== process.env.ADMIN_ACCESS_CODE) {
+  if (!parsed.success || parsed.data.accessCode !== adminAccessCode()) {
     res.status(401).json({ error: "Invalid admin access code" });
     return;
   }

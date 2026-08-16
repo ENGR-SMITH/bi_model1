@@ -18,6 +18,7 @@ const require = createRequire(import.meta.url);
 export const collaborationSeedsTable = sqliteTable("collaboration_seeds", {
   id: text("id").primaryKey(),
   creatorId: text("creator_id").notNull(),
+  creatorName: text("creator_name"),
   sourceProjectId: text("source_project_id").notNull(),
   sourceProjectTitle: text("source_project_title").notNull(),
   sourceSceneId: text("source_scene_id"),
@@ -32,6 +33,8 @@ export const collaborationSeedsTable = sqliteTable("collaboration_seeds", {
   desiredRole: text("desired_role").notNull(),
   visibility: text("visibility").notNull().default("SEED_AND_BRIEF"),
   respondentLimit: integer("respondent_limit").notNull().default(3),
+  // Mirrors pg jsonb: a text column with JSON mode so objects round-trip.
+  projectDocument: text("project_document", { mode: "json" }),
   availability: text("availability").notNull().default("OPEN"),
   publishedAt: integer("published_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   closedAt: integer("closed_at", { mode: "timestamp" }),
@@ -50,6 +53,7 @@ export const seedApplicationsTable = sqliteTable(
     sourceSeedText: text("source_seed_text").notNull(),
     draftText: text("draft_text").notNull().default(""),
     draftComments: text("draft_comments").notNull().default(""),
+    projectDocument: text("project_document", { mode: "json" }),
     status: text("status").notNull().default("DRAFT"),
     submittedAt: integer("submitted_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
@@ -77,6 +81,7 @@ export const continuationSubmissionsTable = sqliteTable(
     seedText: text("seed_text").notNull(),
     continuationText: text("continuation_text").notNull(),
     comments: text("comments").notNull().default(""),
+    projectDocument: text("project_document", { mode: "json" }),
     version: integer("version").notNull().default(1),
     status: text("status").notNull().default("UNDER_REVIEW"),
     submittedAt: integer("submitted_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
@@ -102,6 +107,7 @@ export const collaborationProjectsTable = sqliteTable("collaboration_projects", 
   creatorApproved: integer("creator_approved", { mode: "boolean" }).notNull().default(false),
   respondentApproved: integer("respondent_approved", { mode: "boolean" }).notNull().default(false),
   currentTurn: text("current_turn").notNull().default("CREATOR"),
+  document: text("document", { mode: "json" }),
   lockedAt: integer("locked_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
@@ -240,6 +246,7 @@ export async function buildInMemoryDb() {
   database.run(`
     CREATE TABLE collaboration_seeds (
       id TEXT PRIMARY KEY NOT NULL, creator_id TEXT NOT NULL,
+      creator_name TEXT,
       source_project_id TEXT NOT NULL, source_project_title TEXT NOT NULL,
       source_scene_id TEXT, source_version INTEGER NOT NULL DEFAULT 1,
       seed_text TEXT NOT NULL, unit_type TEXT NOT NULL, protocol TEXT NOT NULL,
@@ -247,6 +254,7 @@ export async function buildInMemoryDb() {
       plot_constraints TEXT NOT NULL DEFAULT '', desired_role TEXT NOT NULL,
       visibility TEXT NOT NULL DEFAULT 'SEED_AND_BRIEF',
       respondent_limit INTEGER NOT NULL DEFAULT 3,
+      project_document TEXT,
       availability TEXT NOT NULL DEFAULT 'OPEN',
       published_at INTEGER NOT NULL, closed_at INTEGER,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
@@ -256,6 +264,7 @@ export async function buildInMemoryDb() {
       respondent_id TEXT NOT NULL, respondent_name TEXT NOT NULL,
       source_project_title TEXT NOT NULL, source_seed_text TEXT NOT NULL,
       draft_text TEXT NOT NULL DEFAULT '', draft_comments TEXT NOT NULL DEFAULT '',
+      project_document TEXT,
       status TEXT NOT NULL DEFAULT 'DRAFT', submitted_at INTEGER,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
@@ -267,7 +276,8 @@ export async function buildInMemoryDb() {
       seed_id TEXT NOT NULL, creator_id TEXT NOT NULL, respondent_id TEXT NOT NULL,
       respondent_name TEXT NOT NULL, source_project_title TEXT NOT NULL,
       seed_text TEXT NOT NULL, continuation_text TEXT NOT NULL,
-      comments TEXT NOT NULL DEFAULT '', version INTEGER NOT NULL DEFAULT 1,
+      comments TEXT NOT NULL DEFAULT '', project_document TEXT,
+      version INTEGER NOT NULL DEFAULT 1,
       status TEXT NOT NULL DEFAULT 'UNDER_REVIEW',
       submitted_at INTEGER NOT NULL, created_at INTEGER NOT NULL,
       UNIQUE (application_id, version)
@@ -281,7 +291,7 @@ export async function buildInMemoryDb() {
       contract_version INTEGER NOT NULL DEFAULT 1,
       creator_approved INTEGER NOT NULL DEFAULT 0,
       respondent_approved INTEGER NOT NULL DEFAULT 0,
-      current_turn TEXT NOT NULL DEFAULT 'CREATOR', locked_at INTEGER,
+      current_turn TEXT NOT NULL DEFAULT 'CREATOR', document TEXT, locked_at INTEGER,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
     CREATE TABLE collaboration_notifications (

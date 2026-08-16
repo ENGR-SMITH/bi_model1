@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { eq, asc } from "drizzle-orm";
 import { db, oracleHealthEventsTable, oracleProvidersTable, type OracleProvider } from "@workspace/db";
 
-export type ProviderId = "groq" | "openrouter" | "ollama" | "lmstudio";
+export type ProviderId = "groq" | "openrouter" | "ollama" | "lmstudio" | "freebuff";
 export type ProviderHealth = "connected" | "not_configured" | "checking" | "rate_limited" | "unavailable" | "error" | "disabled";
 export const MAX_ORACLE_CONTEXT_CHARS = 12_000;
 export const MAX_ORACLE_MESSAGE_CHARS = 4_000;
@@ -44,6 +44,20 @@ export const providerDefinitions: ProviderDefinition[] = [
     baseUrl: "http://localhost:1234/v1",
     models: [{ id: "local-model", label: "Local Model" }],
   },
+  {
+    id: "freebuff",
+    label: "Freebuff",
+    baseUrl: "http://localhost:8081/v1",
+    models: [
+      { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash 07/31" },
+      { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro 08/13" },
+      { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
+      { id: "minimax-m3", label: "MiniMax M3" },
+      { id: "mimo-2.5", label: "MiMo 2.5" },
+      { id: "glm-5.2", label: "GLM 5.2" },
+      { id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
+    ],
+  },
 ];
 
 const definitionFor = (id: string) => providerDefinitions.find((item) => item.id === id);
@@ -73,10 +87,48 @@ export function keyHint(ciphertext: string | null): string | null {
   }
 }
 
+// Environment-variable mapping so model credentials can be set once in .env
+// (or the deployment environment) and the admin page reflects them. API keys
+// are only written when the row has none yet, so a key entered through the
+// admin page always wins over the environment default. Read at call time so
+// late-set environment variables (e.g. in tests) are honored.
+function providerEnv(id: ProviderId): { apiKey?: string; baseUrl?: string; modelId?: string } {
+  switch (id) {
+    case "groq":
+      return {
+        apiKey: process.env.GROQ_API_KEY,
+        baseUrl: process.env.GROQ_BASE_URL,
+        modelId: process.env.GROQ_MODEL_ID,
+      };
+    case "openrouter":
+      return {
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseUrl: process.env.OPENROUTER_BASE_URL,
+        modelId: process.env.OPENROUTER_MODEL_ID,
+      };
+    case "ollama":
+      return {
+        baseUrl: process.env.OLLAMA_BASE_URL,
+        modelId: process.env.OLLAMA_MODEL_ID,
+      };
+    case "lmstudio":
+      return {
+        baseUrl: process.env.LMSTUDIO_BASE_URL,
+        modelId: process.env.LMSTUDIO_MODEL_ID,
+      };
+    case "freebuff":
+      return {
+        apiKey: process.env.FREEBUFF_API_KEY,
+        baseUrl: process.env.FREEBUFF_BASE_URL,
+        modelId: process.env.FREEBUFF_MODEL_ID,
+      };
+  }
+}
+
 export async function ensureProviderRows(): Promise<void> {
-  const existing = await db.select({ id: oracleProvidersTable.id }).from(oracleProvidersTable);
-  const ids = new Set(existing.map((item) => item.id));
-  const missing = providerDefinitions.filter((item) => !ids.has(item.id));
+  let existing = await db.select().from(oracleProvidersTable);
+  const existingById = new Map(existing.map((item) => [item.id, item]));
+  const missing = providerDefinitions.filter((item) => !existingById.has(item.id));
   if (missing.length) {
     await db.insert(oracleProvidersTable).values(
       missing.map((item, index) => ({
@@ -87,6 +139,27 @@ export async function ensureProviderRows(): Promise<void> {
         status: "not_configured",
       })),
     );
+    existing = await db.select().from(oracleProvidersTable);
+  }
+  // Seed any provider whose credentials are supplied via environment.
+  const rowsById = new Map(existing.map((item) => [item.id, item]));
+  for (const definition of providerDefinitions) {
+    const env = providerEnv(definition.id);
+    const row = rowsById.get(definition.id);
+    const patch: Partial<OracleProvider> = {};
+    if (env?.apiKey && !row?.apiKeyCiphertext) {
+      patch.apiKeyCiphertext = encryptSecret(env.apiKey.trim());
+      patch.status = "not_configured";
+    }
+    if (env?.baseUrl && row?.baseUrl === definition.baseUrl) {
+      patch.baseUrl = env.baseUrl;
+    }
+    if (env?.modelId) {
+      patch.modelId = env.modelId;
+    }
+    if (Object.keys(patch).length) {
+      await db.update(oracleProvidersTable).set(patch).where(eq(oracleProvidersTable.id, definition.id));
+    }
   }
 }
 
@@ -122,15 +195,22 @@ export async function listProviderStatuses() {
       lastSuccessModelId: row.lastSuccessModelId ?? null,
       lastSuccessAt: row.lastSuccessAt?.toISOString() ?? null,
       isLastKnownGood: Boolean(row.lastSuccessAt && latestSuccessAt && row.lastSuccessAt.getTime() === latestSuccessAt.getTime()),
-      models: definition.models.map((model, index) => ({
-        ...model,
-        enabled: row.enabled && (row.modelId ? row.modelId === model.id : true),
-        priority: row.priority * 10 + index,
-        status: providerStatus,
-        lastCheckedAt: row.lastCheckedAt?.toISOString() ?? null,
-        cooldownUntil: row.cooldownUntil?.toISOString() ?? null,
-        lastError: row.lastError ?? null,
-      })),
+      models: [
+        ...definition.models.map((model, index) => ({
+          ...model,
+          enabled: row.enabled && (row.modelId ? row.modelId === model.id : true),
+          priority: row.priority * 10 + index,
+          status: providerStatus,
+          lastCheckedAt: row.lastCheckedAt?.toISOString() ?? null,
+          cooldownUntil: row.cooldownUntil?.toISOString() ?? null,
+          lastError: row.lastError ?? null,
+        })),
+        // Keep a saved custom model visible in the list so the admin page can
+        // show it as selected even though it is not in the definition catalog.
+        ...(row.modelId && !definition.models.some((model) => model.id === row.modelId)
+          ? [{ id: row.modelId, label: `${row.modelId} (custom)`, enabled: row.enabled, priority: row.priority * 10 + definition.models.length, status: providerStatus, lastCheckedAt: row.lastCheckedAt?.toISOString() ?? null, cooldownUntil: row.cooldownUntil?.toISOString() ?? null, lastError: row.lastError ?? null }]
+          : []),
+      ],
     };
   });
 }
@@ -161,7 +241,8 @@ async function getConfiguredRows() {
 }
 
 function endpointFor(baseUrl: string): string {
-  return `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+  const clean = baseUrl.replace(/\/+$/, "");
+  return clean.endsWith("/chat/completions") ? clean : `${clean}/chat/completions`;
 }
 
 function errorStatus(responseStatus: number): ProviderHealth {

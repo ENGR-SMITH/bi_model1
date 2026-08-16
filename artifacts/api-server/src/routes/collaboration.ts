@@ -89,7 +89,7 @@ function seedView(
   return {
     id: seed.id,
     creatorId: seed.creatorId,
-    creatorName: "Author",
+    creatorName: seed.creatorName ?? "Author",
     sourceProjectId: seed.sourceProjectId,
     sourceProjectTitle: seed.sourceProjectTitle,
     sourceSceneId: seed.sourceSceneId ?? null,
@@ -285,6 +285,7 @@ router.post("/collaborations/seeds", async (req, res): Promise<void> => {
     id: crypto.randomUUID(),
     creatorId,
     ...parsed.data,
+    creatorName: parsed.data.creatorName ?? "Author",
     availability: "OPEN",
   }).returning();
   await recordActivity({
@@ -346,6 +347,37 @@ router.patch("/collaborations/seeds/:seedId", async (req, res): Promise<void> =>
   }
   const [seed] = await db.update(collaborationSeedsTable).set({ ...parsed.data, updatedAt: new Date() }).where(eq(collaborationSeedsTable.id, existing.id)).returning();
   res.json(seedView(seed, await seedCount(seed.id)));
+});
+
+router.get("/collaborations/seeds/:seedId/project", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const seedId = parseParam(req.params.seedId);
+  const [seed] = await db.select().from(collaborationSeedsTable).where(eq(collaborationSeedsTable.id, seedId));
+  if (!seed) {
+    res.status(404).json({ error: "Seed not found" });
+    return;
+  }
+  const [application] = viewerId === seed.creatorId
+    ? [null]
+    : await db
+        .select({ id: seedApplicationsTable.id })
+        .from(seedApplicationsTable)
+        .where(and(
+          eq(seedApplicationsTable.seedId, seedId),
+          eq(seedApplicationsTable.respondentId, viewerId),
+          inArray(seedApplicationsTable.status, ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "ACCEPTED_PENDING_CONTRACT"]),
+        ))
+        .limit(1);
+  if (viewerId !== seed.creatorId && !application) {
+    res.status(403).json({ error: "You can only fork a seed you are answering" });
+    return;
+  }
+  if (!seed.projectDocument) {
+    res.status(404).json({ error: "This seed has no project snapshot" });
+    return;
+  }
+  res.json(seed.projectDocument);
 });
 
 router.delete("/collaborations/seeds/:seedId", async (req, res): Promise<void> => {
@@ -523,8 +555,9 @@ router.post("/collaborations/applications/:applicationId/submit", async (req, re
     seedText: seed.seedText,
     continuationText: application.draftText,
     comments: application.draftComments,
+    projectDocument: application.projectDocument ?? null,
   }).returning();
-  await notify(seed.creatorId, "continuation_submitted", "A continuation is ready", "A writer submitted a continuation to your seed.", `/authors/collaborations/continuation/${submission.id}`, submission.id);
+  await notify(seed.creatorId, "continuation_submitted", "A continuation is ready", "A writer submitted a continuation to your seed. Open it in Author Den to read the full project before you decide.", `/authors-den/?preview=${submission.id}`, submission.id);
   await recordActivity({
     eventType: "continuation_submitted",
     summary: `${application.respondentName} submitted a continuation for “${seed.sourceProjectTitle}”.`,
@@ -625,6 +658,25 @@ async function getPermittedSubmission(
   }
   return submission;
 }
+
+router.get("/collaborations/continuations/:continuationId/project", async (req, res): Promise<void> => {
+  const creatorId = userId(req, res);
+  if (!creatorId) return;
+  const continuationId = parseParam(req.params.continuationId);
+  const [submission] = await db
+    .select({ id: continuationSubmissionsTable.id, creatorId: continuationSubmissionsTable.creatorId, projectDocument: continuationSubmissionsTable.projectDocument })
+    .from(continuationSubmissionsTable)
+    .where(eq(continuationSubmissionsTable.id, continuationId));
+  if (!submission || submission.creatorId !== creatorId) {
+    res.status(403).json({ error: "Only the seed creator can preview this submission" });
+    return;
+  }
+  if (!submission.projectDocument) {
+    res.status(404).json({ error: "This submission has no project snapshot" });
+    return;
+  }
+  res.json(submission.projectDocument);
+});
 
 router.get("/collaborations/continuations/:continuationId/profile", async (req, res): Promise<void> => {
   const viewerId = userId(req, res);
@@ -742,11 +794,42 @@ async function threadView(thread: typeof collaborationThreadsTable.$inferSelect)
     .from(collaborationMessagesTable)
     .where(eq(collaborationMessagesTable.threadId, thread.id))
     .orderBy(asc(collaborationMessagesTable.createdAt));
+  const [submission] = await db
+    .select({
+      seedId: continuationSubmissionsTable.seedId,
+      creatorId: continuationSubmissionsTable.creatorId,
+      respondentName: continuationSubmissionsTable.respondentName,
+    })
+    .from(continuationSubmissionsTable)
+    .where(eq(continuationSubmissionsTable.id, thread.continuationId));
+  let creatorName = "Author";
+  if (submission) {
+    const [seed] = await db
+      .select({ creatorName: collaborationSeedsTable.creatorName })
+      .from(collaborationSeedsTable)
+      .where(eq(collaborationSeedsTable.id, submission.seedId));
+    if (seed?.creatorName) creatorName = seed.creatorName;
+  }
+  // The private room belongs to the shared project (accepted fork); pre-accept
+  // conversations live on the continuation alone.
+  const [project] = submission
+    ? await db
+        .select({ id: collaborationProjectsTable.id })
+        .from(collaborationProjectsTable)
+        .where(and(
+          eq(collaborationProjectsTable.seedId, submission.seedId),
+          eq(collaborationProjectsTable.respondentId, thread.respondentId),
+        ))
+        .limit(1)
+    : [];
   return {
     id: thread.id,
     continuationId: thread.continuationId,
     creatorId: thread.creatorId,
     respondentId: thread.respondentId,
+    projectId: project?.id ?? null,
+    creatorName,
+    respondentName: submission?.respondentName ?? "Your collaborator",
     messages: messages.map((message) => ({
       id: message.id,
       threadId: message.threadId,
@@ -916,7 +999,21 @@ router.post("/collaborations/threads/:threadId/messages", async (req, res): Prom
   }).returning();
   await db.update(collaborationThreadsTable).set({ updatedAt: new Date() }).where(eq(collaborationThreadsTable.id, thread.id));
   const recipientId = thread.creatorId === viewerId ? thread.respondentId : thread.creatorId;
-  await notify(recipientId, "collaboration_message", "A private message is waiting", "Your collaborator sent a private message about a continuation.", `/authors/collaborations/thread/${thread.id}`, thread.id);
+  // Once the fork is accepted, the private room lives in the shared project in
+  // Author Den — the notification deep-links there with the chat open.
+  const [projectRow] = await db
+    .select({ id: collaborationProjectsTable.id })
+    .from(collaborationProjectsTable)
+    .innerJoin(continuationSubmissionsTable, and(
+      eq(collaborationProjectsTable.seedId, continuationSubmissionsTable.seedId),
+      eq(collaborationProjectsTable.respondentId, thread.respondentId),
+    ))
+    .where(eq(continuationSubmissionsTable.id, thread.continuationId))
+    .limit(1);
+  const messageLink = projectRow
+    ? `/authors-den/?project=${projectRow.id}&chat=1`
+    : `/authors/collaborations/thread/${thread.id}`;
+  await notify(recipientId, "collaboration_message", "A private message is waiting", "Your collaborator sent a private message — open it in the shared project.", messageLink, thread.id);
   await recordActivity({
     eventType: "message_sent",
     summary: "A private message was exchanged in the collaboration thread.",
@@ -982,6 +1079,96 @@ router.delete("/collaborations/continuations/:continuationId", async (req, res):
   res.sendStatus(204);
 });
 
+// Merges the respondent's fork over the frozen seed project so the accepted
+// shared document always contains every part of both sides. Collection items
+// are unioned by id (fork first, seed items appended when the fork dropped
+// them); scalar fields prefer the fork.
+function mergeProjectDocuments(seedDoc: unknown, forkDoc: unknown): Record<string, unknown> {
+  const seed = (seedDoc && typeof seedDoc === "object" ? seedDoc : {}) as Record<string, unknown>;
+  const fork = (forkDoc && typeof forkDoc === "object" ? forkDoc : {}) as Record<string, unknown>;
+  const merged: Record<string, unknown> = { ...seed, ...fork };
+  for (const key of ["scenes", "characters", "plots", "world", "revisions"]) {
+    const seedItems = Array.isArray(seed[key]) ? seed[key] as Array<Record<string, unknown>> : [];
+    const forkItems = Array.isArray(fork[key]) ? fork[key] as Array<Record<string, unknown>> : [];
+    if (!seedItems.length && !forkItems.length) continue;
+    const seen = new Set<string>();
+    const items: Array<Record<string, unknown>> = [];
+    for (const item of [...forkItems, ...seedItems]) {
+      const id = typeof item?.id === "string" ? item.id : null;
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      items.push(item);
+    }
+    merged[key] = items;
+  }
+  return merged;
+}
+
+router.post("/collaborations/continuations/:continuationId/accept", async (req, res): Promise<void> => {
+  const creatorId = userId(req, res);
+  if (!creatorId) return;
+  const continuationId = parseParam(req.params.continuationId);
+  const result = await db.transaction(async (tx) => {
+    const [submission] = await tx.select().from(continuationSubmissionsTable).where(eq(continuationSubmissionsTable.id, continuationId));
+    if (!submission || submission.creatorId !== creatorId || submission.status !== "UNDER_REVIEW") return null;
+    const [seed] = await tx.select().from(collaborationSeedsTable).where(eq(collaborationSeedsTable.id, submission.seedId));
+    if (!seed || seed.availability !== "OPEN") return null;
+    const mergedDocument = mergeProjectDocuments(seed.projectDocument, submission.projectDocument);
+    const [project] = await tx.insert(collaborationProjectsTable).values({
+      id: crypto.randomUUID(),
+      seedId: seed.id,
+      title: seed.sourceProjectTitle,
+      creatorId,
+      creatorName: "Author",
+      respondentId: submission.respondentId,
+      respondentName: submission.respondentName,
+      seedText: submission.seedText,
+      continuationText: submission.continuationText,
+      document: mergedDocument,
+    }).returning();
+    // Open the private room right away so the shared project has its thread.
+    const [existingThread] = await tx.select().from(collaborationThreadsTable).where(eq(collaborationThreadsTable.continuationId, submission.id));
+    if (!existingThread) {
+      await tx.insert(collaborationThreadsTable).values({
+        id: crypto.randomUUID(),
+        continuationId: submission.id,
+        creatorId,
+        respondentId: submission.respondentId,
+      });
+    }
+    await tx.update(continuationSubmissionsTable).set({ status: "ACCEPTED_PENDING_CONTRACT" }).where(eq(continuationSubmissionsTable.id, continuationId));
+    await tx.update(seedApplicationsTable).set({ status: "ACCEPTED_PENDING_CONTRACT", updatedAt: new Date() }).where(eq(seedApplicationsTable.id, submission.applicationId));
+    await tx.update(seedApplicationsTable).set({ status: "DECLINED", updatedAt: new Date() }).where(and(
+      eq(seedApplicationsTable.seedId, seed.id),
+      eq(seedApplicationsTable.status, "UNDER_REVIEW"),
+      eq(seedApplicationsTable.respondentId, submission.respondentId),
+    ));
+    await tx.update(continuationSubmissionsTable).set({ status: "ARCHIVED" }).where(and(
+      eq(continuationSubmissionsTable.seedId, seed.id),
+      eq(continuationSubmissionsTable.status, "UNDER_REVIEW"),
+      eq(continuationSubmissionsTable.creatorId, creatorId),
+    ));
+    await tx.update(collaborationSeedsTable).set({ availability: "ACCEPTED", closedAt: new Date(), updatedAt: new Date() }).where(eq(collaborationSeedsTable.id, seed.id));
+    return { project, submission };
+  });
+  if (!result) {
+    res.status(409).json({ error: "This continuation is no longer available for acceptance" });
+    return;
+  }
+  const { project, submission } = result;
+  await notify(project.respondentId, "respondent_accepted", "Your fork was accepted", "The creator accepted your submission. The merged project is now shared in both studios.", `/authors-den/?project=${project.id}`, project.id);
+  await notify(project.creatorId, "respondent_accepted", "Collaborator accepted", "You accepted the submission. The merged project is now shared in both studios.", `/authors-den/?project=${project.id}`, project.id);
+  await recordActivity({
+    eventType: "respondent_accepted",
+    summary: `Accepted ${submission.respondentName} as a collaborator and merged their fork into “${project.title}”.`,
+    actorId: creatorId,
+    projectId: project.id,
+    seedId: project.seedId,
+    resourceId: project.id,
+  });
+  res.json(await projectView(project));
+});
+
 router.post("/collaborations/continuations/:continuationId/select", async (req, res): Promise<void> => {
   const creatorId = userId(req, res);
   if (!creatorId) return;
@@ -1011,7 +1198,7 @@ router.post("/collaborations/continuations/:continuationId/select", async (req, 
     res.status(409).json({ error: "This continuation is no longer available for selection" });
     return;
   }
-  await notify(result.respondentId, "respondent_selected", "You were selected", "The creator selected your continuation. Review the contract before the shared project opens.", `/authors/tandem/${result.id}/contract`, result.id);
+  await notify(result.respondentId, "respondent_selected", "You were selected", "The creator accepted your continuation. The shared project is open in both studios.", `/authors-den/?project=${result.id}`, result.id);
   await recordActivity({
     eventType: "respondent_selected",
     summary: `Selected ${result.respondentName} as the collaborator for “${result.title}”.`,
@@ -1028,6 +1215,60 @@ router.post("/collaborations/continuations/:continuationId/select", async (req, 
   });
 });
 
+// Build a minimal Author Den project document from a legacy shared room's
+// work blocks + shared story bible entries, so rooms created before the
+// fork/merge model still open in the studio. Returns null when there is no
+// legacy content at all.
+async function legacyProjectDocument(project: typeof collaborationProjectsTable.$inferSelect): Promise<Record<string, unknown> | null> {
+  const [blocks, bible] = await Promise.all([
+    db.select().from(collaborationWorkBlocksTable).where(eq(collaborationWorkBlocksTable.projectId, project.id)).orderBy(asc(collaborationWorkBlocksTable.turnOrder), asc(collaborationWorkBlocksTable.createdAt)),
+    db.select().from(collaborationStoryBibleEntriesTable).where(and(
+      eq(collaborationStoryBibleEntriesTable.projectId, project.id),
+      eq(collaborationStoryBibleEntriesTable.shared, true),
+    )).orderBy(asc(collaborationStoryBibleEntriesTable.createdAt)),
+  ]);
+  if (!blocks.length && !bible.length) return null;
+  const scenes = blocks.map((block, index) => ({
+    id: block.id,
+    title: block.kind === "SEED" ? "Opening" : block.kind === "CONTINUATION" ? "Continuation" : `Pass ${index + 1}`,
+    synopsis: "",
+    content: block.content ? block.content.split(/\n\n+/).filter(Boolean).map((part) => `<p>${part.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br />")}</p>`).join("") : "",
+    status: "Draft",
+    compile: true,
+    target: 0,
+    pov: "",
+    labels: "",
+    notes: "",
+    media: [],
+  }));
+  return {
+    id: project.id,
+    title: project.title,
+    author: project.creatorName ?? "Author",
+    template: "Novel",
+    premise: "",
+    synopsis: "",
+    summary: "",
+    created: project.createdAt.toISOString(),
+    updated: project.updatedAt.toISOString(),
+    scenes,
+    characters: [],
+    plots: [],
+    world: bible.map((entry) => ({
+      id: entry.id,
+      name: entry.name,
+      kind: entry.kind,
+      description: entry.content,
+      notes: "",
+      fantasy: "",
+      mapUrl: "",
+    })),
+    revisions: [],
+    dailyTarget: 750,
+    sessionTarget: 500,
+  };
+}
+
 async function projectView(project: typeof collaborationProjectsTable.$inferSelect) {
   const [thread] = await db
     .select({ id: collaborationThreadsTable.id })
@@ -1038,9 +1279,15 @@ async function projectView(project: typeof collaborationProjectsTable.$inferSele
       eq(continuationSubmissionsTable.respondentId, project.respondentId),
     ))
     .limit(1);
+  const [block] = await db
+    .select({ id: collaborationWorkBlocksTable.id })
+    .from(collaborationWorkBlocksTable)
+    .where(eq(collaborationWorkBlocksTable.projectId, project.id))
+    .limit(1);
   return {
     ...project,
     threadId: thread?.id ?? null,
+    documentAvailable: Boolean(project.document) || Boolean(block),
     createdAt: project.createdAt.toISOString(),
     lockedAt: value(project.lockedAt),
   };
@@ -1083,6 +1330,131 @@ router.get("/collaborations/projects/:projectId", async (req, res): Promise<void
     return;
   }
   res.json(await projectView(project));
+});
+
+// The private room for a shared project: get-or-create it, read the unread
+// message count, or mark the viewer's messages read.
+async function findProjectThread(project: typeof collaborationProjectsTable.$inferSelect) {
+  const [submission] = await db
+    .select()
+    .from(continuationSubmissionsTable)
+    .where(and(
+      eq(continuationSubmissionsTable.seedId, project.seedId),
+      eq(continuationSubmissionsTable.respondentId, project.respondentId),
+    ))
+    .orderBy(asc(continuationSubmissionsTable.createdAt))
+    .limit(1);
+  if (!submission) return null;
+  const [thread] = await db.select().from(collaborationThreadsTable).where(eq(collaborationThreadsTable.continuationId, submission.id));
+  return thread ?? null;
+}
+
+router.post("/collaborations/projects/:projectId/thread", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const projectId = parseParam(req.params.projectId);
+  const project = await getPermittedProject(projectId, viewerId, res);
+  if (!project) return;
+  const existing = await findProjectThread(project);
+  if (existing) {
+    res.json(await threadView(existing));
+    return;
+  }
+  const [submission] = await db
+    .select({ id: continuationSubmissionsTable.id })
+    .from(continuationSubmissionsTable)
+    .where(and(
+      eq(continuationSubmissionsTable.seedId, project.seedId),
+      eq(continuationSubmissionsTable.respondentId, project.respondentId),
+    ))
+    .orderBy(asc(continuationSubmissionsTable.createdAt))
+    .limit(1);
+  if (!submission) {
+    res.status(404).json({ error: "No submission found for this project" });
+    return;
+  }
+  const [thread] = await db.insert(collaborationThreadsTable).values({
+    id: crypto.randomUUID(),
+    continuationId: submission.id,
+    creatorId: project.creatorId,
+    respondentId: project.respondentId,
+  }).returning();
+  res.status(201).json(await threadView(thread));
+});
+
+router.get("/collaborations/projects/:projectId/thread/unread", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const projectId = parseParam(req.params.projectId);
+  const project = await getPermittedProject(projectId, viewerId, res);
+  if (!project) return;
+  const thread = await findProjectThread(project);
+  if (!thread) {
+    res.json({ unread: false, count: 0 });
+    return;
+  }
+  const unreadNotes = await db
+    .select({ id: collaborationNotificationsTable.id })
+    .from(collaborationNotificationsTable)
+    .where(and(
+      eq(collaborationNotificationsTable.recipientId, viewerId),
+      eq(collaborationNotificationsTable.category, "collaboration_message"),
+      eq(collaborationNotificationsTable.resourceId, thread.id),
+      isNull(collaborationNotificationsTable.readAt),
+    ));
+  res.json({ unread: unreadNotes.length > 0, count: unreadNotes.length });
+});
+
+router.post("/collaborations/projects/:projectId/thread/read", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const projectId = parseParam(req.params.projectId);
+  const project = await getPermittedProject(projectId, viewerId, res);
+  if (!project) return;
+  const thread = await findProjectThread(project);
+  if (thread) {
+    await db.update(collaborationNotificationsTable).set({ readAt: new Date() }).where(and(
+      eq(collaborationNotificationsTable.recipientId, viewerId),
+      eq(collaborationNotificationsTable.category, "collaboration_message"),
+      eq(collaborationNotificationsTable.resourceId, thread.id),
+      isNull(collaborationNotificationsTable.readAt),
+    ));
+  }
+  res.status(204).end();
+});
+
+router.get("/collaborations/projects/:projectId/document", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const projectId = parseParam(req.params.projectId);
+  const project = await getPermittedProject(projectId, viewerId, res);
+  if (!project) return;
+  // Legacy rooms (created under the old turn/contract model) have work blocks
+  // instead of a merged document. Synthesize a document from those blocks so
+  // the room still opens in the Author Den instead of dead-ending.
+  const document = project.document ?? await legacyProjectDocument(project);
+  res.json({
+    document: document ?? null,
+    updatedAt: (document ? project.updatedAt : project.createdAt).toISOString(),
+  });
+});
+
+router.put("/collaborations/projects/:projectId/document", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const projectId = parseParam(req.params.projectId);
+  const project = await getPermittedProject(projectId, viewerId, res);
+  if (!project) return;
+  const document = req.body?.document;
+  if (!document || typeof document !== "object") {
+    res.status(400).json({ error: "A project document object is required" });
+    return;
+  }
+  const [updated] = await db.update(collaborationProjectsTable).set({ document, updatedAt: new Date() }).where(eq(collaborationProjectsTable.id, project.id)).returning();
+  res.json({
+    document: updated.document ?? null,
+    updatedAt: updated.updatedAt.toISOString(),
+  });
 });
 
 router.post("/collaborations/projects/:projectId/approve", async (req, res): Promise<void> => {
@@ -1163,8 +1535,8 @@ router.post("/collaborations/projects/:projectId/approve", async (req, res): Pro
       seedId: updated.seedId,
       resourceId: updated.id,
     });
-    await notify(updated.creatorId, "contract_locked", "Contract locked", "Your shared project is ready for the first turn.", `/authors/tandem/${updated.id}`, updated.id);
-    await notify(updated.respondentId, "contract_locked", "Contract locked", "Your shared project is ready for the first turn.", `/authors/tandem/${updated.id}`, updated.id);
+    await notify(updated.creatorId, "contract_locked", "Contract locked", "Your shared project is ready — both studios stay in sync.", `/authors-den/?project=${updated.id}`, updated.id);
+    await notify(updated.respondentId, "contract_locked", "Contract locked", "Your shared project is ready — both studios stay in sync.", `/authors-den/?project=${updated.id}`, updated.id);
   } else {
     await recordActivity({
       eventType: "contract_approved",
@@ -1174,7 +1546,7 @@ router.post("/collaborations/projects/:projectId/approve", async (req, res): Pro
       seedId: updated.seedId,
       resourceId: updated.id,
     });
-    await notify(updated.creatorId === viewerId ? updated.respondentId : updated.creatorId, "contract_action_required", "Contract approval requested", "Your collaborator is waiting for your approval.", `/authors/tandem/${updated.id}/contract`, updated.id);
+    await notify(updated.creatorId === viewerId ? updated.respondentId : updated.creatorId, "contract_action_required", "Contract approval requested", "Your collaborator is waiting for your approval.", `/authors-den/?project=${updated.id}`, updated.id);
   }
   res.json(await projectView(updated));
 });
@@ -1343,7 +1715,7 @@ router.post("/collaborations/projects/:projectId/blocks/:blockId/submit", async 
     .set({ currentTurn: nextTurn, updatedAt: new Date() })
     .where(eq(collaborationProjectsTable.id, project.id));
   const reviewerId = project.creatorId === viewerId ? project.respondentId : project.creatorId;
-  await notify(reviewerId, "your_turn", "A new pass awaits your review", "Your collaborator submitted a new block. Approve it to continue.", `/authors/tandem/${project.id}`, block.id);
+  await notify(reviewerId, "your_turn", "A new pass awaits your review", "Your collaborator submitted a new pass. The project is waiting in your studio.", `/authors-den/?project=${project.id}`, block.id);
   await recordActivity({
     eventType: "block_submitted",
     summary: `${viewerId === project.creatorId ? project.creatorName : project.respondentName} submitted a new block.`,
@@ -1401,7 +1773,7 @@ router.post("/collaborations/projects/:projectId/blocks/:blockId/approve", async
     role: roleFor(updated.ownerId, project) ?? "RESPONDENT",
     kind: "BLOCK",
   });
-  await notify(block.ownerId, "block_approved", "Your pass was approved", "Your collaborator approved your block. It is your turn to continue.", `/authors/tandem/${project.id}`, block.id);
+  await notify(block.ownerId, "block_approved", "Your pass was approved", "Your collaborator approved your pass. The project is waiting in your studio.", `/authors-den/?project=${project.id}`, block.id);
   await recordActivity({
     eventType: "block_approved",
     summary: `${viewerId === project.creatorId ? project.creatorName : project.respondentName} approved a submitted block.`,
@@ -1639,6 +2011,17 @@ router.get("/collaborations/threads", async (req, res): Promise<void> => {
     .from(continuationSubmissionsTable)
     .where(inArray(continuationSubmissionsTable.id, continuationIds));
   const submissionById = new Map(submissions.map((s) => [s.id, s]));
+  const projectRows = submissions.length
+    ? await db
+        .select({
+          id: collaborationProjectsTable.id,
+          seedId: collaborationProjectsTable.seedId,
+          respondentId: collaborationProjectsTable.respondentId,
+        })
+        .from(collaborationProjectsTable)
+        .where(inArray(collaborationProjectsTable.seedId, submissions.map((s) => s.seedId)))
+    : [];
+  const projectByKey = new Map(projectRows.map((row) => [`${row.seedId}|${row.respondentId}`, row.id]));
 
   const threadIds = threads.map((thread) => thread.id);
   const [messages, unreadThreads] = await Promise.all([
@@ -1675,6 +2058,7 @@ router.get("/collaborations/threads", async (req, res): Promise<void> => {
     return {
       id: thread.id,
       continuationId: thread.continuationId,
+      projectId: submission ? projectByKey.get(`${submission.seedId}|${thread.respondentId}`) ?? null : null,
       seedId: submission?.seedId ?? null,
       sourceProjectTitle: submission?.sourceProjectTitle ?? "Private conversation",
       partnerId,

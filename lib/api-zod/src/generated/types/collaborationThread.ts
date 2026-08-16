@@ -12,6 +12,10 @@ export interface CollaborationThread {
   continuationId: string;
   creatorId: string;
   respondentId: string;
+  /** @nullable */
+  projectId: string | null;
+  creatorName: string;
+  respondentName: string;
   messages: CollaborationMessage[];
   createdAt: Date;
   updatedAt: Date;

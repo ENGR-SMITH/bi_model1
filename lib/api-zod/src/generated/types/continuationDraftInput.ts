@@ -5,10 +5,12 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { AuthorProjectDocument } from './authorProjectDocument';
 
 export interface ContinuationDraftInput {
   /** @maxLength 20000 */
   draftText: string;
   /** @maxLength 6000 */
   draftComments: string;
+  projectDocument?: AuthorProjectDocument;
 }

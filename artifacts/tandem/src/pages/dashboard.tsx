@@ -4,14 +4,18 @@ import { Link } from 'wouter';
 import { SectionEyebrow } from '@/components/protected-shell';
 import { tandemCategories } from '@/data/categories';
 
-const accentClasses = {
-  coral: 'bg-[#e55b4c] border-[#c7473c] text-[#fff4e6]',
+// Every door keeps its own house-palette color; the one open door (Authors) gets
+// a bold coral fill + lift so the grid has a clear focal point without going
+// muted and flat like the previous paper-only treatment.
+const openDoorClass = 'bg-[#e55b4c] border-[#c7473c] text-[#fff4e6]';
+const doorClass: Record<string, string> = {
   teal: 'bg-[#3e8074] border-[#2f675e] text-[#fff4e6]',
-  gold: 'bg-[#e1b956] border-[#c49a38] text-[#292b45]',
-  plum: 'bg-[#75617f] border-[#5c4a66] text-[#fff4e6]',
-  blue: 'bg-[#657a9c] border-[#4e6486] text-[#fff4e6]',
+  gold: 'bg-[#f0c85c] border-[#c49a38] text-[#292b45]',
   ink: 'bg-[#292b45] border-[#1d1f34] text-[#fff4e6]',
-} as const;
+  plum: 'bg-[#5c6d8a] border-[#4a5870] text-[#fff4e6]',
+  blue: 'bg-[#657a9c] border-[#4e6486] text-[#fff4e6]',
+  coral: 'bg-[#e55b4c] border-[#c7473c] text-[#fff4e6]',
+};
 
 export default function Dashboard() {
   const { user } = useUser();
@@ -19,12 +23,12 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-[1180px]">
-      <div className="reveal flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+      <div className="reveal flex flex-col justify-between gap-5 border-b-2 border-[#d6cbb9] pb-9 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>The private atrium / six doors</SectionEyebrow>
-          <h1 className="mt-5 max-w-[10ch] text-6xl font-extrabold leading-[.86] tracking-[-0.08em] text-[#292b45] sm:text-8xl">Welcome, {name}.</h1>
+          <h1 className="mt-5 max-w-[12ch] text-6xl font-extrabold leading-[.86] tracking-[-0.08em] text-[#292b45] sm:text-8xl">Welcome, {name}.</h1>
         </div>
-        <div className="max-w-[23rem] border-l-2 border-[#d6cbb9] pl-5 text-sm leading-[1.8] text-[#625f6d]">
+        <div className="max-w-sm border-l-2 border-[#d6cbb9] pl-5 text-sm leading-[1.8] text-[#625f6d]">
           <p>The house is opening one room at a time. Start where your practice already has a pulse.</p>
         </div>
       </div>
@@ -37,7 +41,7 @@ export default function Dashboard() {
             <Link
               key={category.slug}
               href={`/categories/${category.slug}`}
-              className={`soft-lift focus-house group relative min-h-[272px] overflow-hidden rounded-[1.5rem] border-2 p-6 ${accentClasses[category.accent]} ${available ? 'door-shadow' : 'opacity-90'}`}
+              className={`soft-lift focus-house group relative min-h-[272px] overflow-hidden rounded-[1.5rem] border-2 p-6 ${available ? openDoorClass + ' door-shadow' : doorClass[category.accent] ?? doorClass.ink}`}
               data-testid={`card-category-${category.slug}`}
             >
               <span className="absolute -right-10 -top-12 h-36 w-36 rounded-full border border-current opacity-20 transition-transform duration-500 group-hover:scale-125" />
@@ -47,8 +51,8 @@ export default function Dashboard() {
                   <span className="flex h-11 w-11 items-center justify-center rounded-full border border-current bg-black/5">
                     <Icon className="h-5 w-5" strokeWidth={1.7} />
                   </span>
-                  <span className={`rounded-full border border-current px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[0.13em] ${available ? 'bg-[#fff4e6]/15' : 'bg-black/10'}`}>
-                    {category.status}
+                  <span className={`rounded-full border border-current px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[0.13em] ${available ? 'bg-[#fff4e6]/20' : 'bg-black/10'}`}>
+                    {available ? 'Open now' : category.status}
                   </span>
                 </div>
                 <div className="mt-12">

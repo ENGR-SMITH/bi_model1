@@ -1,15 +1,43 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  AlertTriangle, Archive, ArrowLeft, ArrowRight, BookOpen, Bold, Check, ChevronDown, CircleHelp,
-  ClipboardList, Clock3, Code2, Copy, Download, Eraser, FileDown, FileText, FolderOpen,
-  Globe2, Heading1, Heading2, Highlighter, ImagePlus, Italic, Library, Link2, List,
+  AlertTriangle, Archive, ArrowLeft, ArrowRight, BookOpen, Bold, Check, CheckCircle2, ChevronDown, CircleHelp,
+  ClipboardList, Clock3, Code2, Copy, Download, Eraser, ExternalLink, FileDown, FileText, FolderOpen,
+  GitFork, Globe2, Heading1, Heading2, Highlighter, ImagePlus, Italic, Library, Link2, List,
   ListOrdered, MapPin, Menu, MoreHorizontal, Move, PanelLeft, PenLine, Play, Plus,
-  Quote, Redo2, RotateCcw, Save, Search, Send, Settings, ShieldCheck, Sparkles, Strikethrough, Trash2,
-  Undo2, Upload, Users, WandSparkles, X, Zap, MessageCircle
+  Quote, Redo2, RefreshCw, RotateCcw, Save, Search, Send, Settings, ShieldCheck, Sparkles, Strikethrough, Trash2,
+  Undo2, Upload, Users, WandSparkles, X, XCircle, Zap, MessageCircle
 } from "lucide-react";
+import { useUser } from "@clerk/react";
 import { Toaster } from "@/components/ui/toaster";
 import { continuityAudit, oracleChat, outlineAssist, toneRewrite, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
+import {
+  acceptContinuation,
+  createSeedApplication,
+  declineContinuation,
+  getCollaborationProjectDocument,
+  getCollaborationProjectThreadUnread,
+  getCollaborationSeed,
+  getCollaborationSeedProject,
+  getCollaborationThread,
+  getContinuation,
+  getContinuationProject,
+  getOrCreateProjectThread,
+  markCollaborationProjectThreadRead,
+  listCollaborationProjects,
+  saveCollaborationProjectDocument,
+  saveSeedApplicationDraft,
+  sendCollaborationMessage,
+  submitSeedApplication,
+  useAcceptContinuation,
+  useCreateCollaborationSeed,
+  useCreateSeedApplication,
+  useDeclineContinuation,
+  useListCollaborationProjects,
+  useSaveCollaborationProjectDocument,
+  useSaveSeedApplicationDraft,
+  useSubmitSeedApplication,
+} from "@workspace/api-client-react";
 
 type View = "home" | "general" | "characters" | "plots" | "world" | "outline" | "editor" | "search" | "revisions" | "oracle" | "tools" | "settings";
 type MediaItem = { id: string; name: string; src: string; x: number; y: number; size: number };
@@ -18,8 +46,22 @@ type Character = { id: string; name: string; role: string; pov: string; importan
 type Plot = { id: string; name: string; role: string; status: string; description: string; notes: string; steps: string[]; characters: string };
 type WorldItem = { id: string; name: string; kind: string; description: string; notes: string; fantasy: string; mapUrl: string; image?: string; imageName?: string };
 type Revision = { id: string; sceneId: string; sceneTitle: string; content: string; date: string; words: number };
-type Project = { id: string; title: string; author: string; template: string; premise: string; synopsis: string; summary: string; created: string; updated: string; scenes: Scene[]; characters: Character[]; plots: Plot[]; world: WorldItem[]; revisions: Revision[]; dailyTarget: number; sessionTarget: number; isTutorial?: boolean };
+type Project = { id: string; title: string; author: string; template: string; premise: string; synopsis: string; summary: string; created: string; updated: string; scenes: Scene[]; characters: Character[]; plots: Plot[]; world: WorldItem[]; revisions: Revision[]; dailyTarget: number; sessionTarget: number; isTutorial?: boolean; seedId?: string; applicationId?: string; collaborationProjectId?: string; isClone?: boolean; cloneStatus?: string; submittedAt?: string; syncedAt?: string };
 type CollaborationClone = { applicationId: string; seedId: string; sourceProjectTitle: string; status: string; updatedAt: string };
+// Fields exchanged between both Author Den studios for a shared project.
+const SYNC_FIELDS = ["title", "author", "template", "premise", "synopsis", "summary", "scenes", "characters", "plots", "world", "revisions", "dailyTarget", "sessionTarget"] as const;
+function pickSyncFields(doc: Record<string, unknown>): Partial<Project> {
+  const out: Record<string, unknown> = {};
+  for (const key of SYNC_FIELDS) if (doc[key] !== undefined) out[key] = doc[key];
+  return out as Partial<Project>;
+}
+// The continuation text shown to the creator in the review desk is derived
+// from the fork's scene content; the full project document travels alongside.
+function projectDraftText(doc: Project): string {
+  const parts = (doc.scenes ?? []).map((scene) => stripHtml(scene.content)).filter(Boolean);
+  const text = parts.join("\n\n") || stripHtml(doc.premise ?? "");
+  return text.slice(0, 20000);
+}
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 let tutorialProjectActive = false;
@@ -89,7 +131,8 @@ function App() {
   const [view, setView] = useState<View>("general");
   const [editorSceneId, setEditorSceneId] = useState<string | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // The rail starts collapsed; hovering the sidebar auto-expands it.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [theme, setTheme] = useState(() => localStorage.getItem("authors-den-theme") ?? "light");
   const [modal, setModal] = useState<"project" | "import" | "help" | "tutorial" | null>(null);
   const [tutorialStep, setTutorialStep] = useState(0);
@@ -99,7 +142,43 @@ function App() {
   const [mode, setMode] = useState<"lesson" | "draft">("lesson");
   const [draftNudge, setDraftNudge] = useState(false);
   const [toast, setToast] = useState("");
-  const project = projects.find((item) => item.id === projectId) ?? projects[0];
+  const { user } = useUser();
+  const [intent] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      publish: params.get("publish") === "1",
+      answer: params.get("answer") ?? "",
+      preview: params.get("preview") ?? "",
+      openProject: params.get("project") ?? "",
+      chat: params.get("chat") === "1",
+    };
+  });
+  const [publishDraft, setPublishDraft] = useState<Project | null>(null);
+  const [noteProject, setNoteProject] = useState<Project | null>(null);
+  const [preview, setPreview] = useState<{ continuationId: string; project: Project } | null>(null);
+  const [previewMeta, setPreviewMeta] = useState<{ respondentName: string; title: string } | null>(null);
+  const [cloneBusy, setCloneBusy] = useState(false);
+  const [forkError, setForkError] = useState("");
+  const [sharedOpenError, setSharedOpenError] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatThread, setChatThread] = useState<{ id: string; creatorId: string; respondentId: string; creatorName: string; respondentName: string; projectId: string | null } | null>(null);
+  const [chatMessages, setChatMessages] = useState<{ id: string; senderId: string; body: string; createdAt: string }[]>([]);
+  const [chatText, setChatText] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
+  const [chatUnread, setChatUnread] = useState(0);
+  const [incomingAlert, setIncomingAlert] = useState<string | null>(null);
+  const prevUnreadRef = useRef(-1); // -1 = unknown until the first poll for this project
+  const createSeed = useCreateCollaborationSeed();
+  const createApplication = useCreateSeedApplication();
+  const saveDraft = useSaveSeedApplicationDraft();
+  const submitApp = useSubmitSeedApplication();
+  const acceptCont = useAcceptContinuation();
+  const declineCont = useDeclineContinuation();
+  const projectDocsQ = useListCollaborationProjects();
+  const projectsRef = useRef(projects);
+  useEffect(() => { projectsRef.current = projects; }, [projects]);
+  const previewActive = Boolean(preview);
+  const project = preview?.project ?? projects.find((item) => item.id === projectId) ?? projects[0];
   tutorialProjectActive = Boolean(project?.isTutorial && mode === "lesson" && view !== "home");
   const hasUserProject = projects.some((item) => !item.isTutorial);
   useEffect(() => { localStorage.setItem("authors-den-projects", JSON.stringify(projects)); }, [projects]);
@@ -118,11 +197,288 @@ function App() {
       if (control.hasAttribute("contenteditable")) control.setAttribute("contenteditable", "false");
       control.setAttribute("tabindex", "-1");
     });
-  }, [tutorialProjectActive, view, projectId, tutorialStep]);
+  }, [tutorialProjectActive, previewActive, view, projectId, tutorialStep]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 2400); return () => clearTimeout(timer); }, [toast]);
-  const updateProject = (patch: Partial<Project>) => { if (tutorialProjectActive) return; setProjects((items) => items.map((item) => item.id === project?.id ? { ...item, ...patch, updated: now() } : item)); };
+  // “Publish a seed” from the pitch board lands here with ?publish=1 and
+  // triggers the same “A NEW ROOM FOR WORDS” card as clicking New project.
+  useEffect(() => { if (intent.publish && !preview) { setDraftNudge(false); setModal("project"); } }, [intent.publish]);
+  // “Answer this seed” (?answer=seedId) forks the frozen project into this
+  // studio. The fork is a real editable project with a bright clone marker;
+  // submitting it sends the whole document to the creator for review.
+  useEffect(() => {
+    if (!intent.answer) return;
+    let cancelled = false;
+    setCloneBusy(true);
+    setForkError("");
+    (async () => {
+      try {
+        const seed = await getCollaborationSeed(intent.answer);
+        const existing = projectsRef.current.find((p) => p.seedId === intent.answer && p.isClone);
+        if (existing) {
+          if (!cancelled) { openProject(existing); setCloneBusy(false); notify("Returning to your fork of this seed"); }
+          return;
+        }
+        // Open the application first so the frozen project is scoped to a
+        // respondent; the fork is then built from the full snapshot.
+        let applicationId = seed.myApplicationId ?? undefined;
+        if (!applicationId) {
+          const app = await createSeedApplication(intent.answer, { respondentName: user?.firstName || "Writer" });
+          applicationId = app.id;
+        }
+        let doc: Record<string, unknown> | null = null;
+        try { doc = await getCollaborationSeedProject(intent.answer); } catch { doc = null; }
+        const base = (doc && typeof doc === "object" ? doc : {}) as Partial<Project>;
+        const clone: Project = {
+          ...sample(),
+          ...base,
+          id: uid(),
+          title: base.title || seed.sourceProjectTitle || "Forked project",
+          author: user?.fullName || user?.firstName || "Writer",
+          template: base.template || "Novel",
+          isTutorial: false,
+          isClone: true,
+          seedId: intent.answer,
+          applicationId: seed.myApplicationId ?? undefined,
+          cloneStatus: seed.myApplicationStatus && seed.myApplicationStatus !== "DRAFT" ? seed.myApplicationStatus : "DRAFT",
+          created: now(),
+          updated: now(),
+        };
+        if (!Array.isArray(clone.scenes) || !clone.scenes.length) {
+          clone.scenes = [{ id: uid(), title: "Opening scene", synopsis: "", content: textToHtml(seed.seedText), status: "Draft", compile: true, target: 800, pov: "", labels: "", notes: "", media: [] }];
+        }
+        clone.applicationId = applicationId;
+        if (!cancelled) {
+          setProjects((items) => [clone, ...items]);
+          openProject(clone);
+          notify("Fork created from the seed — make it yours, then submit it");
+        }
+      } catch {
+        if (!cancelled) setForkError("This seed could not be forked right now. Check that you are signed in and try again.");
+      } finally {
+        if (!cancelled) setCloneBusy(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [intent.answer]);
+  // “Preview” (?preview=continuationId) opens a submitted fork read-only for
+  // the creator, with Approve / Reject available on every view.
+  useEffect(() => {
+    if (!intent.preview) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const continuation = await getContinuation(intent.preview);
+        const doc = await getContinuationProject(intent.preview);
+        if (cancelled) return;
+        const raw = (doc && typeof doc === "object" ? doc : {}) as Record<string, unknown>;
+        const previewProject: Project = {
+          ...sample(),
+          ...(raw as Partial<Project>),
+          id: uid(),
+          title: typeof raw.title === "string" ? raw.title : continuation.sourceProjectTitle,
+          isTutorial: false,
+          isClone: true,
+          cloneStatus: "UNDER_REVIEW",
+          created: now(),
+          updated: now(),
+        };
+        setPreviewMeta({ respondentName: continuation.respondentName, title: previewProject.title });
+        setView("general");
+        setPreview({ continuationId: intent.preview, project: previewProject });
+      } catch {
+        if (!cancelled) setForkError("This submission could not be opened for preview.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [intent.preview]);
+  // On load, materialize any shared projects (accepted forks) the user is a
+  // participant in, and open the one asked for via ?project=projectId.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = (await listCollaborationProjects()) as any[];
+        for (const row of rows || []) {
+          if (!row?.documentAvailable) continue;
+          try { await ensureSharedProject(row.id); } catch { /* skip */ }
+        }
+      } catch { /* server unavailable — local desk still works */ }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+  useEffect(() => {
+    if (!intent.openProject) return;
+    const local = projectsRef.current.find((p) => p.collaborationProjectId === intent.openProject);
+    if (local) { openProject(local); setSharedOpenError(false); }
+  }, [projects, intent.openProject]);
+  // If a ?project= link can't be materialized (e.g. a legacy room with no
+  // merged document yet), surface a clear note instead of a silent dead end.
+  useEffect(() => {
+    if (!intent.openProject) return;
+    const timer = setTimeout(() => {
+      const local = projectsRef.current.find((p) => p.collaborationProjectId === intent.openProject);
+      if (!local) setSharedOpenError(true);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [intent.openProject, projects.length]);
+  // Push local edits of shared projects to the server (debounced), so both
+  // studios stay in sync like a merged pull request.
+  useEffect(() => {
+    const synced = projects.filter((p) => p.collaborationProjectId);
+    if (!synced.length) return;
+    const timer = setTimeout(() => {
+      synced.forEach((p) => {
+        saveCollaborationProjectDocument(p.collaborationProjectId!, { document: p }).catch(() => { /* offline */ });
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [projects]);
+  // Pull remote changes for shared projects on an interval.
+  useEffect(() => {
+    if (!user) return;
+    const tick = async () => {
+      for (const p of projectsRef.current.filter((x) => x.collaborationProjectId)) {
+        try {
+          const remote = await getCollaborationProjectDocument(p.collaborationProjectId!);
+          if (!remote.document) continue;
+          const remoteDoc = remote.document as Record<string, unknown>;
+          if (JSON.stringify(pickSyncFields(remoteDoc)) !== JSON.stringify(pickSyncFields(p as unknown as Record<string, unknown>))) {
+            setProjects((items) => items.map((item) => item.id === p.id ? { ...item, ...pickSyncFields(remoteDoc), syncedAt: remote.updatedAt ?? item.syncedAt } : item));
+          }
+        } catch { /* offline */ }
+      }
+    };
+    tick();
+    const interval = setInterval(tick, 20000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
+  const updateProject = (patch: Partial<Project>) => { if (tutorialProjectActive || preview) return; setProjects((items) => items.map((item) => item.id === project?.id ? { ...item, ...patch, updated: now() } : item)); };
   const notify = (message: string) => setToast(message);
   const openProject = (item: Project, next: View = "general", sceneId?: string) => { setProjectId(item.id); setEditorSceneId(sceneId ?? null); setView(next); setTutorialOpen(false); setMode(item.isTutorial ? "lesson" : "draft"); };
+  // ---- Private thread (floating chat) — only for collaboration projects ----
+  const isSharedProject = Boolean(project?.collaborationProjectId && !preview && view !== "home");
+  const chatPartnerName = chatThread
+    ? user?.id === chatThread.creatorId
+      ? (chatThread.respondentName || "Your collaborator")
+      : (project?.author || chatThread.creatorName || "Author")
+    : project?.author || "Collaborator";
+  const openChat = async () => {
+    if (!project?.collaborationProjectId) return;
+    setChatBusy(true);
+    try {
+      const thread = await getOrCreateProjectThread(project.collaborationProjectId);
+      setChatThread(thread);
+      setChatMessages((thread.messages ?? []) as any[]);
+      markCollaborationProjectThreadRead(project.collaborationProjectId).catch(() => {});
+      setChatUnread(0);
+      setIncomingAlert(null);
+      prevUnreadRef.current = 0;
+      setChatOpen(true);
+    } catch {
+      notify("The private room could not be opened right now.");
+    } finally {
+      setChatBusy(false);
+    }
+  };
+  const closeChat = () => {
+    // Anything that arrived while the panel was open counts as seen: mark it
+    // read the moment the chat collapses so no stale badge is left behind.
+    if (project?.collaborationProjectId) {
+      markCollaborationProjectThreadRead(project.collaborationProjectId).catch(() => {});
+    }
+    setChatUnread(0);
+    prevUnreadRef.current = 0;
+    setChatOpen(false);
+  };
+  // A soft two-pip chime for an incoming message (Web Audio — no asset needed).
+  const playChatBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      void ctx.resume();
+      const pip = (frequency: number, at: number, duration: number) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime + at);
+        gain.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + at + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + duration);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(ctx.currentTime + at);
+        osc.stop(ctx.currentTime + at + duration + 0.05);
+      };
+      pip(660, 0, 0.16);
+      pip(880, 0.2, 0.2);
+    } catch { /* audio unavailable */ }
+  };
+  const sendChat = async () => {
+    const body = chatText.trim();
+    if (!body || !chatThread) return;
+    setChatBusy(true);
+    try {
+      const message = await sendCollaborationMessage(chatThread.id, { body });
+      setChatMessages((items) => [...items, message as any]);
+      setChatText("");
+    } catch {
+      notify("That message could not be sent.");
+    } finally {
+      setChatBusy(false);
+    }
+  };
+  // Open the chat automatically when the inbox notification deep-links here.
+  useEffect(() => {
+    if (intent.chat && project?.collaborationProjectId && !chatOpen) openChat();
+  }, [intent.chat, project?.collaborationProjectId, chatOpen]);
+  // Refresh messages while the chat is open, and mark anything seen as read so
+  // the badge (and the Tandem inbox) reflect what the user has actually opened.
+  useEffect(() => {
+    if (!chatOpen || !chatThread?.id || !project?.collaborationProjectId) return;
+    const projectId = project.collaborationProjectId;
+    const tick = async () => {
+      try {
+        const thread = await getCollaborationThread(chatThread.id);
+        setChatMessages((thread.messages ?? []) as any[]);
+        markCollaborationProjectThreadRead(projectId).catch(() => {});
+      } catch { /* offline */ }
+    };
+    tick();
+    const interval = setInterval(tick, 15000);
+    return () => clearInterval(interval);
+  }, [chatOpen, chatThread?.id, project?.collaborationProjectId]);
+  // Unread badge on the FAB: driven by the server's unread message state
+  // (unread collaboration_message notifications), not a client-side timestamp.
+  // A message arriving while the chat is collapsed pops a subtle alert + chime.
+  // Mark the unread state unknown whenever the open project changes, so a
+  // pre-existing unread message doesn't chime on first poll.
+  useEffect(() => { prevUnreadRef.current = -1; }, [project?.collaborationProjectId]);
+  useEffect(() => {
+    if (!isSharedProject || !user || !project?.collaborationProjectId) return;
+    const projectId = project.collaborationProjectId;
+    const tick = async () => {
+      try {
+        const state = await getCollaborationProjectThreadUnread(projectId);
+        const count = state.count ?? 0;
+        setChatUnread(count);
+        if (!chatOpen && prevUnreadRef.current === 0 && count > 0) {
+          setIncomingAlert(chatPartnerName || "Your collaborator");
+          playChatBeep();
+        }
+        prevUnreadRef.current = count;
+      } catch { /* offline */ }
+    };
+    tick();
+    const interval = setInterval(tick, 20000);
+    return () => clearInterval(interval);
+  }, [isSharedProject, user?.id, project?.collaborationProjectId, chatOpen]);
+  // Auto-dismiss the incoming-message alert after a few seconds.
+  useEffect(() => {
+    if (!incomingAlert) return;
+    const timer = setTimeout(() => setIncomingAlert(null), 5000);
+    return () => clearTimeout(timer);
+  }, [incomingAlert]);
   const openEditor = (sceneId?: string) => { setEditorSceneId(sceneId ?? project?.scenes[0]?.id ?? null); setView("editor"); setTutorialOpen(false); };
   const tutorialViews: View[] = ["general", "outline", "editor", "settings"];
   const startTutorial = () => { const tutorial = projects.find((item) => item.isTutorial) ?? project ?? sample(); if (!projects.some((item) => item.id === tutorial.id)) setProjects((items) => [tutorial, ...items]); setMode("lesson"); setProjectId(tutorial.id); setEditorSceneId(tutorial.scenes[0]?.id ?? null); setTutorialStep(0); setView("general"); setTutorialOpen(false); setModal("tutorial"); };
@@ -143,19 +499,120 @@ function App() {
     notify("Project duplicated as a clean draft");
   };
   const deleteProject = (id: string) => { setProjects((items) => items.filter((item) => item.id !== id)); if (id === projectId) { setProjectId(projects.find((item) => item.id !== id)?.id ?? ""); setView("home"); } notify("Project deleted"); };
-  const postProject = (item: Project) => {
+  // Publishing happens entirely inside the Author Den: "Post on Pitch Board"
+  // opens The Brief (what a collaborator should know, desired role, respondent
+  // limit) and publishes the frozen project snapshot straight to the API.
+  const postProject = (item: Project) => { setPublishDraft(item); };
+  const publishSeed = (item: Project, brief: { plotConstraints: string; desiredRole: string; respondentLimit: 0 | 3 | 5 | 10 }) => {
     const posted = item.scenes.find((scene) => scene.content.trim());
-    localStorage.setItem("tandem-seed-draft", JSON.stringify({
-      sourceProjectId: item.id,
-      sourceProjectTitle: item.title,
-      // Freeze the source version: which scene was posted and how many
-      // snapshots that scene had at publish time. Editing the Solo project
-      // later never mutates what respondents see.
-      sourceSceneId: posted?.id ?? null,
-      sourceVersion: posted ? item.revisions.filter((r) => r.sceneId === posted.id).length + 1 : 1,
-      seedText: stripHtml(posted?.content ?? item.premise ?? ""),
-    }));
-    window.location.href = "/authors/pitch-board/new";
+    createSeed.mutate({
+      data: {
+        sourceProjectId: item.id,
+        sourceProjectTitle: item.title,
+        creatorName: user?.fullName || user?.username || user?.firstName || item.author || "Author",
+        sourceSceneId: posted?.id ?? null,
+        sourceVersion: posted ? item.revisions.filter((r) => r.sceneId === posted.id).length + 1 : 1,
+        seedText: stripHtml(posted?.content ?? item.premise ?? "").slice(0, 12000),
+        unitType: "scene",
+        protocol: "Continue from the final line",
+        genre: "Literary",
+        tone: "Open and searching",
+        language: "English",
+        plotConstraints: brief.plotConstraints,
+        desiredRole: brief.desiredRole,
+        visibility: "SEED_AND_BRIEF",
+        respondentLimit: brief.respondentLimit,
+        projectDocument: item,
+      },
+    }, {
+      onSuccess: (seed) => {
+        setPublishDraft(null);
+        notify("Seed published to the pitch board");
+        window.location.href = `/authors/pitch-board/seed/${seed.id}`;
+      },
+      onError: () => notify("The seed could not be published. Check that you are signed in and try again."),
+    });
+  };
+  // Submitting a fork: the whole edited project + the note travel with the
+  // application so the creator can preview it read-only in their own studio.
+  const submitClone = (item: Project, note: string) => {
+    const doSubmit = (applicationId: string) => {
+      const draftText = projectDraftText(item);
+      saveDraft.mutate(
+        { applicationId, data: { draftText, draftComments: note, projectDocument: item } },
+        {
+          onSuccess: () => submitApp.mutate({ applicationId }, {
+            onSuccess: () => {
+              setNoteProject(null);
+              setProjects((items) => items.map((p) => p.id === item.id ? { ...p, cloneStatus: "SUBMITTED", submittedAt: now(), applicationId } : p));
+              notify("Fork submitted — the creator will review it in their inbox");
+            },
+            onError: () => notify("The fork could not be submitted. Try again."),
+          }),
+          onError: () => notify("Your fork could not be saved before submitting."),
+        },
+      );
+    };
+    // A declined application is resolved, so resubmitting opens a fresh one.
+    if (item.applicationId && item.cloneStatus !== "DECLINED") { doSubmit(item.applicationId); return; }
+    createApplication.mutate({ seedId: item.seedId || "", data: { respondentName: user?.firstName || "Writer" } }, {
+      onSuccess: (app) => {
+        setProjects((items) => items.map((p) => p.id === item.id ? { ...p, applicationId: app.id } : p));
+        doSubmit(app.id);
+      },
+      onError: () => notify("Could not open an application for this fork."),
+    });
+  };
+  const ensureSharedProject = async (projectId: string) => {
+    const remote = await getCollaborationProjectDocument(projectId);
+    if (!remote.document) return;
+    const doc = remote.document as Record<string, unknown>;
+    const docTitle = typeof doc.title === "string" ? doc.title : "";
+    setProjects((items) => {
+      const existing = items.find((p) => p.collaborationProjectId === projectId);
+      if (existing) {
+        return items.map((p) => p.id === existing.id ? { ...p, ...pickSyncFields(doc), syncedAt: remote.updatedAt ?? p.syncedAt } : p);
+      }
+      const fork = items.find((p) => p.isClone && p.seedId && p.title === docTitle && !p.collaborationProjectId);
+      if (fork) {
+        return items.map((p) => p.id === fork.id ? { ...p, ...pickSyncFields(doc), collaborationProjectId: projectId, cloneStatus: "ACCEPTED", syncedAt: remote.updatedAt ?? p.syncedAt } : p);
+      }
+      const seedProject = items.find((p) => !p.isClone && p.title === docTitle && !p.collaborationProjectId);
+      if (seedProject) {
+        return items.map((p) => p.id === seedProject.id ? { ...p, ...pickSyncFields(doc), collaborationProjectId: projectId, syncedAt: remote.updatedAt ?? p.syncedAt } : p);
+      }
+      const fresh: Project = {
+        ...sample(),
+        ...(doc as Partial<Project>),
+        id: uid(),
+        isTutorial: false,
+        isClone: true,
+        collaborationProjectId: projectId,
+        cloneStatus: "ACCEPTED",
+        created: now(),
+        updated: now(),
+      };
+      return [fresh, ...items];
+    });
+  };
+  const approvePreview = () => {
+    if (!preview) return;
+    acceptCont.mutate({ continuationId: preview.continuationId }, {
+      onSuccess: async (shared) => {
+        try { await ensureSharedProject(shared.id); } catch { /* still navigate */ }
+        setPreview(null);
+        notify("Fork accepted — the merged project is now shared in both studios");
+        window.location.href = `/authors-den/?project=${shared.id}`;
+      },
+      onError: () => notify("This fork could not be accepted right now."),
+    });
+  };
+  const rejectPreview = () => {
+    if (!preview) return;
+    declineCont.mutate({ continuationId: preview.continuationId }, {
+      onSuccess: () => { setPreview(null); window.location.href = "/authors/collaborations/continuations"; },
+      onError: () => notify("The fork could not be declined right now."),
+    });
   };
   const switchToLesson = () => { startTutorial(); };
   const switchToDraft = () => { setMode("draft"); setModal(null); setTutorialOpen(false); if (project?.isTutorial) { setDraftNudge(!hasUserProject); setView("home"); } else { setDraftNudge(false); setEditorSceneId(project?.scenes[0]?.id ?? null); setView(project ? "editor" : "home"); } };
@@ -168,15 +625,28 @@ function App() {
         <button className="icon-btn mobile-only" aria-label="Open navigation" onClick={() => setMobileNav(true)}><Menu size={19} /></button>
         <div className="top-workspace-wrap" onPointerLeave={() => setTopWorkspaceOpen(false)}><button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)}><span>Workspace</span><ChevronDown size={13} /><b>{project?.title ?? "Your projects"}</b></button>{topWorkspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setTopWorkspaceOpen(false); }} onNew={() => { setModal("project"); setTopWorkspaceOpen(false); }} />}</div>
          <div className="mode-switch" role="tablist" aria-label="Writing mode"><button className={`${mode === "draft" ? "active " : ""}draft-mode-tab ${mode === "lesson" ? "wave-nudge" : ""}`} onClick={switchToDraft} role="tab" aria-selected={mode === "draft"}><PenLine size={13} /> Draft</button><button className={mode === "lesson" ? "active" : ""} onClick={switchToLesson} role="tab" aria-selected={mode === "lesson"}><BookOpen size={13} /> Lesson</button></div>
-         <div className="top-actions"><button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><button className="avatar" aria-label="Author settings" onClick={() => project && setView("settings")}>{project?.author?.slice(0, 1) ?? "A"}</button></div>
+         <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><button className="avatar" aria-label="Author settings" onClick={() => project && setView("settings")}>{project?.author?.slice(0, 1) ?? "A"}</button></div>
       </header>
-        {view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} highlightNew={draftNudge} /> : <div className={tutorialProjectActive ? "tutorial-readonly" : ""}>{tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
+        {cloneBusy && <div className="den-status-banner"><RefreshCw size={15} className="spin" /> Opening your fork of this seed…</div>}
+        {forkError && <div className="den-status-banner error"><XCircle size={15} /> {forkError}</div>}
+        {preview && <div className="den-status-banner preview"><GitFork size={15} /> Previewing {previewMeta?.respondentName ? `${previewMeta.respondentName}'s` : "a writer's"} submission of “{previewMeta?.title ?? project.title}” — read only. Approve to merge it into the shared project.</div>}
+        {sharedOpenError && <div className="den-status-banner error"><XCircle size={15} /> This shared room has no merged document in your studio yet — shared projects appear here once a submission has been approved and merged.</div>}
+        {view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
       {tutorialOpen && <TutorialDock step={tutorialStep} onNext={nextLesson} onDismiss={() => setTutorialOpen(false)} />}
     </main>
+    {isSharedProject && <div className={`den-chat ${chatOpen ? "den-chat-open" : ""}`}>
+      {chatOpen ? <div className="den-chat-panel">
+        <div className="den-chat-head"><span className="den-chat-avatar">{(chatPartnerName || "C").slice(0, 1).toUpperCase()}</span><div><b>Private thread</b><small>with {chatPartnerName}</small></div><button className="icon-btn" aria-label="Close private thread" onClick={closeChat}><X size={16} /></button></div>
+        <div className="den-chat-messages">{chatMessages.length ? chatMessages.map((message) => <div key={message.id} className={`den-chat-msg ${message.senderId === user?.id ? "mine" : ""}`}><p>{message.body}</p><time>{new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time></div>) : <div className="den-chat-empty">No messages yet — say hello to your co-writer.</div>}</div>
+        <div className="den-chat-compose"><textarea value={chatText} onChange={(event) => setChatText(event.target.value)} placeholder="Write to your co-writer…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") sendChat(); }} disabled={chatBusy} /><button className="den-chat-send" onClick={sendChat} disabled={chatBusy || !chatText.trim()}><Send size={14} /> Send</button></div>
+      </div> : <><div className="den-chat-fab-wrap">{incomingAlert && <div className="den-chat-alert"><span className="den-chat-avatar">{(chatPartnerName || "C").slice(0, 1).toUpperCase()}</span><button className="den-chat-alert-body" onClick={openChat}><b>New message</b><small>from {incomingAlert}</small></button><button className="den-chat-alert-close" aria-label="Dismiss" onClick={() => setIncomingAlert(null)}><X size={13} /></button></div>}<button className="den-chat-fab" aria-label="Open private thread" title={`Private thread with ${chatPartnerName}`} onClick={openChat}><span className="den-chat-avatar">{(chatPartnerName || "C").slice(0, 1).toUpperCase()}</span><MessageCircle size={20} />{chatUnread > 0 && <span className="den-chat-badge">{chatUnread}</span>}</button></div></>}
+    </div>}
     {modal === "project" && <ProjectModal onClose={() => setModal(null)} onCreate={createProject} />}
     {modal === "import" && <ImportModal onClose={() => setModal(null)} onImport={importFile} />}
     {modal === "help" && <HelpModal onClose={() => setModal(null)} />}
     {modal === "tutorial" && <TutorialModal step={tutorialStep} onClose={closeTutorial} />}
+    {publishDraft && <BriefModal project={publishDraft} onClose={() => setPublishDraft(null)} onPublish={(brief) => publishSeed(publishDraft, brief)} publishing={createSeed.isPending} />}
+    {noteProject && <NoteModal project={noteProject} onClose={() => setNoteProject(null)} onSubmit={(note) => submitClone(noteProject, note)} submitting={saveDraft.isPending || submitApp.isPending || createApplication.isPending} />}
     {toast && <div className="toast" role="status"><Check size={16} />{toast}</div>}
     <Toaster />
   </div>;
@@ -191,7 +661,7 @@ function Sidebar({ view, setView, project, projects, openProject, openEditor, mo
    const aux: [View, string, ReactNode][] = [["search", "Search", <Search size={17} />], ["revisions", "Revisions", <Archive size={17} />], ["oracle", "Oracle", <WandSparkles size={17} />], ["tools", "Tools", <Zap size={17} />], ["settings", "Settings", <Settings size={17} />]];
   const gated = mode === "draft" && !hasUserProject;
   const go = (id: View) => { if (gated) { notify("Create a project first to open your current work"); return; } if (id === "editor") openEditor(); else setView(id); close(); };
-   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`}><div className="brand-row"><div className="brand-mark">A</div><div className="brand-copy"><div className="brand-name">Authors Den</div><div className="brand-sub">writing studio</div></div><button className="icon-btn sidebar-toggle desktop-only" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} title={collapsed ? "Expand navigation" : "Collapse navigation"}><PanelLeft size={17} /></button><button className="icon-btn sidebar-close mobile-only" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
+   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><div className="brand-row"><div className="brand-mark">A</div><div className="brand-copy"><div className="brand-name">Authors Den</div><div className="brand-sub">writing studio</div></div><button className="icon-btn sidebar-close mobile-only" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
      <div className="workspace-switch-wrap" onPointerLeave={() => setWorkspaceOpen(false)}><button className={`workspace-switch ${workspaceOpen ? "open" : ""}`} onClick={() => setWorkspaceOpen(!workspaceOpen)}><span className="workspace-icon"><Library size={14} /></span><span className="workspace-copy"><small>WORKSPACE</small><strong>My writing desk</strong></span><ChevronDown size={14} /></button>{workspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setWorkspaceOpen(false); }} onNew={() => { onNew(); setWorkspaceOpen(false); }} />}</div>
     <button className={`nav-item ${view === "home" ? "active" : ""}`} onClick={() => { setView("home"); close(); }}><FolderOpen size={17} /><span>Projects</span><span className="nav-count">{projects.length}</span></button>
      <div className="nav-label">CURRENT WORK</div>{project ? nav.map(([id, label, icon]) => <button key={id} className={`nav-item ${view === id ? "active" : ""} ${gated ? "nav-item-gated" : ""}`} onClick={() => go(id)} disabled={gated} title={gated ? "Create a project first before opening current work" : undefined}>{icon}<span>{label}</span>{id === "outline" && <span className="nav-count">{project.scenes.length}</span>}{gated && <span className="nav-lock">Create first</span>}</button>) : <div className="empty-sidebar">Open a project to begin.</div>}
@@ -200,11 +670,11 @@ function Sidebar({ view, setView, project, projects, openProject, openEditor, mo
   </aside>;
 }
 
-function Home({ projects, collaborationClones, openProject, onNew, onDuplicate, onDelete, onImport, onExport, onTutorial, onPost, highlightNew }: { projects: Project[]; collaborationClones: CollaborationClone[]; openProject: (project: Project, view?: View) => void; onNew: () => void; onDuplicate: (project: Project) => void; onDelete: (id: string) => void; onImport: () => void; onExport: (format: "json" | "md" | "txt" | "html") => void; onTutorial: () => void; onPost: (project: Project) => void; highlightNew?: boolean }) {
+function Home({ projects, collaborationClones, openProject, onNew, onDuplicate, onDelete, onImport, onExport, onTutorial, onPost, onSubmitClone, highlightNew }: { projects: Project[]; collaborationClones: CollaborationClone[]; openProject: (project: Project, view?: View) => void; onNew: () => void; onDuplicate: (project: Project) => void; onDelete: (id: string) => void; onImport: () => void; onExport: (format: "json" | "md" | "txt" | "html") => void; onTutorial: () => void; onPost: (project: Project) => void; onSubmitClone: (project: Project) => void; highlightNew?: boolean }) {
   return <div className="page home-page"><PageGuide label="YOUR LIBRARY" text="Every project starts here. Open a project to shape the story." /><div className="home-hero"><div><div className="eyebrow"><span className="eyebrow-line" /> PRIVATE WRITING DESK</div><h1>Keep the whole<br /><em>story</em> in reach.</h1><p>A quiet place for premise, people, plot, and pages.<br />Everything you need to carry a work from first thought to final draft.</p></div><div className="hero-orbit"><div className="orbit-center">A</div><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" /><span className="orbit-word word-a">PREMISE</span><span className="orbit-word word-b">DRAFT</span><span className="orbit-word word-c">WORLD</span></div></div>
      <div className="section-head"><div><div className="eyebrow">YOUR LIBRARY</div><h2>Recent projects</h2><button className={`new-library-btn ${highlightNew ? "wave-nudge" : ""}`} onClick={onNew}><span className="new-project-plus"><Plus size={25} strokeWidth={3} /></span><span><b>New project</b><small>Create a project to unlock your desk</small></span></button></div></div>
-     {projects.length ? <div className="project-grid">{projects.map((item, index) => <article className={`project-card ${index === 0 ? "featured" : ""}`} key={item.id}><div className="project-card-top"><span className="template-tag">{item.template}</span><button className="more-btn" aria-label={`Duplicate ${item.title}`} onClick={() => onDuplicate(item)}><MoreHorizontal size={18} /></button></div><button className="project-open" onClick={() => openProject(item)}><h3>{item.title}</h3><p>{item.author}</p><div className="card-rule" /><div className="project-meta"><span><FileText size={13} /> {item.scenes.length} scenes</span><span>{new Date(item.updated).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></div></button><div className="card-actions"><button onClick={() => onDuplicate(item)}><Copy size={13} /> Duplicate</button><button onClick={() => onDelete(item.id)}><Trash2 size={13} /> Delete</button><button onClick={() => onPost(item)}><Send size={13} /> Post on Pitch Board</button></div></article>)}</div> : <Empty icon={<BookOpen size={28} />} title="A blank desk, waiting" text="Create your first project and give the next idea somewhere to land." action={<button className="primary-btn" onClick={onNew}><Plus size={16} /> New project</button>} />}
-     {collaborationClones.length > 0 && <section className="home-lower" aria-label="Collaboration clones"><div className="quick-start"><span className="eyebrow">COLLABORATION CLONES</span><h3>Responses you have in motion.</h3><p>These private continuations stay linked to their frozen source seeds until you submit or withdraw them.</p><div className="quick-actions">{collaborationClones.slice(0, 3).map((clone) => <a className="secondary-btn" key={clone.applicationId} href={`/authors/pitch-board/seed/${clone.seedId}/respond`}><MessageCircle size={15} /> {clone.sourceProjectTitle}<small>{clone.status.replaceAll("_", " ").toLowerCase()}</small></a>)}</div></div></section>}
+     {projects.length ? <div className="project-grid">{projects.map((item, index) => <article className={`project-card ${index === 0 ? "featured" : ""}`} key={item.id}><div className="project-card-top">{item.isClone && !item.collaborationProjectId ? <span className="clone-badge"><GitFork size={11} /> Fork of a seed</span> : item.collaborationProjectId ? <span className="sync-badge"><RefreshCw size={11} /> Shared project</span> : <span className="template-tag">{item.template}</span>}<button className="more-btn" aria-label={`Duplicate ${item.title}`} onClick={() => onDuplicate(item)}><MoreHorizontal size={18} /></button></div><button className="project-open" onClick={() => openProject(item)}><h3>{item.title}</h3><p>{item.author}</p>{item.isClone && !item.collaborationProjectId && <p className="clone-source"><GitFork size={11} /> Forked from a seed ad — edit, then submit it to the creator</p>}{item.collaborationProjectId && <p className="clone-source shared"><RefreshCw size={11} /> Synced with your collaborator — edits appear in both studios</p>}<div className="card-rule" /><div className="project-meta"><span><FileText size={13} /> {item.scenes.length} scenes</span><span>{new Date(item.updated).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></div></button><div className="card-actions">{item.isClone && !item.collaborationProjectId && (item.cloneStatus === "SUBMITTED" || item.cloneStatus === "UNDER_REVIEW") ? <span className="clone-status in-review"><Clock3 size={13} /> In review</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "ACCEPTED" ? <span className="clone-status accepted"><Check size={13} /> Accepted</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "DECLINED" ? <span className="clone-status declined"><XCircle size={13} /> Declined — edit and resubmit</span> : null}{!item.isClone && <button onClick={() => onPost(item)}><Send size={13} /> Post on Pitch Board</button>}{item.isClone && !item.collaborationProjectId && (!item.cloneStatus || item.cloneStatus === "DRAFT" || item.cloneStatus === "DECLINED") && <button className="submit-clone-btn" onClick={() => onSubmitClone(item)}><Send size={13} /> Submit</button>}<button onClick={() => onDuplicate(item)}><Copy size={13} /> Duplicate</button><button onClick={() => onDelete(item.id)}><Trash2 size={13} /> Delete</button></div></article>)}</div> : <Empty icon={<BookOpen size={28} />} title="A blank desk, waiting" text="Create your first project and give the next idea somewhere to land." action={<button className="primary-btn" onClick={onNew}><Plus size={16} /> New project</button>} />}
+     {collaborationClones.length > 0 && <section className="home-lower" aria-label="Collaboration clones"><div className="quick-start"><span className="eyebrow">COLLABORATION CLONES</span><h3>Responses you have in motion.</h3><p>These private forks stay linked to their frozen source seeds until you submit or withdraw them.</p><div className="quick-actions">{collaborationClones.slice(0, 3).map((clone) => <a className="secondary-btn" key={clone.applicationId} href={`/authors-den/?answer=${clone.seedId}`}><MessageCircle size={15} /> {clone.sourceProjectTitle}<small>{clone.status.replaceAll("_", " ").toLowerCase()}</small></a>)}</div></div></section>}
     <div className="home-lower"><div className="quick-start"><span className="eyebrow">START SOMEWHERE</span><h3>Bring in work from another desk.</h3><p>Import a project or plain text draft, then keep going.</p><div className="quick-actions"><button className="secondary-btn" onClick={onImport}><Upload size={15} /> Import file</button><button className="link-btn" onClick={onTutorial}><Play size={14} /> Take the tutorial</button></div></div><div className="portable"><div><Check size={18} /><b>Local by design</b></div><p>Your projects live in this browser. Export anytime.</p><button className="link-btn" onClick={() => onExport("json")}><Download size={14} /> Export a portable project</button></div></div>
   </div>;
 }
@@ -368,10 +838,13 @@ function Editor({ project, editorSceneId, update, setView, notify }: { project: 
     if (scene) update({ scenes: project.scenes.map((item) => item.id === scene.id ? { ...item, ...patch } : item) });
   };
   const command = (name: string, value?: string) => {
-    document.execCommand(name, false, value);
     editorRef.current?.focus();
+    document.execCommand(name, false, value);
     if (editorRef.current) setContent(editorRef.current.innerHTML);
   };
+  // Keep focus + selection inside the editor while clicking toolbar buttons;
+  // otherwise execCommand silently no-ops on the lost selection.
+  const keepSelection = (event: { preventDefault: () => void }) => event.preventDefault();
   const addMedia = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !file.type.startsWith("image/") || !scene) return;
@@ -428,16 +901,16 @@ function Editor({ project, editorSceneId, update, setView, notify }: { project: 
 
   return <div className={`editor-page ${focus ? "focus-editor" : ""}`}>
     {!focus && <PageGuide label="DRAFT" text="Write here with real rich text formatting. Images stay simple, square, movable, and resizable." />}
-    {!focus && <div className="editor-head"><div><div className="eyebrow">DRAFT / SCENE {String(sceneIndex + 1).padStart(2, "0")}</div><input className="editor-title-input" value={scene.title} onChange={(event) => updateScene({ title: event.target.value })} aria-label="Scene title" /></div><div className="editor-head-actions"><span className="save-indicator"><span className="pulse-dot" /> Autosaved</span><button className={`icon-btn ${focus ? "toggled" : ""}`} onClick={() => setFocus(!focus)} aria-label="Toggle focus mode"><PanelLeft size={17} /></button><button className={`icon-btn ${settings ? "toggled" : ""}`} onClick={() => setSettings(!settings)} aria-label="Editor settings"><Settings size={17} /></button></div></div>}
+    {!focus && <div className="editor-head"><div><div className="eyebrow editor-scene-eyebrow">DRAFT / SCENE {String(sceneIndex + 1).padStart(2, "0")}<label className="scene-picker scene-picker-inline"><span>Scene</span><select value={scene.id} onChange={(event) => setSceneId(event.target.value)} aria-label="Current scene">{project.scenes.map((item, index) => <option key={item.id} value={item.id}>{String(index + 1).padStart(2, "0")} · {item.title}</option>)}</select></label></div><input className="editor-title-input" value={scene.title} onChange={(event) => updateScene({ title: event.target.value })} aria-label="Scene title" /></div><div className="editor-head-actions"><span className="save-indicator"><span className="pulse-dot" /> Autosaved</span><button className={`icon-btn ${focus ? "toggled" : ""}`} onClick={() => setFocus(!focus)} aria-label="Toggle focus mode"><PanelLeft size={17} /></button><button className={`icon-btn ${settings ? "toggled" : ""}`} onClick={() => setSettings(!settings)} aria-label="Editor settings"><Settings size={17} /></button></div></div>}
     {focus && <button className="focus-exit icon-btn toggled" onClick={() => setFocus(false)} aria-label="Exit focus mode"><PanelLeft size={17} /><span>Exit focus</span></button>}
-    {!focus && <div className="editor-scene-nav"><button onClick={() => go(sceneIndex - 1)} disabled={sceneIndex <= 0}><ArrowLeft size={14} /> Previous</button><label className="scene-picker"><span>Scene</span><select value={scene.id} onChange={(event) => setSceneId(event.target.value)}>{project.scenes.map((item, index) => <option key={item.id} value={item.id}>{String(index + 1).padStart(2, "0")} · {item.title}</option>)}</select></label><span>{sceneIndex + 1} of {project.scenes.length}</span><button onClick={() => go(sceneIndex + 1)} disabled={sceneIndex >= project.scenes.length - 1}>Next <ArrowRight size={14} /></button></div>}
-    <div className="editor-layout"><div className="editor-column" style={editorStyle}>
+    {!focus && <div className="editor-scene-nav"><span className="scene-counter">{sceneIndex + 1} of {project.scenes.length}</span></div>}
+    <div className="editor-layout"><button className="scene-side-nav scene-side-prev" onClick={() => go(sceneIndex - 1)} disabled={sceneIndex <= 0} aria-label="Previous scene"><ArrowLeft size={18} /></button><div className="editor-column" style={editorStyle}>
       {!focus && <section className="co-writing-bar"><div className="co-writing-top"><label className="co-writing-toggle"><input type="checkbox" checked={coWritingEnabled} onChange={(event) => { setCoWritingEnabled(event.target.checked); setCoWritingSuggestion(null); }} /><span><b>Opt-in co-writing</b></span></label><div className="co-writing-actions"><button className="secondary-btn" onClick={coWriting.isPending ? () => { coWriting.reset(); setCoWritingSuggestion(null); } : suggestNext} disabled={!coWritingEnabled && !coWriting.isPending}>{coWriting.isPending ? <><X size={14} /> Cancel suggestion</> : <><Sparkles size={14} /> Suggest next beat</>}</button></div></div>{coWriting.isError && <div className="oracle-error"><X size={14} /> The suggestion could not reach a working model. Try again when the provider signal is ready.</div>}{coWritingSuggestion && <div className="co-writing-suggestion"><div><span className="eyebrow">SUGGESTED CONTINUATION</span><p>{coWritingSuggestion.content}</p></div><button className="primary-btn" onClick={acceptCoWriting}><Check size={14} /> Accept <kbd>Tab</kbd></button></div>}</section>}
-      <div className="format-bar"><button onClick={() => command("undo")} aria-label="Undo"><Undo2 size={16} /></button><button onClick={() => command("redo")} aria-label="Redo"><Redo2 size={16} /></button><span className="bar-divider" /><button onClick={() => command("bold")} aria-label="Bold"><Bold size={16} /></button><button onClick={() => command("italic")} aria-label="Italic"><Italic size={16} /></button><button onClick={() => command("strikeThrough")} aria-label="Strikethrough"><Strikethrough size={16} /></button><button onClick={() => command("formatBlock", "h1")} aria-label="Title heading"><Heading1 size={16} /></button><button onClick={() => command("formatBlock", "h2")} aria-label="Heading"><Heading2 size={16} /></button><button onClick={() => command("insertUnorderedList")} aria-label="Bulleted list"><List size={16} /></button><button onClick={() => command("insertOrderedList")} aria-label="Numbered list"><ListOrdered size={16} /></button><button onClick={() => command("formatBlock", "blockquote")} aria-label="Quote"><Quote size={16} /></button><button onClick={() => { const url = window.prompt("Link URL"); if (url) command("createLink", url); }} aria-label="Link"><Link2 size={16} /></button><button onClick={() => command("removeFormat")} aria-label="Clear formatting"><Eraser size={16} /></button><button onClick={() => command("formatBlock", "pre")} aria-label="Code"><Code2 size={16} /></button><span className="toolbar-spacer" /><button className="media-import-btn" onClick={() => mediaInput.current?.click()} aria-label="Add image"><ImagePlus size={15} /> Add image</button><input ref={mediaInput} type="file" accept="image/*" hidden onChange={addMedia} /></div>
+      <div className="format-bar"><button onMouseDown={keepSelection} onClick={() => command("undo")} aria-label="Undo"><Undo2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("redo")} aria-label="Redo"><Redo2 size={16} /></button><span className="bar-divider" /><button onMouseDown={keepSelection} onClick={() => command("bold")} aria-label="Bold"><Bold size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("italic")} aria-label="Italic"><Italic size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("strikeThrough")} aria-label="Strikethrough"><Strikethrough size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h1")} aria-label="Title heading"><Heading1 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h2")} aria-label="Heading"><Heading2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertUnorderedList")} aria-label="Bulleted list"><List size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertOrderedList")} aria-label="Numbered list"><ListOrdered size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "blockquote")} aria-label="Quote"><Quote size={16} /></button><button onMouseDown={keepSelection} onClick={() => { const url = window.prompt("Link URL"); if (url) command("createLink", url); }} aria-label="Link"><Link2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("removeFormat")} aria-label="Clear formatting"><Eraser size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "pre")} aria-label="Code"><Code2 size={16} /></button><span className="toolbar-spacer" /><button className="media-import-btn" onMouseDown={keepSelection} onClick={() => mediaInput.current?.click()} aria-label="Add image"><ImagePlus size={15} /> Add image</button><input ref={mediaInput} type="file" accept="image/*" hidden onChange={addMedia} /></div>
       <div ref={editorRef} className="draft-area rich-editor" contentEditable suppressContentEditableWarning onKeyDown={(event) => { if (event.key === "Tab" && coWritingSuggestion && coWritingEnabled) { event.preventDefault(); acceptCoWriting(); } if (event.key === "Escape" && coWritingSuggestion) setCoWritingSuggestion(null); }} onInput={(event) => setContent(event.currentTarget.innerHTML)} data-placeholder="Begin where the pressure is..." />
       <MediaBoard scene={scene} updateScene={updateScene} />
       {settings && !focus && <aside className="editor-settings"><span className="eyebrow">DESK SETTINGS</span><h3>Reading room</h3><label className="field"><span>Typeface · {typeface}</span><select value={typeface} onChange={(event) => setTypeface(event.target.value)}><option>Libre Baskerville</option><option>DM Sans</option><option>DM Mono</option></select></label><label className="field"><span>Text size · {textSize}px</span><input type="range" min="15" max="28" value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} /></label><label className="field"><span>Line spacing · {lineSpacing}</span><input type="range" min="1.3" max="2.2" step=".1" value={lineSpacing} onChange={(event) => setLineSpacing(Number(event.target.value))} /></label></aside>}
-    </div></div>
+    </div><button className="scene-side-nav scene-side-next" onClick={() => go(sceneIndex + 1)} disabled={sceneIndex >= project.scenes.length - 1} aria-label="Next scene"><ArrowRight size={18} /></button></div>
     {!focus && <div className="editor-footer"><span><b>{words(content)}</b> words</span><span><b>{stripHtml(content).length}</b> characters</span><span><b>{stripHtml(content).split(/\n/).filter(Boolean).length}</b> paragraphs</span><span className="footer-spacer" /><button onClick={save}><Save size={14} /> Save snapshot</button></div>}
   </div>;
 }
@@ -511,8 +984,7 @@ function ToneRewritePanel({ project, sceneId, notify }: { project: Project; scen
   return <section className="tone-rewrite-shell">
     <div className="paper-card tone-rewrite-panel">
       <div className="card-heading tone-rewrite-heading">
-        <div><span className="eyebrow"><WandSparkles size={13} /> TONE MATCH</span><h2>Let the passage borrow a voice.</h2><p>Select text in the draft, then compare it against a scene that already sounds like the book.</p></div>
-        <div className="oracle-privacy"><ShieldCheck size={16} /><span>Selected text<br /><b>privacy first</b></span></div>
+        <div><span className="eyebrow"><WandSparkles size={13} /> TONE MATCH</span><h2>Let the passage borrow a voice.</h2></div>
       </div>
       <div className="tone-rewrite-grid">
         <div>
@@ -945,14 +1417,26 @@ function Tools({ project, updateProject, notify, embedded = false }: { project: 
   </div>;
 }
 function SettingsPage({ project, update, notify, exportFile, theme, setTheme }: { project: Project; update: (patch: Partial<Project>) => void; notify: (message: string) => void; exportFile: (format: "json" | "md" | "txt" | "html") => void; theme: string; setTheme: (theme: string) => void }) {
+  const { user } = useUser();
   const applyTheme = (value: string) => { setTheme(value); notify(`${value === "dark" ? "Night" : "Light"} desk applied`); };
   const themes = [{ id: "light", label: "Light desk", detail: "Vellum & brass", swatch: "light-swatch" }, { id: "dark", label: "Night desk", detail: "Ink & amber", swatch: "dark-swatch" }, { id: "sage", label: "Sage room", detail: "Moss & paper", swatch: "sage-swatch" }, { id: "rose", label: "Rose studio", detail: "Blush & ink", swatch: "rose-swatch" }];
-  return <div className="page"><PageHeader eyebrow="THE DESK" title="Settings" description="Tune the room around the way you think." guide="Settings keeps the desk portable, personal, and yours." /><div className="settings-layout"><section className="paper-card settings-card"><div className="card-heading"><div><span className="eyebrow">APPEARANCE</span><h2>Choose your room</h2></div></div><p className="setting-copy">Pick a color combination for the writing desk. Your choice stays saved on this device.</p><div className="theme-grid">{themes.map((item) => <button key={item.id} className={`theme-choice ${theme === item.id ? "selected" : ""}`} onClick={() => applyTheme(item.id)}><span className={`theme-preview ${item.swatch}`}><i /><i /><i /></span><span><b>{item.label}</b><small>{item.detail}</small></span>{theme === item.id && <Check size={15} />}</button>)}</div><div className="setting-row"><div><b>Autosave snapshots</b><small>Keep a revision when a scene changes.</small></div><input type="checkbox" defaultChecked /></div></section><section className="paper-card settings-card"><div className="card-heading"><div><span className="eyebrow">PORTABILITY</span><h2>Take it with you</h2></div><Download size={18} /></div><p className="setting-copy">Authors Den never locks your words away. Download the project as a portable file or finished document.</p><div className="export-grid"><button onClick={() => exportFile("json")}><FileDown size={15} /> Project JSON</button><button onClick={() => exportFile("md")}><FileText size={15} /> Markdown</button><button onClick={() => exportFile("txt")}><FileText size={15} /> Plain text</button><button onClick={() => exportFile("html")}><Globe2 size={15} /> HTML document</button></div></section><section className="paper-card settings-card danger-card"><div className="card-heading"><div><span className="eyebrow">LOCAL DATA</span><h2>Your browser desk</h2></div></div><p className="setting-copy">Changes save automatically in this browser. Export a copy whenever you move between devices.</p><button className="secondary-btn" onClick={() => { update({ updated: now() }); notify("Desk saved locally"); }}><Save size={15} /> Confirm local save</button></section></div></div>;
+  const initial = (user?.fullName || user?.username || user?.firstName || "W").slice(0, 1).toUpperCase();
+  return <div className="page"><PageHeader eyebrow="THE DESK" title="Settings" description="Tune the room around the way you think." guide="Settings keeps the desk portable, personal, and yours." /><div className="settings-layout"><section className="paper-card settings-card account-card"><div className="card-heading"><div><span className="eyebrow">YOUR ACCOUNT</span><h2>Who is at this desk</h2></div><span className="account-avatar">{initial}</span></div><p className="setting-copy">This is the identity shared with your Tandem account — the name creators see when you answer their seed, and the studio both of you keep in sync after a fork is accepted.</p><div className="account-row"><span>Display name</span><b>{user?.fullName || user?.username || user?.firstName || "Writer"}</b></div><div className="account-row"><span>Email</span><b>{user?.primaryEmailAddress?.emailAddress ?? "—"}</b></div><div className="account-row"><span>Author on projects</span><b>{project?.author || "—"}</b></div></section><section className="paper-card settings-card"><div className="card-heading"><div><span className="eyebrow">APPEARANCE</span><h2>Choose your room</h2></div></div><p className="setting-copy">Pick a color combination for the writing desk. Your choice stays saved on this device.</p><div className="theme-grid">{themes.map((item) => <button key={item.id} className={`theme-choice ${theme === item.id ? "selected" : ""}`} onClick={() => applyTheme(item.id)}><span className={`theme-preview ${item.swatch}`}><i /><i /><i /></span><span><b>{item.label}</b><small>{item.detail}</small></span>{theme === item.id && <Check size={15} />}</button>)}</div><div className="setting-row"><div><b>Autosave snapshots</b><small>Keep a revision when a scene changes.</small></div><input type="checkbox" defaultChecked /></div></section><section className="paper-card settings-card"><div className="card-heading"><div><span className="eyebrow">PORTABILITY</span><h2>Take it with you</h2></div><Download size={18} /></div><p className="setting-copy">Authors Den never locks your words away. Download the project as a portable file or finished document.</p><div className="export-grid"><button onClick={() => exportFile("json")}><FileDown size={15} /> Project JSON</button><button onClick={() => exportFile("md")}><FileText size={15} /> Markdown</button><button onClick={() => exportFile("txt")}><FileText size={15} /> Plain text</button><button onClick={() => exportFile("html")}><Globe2 size={15} /> HTML document</button></div></section><section className="paper-card settings-card danger-card"><div className="card-heading"><div><span className="eyebrow">LOCAL DATA</span><h2>Your browser desk</h2></div></div><p className="setting-copy">Changes save automatically in this browser. Export a copy whenever you move between devices.</p><button className="secondary-btn" onClick={() => { update({ updated: now() }); notify("Desk saved locally"); }}><Save size={15} /> Confirm local save</button></section></div></div>;
 }
 
 function TutorialDock({ step, onNext, onDismiss }: { step: number; onNext: () => void; onDismiss: () => void }) { const labels = ["Project shape", "Outline", "Draft", "Settings"]; return <div className="tutorial-dock"><span className="dock-arrow" /><div><span className="eyebrow">NEXT LESSON · {String(step + 1).padStart(2, "0")} / 04</span><b>{labels[step]}</b><small>Close the lesson above, explore this page, then continue when ready.</small></div><button className="primary-btn" onClick={onNext}>{step === labels.length - 1 ? "Finish tutorial" : "Next lesson"} <ArrowRight size={15} /></button><button className="icon-btn" onClick={onDismiss} aria-label="Dismiss lesson"><X size={15} /></button></div>; }
 function TutorialModal({ step, onClose }: { step: number; onClose: () => void }) { const lessons = [{ eyebrow: "01 / PROJECT SHAPE", title: "Start with the north star.", body: "The sample project is your tutorial desk. Close this lesson to see the General page it is describing, then use the Next lesson control on that page." }, { eyebrow: "02 / OUTLINE", title: "Give the story somewhere to go.", body: "Outline holds your scenes. Close this lesson to explore the scene map, then continue from the page when you are ready." }, { eyebrow: "03 / DRAFT", title: "Edit the scene that you chose.", body: "Draft is a real rich-text editor. Close this lesson to write, format, and place simple square images on the page." }, { eyebrow: "04 / MAKE IT YOURS", title: "Your work stays portable.", body: "Settings lets you tune the desk and export your work. Close this lesson to explore the controls." }]; const lesson = lessons[step] ?? lessons[0]; return <div className="modal-backdrop tutorial-backdrop" onMouseDown={onClose}><div className="modal tutorial-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true"><button className="modal-close" onClick={onClose} aria-label="Close tutorial"><X size={17} /></button><div className="tutorial-mark"><span>A</span><i /></div><span className="eyebrow">{lesson.eyebrow}</span><h2>{lesson.title}</h2><p>{lesson.body}</p><div className="tutorial-progress">{lessons.map((_, index) => <span key={index} className={index <= step ? "active" : ""} />)}</div><div className="tutorial-actions"><button className="link-btn" onClick={onClose}>Close lesson</button><span className="tutorial-hint">Continue from the page</span></div></div></div>; }
 function ProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate: (template: string, title: string, author: string) => void }) { const [template, setTemplate] = useState("Novel"); const [title, setTitle] = useState(""); const [author, setAuthor] = useState(""); const templateDetails: Record<string, string> = { Novel: "Long-form arc", Novella: "A compact journey", "Short Story": "One bright spark", "Research Paper": "Ideas in order", Empty: "Make your own shape" }; return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal project-modal" onMouseDown={(event) => event.stopPropagation()}><div className="project-modal-orbit" aria-hidden="true"><span /><i /><b>+</b></div><button className="modal-close" onClick={onClose} aria-label="Close"><X size={17} /></button><div className="project-modal-heading"><span className="eyebrow">A NEW ROOM FOR WORDS</span><h2>Give the next idea<br /><em>somewhere to land.</em></h2><p>Choose a starting shape, then let the work become its own thing.</p></div><div className="template-options">{["Novel", "Novella", "Short Story", "Research Paper", "Empty"].map((value) => <button className={template === value ? "template-option selected" : "template-option"} key={value} onClick={() => setTemplate(value)}><span className="template-glyph">{value.slice(0, 1)}</span><b>{value}</b><small>{templateDetails[value]}</small><span className="template-check"><Check size={11} /></span></button>)}</div><div className="project-modal-fields"><div className="modal-section-label"><span>MAKE IT YOURS</span><i /></div><div className="two-fields"><TextField label="Project title" value={title} onChange={setTitle} placeholder={`Untitled ${template}`} /><TextField label="Author" value={author} onChange={setAuthor} placeholder="Your name" /></div></div><button className="primary-btn modal-submit" onClick={() => onCreate(template, title, author)}><Plus size={15} /> Create project</button></div></div>; }
+function BriefModal({ project, onClose, onPublish, publishing }: { project: Project; onClose: () => void; onPublish: (brief: { plotConstraints: string; desiredRole: string; respondentLimit: 0 | 3 | 5 | 10 }) => void; publishing: boolean }) {
+  const [plotConstraints, setPlotConstraints] = useState("");
+  const [desiredRole, setDesiredRole] = useState("Co-author");
+  const [respondentLimit, setRespondentLimit] = useState<0 | 3 | 5 | 10>(3);
+  return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal brief-modal" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={onClose} aria-label="Close"><X size={17} /></button><span className="eyebrow">THE BRIEF</span><h2>Post “{project.title}” to the pitch board?</h2><p>Your project becomes a frozen seed. Respondents fork it in their own studio, and you review their submitted forks before accepting one as a collaborator.</p><label className="field"><span>What should a collaborator know?</span><textarea value={plotConstraints} onChange={(event) => setPlotConstraints(event.target.value)} placeholder="Constraints, characters, or room to explore…" /></label><div className="two-fields"><label className="field"><span>Desired role</span><input value={desiredRole} onChange={(event) => setDesiredRole(event.target.value)} /></label><label className="field"><span>Respondent limit</span><select value={respondentLimit} onChange={(event) => setRespondentLimit(Number(event.target.value) as 0 | 3 | 5 | 10)}><option value={3}>3 voices</option><option value={5}>5 voices</option><option value={10}>10 voices</option><option value={0}>Unlimited</option></select></label></div><button className="primary-btn modal-submit" onClick={() => onPublish({ plotConstraints, desiredRole, respondentLimit })} disabled={publishing || !desiredRole.trim()}><Send size={15} /> {publishing ? "Publishing…" : "Publish to the pitch board"}</button></div></div>;
+}
+function NoteModal({ project, onClose, onSubmit, submitting }: { project: Project; onClose: () => void; onSubmit: (note: string) => void; submitting: boolean }) {
+  const [note, setNote] = useState("");
+  return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal note-modal" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={onClose} aria-label="Close"><X size={17} /></button><span className="eyebrow">BEFORE YOU SUBMIT</span><h2>Send “{project.title}” to the creator?</h2><p>Your fork — every scene, character, plot, and world page — is about to leave your desk and land in the creator's inbox for a read-only review.</p><label className="field"><span>A note for the creator</span><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Tell them what you changed and where you were heading…" /></label><button className="primary-btn modal-submit" onClick={() => onSubmit(note.trim())} disabled={submitting}><Send size={15} /> {submitting ? "Submitting…" : "Submit fork to the creator"}</button></div></div>;
+}
 function ImportModal({ onClose, onImport }: { onClose: () => void; onImport: (file: File) => void }) { const input = useRef<HTMLInputElement>(null); return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal small-modal" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={onClose} aria-label="Close"><X size={17} /></button><span className="eyebrow">BRING IT IN</span><h2>Import a project</h2><p>Use a project JSON, Markdown file, or plain text draft.</p><div className="drop-zone" onClick={() => input.current?.click()}><Upload size={23} /><b>Choose a file</b><small>JSON, Markdown, or text</small><input ref={input} type="file" accept=".json,.msk,.md,.txt" hidden onChange={(event) => event.target.files?.[0] && onImport(event.target.files[0])} /></div></div></div>; }
 function HelpModal({ onClose }: { onClose: () => void }) { return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal small-modal" onMouseDown={(event) => event.stopPropagation()}><button className="modal-close" onClick={onClose} aria-label="Close"><X size={17} /></button><span className="eyebrow">A FEW SHORTCUTS</span><h2>Keep your hands on the page.</h2><div className="shortcut-list"><div><kbd>⌘ K</kbd><span>Open search</span></div><div><kbd>⌘ S</kbd><span>Save a revision snapshot from Draft</span></div><div><kbd>⌘ Z</kbd><span>Undo your last edit</span></div><div><kbd>⌘ ⇧ F</kbd><span>Toggle focus mode in Draft</span></div></div></div></div>; }
 

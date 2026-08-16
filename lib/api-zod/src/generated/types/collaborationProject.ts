@@ -23,6 +23,7 @@ export interface CollaborationProject {
   currentTurn: string;
   /** @nullable */
   threadId: string | null;
+  documentAvailable: boolean;
   createdAt: Date;
   /** @nullable */
   lockedAt: Date | null;

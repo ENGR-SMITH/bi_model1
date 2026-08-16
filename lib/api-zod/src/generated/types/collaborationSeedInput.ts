@@ -5,6 +5,7 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { AuthorProjectDocument } from './authorProjectDocument';
 import type { CollaborationSeedInputRespondentLimit } from './collaborationSeedInputRespondentLimit';
 import type { CollaborationSeedInputVisibility } from './collaborationSeedInputVisibility';
 
@@ -13,6 +14,7 @@ export interface CollaborationSeedInput {
   sourceProjectId: string;
   /** @minLength 1 */
   sourceProjectTitle: string;
+  creatorName?: string;
   /** @nullable */
   sourceSceneId?: string | null;
   /** @minimum 1 */
@@ -37,4 +39,5 @@ export interface CollaborationSeedInput {
   desiredRole: string;
   visibility: CollaborationSeedInputVisibility;
   respondentLimit: CollaborationSeedInputRespondentLimit;
+  projectDocument?: AuthorProjectDocument;
 }

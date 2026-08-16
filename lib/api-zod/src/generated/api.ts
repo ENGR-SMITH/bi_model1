@@ -116,7 +116,7 @@ export const ListAdminProvidersResponse = zod.array(ListAdminProvidersResponseIt
  * @summary Save provider credentials and routing options
  */
 export const UpdateAdminProviderParams = zod.object({
-  "providerId": zod.enum(['groq', 'openrouter', 'ollama', 'lmstudio'])
+  "providerId": zod.enum(['groq', 'openrouter', 'ollama', 'lmstudio', 'freebuff'])
 })
 
 
@@ -162,7 +162,7 @@ export const UpdateAdminProviderResponse = zod.object({
  * @summary Test provider connectivity
  */
 export const CheckAdminProviderParams = zod.object({
-  "providerId": zod.enum(['groq', 'openrouter', 'ollama', 'lmstudio'])
+  "providerId": zod.enum(['groq', 'openrouter', 'ollama', 'lmstudio', 'freebuff'])
 })
 
 export const CheckAdminProviderResponse = zod.object({
@@ -431,6 +431,7 @@ export const createCollaborationSeedBodySeedTextMax = 12000;
 export const CreateCollaborationSeedBody = zod.object({
   "sourceProjectId": zod.string().min(1),
   "sourceProjectTitle": zod.string().min(1),
+  "creatorName": zod.string().optional(),
   "sourceSceneId": zod.string().nullish(),
   "sourceVersion": zod.number().int().min(1).optional(),
   "seedText": zod.string().min(1).max(createCollaborationSeedBodySeedTextMax),
@@ -442,7 +443,8 @@ export const CreateCollaborationSeedBody = zod.object({
   "plotConstraints": zod.string(),
   "desiredRole": zod.string().min(1),
   "visibility": zod.enum(['SEED_AND_BRIEF', 'SEED_ONLY']),
-  "respondentLimit": zod.union([zod.literal(3),zod.literal(5),zod.literal(10),zod.literal(0)])
+  "respondentLimit": zod.union([zod.literal(3),zod.literal(5),zod.literal(10),zod.literal(0)]),
+  "projectDocument": zod.record(zod.string(), zod.unknown()).optional().describe('A serialized Author Den project (title, scenes, characters, plots, world).')
 })
 
 export const CreateCollaborationSeedResponse = zod.object({
@@ -580,6 +582,20 @@ export const CloseCollaborationSeedResponse = zod.void()
 
 
 /**
+ * The creator or any active respondent can fetch the full project snapshot this seed was published from, so answers can fork it in their own studio.
+ * @summary Read the frozen Author Den project behind a seed
+ */
+
+
+
+export const GetCollaborationSeedProjectParams = zod.object({
+  "seedId": zod.coerce.string().min(1)
+})
+
+export const GetCollaborationSeedProjectResponse = zod.record(zod.string(), zod.unknown()).describe('A serialized Author Den project (title, scenes, characters, plots, world).')
+
+
+/**
  * @summary Create a respondent-owned continuation clone
  */
 
@@ -656,7 +672,8 @@ export const saveSeedApplicationDraftBodyDraftCommentsMax = 6000;
 
 export const SaveSeedApplicationDraftBody = zod.object({
   "draftText": zod.string().max(saveSeedApplicationDraftBodyDraftTextMax),
-  "draftComments": zod.string().max(saveSeedApplicationDraftBodyDraftCommentsMax)
+  "draftComments": zod.string().max(saveSeedApplicationDraftBodyDraftCommentsMax),
+  "projectDocument": zod.record(zod.string(), zod.unknown()).optional().describe('A serialized Author Den project (title, scenes, characters, plots, world).')
 })
 
 export const SaveSeedApplicationDraftResponse = zod.object({
@@ -785,6 +802,20 @@ export const GetContinuationResponse = zod.object({
 
 
 /**
+ * The seed creator opens this to preview the respondent's submitted project in their own Author Den without importing it. Read-only by design.
+ * @summary Read the submitted project fork for a read-only preview
+ */
+
+
+
+export const GetContinuationProjectParams = zod.object({
+  "continuationId": zod.coerce.string().min(1)
+})
+
+export const GetContinuationProjectResponse = zod.record(zod.string(), zod.unknown()).describe('A serialized Author Den project (title, scenes, characters, plots, world).')
+
+
+/**
  * @summary Read the permitted profile and collaboration statistics for a respondent
  */
 
@@ -905,6 +936,9 @@ export const GetContinuationThreadResponse = zod.object({
   "continuationId": zod.string(),
   "creatorId": zod.string(),
   "respondentId": zod.string(),
+  "projectId": zod.string().nullable(),
+  "creatorName": zod.string(),
+  "respondentName": zod.string(),
   "messages": zod.array(zod.object({
   "id": zod.string(),
   "threadId": zod.string(),
@@ -932,6 +966,9 @@ export const StartContinuationThreadResponse = zod.object({
   "continuationId": zod.string(),
   "creatorId": zod.string(),
   "respondentId": zod.string(),
+  "projectId": zod.string().nullable(),
+  "creatorName": zod.string(),
+  "respondentName": zod.string(),
   "messages": zod.array(zod.object({
   "id": zod.string(),
   "threadId": zod.string(),
@@ -955,6 +992,39 @@ export const DeclineContinuationParams = zod.object({
 })
 
 export const DeclineContinuationResponse = zod.void()
+
+
+/**
+ * The creator approves the submitted fork. The seed project and the submitted fork are merged into a shared document that both authors keep in sync in their Author Den studios.
+ * @summary Accept a submission as a collaborator and merge its fork
+ */
+
+
+
+export const AcceptContinuationParams = zod.object({
+  "continuationId": zod.coerce.string().min(1)
+})
+
+export const AcceptContinuationResponse = zod.object({
+  "id": zod.string(),
+  "seedId": zod.string(),
+  "title": zod.string(),
+  "creatorId": zod.string(),
+  "creatorName": zod.string(),
+  "respondentId": zod.string(),
+  "respondentName": zod.string(),
+  "seedText": zod.string(),
+  "continuationText": zod.string(),
+  "status": zod.string(),
+  "contractVersion": zod.number().int(),
+  "creatorApproved": zod.boolean(),
+  "respondentApproved": zod.boolean(),
+  "currentTurn": zod.string(),
+  "threadId": zod.string().nullable(),
+  "documentAvailable": zod.boolean(),
+  "createdAt": zod.coerce.date(),
+  "lockedAt": zod.coerce.date().nullable()
+})
 
 
 /**
@@ -983,6 +1053,7 @@ export const SelectContinuationResponse = zod.object({
   "respondentApproved": zod.boolean(),
   "currentTurn": zod.string(),
   "threadId": zod.string().nullable(),
+  "documentAvailable": zod.boolean(),
   "createdAt": zod.coerce.date(),
   "lockedAt": zod.coerce.date().nullable()
 })
@@ -1033,6 +1104,9 @@ export const GetCollaborationThreadResponse = zod.object({
   "continuationId": zod.string(),
   "creatorId": zod.string(),
   "respondentId": zod.string(),
+  "projectId": zod.string().nullable(),
+  "creatorName": zod.string(),
+  "respondentName": zod.string(),
   "messages": zod.array(zod.object({
   "id": zod.string(),
   "threadId": zod.string(),
@@ -1091,6 +1165,7 @@ export const ListCollaborationProjectsResponseItem = zod.object({
   "respondentApproved": zod.boolean(),
   "currentTurn": zod.string(),
   "threadId": zod.string().nullable(),
+  "documentAvailable": zod.boolean(),
   "createdAt": zod.coerce.date(),
   "lockedAt": zod.coerce.date().nullable()
 })
@@ -1123,9 +1198,105 @@ export const GetCollaborationProjectResponse = zod.object({
   "respondentApproved": zod.boolean(),
   "currentTurn": zod.string(),
   "threadId": zod.string().nullable(),
+  "documentAvailable": zod.boolean(),
   "createdAt": zod.coerce.date(),
   "lockedAt": zod.coerce.date().nullable()
 })
+
+
+/**
+ * @summary Read the shared Author Den document both participants keep in sync
+ */
+
+
+
+export const GetCollaborationProjectDocumentParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const GetCollaborationProjectDocumentResponse = zod.object({
+  "document": zod.record(zod.string(), zod.unknown()).describe('A serialized Author Den project (title, scenes, characters, plots, world).'),
+  "updatedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Push an updated Author Den document into the shared project
+ */
+
+
+
+export const SaveCollaborationProjectDocumentParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const SaveCollaborationProjectDocumentBody = zod.object({
+  "document": zod.record(zod.string(), zod.unknown()).describe('A serialized Author Den project (title, scenes, characters, plots, world).')
+})
+
+export const SaveCollaborationProjectDocumentResponse = zod.object({
+  "document": zod.record(zod.string(), zod.unknown()).describe('A serialized Author Den project (title, scenes, characters, plots, world).'),
+  "updatedAt": zod.coerce.date().nullable()
+})
+
+
+/**
+ * @summary Get or create the private thread for a shared project (open after a fork is accepted)
+ */
+
+
+
+export const GetOrCreateProjectThreadParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const GetOrCreateProjectThreadResponse = zod.object({
+  "id": zod.string(),
+  "continuationId": zod.string(),
+  "creatorId": zod.string(),
+  "respondentId": zod.string(),
+  "projectId": zod.string().nullable(),
+  "creatorName": zod.string(),
+  "respondentName": zod.string(),
+  "messages": zod.array(zod.object({
+  "id": zod.string(),
+  "threadId": zod.string(),
+  "senderId": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Read the viewer's unread message count for a shared project's private thread
+ */
+
+
+
+export const GetCollaborationProjectThreadUnreadParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const GetCollaborationProjectThreadUnreadResponse = zod.object({
+  "unread": zod.boolean(),
+  "count": zod.number().int()
+})
+
+
+/**
+ * @summary Mark the viewer's unread messages read for a shared project's private thread
+ */
+
+
+
+export const MarkCollaborationProjectThreadReadParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const MarkCollaborationProjectThreadReadResponse = zod.void()
 
 
 /**
@@ -1154,6 +1325,7 @@ export const ApproveCollaborationContractResponse = zod.object({
   "respondentApproved": zod.boolean(),
   "currentTurn": zod.string(),
   "threadId": zod.string().nullable(),
+  "documentAvailable": zod.boolean(),
   "createdAt": zod.coerce.date(),
   "lockedAt": zod.coerce.date().nullable()
 })
@@ -1433,6 +1605,7 @@ export const GetCollaborationInboxResponse = zod.array(GetCollaborationInboxResp
 export const ListCollaborationThreadsResponseItem = zod.object({
   "id": zod.string(),
   "continuationId": zod.string(),
+  "projectId": zod.string().nullable(),
   "seedId": zod.string().nullable(),
   "sourceProjectTitle": zod.string(),
   "partnerId": zod.string(),

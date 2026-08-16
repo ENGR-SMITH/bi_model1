@@ -52,11 +52,17 @@ export const CollaborationSeedInputRespondentLimit = {
   NUMBER_0: 0,
 } as const;
 
+/**
+ * A serialized Author Den project (title, scenes, characters, plots, world).
+ */
+export interface AuthorProjectDocument { [key: string]: unknown }
+
 export interface CollaborationSeedInput {
   /** @minLength 1 */
   sourceProjectId: string;
   /** @minLength 1 */
   sourceProjectTitle: string;
+  creatorName?: string;
   /** @nullable */
   sourceSceneId?: string | null;
   /** @minimum 1 */
@@ -81,6 +87,7 @@ export interface CollaborationSeedInput {
   desiredRole: string;
   visibility: CollaborationSeedInputVisibility;
   respondentLimit: CollaborationSeedInputRespondentLimit;
+  projectDocument?: AuthorProjectDocument;
 }
 
 export type CollaborationSeedUpdateVisibility = typeof CollaborationSeedUpdateVisibility[keyof typeof CollaborationSeedUpdateVisibility];
@@ -145,6 +152,17 @@ export interface ContinuationDraftInput {
   draftText: string;
   /** @maxLength 6000 */
   draftComments: string;
+  projectDocument?: AuthorProjectDocument;
+}
+
+export interface ProjectDocument {
+  document: AuthorProjectDocument;
+  /** @nullable */
+  updatedAt: string | null;
+}
+
+export interface SaveCollaborationProjectDocumentInput {
+  document: AuthorProjectDocument;
 }
 
 export interface ContinuationSubmission {
@@ -229,14 +247,25 @@ export interface CollaborationThread {
   continuationId: string;
   creatorId: string;
   respondentId: string;
+  /** @nullable */
+  projectId: string | null;
+  creatorName: string;
+  respondentName: string;
   messages: CollaborationMessage[];
   createdAt: string;
   updatedAt: string;
 }
 
+export interface ThreadUnread {
+  unread: boolean;
+  count: number;
+}
+
 export interface InboxThread {
   id: string;
   continuationId: string;
+  /** @nullable */
+  projectId: string | null;
   /** @nullable */
   seedId: string | null;
   sourceProjectTitle: string;
@@ -277,6 +306,7 @@ export interface CollaborationProject {
   currentTurn: string;
   /** @nullable */
   threadId: string | null;
+  documentAvailable: boolean;
   createdAt: string;
   /** @nullable */
   lockedAt: string | null;
