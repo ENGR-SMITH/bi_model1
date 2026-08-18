@@ -166,6 +166,8 @@
 .text-btn, .link-btn { border: 0; background: transparent; color: hsl(var(--accent)); padding: 5px 0; font-size: 12px; font-weight: 600; }
 .link-btn { text-decoration: underline; text-underline-offset: 3px; }
 .primary-btn:hover, .secondary-btn:hover { transform: translateY(-1px); }
+.primary-btn:disabled, .secondary-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+.primary-btn:disabled:hover, .secondary-btn:disabled:hover { transform: none; }
 .home-page { max-width: 1620px; padding-top: 44px; }
 .home-hero { min-height: 300px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 52px; }
 .home-hero h1 { font: 700 clamp(44px, 6vw, 72px) var(--app-font-serif); letter-spacing: -.075em; line-height: .98; margin: 18px 0 21px; }

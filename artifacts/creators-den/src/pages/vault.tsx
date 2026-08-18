@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -27,6 +27,7 @@ import {
   getListVideoGrantsQueryKey,
   getListVideoJobsQueryKey,
   getListVideoSubmissionsQueryKey,
+  getUploadVideoAssetUrl,
   useAddVideoProjectMember,
   useApproveVideoSubmission,
   useCreateVideoGrant,
@@ -38,7 +39,6 @@ import {
   useListVideoSubmissions,
   useRejectVideoSubmission,
   useRevokeVideoGrant,
-  useUploadVideoAsset,
 } from '@workspace/api-client-react';
 import type { VideoAssetUploadInputKind } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
@@ -146,28 +146,90 @@ function AssetCard({ projectId, asset, released }: { projectId: string; asset: {
 
 function UploadForm({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
-  const upload = useUploadVideoAsset();
   const fileRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<VideoAssetUploadInputKind>('RAW_VIDEO');
   const [fileName, setFileName] = useState('');
+  const [noFile, setNoFile] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [uploadError, setUploadError] = useState('');
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+
+  // Abort any in-flight upload if the form unmounts mid-transfer.
+  useEffect(() => () => {
+    xhrRef.current?.abort();
+  }, []);
+
+  const cancel = () => {
+    xhrRef.current?.abort();
+  };
+
+  const startUpload = (file: File) => {
+    setNoFile(false);
+    setUploadError('');
+    setProgress(0);
+    setUploading(true);
+
+    // XHR instead of fetch so we can stream upload progress for large footage.
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('kind', kind);
+
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+    xhr.open('POST', getUploadVideoAssetUrl(projectId));
+    xhr.upload.onprogress = (progressEvent) => {
+      if (progressEvent.lengthComputable && progressEvent.total > 0) {
+        setProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      xhrRef.current = null;
+      setUploading(false);
+      if (xhr.status >= 200 && xhr.status < 300) {
+        setProgress(100);
+        queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+        if (fileRef.current) fileRef.current.value = '';
+        setFileName('');
+      } else {
+        let message = 'The upload failed. Try once more.';
+        try {
+          const data = JSON.parse(xhr.responseText) as { error?: string };
+          if (typeof data?.error === 'string') message = data.error;
+        } catch {
+          // Non-JSON error body — fall through to the generic message.
+        }
+        setUploadError(message);
+      }
+    };
+    xhr.onerror = () => {
+      xhrRef.current = null;
+      setUploading(false);
+      setUploadError('The upload was interrupted — your connection dropped. Retry to send it again.');
+    };
+    xhr.onabort = () => {
+      xhrRef.current = null;
+      setUploading(false);
+      setProgress(0);
+    };
+    xhr.send(formData);
+  };
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const file = fileRef.current?.files?.[0];
-    if (!file) return;
-    upload.mutate(
-      { projectId, data: { file, kind } },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
-          if (fileRef.current) fileRef.current.value = '';
-          setFileName('');
-        },
-      },
-    );
+    if (!file) {
+      setNoFile(true);
+      fileRef.current?.focus();
+      return;
+    }
+    startUpload(file);
   };
 
-  const error = upload.error as { response?: { data?: { error?: string } } } | null;
+  const retry = () => {
+    const file = fileRef.current?.files?.[0];
+    if (file) startUpload(file);
+  };
 
   return (
     <form onSubmit={submit} data-testid="form-upload-asset">
@@ -177,8 +239,11 @@ function UploadForm({ projectId }: { projectId: string }) {
           ref={fileRef}
           name="file"
           type="file"
-          required
-          onChange={(event) => setFileName(event.target.files?.[0]?.name ?? '')}
+          disabled={uploading}
+          onChange={(event) => {
+            setFileName(event.target.files?.[0]?.name ?? '');
+            setNoFile(false);
+          }}
           data-testid="input-asset-file"
         />
       </div>
@@ -186,6 +251,7 @@ function UploadForm({ projectId }: { projectId: string }) {
         <span>What is it?</span>
         <select
           value={kind}
+          disabled={uploading}
           onChange={(event) => setKind(event.target.value as VideoAssetUploadInputKind)}
           data-testid="select-asset-kind"
         >
@@ -196,17 +262,46 @@ function UploadForm({ projectId }: { projectId: string }) {
       </div>
       <button
         type="submit"
-        disabled={upload.isPending || !fileName}
+        disabled={uploading}
         className="primary-btn"
         data-testid="button-upload-asset"
       >
         <Upload size={14} />
-        {upload.isPending ? 'Locking into the vault…' : 'Upload into the vault'}
+        {uploading ? 'Locking into the vault…' : 'Upload into the vault'}
       </button>
-      {upload.isError && (
-        <p className="setting-copy mt-2" role="alert">
-          {error?.response?.data?.error || 'The upload failed. Try once more.'}
+
+      {uploading && (
+        <div className="den-upload-progress" data-testid="upload-progress">
+          <div className="den-upload-progress-bar">
+            <span style={{ width: `${progress}%` }} />
+          </div>
+          <b>{progress}%</b>
+          <button type="button" onClick={cancel} className="den-upload-cancel" data-testid="button-cancel-upload">
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {!uploading && (fileName ? (
+        <p className="setting-copy mt-2" data-testid="upload-file-ready">
+          Ready to upload: <b>{fileName}</b>
         </p>
+      ) : (
+        <p className="setting-copy mt-2">Choose a raw file above, then upload.</p>
+      ))}
+
+      {!uploading && noFile && !fileName && (
+        <p className="setting-copy mt-2" role="alert" style={{ color: 'hsl(var(--destructive))' }}>
+          Pick a file first — the vault can't upload nothing.
+        </p>
+      )}
+      {!uploading && uploadError && (
+        <div className="mt-2 flex flex-wrap items-center gap-3" role="alert" data-testid="upload-error">
+          <span className="setting-copy" style={{ color: 'hsl(var(--destructive))' }}>{uploadError}</span>
+          <button type="button" onClick={retry} className="secondary-btn" data-testid="button-retry-upload">
+            <Upload size={13} /> Retry
+          </button>
+        </div>
       )}
     </form>
   );

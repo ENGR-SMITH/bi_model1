@@ -131,6 +131,14 @@
 .den-asset-thumb video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #0b0f13; }
 .den-asset-thumb .thumb-state { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; background: hsl(218 29% 10% / .55); font-size: 10px; }
 
+/* ---- Upload progress bar (vault) ---- */
+.den-upload-progress { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.den-upload-progress-bar { flex: 1; height: 6px; border-radius: 6px; overflow: hidden; background: hsl(var(--border)); }
+.den-upload-progress-bar span { display: block; height: 100%; background: hsl(var(--accent)); transition: width .2s ease; }
+.den-upload-progress b { font: 500 10px var(--app-font-mono); color: hsl(var(--muted-foreground)); white-space: nowrap; }
+.den-upload-cancel { flex: 0 0 auto; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--destructive)); padding: 4px 9px; border-radius: 5px; font-size: 10px; font-weight: 600; transition: border-color .16s, background .16s; }
+.den-upload-cancel:hover { border-color: hsl(var(--destructive) / .6); background: hsl(var(--destructive) / .08); }
+
 /* ---- Waveform progress fill (Sound) ---- */
 .den-waveform .played { background: hsl(var(--accent)); }
 .den-waveform .queued { background: hsl(var(--accent) / .22); }
