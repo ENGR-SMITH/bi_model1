@@ -82,6 +82,16 @@ export default defineConfig({
       '/authors-den': {
         target: process.env.VITE_AUTHORS_DEN_PROXY_TARGET || 'http://localhost:5174',
       },
+      '/creators-den': {
+        target: process.env.VITE_CREATORS_DEN_PROXY_TARGET || 'http://localhost:5175',
+      },
+      // Realtime socket for the video platform (creators-den is served via
+      // its own dev server; the socket still lands on the API server).
+      '/socket.io': {
+        target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:3000',
+        ws: true,
+        changeOrigin: true,
+      },
     },
   },
   preview: {

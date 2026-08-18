@@ -25,7 +25,7 @@ export default function Dashboard() {
     <div className="mx-auto max-w-[1180px]">
       <div className="reveal flex flex-col justify-between gap-5 border-b-2 border-[#d6cbb9] pb-9 md:flex-row md:items-end">
         <div>
-          <SectionEyebrow>The private atrium / six doors</SectionEyebrow>
+          <SectionEyebrow>The private atrium / {tandemCategories.length} doors</SectionEyebrow>
           <h1 className="mt-5 max-w-[12ch] text-6xl font-extrabold leading-[.86] tracking-[-0.08em] text-[#292b45] sm:text-8xl">Welcome, {name}.</h1>
         </div>
         <div className="max-w-sm border-l-2 border-[#d6cbb9] pl-5 text-sm leading-[1.8] text-[#625f6d]">
@@ -45,7 +45,7 @@ export default function Dashboard() {
               data-testid={`card-category-${category.slug}`}
             >
               <span className="absolute -right-10 -top-12 h-36 w-36 rounded-full border border-current opacity-20 transition-transform duration-500 group-hover:scale-125" />
-              <span className="absolute right-6 top-6 font-mono-ui text-[10px] uppercase tracking-[0.16em] opacity-65">{String(index + 1).padStart(2, '0')} / 06</span>
+              <span className="absolute right-6 top-6 font-mono-ui text-[10px] uppercase tracking-[0.16em] opacity-65">{String(index + 1).padStart(2, '0')} / {String(tandemCategories.length).padStart(2, '0')}</span>
               <div className="relative flex h-full flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full border border-current bg-black/5">

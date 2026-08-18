@@ -154,3 +154,5 @@ allowBuilds:
   '@clerk/shared': true
   core-js: true
   esbuild: true
+  # bullmq -> msgpackr optional native accelerator; the pure-JS fallback works
+  msgpackr-extract: false

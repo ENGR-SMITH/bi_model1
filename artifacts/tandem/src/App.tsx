@@ -16,6 +16,7 @@ import ActivityPage from '@/pages/activity';
 import InboxPage from '@/pages/inbox';
 import ProfilePage from '@/pages/profile';
 import CollaborationPage from '@/pages/collaboration';
+
 import { ProtectedRoute } from '@/components/protected-shell';
 import {
   Route,
@@ -134,6 +135,7 @@ function RouterWithAuth() {
       <Route path="/dashboard" component={DashboardRoute} />
       <Route path="/categories/:slug" component={CategoryRoute} />
       <Route path="/categories" component={DashboardRoute} />
+
       <Route path="/activity" component={ActivityRoute} />
       <Route path="/inbox" component={InboxRoute} />
       <Route path="/profile" component={ProfileRoute} />

@@ -8,6 +8,10 @@ out-tsc
 .expo
 .expo-shared
 
+# uploaded raw footage (locked vault)
+.uploads
+
+
 # dependencies
 node_modules
 

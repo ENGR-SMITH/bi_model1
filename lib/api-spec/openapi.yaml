@@ -22,6 +22,8 @@ tags:
     description: Shared collaboration projects and contract state
   - name: users
     description: Public profile lookups for collaborators
+  - name: content-creators
+    description: Pre-recorded video production projects (the 4-leg relay)
 paths:
   /healthz:
     get:
@@ -1364,6 +1366,834 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects:
+    get:
+      operationId: listVideoProjects
+      tags: [content-creators]
+      summary: List the authenticated user's content-creation projects
+      responses:
+        "200":
+          description: Projects the user owns or is a member of
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoProject" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createVideoProject
+      tags: [content-creators]
+      summary: Create a locked video project (Captain)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoProjectInput" }
+      responses:
+        "201":
+          description: Created project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoProjectDetail" }
+        "400":
+          description: Invalid project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}:
+    get:
+      operationId: getVideoProject
+      tags: [content-creators]
+      summary: Read a permitted video project with members and assets
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Project detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoProjectDetail" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/members:
+    post:
+      operationId: addVideoProjectMember
+      tags: [content-creators]
+      summary: Invite a member by email with a leg role (Captain only)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoMemberInput" }
+      responses:
+        "201":
+          description: Added member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoMember" }
+        "400":
+          description: Invalid member or user not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/assets:
+    get:
+      operationId: listVideoAssets
+      tags: [content-creators]
+      summary: List the locked assets in a project vault
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Vault assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoAsset" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: uploadVideoAsset
+      tags: [content-creators]
+      summary: Upload raw footage into the locked vault
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/VideoAssetUploadInput" }
+      responses:
+        "201":
+          description: Uploaded asset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoAsset" }
+        "400":
+          description: Invalid upload
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/assets/{assetId}:
+    get:
+      operationId: getVideoAsset
+      tags: [content-creators]
+      summary: Read an asset with its processed files and transcript
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoAssetId" }
+      responses:
+        "200":
+          description: Asset detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoAssetDetail" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/assets/{assetId}/proxy:
+    get:
+      operationId: getVideoAssetProxy
+      tags: [content-creators]
+      summary: Stream the low-res proxy for a locked asset
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoAssetId" }
+      responses:
+        "200":
+          description: Proxy media stream
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: No proxy available for this asset yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}:
+    get:
+      operationId: getVideoTimeline
+      tags: [content-creators]
+      summary: Read the current working timeline for a leg
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: Timeline state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoTimelineState" }
+        "400":
+          description: Unknown leg
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    put:
+      operationId: saveVideoTimeline
+      tags: [content-creators]
+      summary: Save a snapshot of the leg timeline (creates a version)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoTimelineSaveInput" }
+      responses:
+        "200":
+          description: Saved timeline state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoTimelineState" }
+        "400":
+          description: Invalid snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the leg role / Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/versions:
+    get:
+      operationId: listVideoTimelineVersions
+      tags: [content-creators]
+      summary: List the Git-style snapshot history of a leg timeline
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: Version history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoTimelineVersionSummary" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/rollback:
+    post:
+      operationId: rollbackVideoTimeline
+      tags: [content-creators]
+      summary: Restore a previous snapshot as the new working head
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoTimelineRollbackInput" }
+      responses:
+        "200":
+          description: Timeline state after rollback
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoTimelineState" }
+        "400":
+          description: Unknown version
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/submissions:
+    get:
+      operationId: listVideoSubmissions
+      tags: [content-creators]
+      summary: List leg submissions for a project
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoSubmission" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createVideoSubmission
+      tags: [content-creators]
+      summary: Submit the current snapshot of a leg for Captain review
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoSubmissionInput" }
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoSubmission" }
+        "400":
+          description: Invalid submission
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: A submission for this leg is already pending
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/submissions/{submissionId}/approve:
+    post:
+      operationId: approveVideoSubmission
+      tags: [content-creators]
+      summary: Captain approves a leg submission
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoSubmissionId" }
+      responses:
+        "200":
+          description: Approved submission
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoSubmission" }
+        "403":
+          description: Captain only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Submission is not pending
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/submissions/{submissionId}/reject:
+    post:
+      operationId: rejectVideoSubmission
+      tags: [content-creators]
+      summary: Captain rejects a leg submission
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoSubmissionId" }
+      responses:
+        "200":
+          description: Rejected submission
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoSubmission" }
+        "403":
+          description: Captain only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Submission is not pending
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/comments:
+    get:
+      operationId: listVideoComments
+      tags: [content-creators]
+      summary: List timecode comments for a project
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoComment" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createVideoComment
+      tags: [content-creators]
+      summary: Add a timecode comment to the project
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoCommentInput" }
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoComment" }
+        "400":
+          description: Invalid comment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/comments/{commentId}:
+    patch:
+      operationId: resolveVideoComment
+      tags: [content-creators]
+      summary: Resolve or reopen a comment (author or Captain)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoCommentId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoCommentResolveInput" }
+      responses:
+        "200":
+          description: Updated comment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoComment" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/jobs:
+    get:
+      operationId: listVideoJobs
+      tags: [content-creators]
+      summary: List the processing jobs for a project
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoJob" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/assets/{assetId}/sync:
+    post:
+      operationId: syncVideoAsset
+      tags: [content-creators]
+      summary: Queue a multi-cam waveform sync (Visual Editor)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoAssetId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoSyncInput" }
+      responses:
+        "201":
+          description: Queued sync job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoJob" }
+        "400":
+          description: Invalid sync request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the leg role / Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/syncs:
+    get:
+      operationId: listVideoSyncs
+      tags: [content-creators]
+      summary: List the multi-cam sync pairs for a project
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Sync pairs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoSync" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/render:
+    post:
+      operationId: renderVideoTimeline
+      tags: [content-creators]
+      summary: Queue a preview or picture-lock render of a leg timeline
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoRenderInput" }
+      responses:
+        "201":
+          description: Queued render job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoJob" }
+        "400":
+          description: Invalid render request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the leg role / Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: A render is already queued or running for this leg
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/audio:
+    post:
+      operationId: queueAudioPass
+      tags: [content-creators]
+      summary: Queue an audio pass (noise reduction, EQ, ducking) for the SOUND leg
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoAudioPassInput" }
+      responses:
+        "201":
+          description: Queued audio job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoJob" }
+        "400":
+          description: Invalid audio request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the SOUND role / Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/exports:
+    post:
+      operationId: queueVideoExport
+      tags: [content-creators]
+      summary: Queue multi-format exports (16:9, 9:16, 1:1) of the FINISH master
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoExportInput" }
+      responses:
+        "201":
+          description: Queued export job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoJob" }
+        "400":
+          description: Invalid export request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the FINISH role / Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/thumbnail:
+    post:
+      operationId: queueVideoThumbnail
+      tags: [content-creators]
+      summary: Queue thumbnail frame extraction from the FINISH master
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoThumbnailInput" }
+      responses:
+        "201":
+          description: Queued thumbnail job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoJob" }
+        "400":
+          description: Invalid thumbnail request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the FINISH role / Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/files/{fileId}/download:
+    get:
+      operationId: downloadVideoFile
+      tags: [content-creators]
+      summary: Download a file once the Lock is released (audited)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoFileId" }
+      responses:
+        "200":
+          description: File download stream
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "403":
+          description: Lock is still on, or not a member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: File not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/downloads:
+    get:
+      operationId: listVideoDownloads
+      tags: [content-creators]
+      summary: List the download audit trail (Captain)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Download audit trail
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoDownload" }
+        "403":
+          description: Captain only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/assets/{assetId}/reference-analyze:
+    post:
+      operationId: analyzeVideoReference
+      tags: [content-creators]
+      summary: Queue pacing analysis of a REFERENCE asset (viral reference import)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoAssetId" }
+      responses:
+        "201":
+          description: Queued analysis job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoJob" }
+        "403":
+          description: Not allowed (not the SELECTS role / Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/assets/{assetId}/reference:
+    get:
+      operationId: getVideoReference
+      tags: [content-creators]
+      summary: Read the extracted pacing structure of a reference asset
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoAssetId" }
+      responses:
+        "200":
+          description: Reference pacing
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoReference" }
+        "404":
+          description: No analysis yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/grants:
+    get:
+      operationId: listVideoGrants
+      tags: [content-creators]
+      summary: List temporary download grants (Captain)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Grants
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoGrant" }
+        "403":
+          description: Captain only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createVideoGrant
+      tags: [content-creators]
+      summary: Grant a member a temporary download (Captain)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoGrantInput" }
+      responses:
+        "201":
+          description: Created grant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoGrant" }
+        "400":
+          description: Invalid grant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Captain only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/grants/{grantId}/revoke:
+    post:
+      operationId: revokeVideoGrant
+      tags: [content-creators]
+      summary: Revoke a temporary download grant instantly (Captain)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoGrantId" }
+      responses:
+        "200":
+          description: Revoked grant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoGrant" }
+        "403":
+          description: Captain only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Grant not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/notifications:
+    get:
+      operationId: listVideoNotifications
+      tags: [content-creators]
+      summary: List the signed-in user's Tandem notifications
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoNotification" }
+  /video/notifications/{notificationId}/read:
+    post:
+      operationId: markVideoNotificationRead
+      tags: [content-creators]
+      summary: Mark a notification as read
+      parameters:
+        - { $ref: "#/components/parameters/VideoNotificationId" }
+      responses:
+        "200":
+          description: Updated notification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoNotification" }
+        "404":
+          description: Notification not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 components:
   parameters:
     SeedId:
@@ -1438,6 +2268,46 @@ components:
       schema:
         type: string
         enum: [groq, openrouter, ollama, lmstudio, freebuff]
+    VideoProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    VideoAssetId:
+      name: assetId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    VideoFileId:
+      name: fileId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    VideoGrantId:
+      name: grantId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    VideoNotificationId:
+      name: notificationId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    VideoLeg:
+      name: leg
+      in: path
+      required: true
+      schema: { type: string, enum: [SELECTS, CUT, SOUND, FINISH] }
+    VideoSubmissionId:
+      name: submissionId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    VideoCommentId:
+      name: commentId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
   schemas:
     CollaborationSeed:
       type: object
@@ -2159,3 +3029,329 @@ components:
           items:
             type: string
       required: [entries, providerId, modelId, attempted]
+    VideoProject:
+      type: object
+      properties:
+        id: { type: string }
+        ownerId: { type: string }
+        name: { type: string }
+        description: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, ownerId, name, description, status, createdAt, updatedAt]
+    VideoProjectInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        description: { type: string, maxLength: 2000 }
+      required: [name]
+    VideoProjectDetail:
+      type: object
+      properties:
+        id: { type: string }
+        ownerId: { type: string }
+        name: { type: string }
+        description: { type: string }
+        status: { type: string }
+        myRole: { type: ["string", "null"] }
+        members:
+          type: array
+          items: { $ref: "#/components/schemas/VideoMember" }
+        assets:
+          type: array
+          items: { $ref: "#/components/schemas/VideoAsset" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, ownerId, name, description, status, myRole, members, assets, createdAt, updatedAt]
+    VideoMember:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        userId: { type: string }
+        role: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, projectId, userId, role, status, createdAt]
+    VideoMemberInput:
+      type: object
+      properties:
+        email: { type: string, format: email }
+        role:
+          type: string
+          enum: [UPLOADER, ARCHITECT, VISUAL_EDITOR, SOUND_DESIGNER, MOTION_COLOR, VIEWER]
+      required: [email, role]
+    VideoAsset:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        uploaderId: { type: string }
+        kind: { type: string }
+        fileName: { type: string }
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        durationMs: { type: ["integer", "null"] }
+        status: { type: string }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, status, version, createdAt]
+    VideoAssetUploadInput:
+      type: object
+      description: Multipart upload of a raw asset into the project vault
+      properties:
+        file:
+          type: string
+          format: binary
+        kind:
+          type: string
+          enum: [RAW_VIDEO, RAW_AUDIO, SCREEN_REC, B_ROLL, REFERENCE, VO_PICKUP, GRAPHIC]
+      required: [file, kind]
+    VideoAssetFile:
+      type: object
+      properties:
+        id: { type: string }
+        kind: { type: string }
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        metadata: { type: ["object", "null"], additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+      required: [id, kind, mimeType, sizeBytes, metadata, createdAt]
+    VideoTranscriptSegment:
+      type: object
+      properties:
+        id: { type: string }
+        startMs: { type: integer }
+        endMs: { type: integer }
+        text: { type: string }
+        speaker: { type: ["string", "null"] }
+      required: [id, startMs, endMs, text, speaker]
+    VideoTranscript:
+      type: object
+      properties:
+        id: { type: string }
+        assetId: { type: string }
+        language: { type: string }
+        model: { type: string }
+        status: { type: string }
+        segments:
+          type: array
+          items: { $ref: "#/components/schemas/VideoTranscriptSegment" }
+      required: [id, assetId, language, model, status, segments]
+    VideoAssetDetail:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        uploaderId: { type: string }
+        kind: { type: string }
+        fileName: { type: string }
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        durationMs: { type: ["integer", "null"] }
+        status: { type: string }
+        version: { type: integer }
+        createdAt: { type: string, format: date-time }
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/VideoAssetFile" }
+        transcript: { type: ["object", "null"], allOf: [{ $ref: "#/components/schemas/VideoTranscript" }] }
+      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, status, version, createdAt, files, transcript]
+    VideoTimelineState:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        leg: { type: string }
+        status: { type: string }
+        version: { type: ["integer", "null"] }
+        snapshot: { type: ["object", "null"], additionalProperties: true }
+        versions:
+          type: array
+          items: { $ref: "#/components/schemas/VideoTimelineVersionSummary" }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, leg, status, version, snapshot, versions, updatedAt]
+    VideoTimelineVersionSummary:
+      type: object
+      properties:
+        id: { type: string }
+        version: { type: integer }
+        message: { type: string }
+        createdById: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, version, message, createdById, createdAt]
+    VideoTimelineSaveInput:
+      type: object
+      properties:
+        snapshot: { type: object, additionalProperties: true }
+        message: { type: string, maxLength: 500 }
+      required: [snapshot]
+    VideoTimelineRollbackInput:
+      type: object
+      properties:
+        versionId: { type: string, minLength: 1 }
+      required: [versionId]
+    VideoSubmission:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        leg: { type: string }
+        timelineVersionId: { type: string }
+        status: { type: string }
+        note: { type: string }
+        submittedById: { type: string }
+        decidedById: { type: ["string", "null"] }
+        decidedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, leg, timelineVersionId, status, note, submittedById, decidedById, decidedAt, createdAt, updatedAt]
+    VideoSubmissionInput:
+      type: object
+      properties:
+        leg: { type: string, enum: [SELECTS, CUT, SOUND, FINISH] }
+        note: { type: string, maxLength: 2000 }
+      required: [leg]
+    VideoComment:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        leg: { type: ["string", "null"] }
+        assetId: { type: ["string", "null"] }
+        timecodeMs: { type: ["integer", "null"] }
+        body: { type: string }
+        authorId: { type: string }
+        parentId: { type: ["string", "null"] }
+        resolvedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, projectId, leg, assetId, timecodeMs, body, authorId, parentId, resolvedAt, createdAt]
+    VideoCommentInput:
+      type: object
+      properties:
+        leg: { type: string, enum: [SELECTS, CUT, SOUND, FINISH] }
+        assetId: { type: string }
+        timecodeMs: { type: integer, minimum: 0 }
+        body: { type: string, minLength: 1, maxLength: 4000 }
+        parentId: { type: string }
+      required: [body]
+    VideoCommentResolveInput:
+      type: object
+      properties:
+        resolved: { type: boolean }
+      required: [resolved]
+    VideoJob:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        assetId: { type: string }
+        type: { type: string }
+        status: { type: string }
+        attempts: { type: integer }
+        error: { type: ["string", "null"] }
+        params: { type: ["object", "null"], additionalProperties: true }
+        result: { type: ["object", "null"], additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+        startedAt: { type: ["string", "null"], format: date-time }
+        finishedAt: { type: ["string", "null"], format: date-time }
+      required: [id, projectId, assetId, type, status, attempts, error, params, result, createdAt, startedAt, finishedAt]
+    VideoSyncInput:
+      type: object
+      properties:
+        targetAssetId: { type: string, minLength: 1 }
+      required: [targetAssetId]
+    VideoSync:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        primaryAssetId: { type: string }
+        targetAssetId: { type: string }
+        offsetMs: { type: integer }
+        method: { type: string }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, primaryAssetId, targetAssetId, offsetMs, method, status, createdAt, updatedAt]
+    VideoRenderInput:
+      type: object
+      properties:
+        format: { type: string, enum: [PREVIEW, PICTURE_LOCK], default: PREVIEW }
+      required: [format]
+    VideoAudioPassInput:
+      type: object
+      properties:
+        action: { type: string, enum: [NOISE_REDUCTION, EQ, DUCKING, LEVELING] }
+        assetId: { type: string }
+      required: [action]
+    VideoExportInput:
+      type: object
+      properties:
+        formats:
+          type: array
+          items: { type: string, enum: ["16:9", "9:16", "1:1"] }
+          minItems: 1
+      required: [formats]
+    VideoThumbnailInput:
+      type: object
+      properties:
+        assetId: { type: string, minLength: 1 }
+        timeMs: { type: integer, minimum: 0 }
+      required: [assetId, timeMs]
+    VideoDownload:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        fileId: { type: string }
+        fileName: { type: string }
+        memberId: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, projectId, fileId, fileName, memberId, createdAt]
+    VideoReference:
+      type: object
+      properties:
+        id: { type: string }
+        assetId: { type: string }
+        status: { type: string }
+        pacing: { type: ["object", "null"], additionalProperties: true }
+        error: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, assetId, status, pacing, error, createdAt, updatedAt]
+    VideoGrant:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        fileId: { type: string }
+        memberId: { type: string }
+        reason: { type: string }
+        grantedById: { type: string }
+        expiresAt: { type: string, format: date-time }
+        revokedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, projectId, fileId, memberId, reason, grantedById, expiresAt, revokedAt, createdAt]
+    VideoGrantInput:
+      type: object
+      properties:
+        memberId: { type: string, minLength: 1 }
+        fileId: { type: string, minLength: 1 }
+        reason: { type: string, maxLength: 500 }
+        expiresInHours: { type: integer, minimum: 1, maximum: 168, default: 24 }
+      required: [memberId, fileId]
+    VideoNotification:
+      type: object
+      properties:
+        id: { type: string }
+        recipientId: { type: string }
+        category: { type: string }
+        title: { type: string }
+        body: { type: string }
+        deepLink: { type: string }
+        resourceId: { type: ["string", "null"] }
+        readAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [id, recipientId, category, title, body, deepLink, resourceId, readAt, createdAt]

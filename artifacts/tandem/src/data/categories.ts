@@ -1,5 +1,6 @@
 import {
   AudioLines,
+  Clapperboard,
   Compass,
   Headphones,
   Mic2,
@@ -27,6 +28,15 @@ export const tandemCategories: TandemCategory[] = [
     status: 'Available',
     icon: PenLine,
     accent: 'coral',
+  },
+  {
+    slug: 'content-creators',
+    name: 'Content Creators',
+    shortName: 'Creators',
+    description: 'Turn raw footage into publish-ready masters with a four-role relay. The clips stay locked in the room.',
+    status: 'Available',
+    icon: Clapperboard,
+    accent: 'blue',
   },
   {
     slug: 'singers',

@@ -6,6 +6,7 @@ import { useCreateWaitlistEntry } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/protected-shell';
 import { getTandemCategory } from '@/data/categories';
 import AuthorsPage from '@/pages/authors';
+import ContentCreatorsPage from '@/pages/content-creators';
 import { useToast } from '@/hooks/use-toast';
 
 export default function CategoryUnavailable() {
@@ -32,6 +33,7 @@ export default function CategoryUnavailable() {
 
   if (!category) return <CategoryNotFound />;
   if (category.slug === 'authors') return <AuthorsPage />;
+  if (category.slug === 'content-creators') return <ContentCreatorsPage />;
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

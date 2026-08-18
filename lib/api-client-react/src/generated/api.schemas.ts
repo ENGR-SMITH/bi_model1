@@ -811,6 +811,431 @@ export interface WorldBibleExtractResult {
   attempted: string[];
 }
 
+export interface VideoProject {
+  id: string;
+  ownerId: string;
+  name: string;
+  description: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VideoProjectInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  name: string;
+  /** @maxLength 2000 */
+  description?: string;
+}
+
+export interface VideoMember {
+  id: string;
+  projectId: string;
+  userId: string;
+  role: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface VideoAsset {
+  id: string;
+  projectId: string;
+  uploaderId: string;
+  kind: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  /** @nullable */
+  durationMs: number | null;
+  status: string;
+  version: number;
+  createdAt: string;
+}
+
+export interface VideoProjectDetail {
+  id: string;
+  ownerId: string;
+  name: string;
+  description: string;
+  status: string;
+  /** @nullable */
+  myRole: string | null;
+  members: VideoMember[];
+  assets: VideoAsset[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type VideoMemberInputRole = typeof VideoMemberInputRole[keyof typeof VideoMemberInputRole];
+
+
+export const VideoMemberInputRole = {
+  UPLOADER: 'UPLOADER',
+  ARCHITECT: 'ARCHITECT',
+  VISUAL_EDITOR: 'VISUAL_EDITOR',
+  SOUND_DESIGNER: 'SOUND_DESIGNER',
+  MOTION_COLOR: 'MOTION_COLOR',
+  VIEWER: 'VIEWER',
+} as const;
+
+export interface VideoMemberInput {
+  email: string;
+  role: VideoMemberInputRole;
+}
+
+export type VideoAssetUploadInputKind = typeof VideoAssetUploadInputKind[keyof typeof VideoAssetUploadInputKind];
+
+
+export const VideoAssetUploadInputKind = {
+  RAW_VIDEO: 'RAW_VIDEO',
+  RAW_AUDIO: 'RAW_AUDIO',
+  SCREEN_REC: 'SCREEN_REC',
+  B_ROLL: 'B_ROLL',
+  REFERENCE: 'REFERENCE',
+  VO_PICKUP: 'VO_PICKUP',
+  GRAPHIC: 'GRAPHIC',
+} as const;
+
+/**
+ * Multipart upload of a raw asset into the project vault
+ */
+export interface VideoAssetUploadInput {
+  file: Blob;
+  kind: VideoAssetUploadInputKind;
+}
+
+/**
+ * @nullable
+ */
+export type VideoAssetFileMetadata = { [key: string]: unknown } | null;
+
+export interface VideoAssetFile {
+  id: string;
+  kind: string;
+  mimeType: string;
+  sizeBytes: number;
+  /** @nullable */
+  metadata: VideoAssetFileMetadata;
+  createdAt: string;
+}
+
+export interface VideoTranscriptSegment {
+  id: string;
+  startMs: number;
+  endMs: number;
+  text: string;
+  /** @nullable */
+  speaker: string | null;
+}
+
+export interface VideoTranscript {
+  id: string;
+  assetId: string;
+  language: string;
+  model: string;
+  status: string;
+  segments: VideoTranscriptSegment[];
+}
+
+export interface VideoAssetDetail {
+  id: string;
+  projectId: string;
+  uploaderId: string;
+  kind: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  /** @nullable */
+  durationMs: number | null;
+  status: string;
+  version: number;
+  createdAt: string;
+  files: VideoAssetFile[];
+  /** @nullable */
+  transcript: VideoTranscript | null;
+}
+
+/**
+ * @nullable
+ */
+export type VideoTimelineStateSnapshot = { [key: string]: unknown } | null;
+
+export interface VideoTimelineVersionSummary {
+  id: string;
+  version: number;
+  message: string;
+  createdById: string;
+  createdAt: string;
+}
+
+export interface VideoTimelineState {
+  id: string;
+  projectId: string;
+  leg: string;
+  status: string;
+  /** @nullable */
+  version: number | null;
+  /** @nullable */
+  snapshot: VideoTimelineStateSnapshot;
+  versions: VideoTimelineVersionSummary[];
+  updatedAt: string;
+}
+
+export type VideoTimelineSaveInputSnapshot = { [key: string]: unknown };
+
+export interface VideoTimelineSaveInput {
+  snapshot: VideoTimelineSaveInputSnapshot;
+  /** @maxLength 500 */
+  message?: string;
+}
+
+export interface VideoTimelineRollbackInput {
+  /** @minLength 1 */
+  versionId: string;
+}
+
+export interface VideoSubmission {
+  id: string;
+  projectId: string;
+  leg: string;
+  timelineVersionId: string;
+  status: string;
+  note: string;
+  submittedById: string;
+  /** @nullable */
+  decidedById: string | null;
+  /** @nullable */
+  decidedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type VideoSubmissionInputLeg = typeof VideoSubmissionInputLeg[keyof typeof VideoSubmissionInputLeg];
+
+
+export const VideoSubmissionInputLeg = {
+  SELECTS: 'SELECTS',
+  CUT: 'CUT',
+  SOUND: 'SOUND',
+  FINISH: 'FINISH',
+} as const;
+
+export interface VideoSubmissionInput {
+  leg: VideoSubmissionInputLeg;
+  /** @maxLength 2000 */
+  note?: string;
+}
+
+export interface VideoComment {
+  id: string;
+  projectId: string;
+  /** @nullable */
+  leg: string | null;
+  /** @nullable */
+  assetId: string | null;
+  /** @nullable */
+  timecodeMs: number | null;
+  body: string;
+  authorId: string;
+  /** @nullable */
+  parentId: string | null;
+  /** @nullable */
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
+export type VideoCommentInputLeg = typeof VideoCommentInputLeg[keyof typeof VideoCommentInputLeg];
+
+
+export const VideoCommentInputLeg = {
+  SELECTS: 'SELECTS',
+  CUT: 'CUT',
+  SOUND: 'SOUND',
+  FINISH: 'FINISH',
+} as const;
+
+export interface VideoCommentInput {
+  leg?: VideoCommentInputLeg;
+  assetId?: string;
+  /** @minimum 0 */
+  timecodeMs?: number;
+  /**
+     * @minLength 1
+     * @maxLength 4000
+     */
+  body: string;
+  parentId?: string;
+}
+
+export interface VideoCommentResolveInput {
+  resolved: boolean;
+}
+
+/**
+ * @nullable
+ */
+export type VideoJobParams = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type VideoJobResult = { [key: string]: unknown } | null;
+
+export interface VideoJob {
+  id: string;
+  projectId: string;
+  assetId: string;
+  type: string;
+  status: string;
+  attempts: number;
+  /** @nullable */
+  error: string | null;
+  /** @nullable */
+  params: VideoJobParams;
+  /** @nullable */
+  result: VideoJobResult;
+  createdAt: string;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  finishedAt: string | null;
+}
+
+export interface VideoSyncInput {
+  /** @minLength 1 */
+  targetAssetId: string;
+}
+
+export interface VideoSync {
+  id: string;
+  projectId: string;
+  primaryAssetId: string;
+  targetAssetId: string;
+  offsetMs: number;
+  method: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type VideoRenderInputFormat = typeof VideoRenderInputFormat[keyof typeof VideoRenderInputFormat];
+
+
+export const VideoRenderInputFormat = {
+  PREVIEW: 'PREVIEW',
+  PICTURE_LOCK: 'PICTURE_LOCK',
+} as const;
+
+export interface VideoRenderInput {
+  format: VideoRenderInputFormat;
+}
+
+export type VideoAudioPassInputAction = typeof VideoAudioPassInputAction[keyof typeof VideoAudioPassInputAction];
+
+
+export const VideoAudioPassInputAction = {
+  NOISE_REDUCTION: 'NOISE_REDUCTION',
+  EQ: 'EQ',
+  DUCKING: 'DUCKING',
+  LEVELING: 'LEVELING',
+} as const;
+
+export interface VideoAudioPassInput {
+  action: VideoAudioPassInputAction;
+  assetId?: string;
+}
+
+export type VideoExportInputFormatsItem = typeof VideoExportInputFormatsItem[keyof typeof VideoExportInputFormatsItem];
+
+
+export const VideoExportInputFormatsItem = {
+  '16:9': '16:9',
+  '9:16': '9:16',
+  '1:1': '1:1',
+} as const;
+
+export interface VideoExportInput {
+  /** @minItems 1 */
+  formats: VideoExportInputFormatsItem[];
+}
+
+export interface VideoThumbnailInput {
+  /** @minLength 1 */
+  assetId: string;
+  /** @minimum 0 */
+  timeMs: number;
+}
+
+export interface VideoDownload {
+  id: string;
+  projectId: string;
+  fileId: string;
+  fileName: string;
+  memberId: string;
+  createdAt: string;
+}
+
+/**
+ * @nullable
+ */
+export type VideoReferencePacing = { [key: string]: unknown } | null;
+
+export interface VideoReference {
+  id: string;
+  assetId: string;
+  status: string;
+  /** @nullable */
+  pacing: VideoReferencePacing;
+  /** @nullable */
+  error: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VideoGrant {
+  id: string;
+  projectId: string;
+  fileId: string;
+  memberId: string;
+  reason: string;
+  grantedById: string;
+  expiresAt: string;
+  /** @nullable */
+  revokedAt: string | null;
+  createdAt: string;
+}
+
+export interface VideoGrantInput {
+  /** @minLength 1 */
+  memberId: string;
+  /** @minLength 1 */
+  fileId: string;
+  /** @maxLength 500 */
+  reason?: string;
+  /**
+     * @minimum 1
+     * @maximum 168
+     */
+  expiresInHours?: number;
+}
+
+export interface VideoNotification {
+  id: string;
+  recipientId: string;
+  category: string;
+  title: string;
+  body: string;
+  deepLink: string;
+  /** @nullable */
+  resourceId: string | null;
+  /** @nullable */
+  readAt: string | null;
+  createdAt: string;
+}
+
 export type GenreQueryParameter = string;
 
 export type UnitQueryParameter = string;

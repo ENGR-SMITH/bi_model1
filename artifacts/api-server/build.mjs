@@ -14,8 +14,22 @@ async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
   await rm(distDir, { recursive: true, force: true });
 
+  const workerEntryPoints = [
+    "proxy-worker",
+    "transcribe-worker",
+    "sync-worker",
+    "render-worker",
+    "audio-worker",
+    "finish-worker",
+    "reference-worker",
+    "all",
+  ].map((name) => path.resolve(artifactDir, `src/workers/${name}.ts`));
+
   await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/index.ts")],
+    entryPoints: [
+      path.resolve(artifactDir, "src/index.ts"),
+      ...workerEntryPoints,
+    ],
     platform: "node",
     bundle: true,
     format: "esm",

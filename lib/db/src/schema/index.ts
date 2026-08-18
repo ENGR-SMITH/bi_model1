@@ -22,3 +22,5 @@ export * from "./waitlist";
 export * from "./collaborations";
 export * from "./collaboration-threads";
 export * from "./collaboration-work";
+export * from "./video-projects";
+export * from "./video-production";
