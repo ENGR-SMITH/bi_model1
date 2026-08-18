@@ -8,6 +8,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { RealtimeProvider } from '@/lib/realtime';
 
 import './index.css';
+import './creators.css';
 
 const queryClient = new QueryClient();
 

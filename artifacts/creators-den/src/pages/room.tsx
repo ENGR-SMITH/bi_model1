@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  ArrowLeft,
   ArrowRight,
   ArrowUpRight,
   Bell,
@@ -11,6 +10,7 @@ import {
   Palette,
   Scissors,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,8 +22,14 @@ import {
   useListVideoProjects,
   useMarkVideoNotificationRead,
 } from '@workspace/api-client-react';
-import { SectionEyebrow } from '@/components/shell';
 import { useRealtimeNotifications } from '@/lib/realtime';
+
+const LEGS = [
+  { number: '01', role: 'Story Architect', studio: 'Selects & structure', icon: Film, blurb: 'Marks the golden takes and builds the narrative spine: Hook → Setup → Core → Payoff → CTA.' },
+  { number: '02', role: 'Visual Editor', studio: 'Precision cutting', icon: Scissors, blurb: 'Tightens every cut, layers B-roll, syncs cameras, and locks the picture.' },
+  { number: '03', role: 'Sound Designer', studio: 'Restore & score', icon: Mic2, blurb: 'Cleans captured audio, ducks music under speech, and repairs bad takes.' },
+  { number: '04', role: 'Motion & Color', studio: 'Finish & polish', icon: Palette, blurb: 'Grades the footage into one look, burns captions, and exports every format.' },
+];
 
 function NotificationsPanel() {
   const queryClient = useQueryClient();
@@ -47,28 +53,28 @@ function NotificationsPanel() {
   if (!notifications.data || notifications.data.length === 0) return null;
 
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5" data-testid="panel-notifications">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">
-          <Bell className="h-4 w-4" />
-          Notices
-        </div>
+    <div className="paper-card" data-testid="panel-notifications">
+      <div className="inline-heading">
+        <span className="eyebrow"><Bell size={13} /> Notices</span>
         {unread.length > 0 && (
-          <span className="rounded-full bg-[#e55b4c] px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#fff4e6]">{unread.length} new</span>
+          <span className="den-tag danger">{unread.length} new</span>
         )}
       </div>
-      <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
-        {(notifications.data ?? []).slice(0, 10).map((notification) => (
+      <div className="den-stack">
+        {(notifications.data ?? []).slice(0, 8).map((notification) => (
           <a
             key={notification.id}
             href={notification.deepLink || '/'}
             onClick={() => !notification.readAt && open(notification)}
-            className={`block rounded-xl border-2 px-3 py-2.5 transition-colors ${notification.readAt ? 'border-[#e5d7c5] bg-[#f1e8da] opacity-70' : 'border-[#8dc2ad] bg-[#e5f1e8]'}`}
+            className={`list-row ${notification.readAt ? '' : 'selected'}`}
             data-testid={`notification-${notification.id}`}
           >
-            <p className="text-sm font-bold text-[#292b45]">{notification.title}</p>
-            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[#77717a]">{notification.body}</p>
-            <p className="mt-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#98909a]">{notification.category.replaceAll('_', ' ')} · {new Date(notification.createdAt).toLocaleDateString()}</p>
+            <span className="world-symbol"><Bell size={13} /></span>
+            <span>
+              <b>{notification.title}</b>
+              <small>{notification.body}</small>
+              <small>{notification.category.replaceAll('_', ' ')} · {new Date(notification.createdAt).toLocaleDateString()}</small>
+            </span>
           </a>
         ))}
       </div>
@@ -76,24 +82,7 @@ function NotificationsPanel() {
   );
 }
 
-const LEGS = [
-  { number: '01', role: 'Story Architect', studio: 'Selects & structure', icon: Film, blurb: 'Marks the golden takes and builds the narrative spine: Hook → Setup → Core → Payoff → CTA.' },
-  { number: '02', role: 'Visual Editor', studio: 'Precision cutting', icon: Scissors, blurb: 'Tightens every cut, layers B-roll, syncs cameras, and locks the picture.' },
-  { number: '03', role: 'Sound Designer', studio: 'Restore & score', icon: Mic2, blurb: 'Cleans captured audio, ducks music under speech, and repairs bad takes.' },
-  { number: '04', role: 'Motion & Color', studio: 'Finish & polish', icon: Palette, blurb: 'Grades the footage into one look, burns captions, and exports every format.' },
-];
-
-function Empty({ body }: { body: string }) {
-  return (
-    <div className="rounded-[1.75rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-8 shadow-[8px_10px_0_rgba(41,43,69,.07)]">
-      <Sparkles className="h-7 w-7 text-[#e55b4c]" />
-      <p className="mt-7 font-display text-4xl italic">No footage yet.</p>
-      <p className="mt-3 max-w-xl text-sm leading-[1.8] text-[#77717a]">{body}</p>
-    </div>
-  );
-}
-
-function NewProjectCard() {
+function NewProjectModal({ onClose }: { onClose: () => void }) {
   const [, setLocation] = useLocation();
   const create = useCreateVideoProject();
   const [name, setName] = useState('');
@@ -113,47 +102,55 @@ function NewProjectCard() {
   const error = create.error as { response?: { data?: { error?: string } } } | null;
 
   return (
-    <div className="rounded-[1.5rem] border-2 border-[#8dc2ad] bg-[#e5f1e8] p-6">
-      <div className="flex items-center justify-between">
-        <span className="flex h-11 w-11 items-center justify-center rounded-full border border-[#286254] text-[#286254]"><Clapperboard className="h-5 w-5" /></span>
-        <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#286254]">Start a project</span>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal project-modal" onClick={(event) => event.stopPropagation()}>
+        <span className="project-modal-orbit"><span /><i /><b>C</b></span>
+        <button type="button" className="modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
+        <div className="project-modal-heading">
+          <span className="eyebrow">New locked room</span>
+          <h2>A new room <em>for footage.</em></h2>
+          <p>Name the project, then drop your raw footage into the vault. Files are viewable by the team — downloadable by no one.</p>
+        </div>
+        <form className="project-modal-fields" onSubmit={submit}>
+          <div className="field">
+            <span>Project name</span>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Project name — e.g. Interview with Ada"
+              maxLength={120}
+              required
+              autoFocus
+              data-testid="input-video-project-name"
+            />
+          </div>
+          <div className="field">
+            <span>What are we cutting? (optional)</span>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="What are we cutting?"
+              maxLength={2000}
+              rows={3}
+              data-testid="input-video-project-description"
+            />
+          </div>
+          {create.isError && (
+            <p className="text-sm font-semibold text-[#a33d31]" role="alert">
+              {error?.response?.data?.error || 'We could not open that room just yet.'}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={create.isPending || !name.trim()}
+            className="primary-btn modal-submit"
+            data-testid="button-create-video-project"
+          >
+            {create.isPending ? 'Opening the room…' : 'Create project'}
+            <ArrowRight size={15} />
+          </button>
+        </form>
       </div>
-      <h2 className="mt-5 text-3xl font-extrabold leading-[.95] tracking-[-0.05em] text-[#292b45]">New locked room.</h2>
-      <p className="mt-2 text-sm leading-relaxed text-[#286254]">Name the project, then drop your raw footage into the vault. Files are viewable by the team — downloadable by no one.</p>
-      <form className="mt-5 space-y-3" onSubmit={submit}>
-        <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Project name — e.g. Interview with Ada"
-          maxLength={120}
-          required
-          data-testid="input-video-project-name"
-          className="focus-house w-full rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-4 py-3 text-sm text-[#292b45] placeholder:text-[#98909a]"
-        />
-        <textarea
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="What are we cutting? (optional)"
-          maxLength={2000}
-          rows={2}
-          data-testid="input-video-project-description"
-          className="focus-house w-full resize-none rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-4 py-3 text-sm text-[#292b45] placeholder:text-[#98909a]"
-        />
-        <button
-          type="submit"
-          disabled={create.isPending || !name.trim()}
-          data-testid="button-create-video-project"
-          className="focus-house inline-flex items-center gap-2 rounded-xl bg-[#292b45] px-5 py-3 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#286254] disabled:cursor-wait disabled:opacity-60"
-        >
-          {create.isPending ? 'Opening the room...' : 'Create project'}
-          <ArrowRight className="h-4 w-4" />
-        </button>
-        {create.isError && (
-          <p className="text-sm font-semibold text-[#a33d31]" role="alert">
-            {error?.response?.data?.error || 'We could not open that room just yet.'}
-          </p>
-        )}
-      </form>
     </div>
   );
 }
@@ -162,85 +159,128 @@ export default function ContentCreatorsPage() {
   const { user } = useUser();
   const name = user?.firstName || user?.username || 'maker';
   const projects = useListVideoProjects();
+  const [modalOpen, setModalOpen] = useState(false);
 
   return (
-    <div className="mx-auto max-w-[1180px]">
-      <Link href="/dashboard" className="focus-house inline-flex items-center gap-2 rounded-full py-1 text-xs font-bold text-[#77717a] hover:text-[#292b45]" data-testid="link-creators-back-dashboard">
-        <ArrowUpRight className="h-3.5 w-3.5 rotate-[225deg]" />
-        Back to the atrium
-      </Link>
-
-      <div className="reveal mt-6 flex flex-col justify-between gap-5 border-b-2 border-[#d6cbb9] pb-9 md:flex-row md:items-end">
+    <div className="home-page">
+      <div className="page-guide">
+        <span className="guide-pin" />
         <div>
-          <SectionEyebrow>Content creators / the room</SectionEyebrow>
-          <h1 className="mt-4 max-w-[13ch] text-5xl font-extrabold leading-[.88] tracking-[-0.07em] text-[#292b45] sm:text-7xl">Your footage has a room.</h1>
+          <b>CONTENT CREATORS · THE ROOM</b>
+          <span>Four roles, one relay — selects, cut, sound, finish — working the same locked footage until the Captain releases it.</span>
         </div>
-        <div className="max-w-sm border-l-2 border-[#d6cbb9] pl-5 text-sm leading-[1.8] text-[#625f6d]">
-          <p>Welcome in, {name}. Four roles, one relay — selects, cut, sound, finish — working the same locked footage until the Captain releases it.</p>
+        <span className="guide-spark" />
+      </div>
+
+      <div className="home-hero">
+        <div>
+          <span className="eyebrow-line" /><span className="eyebrow">Welcome in, {name}</span>
+          <h1>Your footage<br /><em>has a room.</em></h1>
+          <p>
+            Drop raw files into a locked vault, hand each role its studio, and relay the picture
+            down the line — selects, cut, sound, finish — until the Captain releases the master.
+          </p>
+          <button type="button" className="hero-new-project" onClick={() => setModalOpen(true)} data-testid="button-new-project">
+            <Clapperboard size={16} />
+            New locked room
+            <ArrowRight size={15} />
+          </button>
+        </div>
+        <div className="hero-orbit">
+          <span className="orbit-center">C</span>
+          <span className="orbit-ring ring-one" />
+          <span className="orbit-ring ring-two" />
+          <span className="orbit-word word-a">SELECTS</span>
+          <span className="orbit-word word-b">SOUND</span>
+          <span className="orbit-word word-c">FINISH</span>
         </div>
       </div>
 
-      <div className="reveal reveal-1 mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="section-head">
+        <div>
+          <span className="eyebrow">The relay</span>
+          <h2>Four roles, one locked picture</h2>
+        </div>
+        <span className="mono-label">01 — 04</span>
+      </div>
+
+      <div className="project-grid">
         {LEGS.map((leg) => {
           const Icon = leg.icon;
           return (
-            <div key={leg.number} className="soft-lift rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5" data-testid={`card-leg-${leg.number}`}>
-              <div className="flex items-center justify-between">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#292b45] text-[#f0c85c]"><Icon className="h-4 w-4" /></span>
-                <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#98909a]">{leg.number} / 04</span>
+            <div key={leg.number} className="project-card" data-testid={`card-leg-${leg.number}`}>
+              <div className="project-card-top">
+                <span className="template-tag">{leg.studio}</span>
+                <span className="mono-label">{leg.number} / 04</span>
               </div>
-              <p className="mt-5 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">{leg.studio}</p>
-              <h2 className="mt-1 font-display text-2xl italic leading-none">{leg.role}</h2>
-              <p className="mt-2 text-xs leading-relaxed text-[#77717a]">{leg.blurb}</p>
+              <div className="project-open">
+                <h3><Icon size={16} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 7, color: 'hsl(var(--accent))' }} />{leg.role}</h3>
+                <p>{leg.blurb}</p>
+              </div>
+              <div className="card-rule" />
+              <div className="project-meta">
+                <span><Sparkles size={11} /> direct manipulation + AI</span>
+                <span>studio</span>
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="reveal reveal-2 mt-10 grid gap-6 lg:grid-cols-[.9fr_1.1fr]">
-        <div className="space-y-4">
-          <NotificationsPanel />
-          <NewProjectCard />
-        </div>
-        <div>
-          <div className="flex items-center gap-4">
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#e55b4c]">Your rooms</span>
-            <div className="h-px flex-1 bg-[#d6cbb9]" />
-          </div>
-          <div className="mt-4 space-y-4">
-            {projects.isLoading ? (
-              <div className="h-40 animate-pulse rounded-[1.5rem] bg-[#e5d7c5]" />
-            ) : projects.isError ? (
-              <p className="text-sm text-[#a33d31]">The vault could not be opened. Try again in a moment.</p>
-            ) : projects.data && projects.data.length > 0 ? (
-              projects.data.map((project) => (
+      <div className="home-lower">
+        <div className="quick-start">
+          <span className="eyebrow">Recent rooms</span>
+          <h3>Your locked rooms</h3>
+          <p>Every room is private by design — raw footage stays in the vault until the Captain approves the final master.</p>
+          {projects.isLoading ? (
+            <div className="panel-empty">Opening the vault…</div>
+          ) : projects.isError ? (
+            <p className="text-sm text-[#a33d31]">The vault could not be opened. Try again in a moment.</p>
+          ) : projects.data && projects.data.length > 0 ? (
+            <div className="den-stack">
+              {projects.data.map((project) => (
                 <Link
                   key={project.id}
                   href={`/projects/${project.id}`}
-                  className="soft-lift focus-house group flex items-start justify-between gap-4 rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5"
+                  className="list-row"
                   data-testid={`card-video-project-${project.id}`}
                 >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-[#f0c85c] px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#292b45]">{project.status.replaceAll('_', ' ')}</span>
-                      <span className="font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#98909a]">{new Date(project.createdAt).toLocaleDateString()}</span>
-                    </div>
-                    <h2 className="mt-3 font-display text-3xl italic leading-none">{project.name}</h2>
-                    {project.description && <p className="mt-2 max-w-md text-xs leading-relaxed text-[#77717a]">{project.description}</p>}
-                  </div>
-                  <ArrowUpRight className="mt-1 h-5 w-5 shrink-0 text-[#e55b4c] transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
+                  <span className="world-symbol"><Film size={13} /></span>
+                  <span>
+                    <b>{project.name}</b>
+                    <small>{project.status.replaceAll('_', ' ')} · {new Date(project.createdAt).toLocaleDateString()}</small>
+                    {project.description && <small>{project.description}</small>}
+                  </span>
+                  <ArrowUpRight size={14} />
                 </Link>
-              ))
-            ) : (
-              <Empty body="Create your first project above — then drop in the raw footage and the relay can begin." />
-            )}
+              ))}
+            </div>
+          ) : (
+            <div className="panel-empty">
+              No rooms yet — create your first project above, then drop in the raw footage and the relay can begin.
+            </div>
+          )}
+        </div>
+
+        <div className="portable">
+          <span className="eyebrow">The lock</span>
+          <div>
+            <LockKeyhole size={14} />
+            <span>Private by design — raw files never leave the server.</span>
           </div>
-          <p className="mt-6 flex items-center gap-2 text-xs text-[#77717a]">
-            <LockKeyhole className="h-4 w-4 text-[#e55b4c]" />
-            Every room is private by design. The Lock keeps raw footage in the vault until the Captain approves the final master.
-          </p>
+          <div>
+            <Sparkles size={14} />
+            <span>Every role gets direct-manipulation tools and a role-aware AI oracle.</span>
+          </div>
+          <div>
+            <Film size={14} />
+            <span>Proxies are streamed, transcripts are searchable, originals stay locked.</span>
+          </div>
+          <NotificationsPanel />
         </div>
       </div>
+
+      {modalOpen && <NewProjectModal onClose={() => setModalOpen(false)} />}
     </div>
   );
 }

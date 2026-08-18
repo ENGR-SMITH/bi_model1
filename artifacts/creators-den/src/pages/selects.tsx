@@ -42,21 +42,17 @@ import {
   useResolveVideoComment,
   useRollbackVideoTimeline,
   useSaveVideoTimeline,
+  oracleChat,
 } from '@workspace/api-client-react';
 import type {
   VideoAssetDetail,
   VideoTranscriptSegment,
   VideoTimelineVersionSummary,
 } from '@workspace/api-client-react';
-import { SectionEyebrow } from '@/components/shell';
+import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
-
-const LEGS = [
-  { leg: 'SELECTS', role: 'Story Architect', icon: Film },
-  { leg: 'CUT', role: 'Visual Editor', icon: Scissors },
-  { leg: 'SOUND', role: 'Sound Designer', icon: Mic2 },
-  { leg: 'FINISH', role: 'Motion & Color', icon: Palette },
-] as const;
+import { Timeline, formatTimecode, type TimelineBlock } from '@/components/timeline';
+import { RoleOracle, AiResult, type StudioLeg } from '@/components/role-oracle';
 
 const LEG_ROLES: Record<string, string> = {
   SELECTS: 'ARCHITECT',
@@ -66,6 +62,13 @@ const LEG_ROLES: Record<string, string> = {
 };
 
 const SCENE_TYPES = ['HOOK', 'SETUP', 'CORE', 'PAYOFF', 'CTA'] as const;
+const SCENE_TONES: Record<string, TimelineBlock['tone']> = {
+  HOOK: 'gold',
+  SETUP: 'teal',
+  CORE: 'accent',
+  PAYOFF: 'primary',
+  CTA: 'danger',
+};
 
 interface Clip {
   id: string;
@@ -88,21 +91,6 @@ interface WorkingSnapshot {
 }
 
 const EMPTY_SNAPSHOT: WorkingSnapshot = { clips: [], sceneBlocks: [], markers: [] };
-
-function formatTimecode(ms: number | null | undefined): string {
-  if (ms == null) return '–:––';
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function formatDuration(ms: number): string {
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}m ${seconds}s`;
-}
 
 // ---------------------------------------------------------------------------
 // Reference guide (M4) — viral reference pacing, side-by-side
@@ -137,64 +125,46 @@ function ReferenceGuide({ projectId, assets, onSeek }: { projectId: string; asse
   const error = analyze.error as { response?: { data?: { error?: string } } } | null;
 
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">
-          <Compass className="h-4 w-4" />
-          Reference guide
-        </div>
-        <select
-          value={selectedId}
-          onChange={(event) => setSelectedId(event.target.value)}
-          className="focus-house rounded-lg border-2 border-[#e5d7c5] bg-[#f7eddf] px-3 py-1.5 text-xs text-[#292b45]"
-          data-testid="select-reference-asset"
-        >
+    <div className="paper-card" data-testid="panel-reference">
+      <div className="inline-heading">
+        <span className="eyebrow"><Compass size={13} /> Reference guide</span>
+        <select value={selectedId} onChange={(event) => setSelectedId(event.target.value)} className="!w-auto !text-xs" data-testid="select-reference-asset">
           {assets.map((a) => (
             <option key={a.id} value={a.id}>{a.fileName}</option>
           ))}
         </select>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-[#77717a]">
+      <p className="setting-copy">
         Import a viral vlog as a reference and its pacing (Hook → Setup → Core → Payoff → CTA) appears here, side-by-side with your own selects.
       </p>
 
       {reference.data?.status === 'READY' && pacing?.sections ? (
-        <div className="mt-4 space-y-2">
+        <div className="den-stack mt-3">
           {pacing.sections.map((section, index) => (
             <button
               key={index}
               type="button"
               onClick={() => onSeek(section.startMs)}
-              className="focus-house group flex w-full items-center justify-between gap-3 rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf] px-3 py-2.5 transition-colors hover:border-[#8dc2ad]"
+              className="list-row"
               data-testid={`reference-beat-${section.label}`}
             >
-              <span className="flex items-center gap-2 text-sm font-bold text-[#292b45]">
-                <Play className="h-3 w-3 text-[#e55b4c]" />
-                {section.label}
-              </span>
-              <span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#98909a]">
-                {Math.floor(section.startMs / 1000 / 60)}:{String(Math.floor((section.startMs / 1000) % 60)).padStart(2, '0')}
+              <span className="world-symbol"><Play size={12} /></span>
+              <span>
+                <b>{section.label}</b>
+                <small>{Math.floor(section.startMs / 1000 / 60)}:{String(Math.floor((section.startMs / 1000) % 60)).padStart(2, '0')}</small>
               </span>
             </button>
           ))}
-          <p className="pt-1 font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#98909a]">
-            pacing source · {pacing.source ?? 'DEMO'}
-          </p>
+          <p className="mono-label">pacing source · {pacing.source ?? 'DEMO'}</p>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={run}
-          disabled={analyze.isPending || !selectedId}
-          className="focus-house mt-4 inline-flex items-center gap-2 rounded-xl bg-[#292b45] px-4 py-2.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#286254] disabled:cursor-wait disabled:opacity-60"
-          data-testid="button-analyze-reference"
-        >
-          <Compass className={`h-4 w-4 ${analyze.isPending ? 'animate-spin' : ''}`} />
+        <button type="button" onClick={run} disabled={analyze.isPending || !selectedId} className="secondary-btn mt-3" data-testid="button-analyze-reference">
+          <Compass size={14} className={analyze.isPending ? 'spin' : ''} />
           {analyze.isPending ? 'Analyzing…' : 'Analyze pacing'}
         </button>
       )}
       {analyze.isError && (
-        <p className="mt-2 text-sm font-semibold text-[#a33d31]" role="alert">
+        <p className="setting-copy mt-2" role="alert">
           {error?.response?.data?.error || 'The reference could not be analyzed.'}
         </p>
       )}
@@ -231,14 +201,11 @@ function TranscriptPanel({
   const transcript = asset.transcript;
 
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">
-          <Search className="h-4 w-4" />
-          Transcript
-        </div>
+    <div className="paper-card">
+      <div className="inline-heading">
+        <span className="eyebrow"><Search size={13} /> Transcript</span>
         {transcript && (
-          <span className={`rounded-full px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] ${transcript.status === 'DEMO' ? 'bg-[#f0c85c] text-[#292b45]' : 'bg-[#e5f1e8] text-[#286254]'}`}>
+          <span className={`den-tag ${transcript.status === 'DEMO' ? 'gold' : 'teal'}`}>
             {transcript.status === 'DEMO' ? 'Demo — whisper not installed' : transcript.model}
           </span>
         )}
@@ -250,12 +217,12 @@ function TranscriptPanel({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search the transcript…"
-            className="focus-house mt-4 w-full rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-4 py-2.5 text-sm text-[#292b45] placeholder:text-[#98909a]"
+            className="mb-3"
             data-testid="input-transcript-search"
           />
-          <div className="mt-3 max-h-[420px] space-y-2 overflow-y-auto pr-1">
+          <div className="den-stack max-h-[420px] overflow-y-auto pr-1">
             {filtered.length === 0 ? (
-              <p className="text-sm text-[#77717a]">No transcript lines match.</p>
+              <p className="setting-copy">No transcript lines match.</p>
             ) : (
               filtered.map((segment) => (
                 <button
@@ -265,31 +232,44 @@ function TranscriptPanel({
                     setActiveId(segment.id);
                     onSeek(segment.startMs);
                   }}
-                  className={`group w-full rounded-xl border-2 px-3 py-2.5 text-left transition-colors ${activeId === segment.id ? 'border-[#e55b4c] bg-[#ffe9df]' : 'border-[#e5d7c5] bg-[#f7eddf] hover:border-[#8dc2ad]'}`}
+                  className={`list-row ${activeId === segment.id ? 'selected' : ''}`}
                   data-testid={`transcript-segment-${segment.id}`}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#98909a]">
-                      {formatTimecode(segment.startMs)} → {formatTimecode(segment.endMs)}
-                    </span>
-                    <span className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <span onClick={(event) => { event.stopPropagation(); onSelect(segment); }} className="rounded-full bg-[#286254] p-1 text-[#fff4e6]" title="Mark as a select">
-                        <Plus className="h-3 w-3" />
+                  <span className="world-symbol"><Play size={12} /></span>
+                  <span>
+                    <b className="mono-label !text-[9px]">{formatTimecode(segment.startMs)} → {formatTimecode(segment.endMs)}</b>
+                    <small className="!text-xs !normal-case">{segment.text}</small>
+                    <span className="mt-1 flex gap-2">
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(event) => { event.stopPropagation(); onSelect(segment); }}
+                        onKeyDown={(event) => { if (event.key === 'Enter') { event.stopPropagation(); onSelect(segment); } }}
+                        className="link-btn !text-[10px]"
+                        title="Mark as a select"
+                      >
+                        <Plus size={11} /> mark select
                       </span>
-                      <span onClick={(event) => { event.stopPropagation(); onComment(segment); }} className="rounded-full bg-[#292b45] p-1 text-[#f0c85c]" title="Comment at this timecode">
-                        <MessageSquare className="h-3 w-3" />
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(event) => { event.stopPropagation(); onComment(segment); }}
+                        onKeyDown={(event) => { if (event.key === 'Enter') { event.stopPropagation(); onComment(segment); } }}
+                        className="link-btn !text-[10px]"
+                        title="Comment at this timecode"
+                      >
+                        <MessageSquare size={11} /> comment
                       </span>
                     </span>
-                  </div>
-                  <p className="mt-1 text-sm leading-relaxed text-[#292b45]">{segment.text}</p>
+                  </span>
                 </button>
               ))
             )}
           </div>
         </>
       ) : (
-        <p className="mt-4 flex items-center gap-2 text-sm text-[#77717a]">
-          <Sparkles className="h-4 w-4 text-[#e55b4c]" />
+        <p className="den-footnote mt-3">
+          <Sparkles size={13} />
           Transcription is still running. Uploads are processed in the background — refresh in a moment.
         </p>
       )}
@@ -298,100 +278,112 @@ function TranscriptPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Selects builder (right rail)
+// Selects builder (right rail) — direct-manipulation timeline
 // ---------------------------------------------------------------------------
 
-function SelectsPanel({
+function SelectsBuilder({
   snapshot,
   onChange,
   canEdit,
-  dirty,
+  durationMs,
+  playheadMs,
+  onScrub,
 }: {
   snapshot: WorkingSnapshot;
   onChange: (next: WorkingSnapshot) => void;
   canEdit: boolean;
-  dirty: boolean;
+  durationMs: number;
+  playheadMs: number;
+  onScrub: (ms: number) => void;
 }) {
-  const addClip = (segment: VideoTranscriptSegment, assetId: string) => {
-    const clip: Clip = { id: crypto.randomUUID(), assetId, inMs: segment.startMs, outMs: segment.endMs };
-    onChange({ ...snapshot, clips: [...snapshot.clips, clip] });
+  const clipBlocks: TimelineBlock[] = snapshot.clips.map((clip, index) => ({
+    id: clip.id,
+    label: `#${index + 1}`,
+    sublabel: `${formatTimecode(clip.inMs)} → ${formatTimecode(clip.outMs)}`,
+    startMs: clip.inMs,
+    endMs: clip.outMs,
+    tone: 'gold',
+  }));
+
+  const sceneBlocks: TimelineBlock[] = snapshot.sceneBlocks.map((block) => ({
+    id: block.id,
+    label: block.type,
+    sublabel: `${formatTimecode(block.startMs)} → ${formatTimecode(block.endMs)}`,
+    startMs: block.startMs,
+    endMs: Math.max(block.endMs, block.startMs + 1000),
+    tone: SCENE_TONES[block.type] ?? 'accent',
+  }));
+
+  const onClipsChange = (next: TimelineBlock[]) => {
+    const nextClips = snapshot.clips.map((clip) => {
+      const block = next.find((b) => b.id === clip.id);
+      return block ? { ...clip, inMs: block.startMs, outMs: block.endMs } : clip;
+    });
+    onChange({ ...snapshot, clips: nextClips });
   };
 
-  const removeClip = (id: string) => {
-    onChange({ ...snapshot, clips: snapshot.clips.filter((clip) => clip.id !== id) });
+  const onSceneChange = (next: TimelineBlock[]) => {
+    const nextBlocks = snapshot.sceneBlocks.map((block) => {
+      const bar = next.find((b) => b.id === block.id);
+      return bar ? { ...block, startMs: bar.startMs, endMs: bar.endMs } : block;
+    });
+    onChange({ ...snapshot, sceneBlocks: nextBlocks });
   };
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-        <div className="flex items-center justify-between">
-          <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">Selects</span>
-          <span className="rounded-full bg-[#292b45] px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#f0c85c]">{snapshot.clips.length} marked</span>
+      <Timeline
+        title={`Selects — ${snapshot.clips.length} marked`}
+        hint="Drag to move · pull edges to trim · click the ruler to scrub"
+        blocks={clipBlocks}
+        durationMs={durationMs}
+        playheadMs={playheadMs}
+        canEdit={canEdit}
+        onChange={onClipsChange}
+        onScrub={onScrub}
+      />
+
+      <div className="paper-card">
+        <div className="inline-heading">
+          <span className="eyebrow">Scene blocks · the narrative spine</span>
+          <span className="mono-label">Hook → Setup → Core → Payoff → CTA</span>
         </div>
-        {snapshot.clips.length === 0 ? (
-          <p className="mt-4 text-sm leading-relaxed text-[#77717a]">
-            Hover a transcript line and hit <Plus className="inline h-3.5 w-3.5" /> to mark it as a select. Your picks build the paper edit.
-          </p>
-        ) : (
-          <div className="mt-4 space-y-2">
-            {snapshot.clips.map((clip, index) => (
-              <div key={clip.id} className="flex items-center justify-between gap-3 rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf] px-3 py-2.5" data-testid={`select-clip-${clip.id}`}>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#98909a]">#{index + 1}</span>
-                  <span className="text-sm font-bold text-[#292b45]">{formatTimecode(clip.inMs)} → {formatTimecode(clip.outMs)}</span>
-                </div>
-                {canEdit && (
-                  <button type="button" onClick={() => removeClip(clip.id)} className="rounded-full p-1 text-[#98909a] hover:bg-[#ffe9df] hover:text-[#a33d31]" title="Remove select">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
+        <p className="setting-copy mb-3">Drag each beat to place it in the timeline — the spine that drives the cut.</p>
+        <Timeline
+          title=""
+          hint=""
+          blocks={sceneBlocks}
+          durationMs={durationMs}
+          playheadMs={playheadMs}
+          canEdit={canEdit}
+          onChange={onSceneChange}
+          onScrub={onScrub}
+        />
+        {canEdit && (
+          <div className="den-chip-list mt-3">
+            {SCENE_TYPES.map((type) => {
+              const exists = snapshot.sceneBlocks.some((b) => b.type === type);
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  className={`den-chip ${exists ? '' : 'text-[hsl(var(--accent))] border-[hsl(var(--accent)/.5)]'}`}
+                  onClick={() => {
+                    const existing = snapshot.sceneBlocks.find((b) => b.type === type);
+                    const next = existing
+                      ? snapshot.sceneBlocks.filter((b) => b.type !== type)
+                      : [...snapshot.sceneBlocks, { id: crypto.randomUUID(), type, startMs: 0, endMs: 0 }];
+                    onChange({ ...snapshot, sceneBlocks: next });
+                  }}
+                  data-testid={`scene-block-${type}`}
+                >
+                  {exists ? <X size={10} /> : <Plus size={10} />}
+                  {type} {exists && '· placed'}
+                </button>
+              );
+            })}
           </div>
         )}
-        {dirty && (
-          <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-[#a33d31]">
-            <Sparkles className="h-3.5 w-3.5" />
-            Unsaved changes
-          </p>
-        )}
-      </div>
-
-      <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-        <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">Scene blocks</span>
-        <p className="mt-1 text-xs leading-relaxed text-[#77717a]">The narrative spine — Hook → Setup → Core → Payoff → CTA.</p>
-        <div className="mt-4 space-y-2">
-          {SCENE_TYPES.map((type) => {
-            const block = snapshot.sceneBlocks.find((b) => b.type === type);
-            return (
-              <div key={type} className={`flex items-center justify-between gap-3 rounded-xl border-2 px-3 py-2.5 ${block ? 'border-[#8dc2ad] bg-[#e5f1e8]' : 'border-[#e5d7c5] bg-[#f7eddf]'}`} data-testid={`scene-block-${type}`}>
-                <div>
-                  <p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-[#286254]">{type}</p>
-                  {block && (
-                    <p className="mt-0.5 text-xs font-semibold text-[#292b45]">
-                      {formatTimecode(block.startMs)} → {formatTimecode(block.endMs)}
-                    </p>
-                  )}
-                </div>
-                {canEdit && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const existing = snapshot.sceneBlocks.find((b) => b.type === type);
-                      const next = existing
-                        ? snapshot.sceneBlocks.filter((b) => b.type !== type)
-                        : [...snapshot.sceneBlocks, { id: crypto.randomUUID(), type, startMs: 0, endMs: 0 }];
-                      onChange({ ...snapshot, sceneBlocks: next });
-                    }}
-                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold ${block ? 'bg-[#292b45] text-[#fff4e6]' : 'bg-[#286254] text-[#fff4e6]'}`}
-                  >
-                    {block ? 'Remove' : 'Add block'}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
@@ -400,8 +392,6 @@ function SelectsPanel({
 // ---------------------------------------------------------------------------
 // Version history + submit
 // ---------------------------------------------------------------------------
-
-type StudioLeg = 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';
 
 export function HistoryPanel({
   projectId,
@@ -448,33 +438,24 @@ export function HistoryPanel({
   const submitError = submit.error as { response?: { data?: { error?: string } } } | null;
 
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-      <div className="flex items-center justify-between">
-        <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">Snapshot history</span>
-        <span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#98909a]">v{currentVersion ?? 0}</span>
+    <div className="paper-card">
+      <div className="inline-heading">
+        <span className="eyebrow">Snapshot history</span>
+        <span className="mono-label">v{currentVersion ?? 0}</span>
       </div>
       {versions.length === 0 ? (
-        <p className="mt-4 text-sm text-[#77717a]">No snapshots yet — save your first select pass above.</p>
+        <p className="setting-copy">No snapshots yet — save your first pass above.</p>
       ) : (
-        <div className="mt-4 max-h-56 space-y-2 overflow-y-auto pr-1">
+        <div className="den-stack max-h-56 overflow-y-auto pr-1">
           {versions.map((version) => (
-            <div key={version.id} className="flex items-center justify-between gap-3 rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf] px-3 py-2.5" data-testid={`version-${version.version}`}>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-[#292b45]">
-                  v{version.version}
-                  {version.version === currentVersion && <span className="ml-2 rounded-full bg-[#e5f1e8] px-2 py-0.5 font-mono-ui text-[8px] uppercase tracking-[.14em] text-[#286254]">head</span>}
-                </p>
-                {version.message && <p className="truncate text-xs text-[#77717a]">{version.message}</p>}
-              </div>
+            <div key={version.id} className="list-row" data-testid={`version-${version.version}`}>
+              <span>
+                <b>v{version.version} {version.version === currentVersion && <span className="den-tag teal ml-1">head</span>}</b>
+                {version.message && <small>{version.message}</small>}
+              </span>
               {canSubmit && version.version !== currentVersion && (
-                <button
-                  type="button"
-                  onClick={() => onRollback(version.id)}
-                  className="inline-flex items-center gap-1 rounded-full bg-[#292b45] px-3 py-1.5 text-xs font-bold text-[#fff4e6] hover:bg-[#286254]"
-                  title="Restore this snapshot as the new head"
-                >
-                  <RotateCcw className="h-3 w-3" />
-                  Restore
+                <button type="button" onClick={() => onRollback(version.id)} className="link-btn" title="Restore this snapshot as the new head">
+                  <RotateCcw size={12} /> Restore
                 </button>
               )}
             </div>
@@ -483,31 +464,24 @@ export function HistoryPanel({
       )}
 
       {canSubmit && (
-        <div className="mt-5 border-t-2 border-[#e5d7c5] pt-4">
-          <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#286254]">Submit for review</span>
-          <p className="mt-1 text-xs leading-relaxed text-[#77717a]">Pins the current head snapshot and hands the leg to the Captain.</p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
+          <span className="eyebrow">Submit for review</span>
+          <p className="setting-copy mt-1">Pins the current head snapshot and hands the leg to the Captain.</p>
+          <div className="mt-3 flex gap-2">
             <input
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder="Note for the Captain (optional)"
               maxLength={2000}
-              className="focus-house flex-1 rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-4 py-2.5 text-sm text-[#292b45] placeholder:text-[#98909a]"
               data-testid="input-submit-note"
             />
-            <button
-              type="button"
-              onClick={onSubmit}
-              disabled={submit.isPending}
-              className="focus-house inline-flex items-center justify-center gap-2 rounded-xl bg-[#e55b4c] px-4 py-2.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#c7473c] disabled:cursor-wait disabled:opacity-60"
-              data-testid="button-submit-leg"
-            >
-              <Send className="h-4 w-4" />
+            <button type="button" onClick={onSubmit} disabled={submit.isPending} className="secondary-btn" data-testid="button-submit-leg">
+              <Send size={13} />
               {submit.isPending ? 'Submitting…' : 'Submit'}
             </button>
           </div>
           {submit.isError && (
-            <p className="mt-2 text-sm font-semibold text-[#a33d31]" role="alert">
+            <p className="setting-copy mt-2" role="alert">
               {submitError?.response?.data?.error || 'The submission could not be created.'}
             </p>
           )}
@@ -556,12 +530,11 @@ export function CommentsPanel({ projectId, leg = 'SELECTS' }: { projectId: strin
   };
 
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-      <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">
-        <MessageSquare className="h-4 w-4" />
-        Timecode notes
+    <div className="paper-card">
+      <div className="inline-heading">
+        <span className="eyebrow"><MessageSquare size={13} /> Timecode notes</span>
       </div>
-      <form className="mt-4 space-y-2" onSubmit={submit} data-testid="form-comment">
+      <form className="space-y-2" onSubmit={submit} data-testid="form-comment">
         <textarea
           value={body}
           onChange={(event) => setBody(event.target.value)}
@@ -569,53 +542,46 @@ export function CommentsPanel({ projectId, leg = 'SELECTS' }: { projectId: strin
           maxLength={4000}
           rows={2}
           required
-          className="focus-house w-full resize-none rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-4 py-2.5 text-sm text-[#292b45] placeholder:text-[#98909a]"
           data-testid="input-comment"
         />
         <div className="flex items-center gap-2">
-          <span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#98909a]">Pin at</span>
+          <span className="mono-label">Pin at</span>
           <input
             value={timecodeMs == null ? '' : formatTimecode(timecodeMs)}
             readOnly
             placeholder="playhead time"
-            className="w-28 rounded-lg border-2 border-[#e5d7c5] bg-[#f7eddf] px-2 py-1.5 text-center font-mono-ui text-[11px] text-[#292b45]"
+            className="w-28 text-center"
           />
-          <button
-            type="submit"
-            disabled={create.isPending || !body.trim()}
-            className="focus-house ml-auto inline-flex items-center gap-1.5 rounded-xl bg-[#292b45] px-4 py-2 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#286254] disabled:cursor-wait disabled:opacity-60"
-            data-testid="button-add-comment"
-          >
-            <Plus className="h-4 w-4" />
+          <button type="submit" disabled={create.isPending || !body.trim()} className="primary-btn ml-auto" data-testid="button-add-comment">
+            <Plus size={13} />
             {create.isPending ? 'Pinning…' : 'Pin note'}
           </button>
         </div>
       </form>
 
       {comments.data && comments.data.length > 0 ? (
-        <div className="mt-5 space-y-2">
+        <div className="den-stack mt-4">
           {comments.data.map((comment) => (
-            <div key={comment.id} className={`rounded-xl border-2 px-3 py-2.5 ${comment.resolvedAt ? 'border-[#e5d7c5] bg-[#f1e8da] opacity-70' : 'border-[#8dc2ad] bg-[#e5f1e8]'}`} data-testid={`comment-${comment.id}`}>
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#286254]">
-                  {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'project note'}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onResolve(comment.id, !comment.resolvedAt)}
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold ${comment.resolvedAt ? 'bg-[#292b45] text-[#f0c85c]' : 'bg-[#fff4e6] text-[#286254]'}`}
-                  title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
-                >
-                  <Check className="h-3 w-3" />
-                  {comment.resolvedAt ? 'Reopen' : 'Resolve'}
-                </button>
-              </div>
-              <p className="mt-1 text-sm leading-relaxed text-[#292b45]">{comment.body}</p>
+            <div key={comment.id} className={`list-row ${comment.resolvedAt ? '' : 'selected'}`} data-testid={`comment-${comment.id}`}>
+              <span className="world-symbol"><MessageSquare size={13} /></span>
+              <span>
+                <b className="mono-label !text-[9px]">{comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'project note'}</b>
+                <small className="!normal-case">{comment.body}</small>
+              </span>
+              <button
+                type="button"
+                onClick={() => onResolve(comment.id, !comment.resolvedAt)}
+                className="link-btn"
+                title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
+              >
+                <Check size={12} />
+                {comment.resolvedAt ? 'Reopen' : 'Resolve'}
+              </button>
             </div>
           ))}
         </div>
       ) : (
-        <p className="mt-4 text-sm text-[#77717a]">No notes yet — pin feedback to a moment in the footage.</p>
+        <p className="setting-copy mt-4">No notes yet — pin feedback to a moment in the footage.</p>
       )}
     </div>
   );
@@ -639,6 +605,9 @@ export default function ContentCreatorsStudioPage() {
   const [message, setMessage] = useState('');
   const [working, setWorking] = useState<WorkingSnapshot>(EMPTY_SNAPSHOT);
   const [dirty, setDirty] = useState(false);
+  // One-click AI results
+  const [aiResult, setAiResult] = useState<{ kind: 'selects' | 'spine'; title: string; body: string; meta: { providerId: string; modelId: string } | null } | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   const project = useGetVideoProject(projectId);
   const asset = useGetVideoAsset(projectId, assetId ?? '', {
@@ -675,6 +644,7 @@ export default function ContentCreatorsStudioPage() {
 
   const proxyUrl = assetId ? `/api/video/projects/${projectId}/assets/${assetId}/proxy` : null;
   const hasProxy = (asset.data?.files ?? []).some((file) => file.kind === 'PROXY');
+  const assetDuration = asset.data?.durationMs ?? Math.max(60_000, (project.data?.assets[0]?.durationMs ?? 60_000));
 
   const onSeek = (ms: number) => {
     setPlayheadMs(ms);
@@ -688,6 +658,12 @@ export default function ContentCreatorsStudioPage() {
     const clip: Clip = { id: crypto.randomUUID(), assetId: assetId ?? '', inMs: segment.startMs, outMs: segment.endMs };
     setWorking((prev) => ({ ...prev, clips: [...prev.clips, clip] }));
     setDirty(true);
+  };
+
+  // Scrub from the timeline ruler without auto-playing.
+  const onScrub = (ms: number) => {
+    setPlayheadMs(ms);
+    if (videoRef.current) videoRef.current.currentTime = ms / 1000;
   };
 
   const onCommentFromTranscript = (segment: VideoTranscriptSegment) => {
@@ -712,24 +688,104 @@ export default function ContentCreatorsStudioPage() {
 
   const legStatus = submissions.data?.find((s) => s.leg === leg);
 
+  // Build the AI context: transcript + current selects + scene blocks.
+  const oracleContext = useMemo(() => {
+    const lines = (asset.data?.transcript?.segments ?? [])
+      .map((s) => `${formatTimecode(s.startMs)}–${formatTimecode(s.endMs)}: ${s.text}`)
+      .join('\n');
+    const selects = working.clips.map((c, i) => `#${i + 1} ${formatTimecode(c.inMs)}–${formatTimecode(c.outMs)}`).join(', ') || 'none yet';
+    const spine = working.sceneBlocks.map((b) => `${b.type}@${formatTimecode(b.startMs)}`).join(', ') || 'none yet';
+    return [
+      `Project: ${project.data?.name ?? 'Untitled'}`,
+      `Asset: ${asset.data?.fileName ?? 'unknown'} (duration ${formatTimecode(assetDuration)})`,
+      `Transcript:\n${lines.slice(0, 6000) || '(no transcript yet)'}`,
+      `Current selects: ${selects}`,
+      `Scene blocks: ${spine}`,
+    ].join('\n\n').slice(0, 12000);
+  }, [asset.data, working, project.data?.name, assetDuration]);
+
+  // Parse "0:05–0:12" ranges out of an oracle answer and apply them as selects.
+  const applySelectsFromAnswer = (text: string) => {
+    const ranges = parseTimecodeRanges(text);
+    if (ranges.length === 0) return 0;
+    const added: Clip[] = ranges
+      .filter(([inMs, outMs]) => inMs < outMs)
+      .map(([inMs, outMs]) => ({ id: crypto.randomUUID(), assetId: assetId ?? '', inMs, outMs }));
+    setWorking((prev) => ({ ...prev, clips: [...prev.clips, ...added] }));
+    setDirty(true);
+    return added.length;
+  };
+
+  // Parse "TYPE @ 0:05" beat placements out of an oracle answer and apply them.
+  const applySpineFromAnswer = (text: string) => {
+    const placements: Array<{ type: (typeof SCENE_TYPES)[number]; startMs: number }> = [];
+    for (const type of SCENE_TYPES) {
+      const re = new RegExp(`${type}\\s*[@:]\\s*(\\d{1,2}):(\\d{2})`, 'i');
+      const m = text.match(re);
+      if (m) placements.push({ type, startMs: (Number(m[1]) * 60 + Number(m[2])) * 1000 });
+    }
+    if (placements.length === 0) return 0;
+    const next = snapshotSceneBlocksWith(working, placements);
+    setWorking((prev) => ({ ...prev, sceneBlocks: next }));
+    setDirty(true);
+    return placements.length;
+  };
+
+  // Runs a one-shot oracle prompt for the quick actions and returns the text.
+  const runOracleSuggestion = async (instruction: string): Promise<string | null> => {
+    setAiBusy(true);
+    try {
+      const result = await oracleChat({ messages: [{ role: 'system', content: 'You are the Story Architect\'s assistant in a video relay. Be concise and concrete.' }, { role: 'user', content: `${instruction}\n\nContext:\n${oracleContext}` }] });
+      setAiResult((prev) => (prev ? { ...prev, meta: { providerId: result.providerId, modelId: result.modelId } } : prev));
+      return result.content;
+    } catch {
+      return null;
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const quickActions = [
+    {
+      id: 'auto-selects',
+      label: 'Suggest selects from transcript',
+      busy: aiBusy,
+      run: () => {
+        setAiResult(null);
+        void runOracleSuggestion(
+          'Mark the strongest moments as selects. Answer ONLY with lines of the form "start–end | reason", one per line, using MM:SS timecodes from the transcript.',
+        ).then((body) => {
+          if (!body) return;
+          setAiResult({ kind: 'selects', title: 'Selects suggestions (review, then Apply)', body, meta: null });
+        });
+      },
+    },
+    {
+      id: 'auto-spine',
+      label: 'Place the 5-beat spine',
+      busy: aiBusy,
+      run: () => {
+        setAiResult(null);
+        void runOracleSuggestion(
+          'Place the narrative spine on this footage. Answer ONLY with lines of the form "TYPE @ MM:SS" for HOOK, SETUP, CORE, PAYOFF, CTA using timecodes from the transcript.',
+        ).then((body) => {
+          if (!body) return;
+          setAiResult({ kind: 'spine', title: 'Spine suggestions (review, then place)', body, meta: null });
+        });
+      },
+    },
+  ];
+
   if (project.isLoading) {
-    return (
-      <div className="mx-auto max-w-[1180px]">
-        <div className="h-40 animate-pulse rounded-[1.5rem] bg-[#e5d7c5]" />
-        <div className="mt-6 h-96 animate-pulse rounded-[1.5rem] bg-[#e5d7c5]" />
-      </div>
-    );
+    return <div className="page"><div className="panel-empty">Opening the studio…</div></div>;
   }
 
   if (project.isError || !project.data) {
     return (
-      <div className="mx-auto max-w-2xl py-16">
-        <SectionEyebrow>Studio closed</SectionEyebrow>
-        <h1 className="mt-5 text-6xl font-extrabold tracking-[-0.08em]">This room is out of reach.</h1>
-        <Link href={`/projects/${projectId}`} className="focus-house mt-8 inline-flex items-center gap-2 rounded-full bg-[#292b45] px-5 py-3 text-sm font-bold text-[#fff4e6]">
-          <ArrowLeft className="h-4 w-4" />
-          Back to the vault
-        </Link>
+      <div className="page">
+        <div className="page-guide"><span className="guide-pin" /><div><b>STUDIO CLOSED</b><span>This room is out of reach.</span></div></div>
+        <h1 style={{ font: '700 43px var(--app-font-serif)', letterSpacing: '-.045em', margin: '9px 0 20px' }}>This room is out of reach.</h1>
+        <Link href={`/projects/${projectId}`} className="secondary-btn"><ArrowLeft size={14} /> Back to the vault</Link>
       </div>
     );
   }
@@ -737,100 +793,80 @@ export default function ContentCreatorsStudioPage() {
   const p = project.data;
 
   return (
-    <div className="mx-auto max-w-[1280px]">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href={`/projects/${p.id}`} className="focus-house inline-flex items-center gap-2 rounded-full py-1 text-xs font-bold text-[#77717a] hover:text-[#292b45]" data-testid="link-studio-back-vault">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to the vault
-        </Link>
-        <Link href={`/projects/${p.id}/selects`} className="focus-house inline-flex items-center gap-2 rounded-full py-1 text-xs font-bold text-[#77717a] hover:text-[#292b45]">
-          <ArrowUpRight className="h-3.5 w-3.5" />
-          {p.name}
-        </Link>
+    <div className="page">
+      <div className="page-guide">
+        <span className="guide-pin" />
+        <div>
+          <b>CONTENT CREATORS · THE STUDIO</b>
+          <span>Marks the golden takes and builds the narrative spine: Hook → Setup → Core → Payoff → CTA. Drag the timeline, scrub, and ask the oracle.</span>
+        </div>
+        <span className="guide-spark" />
       </div>
 
-      <div className="reveal mt-4 flex flex-col justify-between gap-5 border-b-2 border-[#d6cbb9] pb-7 md:flex-row md:items-end">
+      <div className="page-header">
         <div>
-          <SectionEyebrow>Content creators / the studio</SectionEyebrow>
-          <h1 className="mt-3 text-4xl font-extrabold leading-[.92] tracking-[-0.06em] text-[#292b45] sm:text-6xl">The selects studio.</h1>
+          <SectionEyebrow>Story Architect · selects</SectionEyebrow>
+          <h1>The selects studio.</h1>
+          <p>Hover a transcript line to mark a select, drag clips on the timeline to rework the paper edit, and let the oracle draft the spine.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {LEGS.map((item) => {
-            const Icon = item.icon;
-            const active = item.leg === leg;
-            const status = submissions.data?.find((s) => s.leg === item.leg);
-            const inner = (
-              <>
-                <Icon className="h-4 w-4" />
-                {item.role}
-                {status && (
-                  <span className={`rounded-full px-2 py-0.5 font-mono-ui text-[8px] uppercase tracking-[.12em] ${status.status === 'APPROVED' ? 'bg-[#e5f1e8] text-[#286254]' : status.status === 'REJECTED' ? 'bg-[#ffe9df] text-[#a33d31]' : 'bg-[#f0c85c] text-[#292b45]'}`}>
-                    {status.status}
-                  </span>
-                )}
-              </>
-            );
-            const tabClass = `focus-house inline-flex items-center gap-2 rounded-full border-2 px-4 py-2 text-sm font-bold transition-colors ${active ? 'border-[#292b45] bg-[#292b45] text-[#fff4e6]' : 'border-[#d6cbb9] bg-[#fff4e6] text-[#625f6d] hover:border-[#8dc2ad]'}`;
-            const href =
-              item.leg === 'CUT'
-                ? `/projects/${p.id}/cut`
-                : item.leg === 'SOUND'
-                  ? `/projects/${p.id}/sound`
-                  : item.leg === 'FINISH'
-                    ? `/projects/${p.id}/finish`
-                    : null;
-            if (href) {
-              return (
-                <Link
-                  key={item.leg}
-                  href={href}
-                  className={tabClass}
-                  data-testid={`tab-leg-${item.leg}`}
-                >
-                  {inner}
-                </Link>
-              );
-            }
+        <div className="flex items-center gap-3">
+          <Link href={`/projects/${p.id}`} className="secondary-btn" data-testid="link-studio-back-vault">
+            <ArrowLeft size={14} />
+            The vault
+          </Link>
+          <span className={`den-tag ${canEdit ? 'teal' : 'muted'}`}>{canEdit ? 'Editing' : 'Viewing'}</span>
+        </div>
+      </div>
+
+      <div className="role-tabs mb-5">
+        {RELAY_LEGS.map((item) => {
+          const Icon = item.icon;
+          const active = item.leg === leg;
+          const status = submissions.data?.find((s) => s.leg === item.leg);
+          const href =
+            item.leg === 'CUT'
+              ? `/projects/${p.id}/cut`
+              : item.leg === 'SOUND'
+                ? `/projects/${p.id}/sound`
+                : item.leg === 'FINISH'
+                  ? `/projects/${p.id}/finish`
+                  : null;
+          const inner = (
+            <>
+              <Icon size={13} />
+              {item.role}
+              {status && <span className={`leg-badge ${status.status === 'APPROVED' ? 'text-[#286254]' : status.status === 'REJECTED' ? 'text-[#a33d31]' : ''}`}>{status.status}</span>}
+            </>
+          );
+          if (href) {
             return (
-              <button
-                key={item.leg}
-                type="button"
-                onClick={() => setLeg(item.leg)}
-                className={tabClass}
-                data-testid={`tab-leg-${item.leg}`}
-              >
+              <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`tab-leg-${item.leg}`}>
                 {inner}
-              </button>
+              </Link>
             );
-          })}
-        </div>
+          }
+          return (
+            <button key={item.leg} type="button" className={active ? 'active' : ''} onClick={() => setLeg(item.leg)} data-testid={`tab-leg-${item.leg}`}>
+              {inner}
+            </button>
+          );
+        })}
       </div>
 
       {leg !== 'SELECTS' ? (
-        <div className="mt-10 rounded-[1.75rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-10 text-center shadow-[8px_10px_0_rgba(41,43,69,.07)]">
-          <Clapperboard className="mx-auto h-8 w-8 text-[#e55b4c]" />
-          <p className="mt-6 font-display text-4xl italic">This leg is next in the relay.</p>
-          <p className="mx-auto mt-3 max-w-lg text-sm leading-[1.8] text-[#77717a]">
-            The {LEGS.find((l) => l.leg === leg)?.role} studio arrives in the next milestone. Story Architect selects are the first pass — get them right and the cut is easy.
-          </p>
-          <button type="button" onClick={() => setLeg('SELECTS')} className="focus-house mt-8 inline-flex items-center gap-2 rounded-full bg-[#292b45] px-5 py-3 text-sm font-bold text-[#fff4e6] hover:bg-[#286254]">
-            <Film className="h-4 w-4" />
-            Open the selects studio
-          </button>
+        <div className="empty-state">
+          <Clapperboard size={24} />
+          <h3>This leg is next in the relay.</h3>
+          <p>The {RELAY_LEGS.find((l) => l.leg === leg)?.role} studio lives at its own address — use the tabs above to jump between the four rooms.</p>
         </div>
       ) : (
-        <div className="reveal reveal-1 mt-8 grid gap-6 lg:grid-cols-[1.15fr_.85fr]">
+        <div className="den-two-col">
           <div className="space-y-4">
-            <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">Proxy player</span>
+            <div className="paper-card">
+              <div className="inline-heading">
+                <span className="eyebrow">Proxy player</span>
                 {p.assets.length > 1 && (
-                  <select
-                    value={assetId ?? ''}
-                    onChange={(event) => setAssetId(event.target.value || null)}
-                    className="focus-house rounded-lg border-2 border-[#e5d7c5] bg-[#f7eddf] px-3 py-1.5 text-xs text-[#292b45]"
-                    data-testid="select-player-asset"
-                  >
+                  <select value={assetId ?? ''} onChange={(event) => setAssetId(event.target.value || null)} className="!w-auto !text-xs" data-testid="select-player-asset">
                     {p.assets.map((a) => (
                       <option key={a.id} value={a.id}>{a.fileName}</option>
                     ))}
@@ -840,39 +876,40 @@ export default function ContentCreatorsStudioPage() {
 
               {assetId ? (
                 hasProxy ? (
-                  <video
-                    ref={videoRef}
-                    key={assetId}
-                    src={proxyUrl ?? undefined}
-                    controls
-                    preload="metadata"
-                    className="mt-4 aspect-video w-full rounded-xl border-2 border-[#292b45] bg-black"
-                    onTimeUpdate={(event) => setPlayheadMs(Math.floor((event.target as HTMLVideoElement).currentTime * 1000))}
-                    data-testid="proxy-player"
-                  />
+                  <div className="den-player mt-3">
+                    <video
+                      ref={videoRef}
+                      key={assetId}
+                      src={proxyUrl ?? undefined}
+                      controls
+                      preload="metadata"
+                      onTimeUpdate={(event) => setPlayheadMs(Math.floor((event.target as HTMLVideoElement).currentTime * 1000))}
+                      data-testid="proxy-player"
+                    />
+                  </div>
                 ) : (
-                  <div className="mt-4 flex aspect-video w-full items-center justify-center rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf]">
+                  <div className="den-player den-player-overlay mt-3 aspect-video">
                     <div className="text-center">
-                      <Sparkles className="mx-auto h-7 w-7 animate-pulse text-[#e55b4c]" />
-                      <p className="mt-3 text-sm font-semibold text-[#625f6d]">Building the proxy…</p>
-                      <p className="mt-1 text-xs text-[#98909a]">Refresh in a moment — processing runs in the background.</p>
+                      <Sparkles className="mx-auto mb-2 animate-pulse" size={22} />
+                      <p className="text-sm font-semibold">Building the proxy…</p>
+                      <p className="text-xs opacity-70">Refresh in a moment — processing runs in the background.</p>
                     </div>
                   </div>
                 )
               ) : (
-                <div className="mt-4 flex aspect-video w-full items-center justify-center rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf]">
+                <div className="den-player den-player-overlay mt-3 aspect-video">
                   <div className="text-center">
-                    <Play className="mx-auto h-7 w-7 text-[#98909a]" />
-                    <p className="mt-3 text-sm font-semibold text-[#625f6d]">No footage in the vault yet.</p>
-                    <Link href={`/projects/${p.id}`} className="focus-house mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#e55b4c] hover:text-[#a33d31]">
-                      Upload raw footage <ArrowUpRight className="h-3 w-3" />
+                    <Play className="mx-auto mb-2" size={22} />
+                    <p className="text-sm font-semibold">No footage in the vault yet.</p>
+                    <Link href={`/projects/${p.id}`} className="link-btn mt-2">
+                      Upload raw footage <ArrowUpRight size={12} />
                     </Link>
                   </div>
                 </div>
               )}
 
-              <p className="mt-3 flex items-center gap-2 text-xs text-[#77717a]">
-                <LockKeyhole className="h-3.5 w-3.5 text-[#e55b4c]" />
+              <p className="den-footnote mt-3">
+                <LockKeyhole size={13} />
                 Streaming the degraded proxy — the locked original never leaves the server.
               </p>
             </div>
@@ -883,44 +920,75 @@ export default function ContentCreatorsStudioPage() {
           </div>
 
           <div className="space-y-4">
-            <SelectsPanel snapshot={working} onChange={setWorking} canEdit={canEdit} dirty={dirty} />
+            <SelectsBuilder
+              snapshot={working}
+              onChange={(next) => { setWorking(next); setDirty(true); }}
+              canEdit={canEdit}
+              durationMs={assetDuration}
+              playheadMs={playheadMs}
+              onScrub={onScrub}
+            />
 
-            <div className="rounded-[1.25rem] border-2 border-[#8dc2ad] bg-[#e5f1e8] p-5">
-              <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#286254]">
-                <Save className="h-4 w-4" />
-                Save this pass
+            {aiResult && (
+              <AiResult
+                title={aiResult.title}
+                meta={aiResult.meta}
+                actions={
+                  aiResult.kind === 'selects'
+                    ? [
+                        <button key="apply" type="button" className="secondary-btn" onClick={() => { const n = applySelectsFromAnswer(aiResult.body); setAiResult({ ...aiResult, title: n > 0 ? `Suggestions — ${n} applied` : aiResult.title }); }}>
+                          <Plus size={13} /> Apply selects
+                        </button>,
+                        <button key="dismiss" type="button" className="text-btn" onClick={() => setAiResult(null)}>Dismiss</button>,
+                      ]
+                    : [
+                        <button key="apply" type="button" className="secondary-btn" onClick={() => { const n = applySpineFromAnswer(aiResult.body); setAiResult({ ...aiResult, title: n > 0 ? `Spine — ${n} beats placed` : aiResult.title }); }}>
+                          <Plus size={13} /> Place beats
+                        </button>,
+                        <button key="dismiss" type="button" className="text-btn" onClick={() => setAiResult(null)}>Dismiss</button>,
+                      ]
+                }
+              >
+                {aiResult.body}
+              </AiResult>
+            )}
+
+            <RoleOracle
+              leg="SELECTS"
+              roleName="Story Architect"
+              context={oracleContext}
+              quickActions={quickActions}
+              disabled={!canEdit}
+              placeholder="e.g. Which three transcript lines should open the video?"
+            />
+
+            <div className="paper-card accent-card">
+              <div className="inline-heading">
+                <span className="eyebrow"><Save size={13} /> Save this pass</span>
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-[#286254]">
+              <p className="setting-copy">
                 Every save creates a Git-style snapshot — roll back to any past version, the Captain can always see what changed.
               </p>
               {canEdit ? (
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <div className="mt-3 flex gap-2">
                   <input
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     placeholder="What changed in this pass? (optional)"
                     maxLength={500}
-                    className="focus-house flex-1 rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-4 py-2.5 text-sm text-[#292b45] placeholder:text-[#98909a]"
                     data-testid="input-save-message"
                   />
-                  <button
-                    type="button"
-                    onClick={onSave}
-                    disabled={save.isPending || !dirty}
-                    className="focus-house inline-flex items-center justify-center gap-2 rounded-xl bg-[#292b45] px-4 py-2.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#286254] disabled:cursor-not-allowed disabled:opacity-50"
-                    data-testid="button-save-snapshot"
-                  >
-                    <Save className="h-4 w-4" />
+                  <button type="button" onClick={onSave} disabled={save.isPending || !dirty} className="primary-btn" data-testid="button-save-snapshot">
+                    <Save size={13} />
                     {save.isPending ? 'Saving…' : 'Save snapshot'}
                   </button>
                 </div>
               ) : (
-                <p className="mt-4 text-sm font-semibold text-[#286254]">
-                  You&apos;re viewing this leg — only the {LEG_ROLES[leg] === 'ARCHITECT' ? 'Story Architect' : LEG_ROLES[leg]} or the Captain can edit it.
-                </p>
+                <p className="setting-copy mt-3">You&apos;re viewing this leg — only the Story Architect or the Captain can edit it.</p>
               )}
+              {dirty && <p className="den-footnote mt-2"><Sparkles size={12} /> Unsaved changes</p>}
               {save.isError && (
-                <p className="mt-2 text-sm font-semibold text-[#a33d31]" role="alert">
+                <p className="setting-copy mt-2" role="alert">
                   {saveError?.response?.data?.error || 'The snapshot could not be saved.'}
                 </p>
               )}
@@ -935,8 +1003,8 @@ export default function ContentCreatorsStudioPage() {
             />
 
             {legStatus && (
-              <p className="flex items-center gap-2 text-xs font-semibold text-[#625f6d]">
-                <Sparkles className="h-4 w-4 text-[#e55b4c]" />
+              <p className="den-footnote">
+                <Sparkles size={13} />
                 Leg status: {legStatus.status.toLowerCase()}
                 {legStatus.decidedAt && ` · decided ${new Date(legStatus.decidedAt).toLocaleDateString()}`}
               </p>
@@ -945,10 +1013,39 @@ export default function ContentCreatorsStudioPage() {
         </div>
       )}
 
-      <p className="reveal reveal-2 mt-10 flex items-center gap-3 border-t-2 border-[#d6cbb9] pt-3 text-xs text-[#77717a]">
-        <LockKeyhole className="h-4 w-4 text-[#e55b4c]" />
+      <p className="den-footnote mt-8">
+        <LockKeyhole size={13} />
         Every frame stays locked. Proxies are streamed, transcripts are searchable, and the originals never leave the vault.
       </p>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function parseTimecodeRanges(text: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  const re = /(\d{1,2}):(\d{2})\s*[–—-]\s*(\d{1,2}):(\d{2})/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const start = (Number(m[1]) * 60 + Number(m[2])) * 1000;
+    const end = (Number(m[3]) * 60 + Number(m[4])) * 1000;
+    if (end > start) ranges.push([start, end]);
+  }
+  return ranges;
+}
+
+function snapshotSceneBlocksWith(snapshot: WorkingSnapshot, placements: Array<{ type: (typeof SCENE_TYPES)[number]; startMs: number }>): SceneBlock[] {
+  const next = snapshot.sceneBlocks.map((b) => ({ ...b }));
+  for (const placement of placements) {
+    const index = next.findIndex((b) => b.type === placement.type);
+    if (index >= 0) {
+      next[index] = { ...next[index], startMs: placement.startMs, endMs: placement.startMs };
+    } else {
+      next.push({ id: crypto.randomUUID(), type: placement.type, startMs: placement.startMs, endMs: placement.startMs });
+    }
+  }
+  return next;
 }

@@ -9,7 +9,6 @@ import {
   Link2,
   LockKeyhole,
   Mic2,
-  Minus,
   Palette,
   Play,
   Plus,
@@ -28,6 +27,7 @@ import {
   getGetVideoTimelineQueryKey,
   getListVideoJobsQueryKey,
   getListVideoSyncsQueryKey,
+  oracleChat,
   useGetVideoAsset,
   useGetVideoProject,
   useGetVideoTimeline,
@@ -37,17 +37,11 @@ import {
   useSaveVideoTimeline,
   useSyncVideoAsset,
 } from '@workspace/api-client-react';
-import type { VideoAssetDetail } from '@workspace/api-client-react';
-import { SectionEyebrow } from '@/components/shell';
+import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
-
-const LEG_TABS = [
-  { leg: 'SELECTS', role: 'Story Architect', icon: Film },
-  { leg: 'CUT', role: 'Visual Editor', icon: Scissors },
-  { leg: 'SOUND', role: 'Sound Designer', icon: Mic2 },
-  { leg: 'FINISH', role: 'Motion & Color', icon: Palette },
-] as const;
+import { Timeline, formatTimecode, formatDuration, type TimelineBlock } from '@/components/timeline';
+import { RoleOracle, AiResult } from '@/components/role-oracle';
 
 interface CutClip {
   id: string;
@@ -72,16 +66,6 @@ interface CutSnapshot {
 }
 
 const EMPTY_CUT: CutSnapshot = { clips: [], overlays: [], sceneBlocks: [], markers: [] };
-
-const TRIM_STEP_MS = 500;
-
-function formatTimecode(ms: number | null | undefined): string {
-  if (ms == null) return '–:––';
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
 
 function formatOffset(ms: number): string {
   if (ms === 0) return 'in sync';
@@ -125,16 +109,11 @@ function PlayerRail({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-        <div className="flex items-center justify-between gap-3">
-          <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">Proxy player</span>
+      <div className="paper-card">
+        <div className="inline-heading">
+          <span className="eyebrow">Proxy player</span>
           {assets.length > 1 && (
-            <select
-              value={assetId ?? ''}
-              onChange={(event) => setAssetId(event.target.value || null)}
-              className="focus-house rounded-lg border-2 border-[#e5d7c5] bg-[#f7eddf] px-3 py-1.5 text-xs text-[#292b45]"
-              data-testid="cut-select-player-asset"
-            >
+            <select value={assetId ?? ''} onChange={(event) => setAssetId(event.target.value || null)} className="!w-auto !text-xs" data-testid="cut-select-player-asset">
               {assets.map((a) => (
                 <option key={a.id} value={a.id}>{a.fileName}</option>
               ))}
@@ -144,54 +123,48 @@ function PlayerRail({
 
         {assetId ? (
           hasProxy ? (
-            <video
-              ref={videoRef}
-              key={assetId}
-              src={proxyUrl ?? undefined}
-              controls
-              preload="metadata"
-              className="mt-4 aspect-video w-full rounded-xl border-2 border-[#292b45] bg-black"
-              onTimeUpdate={(event) => setPlayheadMs(Math.floor((event.target as HTMLVideoElement).currentTime * 1000))}
-              data-testid="cut-proxy-player"
-            />
+            <div className="den-player mt-3">
+              <video
+                ref={videoRef}
+                key={assetId}
+                src={proxyUrl ?? undefined}
+                controls
+                preload="metadata"
+                onTimeUpdate={(event) => setPlayheadMs(Math.floor((event.target as HTMLVideoElement).currentTime * 1000))}
+                data-testid="cut-proxy-player"
+              />
+            </div>
           ) : (
-            <div className="mt-4 flex aspect-video w-full items-center justify-center rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf]">
+            <div className="den-player den-player-overlay mt-3 aspect-video">
               <div className="text-center">
-                <Sparkles className="mx-auto h-7 w-7 animate-pulse text-[#e55b4c]" />
-                <p className="mt-3 text-sm font-semibold text-[#625f6d]">Building the proxy…</p>
+                <Sparkles className="mx-auto mb-2 animate-pulse" size={22} />
+                <p className="text-sm font-semibold">Building the proxy…</p>
               </div>
             </div>
           )
         ) : (
-          <div className="mt-4 flex aspect-video w-full items-center justify-center rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf]">
-            <p className="text-sm font-semibold text-[#625f6d]">No footage in the vault yet.</p>
+          <div className="den-player den-player-overlay mt-3 aspect-video">
+            <p className="text-sm font-semibold">No footage in the vault yet.</p>
           </div>
         )}
 
-        <p className="mt-3 flex items-center gap-2 text-xs text-[#77717a]">
-          <LockKeyhole className="h-3.5 w-3.5 text-[#e55b4c]" />
+        <p className="den-footnote mt-3">
+          <LockKeyhole size={13} />
           Streaming the degraded proxy — the locked original never leaves the server.
         </p>
       </div>
 
-      <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-        <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">
-          <Film className="h-4 w-4" />
-          Beat markers · from the selects pass
+      <div className="paper-card">
+        <div className="inline-heading">
+          <span className="eyebrow"><Film size={13} /> Beat markers · from the selects pass</span>
         </div>
         {beats.length === 0 ? (
-          <p className="mt-3 text-sm text-[#77717a]">No scene blocks yet — the Story Architect marks the spine in the selects studio.</p>
+          <p className="setting-copy">No scene blocks yet — the Story Architect marks the spine in the selects studio.</p>
         ) : (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="den-chip-list mt-2">
             {beats.map((beat) => (
-              <button
-                key={beat.id}
-                type="button"
-                onClick={() => seek(beat.startMs)}
-                className="focus-house inline-flex items-center gap-1.5 rounded-full border-2 border-[#8dc2ad] bg-[#e5f1e8] px-3 py-1.5 text-xs font-bold text-[#286254] hover:border-[#286254]"
-                data-testid={`cut-beat-${beat.type}`}
-              >
-                <Play className="h-3 w-3" />
+              <button key={beat.id} type="button" onClick={() => seek(beat.startMs)} className="den-chip" data-testid={`cut-beat-${beat.type}`}>
+                <Play size={10} />
                 {beat.type} · {formatTimecode(beat.startMs)}
               </button>
             ))}
@@ -239,56 +212,39 @@ function SyncPanel({
   const syncError = sync.error as { response?: { data?: { error?: string } } } | null;
 
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#8dc2ad] bg-[#e5f1e8] p-5">
-      <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#286254]">
-        <Link2 className="h-4 w-4" />
-        Multi-cam sync
+    <div className="paper-card accent-card">
+      <div className="inline-heading">
+        <span className="eyebrow"><Link2 size={13} /> Multi-cam sync</span>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-[#286254]">
+      <p className="setting-copy">
         Align two angles by waveform. The offset shows how the second camera sits against the first, so your switches land on the same moment.
       </p>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-        <select
-          value={primary}
-          onChange={(event) => setPrimary(event.target.value)}
-          className="focus-house rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-3 py-2.5 text-sm text-[#292b45]"
-          data-testid="cut-select-sync-primary"
-        >
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <select value={primary} onChange={(event) => setPrimary(event.target.value)} data-testid="cut-select-sync-primary">
           {assets.map((a) => (
             <option key={a.id} value={a.id}>{a.fileName}</option>
           ))}
         </select>
-        <select
-          value={target}
-          onChange={(event) => setTarget(event.target.value)}
-          className="focus-house rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-3 py-2.5 text-sm text-[#292b45]"
-          data-testid="cut-select-sync-target"
-        >
+        <select value={target} onChange={(event) => setTarget(event.target.value)} data-testid="cut-select-sync-target">
           {assets.map((a) => (
             <option key={a.id} value={a.id}>{a.fileName}</option>
           ))}
         </select>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={run}
-          disabled={sync.isPending || !primary || !target || primary === target}
-          className="focus-house inline-flex items-center gap-2 rounded-xl bg-[#292b45] px-4 py-2.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#286254] disabled:cursor-not-allowed disabled:opacity-50"
-          data-testid="button-run-sync"
-        >
-          <RefreshCw className={`h-4 w-4 ${sync.isPending ? 'animate-spin' : ''}`} />
+        <button type="button" onClick={run} disabled={sync.isPending || !primary || !target || primary === target} className="secondary-btn" data-testid="button-run-sync">
+          <RefreshCw size={14} className={sync.isPending ? 'spin' : ''} />
           {sync.isPending ? 'Syncing…' : 'Sync cameras'}
         </button>
         {pair && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fff4e6] px-3 py-1.5 font-mono-ui text-[10px] uppercase tracking-[.12em] text-[#286254]" data-testid="sync-offset">
-            <Camera className="h-3.5 w-3.5" />
+          <span className="den-tag teal" data-testid="sync-offset">
+            <Camera size={11} />
             {formatOffset(pair.offsetMs)} · {pair.method}
           </span>
         )}
       </div>
       {sync.isError && (
-        <p className="mt-2 text-sm font-semibold text-[#a33d31]" role="alert">
+        <p className="setting-copy mt-2" role="alert">
           {syncError?.response?.data?.error || 'The sync could not be queued.'}
         </p>
       )}
@@ -297,46 +253,8 @@ function SyncPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Cut builder: main track + overlays
+// Cut builder: main track + overlay layer with drag-and-drop
 // ---------------------------------------------------------------------------
-
-function TrimControl({
-  label,
-  valueMs,
-  onNudge,
-  min,
-  max,
-}: {
-  label: string;
-  valueMs: number;
-  onNudge: (delta: number) => void;
-  min?: number;
-  max?: number;
-}) {
-  return (
-    <div className="flex items-center gap-1">
-      <button
-        type="button"
-        onClick={() => onNudge(-TRIM_STEP_MS)}
-        disabled={min !== undefined && valueMs - TRIM_STEP_MS < min}
-        className="rounded-full border border-[#d6cbb9] p-1 text-[#625f6d] hover:bg-[#ffe9df] hover:text-[#a33d31] disabled:opacity-40"
-        title={`${label} −0.5s`}
-      >
-        <Minus className="h-3 w-3" />
-      </button>
-      <span className="w-14 text-center font-mono-ui text-[10px] uppercase tracking-[.1em] text-[#292b45]">{label} {formatTimecode(valueMs)}</span>
-      <button
-        type="button"
-        onClick={() => onNudge(TRIM_STEP_MS)}
-        disabled={max !== undefined && valueMs + TRIM_STEP_MS > max}
-        className="rounded-full border border-[#d6cbb9] p-1 text-[#625f6d] hover:bg-[#e5f1e8] hover:text-[#286254] disabled:opacity-40"
-        title={`${label} +0.5s`}
-      >
-        <Plus className="h-3 w-3" />
-      </button>
-    </div>
-  );
-}
 
 function CutBuilder({
   snapshot,
@@ -344,184 +262,186 @@ function CutBuilder({
   assets,
   syncs,
   canEdit,
+  durationMs,
+  playheadMs,
+  onScrub,
 }: {
   snapshot: CutSnapshot;
   onChange: (next: CutSnapshot) => void;
   assets: Array<{ id: string; fileName: string; kind: string }>;
   syncs: Array<{ primaryAssetId: string; targetAssetId: string; offsetMs: number }>;
   canEdit: boolean;
+  durationMs: number;
+  playheadMs: number;
+  onScrub: (ms: number) => void;
 }) {
   const [overlayAssetId, setOverlayAssetId] = useState('');
 
   const overlayCandidates = assets.filter((a) => ['B_ROLL', 'SCREEN_REC', 'GRAPHIC', 'REFERENCE'].includes(a.kind));
   const videoCandidates = assets.filter((a) => ['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE'].includes(a.kind));
 
-  const updateClip = (id: string, patch: Partial<CutClip>) => {
-    onChange({ ...snapshot, clips: snapshot.clips.map((c) => (c.id === id ? { ...c, ...patch } : c)) });
+  const clipBlocks: TimelineBlock[] = snapshot.clips.map((clip, index) => {
+    const asset = assets.find((a) => a.id === clip.assetId);
+    const sync = syncs.find((s) => s.primaryAssetId === clip.assetId || s.targetAssetId === clip.assetId);
+    return {
+      id: clip.id,
+      label: `${index + 1} · ${asset?.fileName ?? clip.assetId}`,
+      sublabel: sync ? formatOffset(sync.offsetMs) : formatDuration(clip.outMs - clip.inMs),
+      startMs: clip.inMs,
+      endMs: clip.outMs,
+      tone: 'accent',
+    };
+  });
+
+  const overlayBlocks: TimelineBlock[] = snapshot.overlays.map((overlay) => ({
+    id: overlay.id,
+    label: assets.find((a) => a.id === overlay.assetId)?.fileName ?? overlay.assetId,
+    sublabel: 'overlay',
+    startMs: overlay.inMs,
+    endMs: overlay.outMs,
+    tone: 'teal',
+  }));
+
+  const onClipsChange = (next: TimelineBlock[]) => {
+    const nextClips = snapshot.clips.map((clip) => {
+      const block = next.find((b) => b.id === clip.id);
+      return block ? { ...clip, inMs: block.startMs, outMs: block.endMs } : clip;
+    });
+    onChange({ ...snapshot, clips: nextClips });
   };
 
-  const removeClip = (id: string) => {
-    onChange({ ...snapshot, clips: snapshot.clips.filter((c) => c.id !== id) });
+  const onOverlaysChange = (next: TimelineBlock[]) => {
+    const nextOverlays = snapshot.overlays.map((overlay) => {
+      const block = next.find((b) => b.id === overlay.id);
+      return block ? { ...overlay, inMs: block.startMs, outMs: block.endMs } : overlay;
+    });
+    onChange({ ...snapshot, overlays: nextOverlays });
   };
 
-  const addOverlay = () => {
+  const addOverlay = (assetIdToAdd: string, atMs: number) => {
+    const overlay: CutOverlay = { id: crypto.randomUUID(), assetId: assetIdToAdd, inMs: atMs, outMs: atMs + 5000 };
+    onChange({ ...snapshot, overlays: [...snapshot.overlays, overlay] });
+  };
+
+  const addOverlayViaSelect = () => {
     if (!overlayAssetId) return;
-    const clip: CutOverlay = { id: crypto.randomUUID(), assetId: overlayAssetId, inMs: 0, outMs: 5000 };
-    onChange({ ...snapshot, overlays: [...snapshot.overlays, clip] });
+    addOverlay(overlayAssetId, 0);
+    setOverlayAssetId('');
   };
 
-  const updateOverlay = (id: string, patch: Partial<CutOverlay>) => {
-    onChange({ ...snapshot, overlays: snapshot.overlays.map((o) => (o.id === id ? { ...o, ...patch } : o)) });
-  };
-
-  const removeOverlay = (id: string) => {
-    onChange({ ...snapshot, overlays: snapshot.overlays.filter((o) => o.id !== id) });
+  const updateClipAsset = (id: string, assetId: string) => {
+    onChange({ ...snapshot, clips: snapshot.clips.map((c) => (c.id === id ? { ...c, assetId } : c)) });
   };
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-        <div className="flex items-center justify-between">
-          <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">Main track — the cut</span>
-          <span className="rounded-full bg-[#292b45] px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-[#f0c85c]">{snapshot.clips.length} clips</span>
-        </div>
+      <Timeline
+        title={`Main track — ${snapshot.clips.length} clips`}
+        hint="Drag to move · pull edges to trim · click the ruler to scrub"
+        blocks={clipBlocks}
+        durationMs={durationMs}
+        playheadMs={playheadMs}
+        canEdit={canEdit}
+        onChange={onClipsChange}
+        onScrub={onScrub}
+      />
 
-        {snapshot.clips.length === 0 ? (
-          <p className="mt-4 text-sm leading-relaxed text-[#77717a]">
-            Start from the selects — add clips here, trim their in/out, and switch cameras per cut. (Tip: open the selects studio first to build the spine.)
-          </p>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {snapshot.clips.map((clip, index) => {
-              const sync = syncs.find(
-                (s) => (s.primaryAssetId === clip.assetId) || (s.targetAssetId === clip.assetId),
-              );
-              return (
-                <div key={clip.id} className="rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf] p-3.5" data-testid={`cut-clip-${clip.id}`}>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#292b45] font-mono-ui text-[10px] text-[#f0c85c]">{index + 1}</span>
-                      {canEdit ? (
-                        <select
-                          value={clip.assetId}
-                          onChange={(event) => updateClip(clip.id, { assetId: event.target.value })}
-                          className="focus-house rounded-lg border-2 border-[#d6cbb9] bg-[#fff4e6] px-2.5 py-1.5 text-xs font-bold text-[#292b45]"
-                          data-testid={`cut-clip-camera-${clip.id}`}
-                        >
-                          {videoCandidates.map((a) => (
-                            <option key={a.id} value={a.id}>{a.fileName}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-sm font-bold text-[#292b45]">{assets.find((a) => a.id === clip.assetId)?.fileName ?? clip.assetId}</span>
-                      )}
-                      {sync && (
-                        <span className="rounded-full bg-[#e5f1e8] px-2 py-0.5 font-mono-ui text-[8px] uppercase tracking-[.12em] text-[#286254]" title="Synced pair">
-                          {formatOffset(sync.offsetMs)}
-                        </span>
-                      )}
-                    </div>
-                    {canEdit && (
-                      <button type="button" onClick={() => removeClip(clip.id)} className="rounded-full p-1.5 text-[#98909a] hover:bg-[#ffe9df] hover:text-[#a33d31]" title="Remove clip">
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                  {canEdit && (
-                    <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 border-t-2 border-[#e5d7c5] pt-3">
-                      <TrimControl
-                        label="in"
-                        valueMs={clip.inMs}
-                        min={0}
-                        max={clip.outMs - 100}
-                        onNudge={(delta) => updateClip(clip.id, { inMs: Math.max(0, Math.min(clip.inMs + delta, clip.outMs - 100)) })}
-                      />
-                      <TrimControl
-                        label="out"
-                        valueMs={clip.outMs}
-                        min={clip.inMs + 100}
-                        onNudge={(delta) => updateClip(clip.id, { outMs: Math.max(clip.inMs + 100, clip.outMs + delta) })}
-                      />
-                      <span className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#98909a]">dur {formatTimecode(clip.outMs - clip.inMs)}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+      <div className="paper-card">
+        <div className="inline-heading">
+          <span className="eyebrow"><Layers size={13} /> Overlay layer — b-roll &amp; screens</span>
+          <span className="mono-label">{snapshot.overlays.length} layered</span>
+        </div>
+        <p className="setting-copy">Drag a file from the bin onto the overlay timeline to place it — or pick one and add it.</p>
+
+        {overlayCandidates.length > 0 && (
+          <div className="den-chip-list mt-3">
+            {overlayCandidates.map((a) => (
+              <span
+                key={a.id}
+                draggable={canEdit}
+                onDragStart={(event) => {
+                  event.dataTransfer.setData('text/plain', a.id);
+                  event.dataTransfer.effectAllowed = 'copy';
+                }}
+                className="den-chip cursor-grab"
+                title="Drag onto the overlay timeline"
+                data-testid={`bin-asset-${a.id}`}
+              >
+                <Layers size={10} />
+                {a.fileName}
+              </span>
+            ))}
           </div>
         )}
-      </div>
 
-      <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-        <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">
-          <Layers className="h-4 w-4" />
-          Overlay layer — b-roll &amp; screens
+        <div
+          className="mt-3"
+          onDragOver={(event) => {
+            if (!canEdit) return;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+          }}
+          onDrop={(event) => {
+            if (!canEdit) return;
+            event.preventDefault();
+            const id = event.dataTransfer.getData('text/plain');
+            if (!id) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+            addOverlay(id, Math.round(ratio * durationMs));
+          }}
+        >
+          <Timeline
+            title=""
+            hint=""
+            blocks={overlayBlocks}
+            durationMs={durationMs}
+            playheadMs={playheadMs}
+            canEdit={canEdit}
+            onChange={onOverlaysChange}
+            onScrub={onScrub}
+          />
         </div>
-        {overlayCandidates.length === 0 ? (
-          <p className="mt-3 text-sm text-[#77717a]">Upload B-roll, screen recordings, or reference footage to layer over the cut.</p>
-        ) : (
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <select
-              value={overlayAssetId}
-              onChange={(event) => setOverlayAssetId(event.target.value)}
-              className="focus-house flex-1 rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-3 py-2.5 text-sm text-[#292b45]"
-              data-testid="cut-select-overlay-asset"
-            >
+
+        {canEdit && (
+          <div className="mt-3 flex gap-2">
+            <select value={overlayAssetId} onChange={(event) => setOverlayAssetId(event.target.value)} className="flex-1" data-testid="cut-select-overlay-asset">
               <option value="">Pick footage to layer…</option>
               {overlayCandidates.map((a) => (
                 <option key={a.id} value={a.id}>{a.fileName}</option>
               ))}
             </select>
-            {canEdit && (
-              <button
-                type="button"
-                onClick={addOverlay}
-                disabled={!overlayAssetId}
-                className="focus-house inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#286254] px-4 py-2.5 text-sm font-bold text-[#fff4e6] hover:bg-[#1d5048] disabled:cursor-not-allowed disabled:opacity-50"
-                data-testid="button-add-overlay"
-              >
-                <Plus className="h-4 w-4" />
-                Add layer
-              </button>
-            )}
-          </div>
-        )}
-
-        {snapshot.overlays.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {snapshot.overlays.map((overlay) => (
-              <div key={overlay.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf] px-3.5 py-2.5" data-testid={`cut-overlay-${overlay.id}`}>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-[#292b45]">{assets.find((a) => a.id === overlay.assetId)?.fileName ?? overlay.assetId}</p>
-                  <p className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#98909a]">overlay</p>
-                </div>
-                {canEdit ? (
-                  <div className="flex items-center gap-3">
-                    <TrimControl
-                      label="in"
-                      valueMs={overlay.inMs}
-                      min={0}
-                      max={overlay.outMs - 100}
-                      onNudge={(delta) => updateOverlay(overlay.id, { inMs: Math.max(0, Math.min(overlay.inMs + delta, overlay.outMs - 100)) })}
-                    />
-                    <TrimControl
-                      label="out"
-                      valueMs={overlay.outMs}
-                      min={overlay.inMs + 100}
-                      onNudge={(delta) => updateOverlay(overlay.id, { outMs: Math.max(overlay.inMs + 100, overlay.outMs + delta) })}
-                    />
-                    <button type="button" onClick={() => removeOverlay(overlay.id)} className="rounded-full p-1.5 text-[#98909a] hover:bg-[#ffe9df] hover:text-[#a33d31]">
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <span className="font-mono-ui text-[10px] text-[#77717a]">{formatTimecode(overlay.inMs)} → {formatTimecode(overlay.outMs)}</span>
-                )}
-              </div>
-            ))}
+            <button type="button" onClick={addOverlayViaSelect} disabled={!overlayAssetId} className="secondary-btn" data-testid="button-add-overlay">
+              <Plus size={13} /> Add layer
+            </button>
           </div>
         )}
       </div>
+
+      {canEdit && snapshot.clips.length > 0 && (
+        <div className="paper-card">
+          <div className="inline-heading">
+            <span className="eyebrow">Camera per clip</span>
+          </div>
+          <div className="den-stack">
+            {snapshot.clips.map((clip, index) => (
+              <div key={clip.id} className="list-row" data-testid={`cut-clip-${clip.id}`}>
+                <span className="world-symbol">{index + 1}</span>
+                <span className="!text-xs">
+                  <select value={clip.assetId} onChange={(event) => updateClipAsset(clip.id, event.target.value)} className="!w-auto !text-xs" data-testid={`cut-clip-camera-${clip.id}`}>
+                    {videoCandidates.map((a) => (
+                      <option key={a.id} value={a.id}>{a.fileName}</option>
+                    ))}
+                  </select>
+                </span>
+                <button type="button" onClick={() => onChange({ ...snapshot, clips: snapshot.clips.filter((c) => c.id !== clip.id) })} className="danger-icon" title="Remove clip">
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -561,46 +481,29 @@ function RenderPanel({
   const renderError = render.error as { response?: { data?: { error?: string } } } | null;
 
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#8dc2ad] bg-[#e5f1e8] p-5">
-      <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#286254]">
-        <Clapperboard className="h-4 w-4" />
-        Render preview
+    <div className="paper-card accent-card">
+      <div className="inline-heading">
+        <span className="eyebrow"><Clapperboard size={13} /> Render preview</span>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-[#286254]">
+      <p className="setting-copy">
         Render the current cut so the Captain reviews the picture, not the JSON. Submitting this leg also queues a picture-lock render automatically.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {canEdit && (
-          <button
-            type="button"
-            onClick={queuePreview}
-            disabled={render.isPending}
-            className="focus-house inline-flex items-center gap-2 rounded-xl bg-[#292b45] px-4 py-2.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#286254] disabled:cursor-wait disabled:opacity-60"
-            data-testid="button-render-preview"
-          >
-            <Clapperboard className={`h-4 w-4 ${render.isPending ? 'animate-pulse' : ''}`} />
+          <button type="button" onClick={queuePreview} disabled={render.isPending} className="primary-btn" data-testid="button-render-preview">
+            <Clapperboard size={14} className={render.isPending ? 'animate-pulse' : ''} />
             {render.isPending ? 'Queuing…' : 'Render preview'}
           </button>
         )}
         {latest && (
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono-ui text-[10px] uppercase tracking-[.12em] ${
-              latest.status === 'SUCCEEDED'
-                ? 'bg-[#fff4e6] text-[#286254]'
-                : latest.status === 'FAILED'
-                  ? 'bg-[#ffe9df] text-[#a33d31]'
-                  : 'bg-[#f0c85c] text-[#292b45]'
-            }`}
-            data-testid="render-status"
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${latest.status === 'SUCCEEDED' ? 'bg-[#286254]' : latest.status === 'FAILED' ? 'bg-[#a33d31]' : 'animate-pulse bg-[#292b45]'}`} />
+          <span className={`den-tag ${latest.status === 'SUCCEEDED' ? 'teal' : latest.status === 'FAILED' ? 'danger' : 'gold'}`} data-testid="render-status">
             {latest.status.toLowerCase()} · {String(latest.params?.format ?? 'PREVIEW').replaceAll('_', ' ')}
-            {latest.status === 'SUCCEEDED' && Boolean(latest.result?.demo) && ' · demo receipt (no melt installed)'}
+            {latest.status === 'SUCCEEDED' && Boolean(latest.result?.demo) && ' · demo receipt'}
           </span>
         )}
       </div>
       {render.isError && (
-        <p className="mt-2 text-sm font-semibold text-[#a33d31]" role="alert">
+        <p className="setting-copy mt-2" role="alert">
           {renderError?.response?.data?.error || 'The render could not be queued.'}
         </p>
       )}
@@ -622,6 +525,9 @@ export default function ContentCreatorsCutPage() {
   const [working, setWorking] = useState<CutSnapshot>(EMPTY_CUT);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState('');
+  const [playheadMs, setPlayheadMs] = useState(0);
+  const [aiResult, setAiResult] = useState<{ title: string; body: string; meta: { providerId: string; modelId: string } | null } | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   const project = useGetVideoProject(projectId);
   const cutTimeline = useGetVideoTimeline(projectId, 'CUT');
@@ -653,7 +559,12 @@ export default function ContentCreatorsCutPage() {
   const role = member?.role ?? project.data?.myRole;
   const canEdit = role === 'CAPTAIN' || role === 'VISUAL_EDITOR';
 
-  const onSeek = (_ms: number) => {};
+  const timelineDuration = Math.max(
+    60_000,
+    project.data?.assets.reduce((max, a) => Math.max(max, a.durationMs ?? 0), 0) ?? 60_000,
+  );
+
+  const onScrub = (ms: number) => setPlayheadMs(ms);
 
   const onSave = () => {
     save.mutate(
@@ -670,24 +581,97 @@ export default function ContentCreatorsCutPage() {
 
   const saveError = save.error as { response?: { data?: { error?: string } } } | null;
 
+  // AI context: current cut + beats + sync offsets.
+  const oracleContext = useMemo(() => {
+    const clips = working.clips.map((c, i) => `clip ${i + 1}: ${formatTimecode(c.inMs)}–${formatTimecode(c.outMs)} (asset ${c.assetId.slice(0, 8)})`).join('\n') || 'none yet';
+    const overlays = working.overlays.map((o) => `overlay ${o.assetId.slice(0, 8)} @ ${formatTimecode(o.inMs)}–${formatTimecode(o.outMs)}`).join('\n') || 'none yet';
+    const spine = beats.map((b) => `${b.type}@${formatTimecode(b.startMs)}`).join(', ') || 'none yet';
+    const sync = syncs.data?.map((s) => `${s.primaryAssetId.slice(0, 8)} vs ${s.targetAssetId.slice(0, 8)}: ${formatOffset(s.offsetMs)}`).join('\n') || 'none yet';
+    return [
+      `Project: ${project.data?.name ?? 'Untitled'}`,
+      `Timeline duration: ${formatTimecode(timelineDuration)}`,
+      `Beats (from selects): ${spine}`,
+      `Main track:\n${clips}`,
+      `Overlay layer:\n${overlays}`,
+      `Sync pairs:\n${sync}`,
+    ].join('\n\n').slice(0, 12000);
+  }, [working, beats, syncs.data, project.data?.name, timelineDuration]);
+
+  const runOracleSuggestion = async (instruction: string): Promise<string | null> => {
+    setAiBusy(true);
+    try {
+      const result = await oracleChat({ messages: [{ role: 'system', content: 'You are the Visual Editor\'s assistant in a video relay. Be concise and concrete.' }, { role: 'user', content: `${instruction}\n\nContext:\n${oracleContext}` }] });
+      setAiResult((prev) => (prev ? { ...prev, meta: { providerId: result.providerId, modelId: result.modelId } } : prev));
+      return result.content;
+    } catch {
+      return null;
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  // Parse "clip N: in MM:SS out MM:SS" lines and apply as trims.
+  const applyTrimsFromAnswer = (text: string): number => {
+    let applied = 0;
+    const re = /clip\s+(\d+)[:.)]\s*in\s+(\d{1,2}):(\d{2})\s*out\s+(\d{1,2}):(\d{2})/gi;
+    let m: RegExpExecArray | null;
+    const nextClips = working.clips.map((c) => ({ ...c }));
+    while ((m = re.exec(text)) !== null) {
+      const index = Number(m[1]) - 1;
+      const clip = nextClips[index];
+      if (!clip) continue;
+      const inMs = (Number(m[2]) * 60 + Number(m[3])) * 1000;
+      const outMs = (Number(m[4]) * 60 + Number(m[5])) * 1000;
+      if (outMs > inMs && inMs >= 0 && outMs <= timelineDuration) {
+        clip.inMs = inMs;
+        clip.outMs = outMs;
+        applied += 1;
+      }
+    }
+    if (applied > 0) {
+      setWorking((prev) => ({ ...prev, clips: nextClips }));
+      setDirty(true);
+    }
+    return applied;
+  };
+
+  const quickActions = [
+    {
+      id: 'review-cut',
+      label: 'Review the cut',
+      busy: aiBusy,
+      run: () => {
+        setAiResult(null);
+        void runOracleSuggestion('Review the current cut for pacing, rhythm, and continuity. Give concrete notes with timecodes. Be concise.').then((body) => {
+          if (body) setAiResult({ title: 'Cut review', body, meta: null });
+        });
+      },
+    },
+    {
+      id: 'suggest-trims',
+      label: 'Suggest trims',
+      busy: aiBusy,
+      run: () => {
+        setAiResult(null);
+        void runOracleSuggestion('Suggest tighter trims. Answer ONLY with lines of the form "clip N: in MM:SS out MM:SS", one per clip you would change, using the clip numbers above.').then((body) => {
+          if (!body) return;
+          const count = applyTrimsFromAnswer(body);
+          setAiResult({ title: count > 0 ? `Trim suggestions — ${count} applied` : 'Trim suggestions (review below)', body, meta: null });
+        });
+      },
+    },
+  ];
+
   if (project.isLoading) {
-    return (
-      <div className="mx-auto max-w-[1280px]">
-        <div className="h-40 animate-pulse rounded-[1.5rem] bg-[#e5d7c5]" />
-        <div className="mt-6 h-96 animate-pulse rounded-[1.5rem] bg-[#e5d7c5]" />
-      </div>
-    );
+    return <div className="page"><div className="panel-empty">Opening the cutting room…</div></div>;
   }
 
   if (project.isError || !project.data) {
     return (
-      <div className="mx-auto max-w-2xl py-16">
-        <SectionEyebrow>Cutting room closed</SectionEyebrow>
-        <h1 className="mt-5 text-6xl font-extrabold tracking-[-0.08em]">This room is out of reach.</h1>
-        <Link href={`/projects/${projectId}`} className="focus-house mt-8 inline-flex items-center gap-2 rounded-full bg-[#292b45] px-5 py-3 text-sm font-bold text-[#fff4e6]">
-          <ArrowLeft className="h-4 w-4" />
-          Back to the vault
-        </Link>
+      <div className="page">
+        <div className="page-guide"><span className="guide-pin" /><div><b>CUTTING ROOM CLOSED</b><span>This room is out of reach.</span></div></div>
+        <h1 style={{ font: '700 43px var(--app-font-serif)', letterSpacing: '-.045em', margin: '9px 0 20px' }}>This room is out of reach.</h1>
+        <Link href={`/projects/${projectId}`} className="secondary-btn"><ArrowLeft size={14} /> Back to the vault</Link>
       </div>
     );
   }
@@ -695,59 +679,62 @@ export default function ContentCreatorsCutPage() {
   const p = project.data;
 
   return (
-    <div className="mx-auto max-w-[1280px]">
-      <Link href={`/projects/${p.id}`} className="focus-house inline-flex items-center gap-2 rounded-full py-1 text-xs font-bold text-[#77717a] hover:text-[#292b45]" data-testid="link-cut-back-vault">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Back to the vault
-      </Link>
-
-      <div className="reveal mt-4 flex flex-col justify-between gap-5 border-b-2 border-[#d6cbb9] pb-7 md:flex-row md:items-end">
+    <div className="page">
+      <div className="page-guide">
+        <span className="guide-pin" />
         <div>
-          <SectionEyebrow>Content creators / the cutting room</SectionEyebrow>
-          <h1 className="mt-3 text-4xl font-extrabold leading-[.92] tracking-[-0.06em] text-[#292b45] sm:text-6xl">Precision cutting.</h1>
-          <p className="mt-3 max-w-xl text-sm leading-[1.8] text-[#625f6d]">
-            Trim every cut, layer B-roll over the audio-heavy beats, and switch between synced cameras — then hand the Captain a picture-locked rough cut.
-          </p>
+          <b>CONTENT CREATORS · THE CUTTING ROOM</b>
+          <span>Trim every cut, layer B-roll over the audio-heavy beats, and switch between synced cameras — then hand the Captain a picture-locked rough cut.</span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {LEG_TABS.map((item) => {
-            const Icon = item.icon;
-            const active = item.leg === 'CUT';
-            const href =
-              item.leg === 'SELECTS'
-                ? `/projects/${p.id}/selects`
-                : item.leg === 'CUT'
-                  ? `/projects/${p.id}/cut`
-                  : item.leg === 'SOUND'
-                    ? `/projects/${p.id}/sound`
-                    : `/projects/${p.id}/finish`;
-            return (
-              <Link
-                key={item.leg}
-                href={href}
-                className={`focus-house inline-flex items-center gap-2 rounded-full border-2 px-4 py-2 text-sm font-bold transition-colors ${active ? 'border-[#292b45] bg-[#292b45] text-[#fff4e6]' : 'border-[#d6cbb9] bg-[#fff4e6] text-[#625f6d] hover:border-[#8dc2ad]'}`}
-                data-testid={`cut-tab-leg-${item.leg}`}
-              >
-                <Icon className="h-4 w-4" />
-                {item.role}
-              </Link>
-            );
-          })}
+        <span className="guide-spark" />
+      </div>
+
+      <div className="page-header">
+        <div>
+          <SectionEyebrow>Visual Editor · precision cutting</SectionEyebrow>
+          <h1>Precision cutting.</h1>
+          <p>Drag clips on the timeline, pull their edges to trim, and drop b-roll straight onto the overlay layer.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href={`/projects/${p.id}`} className="secondary-btn" data-testid="link-cut-back-vault">
+            <ArrowLeft size={14} />
+            The vault
+          </Link>
+          <span className={`den-tag ${canEdit ? 'teal' : 'muted'}`}>
+            <Check size={10} />
+            {canEdit ? 'Editing as Visual Editor' : 'Viewing'}
+          </span>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#286254]">
-        <Check className="h-4 w-4" />
-        {canEdit ? 'Editing as Visual Editor' : 'Viewing — Visual Editor can edit'}
+      <div className="role-tabs mb-5">
+        {RELAY_LEGS.map((item) => {
+          const Icon = item.icon;
+          const active = item.leg === 'CUT';
+          const href =
+            item.leg === 'SELECTS'
+              ? `/projects/${p.id}/selects`
+              : item.leg === 'CUT'
+                ? `/projects/${p.id}/cut`
+                : item.leg === 'SOUND'
+                  ? `/projects/${p.id}/sound`
+                  : `/projects/${p.id}/finish`;
+          return (
+            <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`cut-tab-leg-${item.leg}`}>
+              <Icon size={13} />
+              {item.role}
+            </Link>
+          );
+        })}
       </div>
 
-      <div className="reveal reveal-1 mt-8 grid gap-6 lg:grid-cols-[1.05fr_.95fr]">
+      <div className="den-two-col">
         <div className="space-y-4">
           <PlayerRail
             projectId={p.id}
             assets={p.assets}
             beats={beats}
-            onSeek={onSeek}
+            onSeek={onScrub}
           />
         </div>
 
@@ -756,53 +743,60 @@ export default function ContentCreatorsCutPage() {
 
           <CutBuilder
             snapshot={working}
-            onChange={(next) => {
-              setWorking(next);
-              setDirty(true);
-            }}
+            onChange={(next) => { setWorking(next); setDirty(true); }}
             assets={p.assets}
             syncs={syncs.data ?? []}
             canEdit={canEdit}
+            durationMs={timelineDuration}
+            playheadMs={playheadMs}
+            onScrub={onScrub}
           />
 
-          {dirty && (
-            <p className="flex items-center gap-2 text-xs font-semibold text-[#a33d31]">
-              <Sparkles className="h-3.5 w-3.5" />
-              Unsaved changes
-            </p>
+          {aiResult && (
+            <AiResult
+              title={aiResult.title}
+              meta={aiResult.meta}
+              actions={[
+                <button key="dismiss" type="button" className="text-btn" onClick={() => setAiResult(null)}>Dismiss</button>,
+              ]}
+            >
+              {aiResult.body}
+            </AiResult>
           )}
 
-          <div className="rounded-[1.25rem] border-2 border-[#8dc2ad] bg-[#e5f1e8] p-5">
-            <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#286254]">
-              <Save className="h-4 w-4" />
-              Save this cut
+          <RoleOracle
+            leg="CUT"
+            roleName="Visual Editor"
+            context={oracleContext}
+            quickActions={quickActions}
+            disabled={!canEdit}
+            placeholder="e.g. Where should I switch cameras in the first minute?"
+          />
+
+          <div className="paper-card accent-card">
+            <div className="inline-heading">
+              <span className="eyebrow"><Save size={13} /> Save this cut</span>
             </div>
             {canEdit ? (
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <div className="mt-3 flex gap-2">
                 <input
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   placeholder="What changed in this pass? (optional)"
                   maxLength={500}
-                  className="focus-house flex-1 rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-4 py-2.5 text-sm text-[#292b45] placeholder:text-[#98909a]"
                   data-testid="cut-input-save-message"
                 />
-                <button
-                  type="button"
-                  onClick={onSave}
-                  disabled={save.isPending || !dirty}
-                  className="focus-house inline-flex items-center justify-center gap-2 rounded-xl bg-[#292b45] px-4 py-2.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#286254] disabled:cursor-not-allowed disabled:opacity-50"
-                  data-testid="cut-button-save"
-                >
-                  <Save className="h-4 w-4" />
+                <button type="button" onClick={onSave} disabled={save.isPending || !dirty} className="primary-btn" data-testid="cut-button-save">
+                  <Save size={13} />
                   {save.isPending ? 'Saving…' : 'Save cut'}
                 </button>
               </div>
             ) : (
-              <p className="mt-4 text-sm font-semibold text-[#286254]">Only the Visual Editor or the Captain can change this cut.</p>
+              <p className="setting-copy mt-3">Only the Visual Editor or the Captain can change this cut.</p>
             )}
+            {dirty && <p className="den-footnote mt-2"><Sparkles size={12} /> Unsaved changes</p>}
             {save.isError && (
-              <p className="mt-2 text-sm font-semibold text-[#a33d31]" role="alert">
+              <p className="setting-copy mt-2" role="alert">
                 {saveError?.response?.data?.error || 'The cut could not be saved.'}
               </p>
             )}
@@ -820,8 +814,8 @@ export default function ContentCreatorsCutPage() {
         </div>
       </div>
 
-      <p className="reveal reveal-2 mt-10 flex items-center gap-3 border-t-2 border-[#d6cbb9] pt-3 text-xs text-[#77717a]">
-        <LockKeyhole className="h-4 w-4 text-[#e55b4c]" />
+      <p className="den-footnote mt-8">
+        <LockKeyhole size={13} />
         Every frame stays locked. When you submit, a picture-lock render is queued and the Captain reviews the rendered cut.
       </p>
     </div>

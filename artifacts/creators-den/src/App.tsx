@@ -10,10 +10,10 @@ import FinishPage from '@/pages/finish';
 
 function NotFound() {
   return (
-    <div className="mx-auto max-w-2xl py-16">
-      <SectionEyebrow>Room not found</SectionEyebrow>
-      <h1 className="mt-5 text-6xl font-extrabold tracking-[-0.08em]">This door leads nowhere.</h1>
-      <Link href="/" className="focus-house mt-8 inline-flex items-center gap-2 rounded-full bg-[#292b45] px-5 py-3 text-sm font-bold text-[#fff4e6]">
+    <div className="page">
+      <div className="page-guide"><span className="guide-pin" /><div><b>ROOM NOT FOUND</b><span>This door leads nowhere.</span></div></div>
+      <h1 style={{ font: '700 clamp(30px, 4vw, 43px) var(--app-font-serif)', letterSpacing: '-.045em', margin: '9px 0 24px' }}>This door leads nowhere.</h1>
+      <Link href="/" className="primary-btn">
         Back to the room
       </Link>
     </div>

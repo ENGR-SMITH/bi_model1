@@ -4,11 +4,9 @@ import {
   AudioLines,
   Check,
   Film,
-  Link2,
   LockKeyhole,
   Mic2,
   Mic,
-  Minus,
   Music4,
   Palette,
   Play,
@@ -17,7 +15,6 @@ import {
   Scissors,
   Sparkles,
   Square,
-  Upload,
   X,
 } from 'lucide-react';
 import { Link, useParams } from 'wouter';
@@ -27,6 +24,7 @@ import {
   getGetVideoProjectQueryKey,
   getGetVideoTimelineQueryKey,
   getListVideoJobsQueryKey,
+  oracleChat,
   useGetVideoProject,
   useGetVideoTimeline,
   useListVideoJobs,
@@ -35,9 +33,11 @@ import {
   useUploadVideoAsset,
 } from '@workspace/api-client-react';
 import type { VideoAssetDetail } from '@workspace/api-client-react';
-import { SectionEyebrow } from '@/components/shell';
+import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
+import { Timeline, formatTimecode, type TimelineBlock } from '@/components/timeline';
+import { RoleOracle, AiResult } from '@/components/role-oracle';
 
 const AUDIO_ACTIONS = [
   { action: 'NOISE_REDUCTION', label: 'Noise reduction', blurb: 'Hum, echo, wind, room tone.' },
@@ -78,20 +78,65 @@ interface SoundSnapshot {
 
 const EMPTY_SOUND: SoundSnapshot = { clips: [], passes: [], music: [], pickups: [], sceneBlocks: [], markers: [] };
 
-function formatTimecode(ms: number | null | undefined): string {
-  if (ms == null) return '–:––';
-  const totalSeconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
+// ---------------------------------------------------------------------------
+// Pseudo-waveform (visual only — deterministic per asset id)
+// ---------------------------------------------------------------------------
 
-const LEG_TABS = [
-  { leg: 'SELECTS', role: 'Story Architect', icon: Film },
-  { leg: 'CUT', role: 'Visual Editor', icon: Scissors },
-  { leg: 'SOUND', role: 'Sound Designer', icon: Mic2 },
-  { leg: 'FINISH', role: 'Motion & Color', icon: Palette },
-] as const;
+function WaveformStrip({ seed, durationMs, playheadMs, onScrub, canEdit }: { seed: string; durationMs: number; playheadMs: number; onScrub: (ms: number) => void; canEdit: boolean }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const bars = useMemo(() => {
+    let h = 0;
+    const next = () => {
+      h = (h * 9301 + 49297) % 233280;
+      return h / 233280;
+    };
+    let s = 0;
+    for (const ch of seed) s += ch.charCodeAt(0);
+    h = s * 2654435761 % 233280;
+    const count = 96;
+    return Array.from({ length: count }, (_, i) => {
+      const v = next() * 0.55 + 0.22;
+      const swell = Math.sin(i / 6 + s) * 0.08;
+      return Math.max(0.12, Math.min(0.95, v + swell));
+    });
+  }, [seed]);
+
+  const msFromX = (clientX: number) => {
+    const el = ref.current;
+    if (!el) return 0;
+    const rect = el.getBoundingClientRect();
+    return Math.round(Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)) * durationMs);
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="den-waveform"
+      style={{ cursor: canEdit ? 'crosshair' : 'default' }}
+      onPointerDown={(event) => {
+        if (!canEdit) return;
+        onScrub(msFromX(event.clientX));
+        const move = (e: PointerEvent) => onScrub(msFromX(e.clientX));
+        const up = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+      }}
+      data-testid="sound-waveform"
+    >
+      <div className="den-waveform-bars">
+        {bars.map((height, index) => (
+          <span key={index} style={{ height: `${height * 100}%` }} />
+        ))}
+      </div>
+      <span className="timeline-playhead" style={{ left: `${durationMs > 0 ? (playheadMs / durationMs) * 100 : 0}%` }}>
+        <span className="timeline-playhead-label">{formatTimecode(playheadMs)}</span>
+      </span>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Audio pass panel
@@ -109,12 +154,12 @@ function AudioPassPanel({
   running: boolean;
 }) {
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-      <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">
-        <AudioLines className="h-4 w-4" />
-        Audio passes
+    <div className="paper-card">
+      <div className="inline-heading">
+        <span className="eyebrow"><AudioLines size={13} /> Audio passes</span>
+        <span className="mono-label">{passes.length} applied</span>
       </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2 mt-3">
         {AUDIO_ACTIONS.map((item) => {
           const applied = passes.some((p) => p.action === item.action);
           return (
@@ -123,22 +168,21 @@ function AudioPassPanel({
               type="button"
               onClick={() => onRun(item.action)}
               disabled={running}
-              className={`focus-house rounded-xl border-2 px-4 py-3 text-left transition-colors disabled:cursor-wait disabled:opacity-60 ${applied ? 'border-[#8dc2ad] bg-[#e5f1e8]' : 'border-[#e5d7c5] bg-[#f7eddf] hover:border-[#8dc2ad]'}`}
+              className="list-row"
               data-testid={`audio-pass-${item.action}`}
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-bold text-[#292b45]">{item.label}</span>
-                {applied && (
-                  <span className="rounded-full bg-[#286254] px-2 py-0.5 font-mono-ui text-[8px] uppercase tracking-[.12em] text-[#fff4e6]">applied</span>
-                )}
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-[#77717a]">{item.blurb}</p>
+              <span className="world-symbol"><AudioLines size={13} /></span>
+              <span>
+                <b>{item.label}</b>
+                <small>{item.blurb}</small>
+              </span>
+              {applied && <span className="den-tag teal">applied</span>}
             </button>
           );
         })}
       </div>
-      <p className="mt-3 flex items-center gap-2 text-xs text-[#77717a]">
-        <Sparkles className="h-4 w-4 text-[#e55b4c]" />
+      <p className="den-footnote mt-3">
+        <Sparkles size={13} />
         Passes run in the background worker — the honest demo receipt appears when no audio tooling is installed.
       </p>
     </div>
@@ -203,15 +247,14 @@ function PickupRecorder({
   const uploadError = upload.error as { response?: { data?: { error?: string } } } | null;
 
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-      <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">
-        <Mic2 className="h-4 w-4" />
-        Pickup voiceover
+    <div className="paper-card">
+      <div className="inline-heading">
+        <span className="eyebrow"><Mic2 size={13} /> Pickup voiceover</span>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-[#77717a]">
+      <p className="setting-copy">
         Flag a bad take, re-record the line in-browser, and it lands as a VO_PICKUP asset pinned to a timecode.
       </p>
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <input
           value={timeMs === 0 ? '' : formatTimecode(timeMs)}
           onChange={(event) => {
@@ -219,35 +262,24 @@ function PickupRecorder({
             setTimeMs((m * 60 + s) * 1000);
           }}
           placeholder="pin at 0:00"
-          className="w-32 rounded-lg border-2 border-[#e5d7c5] bg-[#f7eddf] px-2 py-2 text-center font-mono-ui text-[11px] text-[#292b45]"
+          className="w-32 text-center"
           data-testid="pickup-timecode"
         />
         {recording ? (
-          <button
-            type="button"
-            onClick={stop}
-            className="focus-house inline-flex items-center gap-2 rounded-xl bg-[#e55b4c] px-4 py-2.5 text-sm font-bold text-[#fff4e6] hover:bg-[#c7473c]"
-            data-testid="button-stop-recording"
-          >
-            <Square className="h-4 w-4" />
+          <button type="button" onClick={stop} className="secondary-btn" data-testid="button-stop-recording">
+            <Square size={13} />
             Stop & upload
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={start}
-            disabled={upload.isPending}
-            className="focus-house inline-flex items-center gap-2 rounded-xl bg-[#292b45] px-4 py-2.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#286254] disabled:cursor-wait disabled:opacity-60"
-            data-testid="button-record-pickup"
-          >
-            <Mic className="h-4 w-4" />
+          <button type="button" onClick={start} disabled={upload.isPending} className="primary-btn" data-testid="button-record-pickup">
+            <Mic size={13} />
             {upload.isPending ? 'Uploading…' : 'Record pickup VO'}
           </button>
         )}
       </div>
-      {error && <p className="mt-2 text-sm font-semibold text-[#a33d31]">{error}</p>}
+      {error && <p className="setting-copy mt-2">{error}</p>}
       {upload.isError && (
-        <p className="mt-2 text-sm font-semibold text-[#a33d31]" role="alert">
+        <p className="setting-copy mt-2" role="alert">
           {uploadError?.response?.data?.error || 'The pickup VO could not be uploaded.'}
         </p>
       )}
@@ -256,147 +288,158 @@ function PickupRecorder({
 }
 
 // ---------------------------------------------------------------------------
-// Music layer
+// Music + pickup layers (direct manipulation on the waveform strip)
 // ---------------------------------------------------------------------------
 
-function MusicPanel({
+function SoundLayers({
   snapshot,
   onChange,
   assets,
   canEdit,
+  durationMs,
+  playheadMs,
+  onScrub,
 }: {
   snapshot: SoundSnapshot;
   onChange: (next: SoundSnapshot) => void;
-  assets: Array<{ id: string; fileName: string }>;
+  assets: Array<{ id: string; fileName: string; kind: string }>;
   canEdit: boolean;
+  durationMs: number;
+  playheadMs: number;
+  onScrub: (ms: number) => void;
 }) {
   const [assetId, setAssetId] = useState('');
+  const audioSeed = assets.find((a) => a.kind === 'RAW_AUDIO' || a.kind === 'VO_PICKUP')?.id ?? assets[0]?.id ?? 'sound';
+
+  const musicBlocks: TimelineBlock[] = snapshot.music.map((track) => ({
+    id: track.id,
+    label: assets.find((a) => a.id === track.assetId)?.fileName ?? track.assetId,
+    sublabel: track.duckUnderSpeech ? 'duck under speech' : 'full mix',
+    startMs: track.inMs,
+    endMs: track.outMs,
+    tone: 'gold',
+  }));
+
+  const pickupBlocks: TimelineBlock[] = snapshot.pickups.map((pickup) => ({
+    id: pickup.id,
+    label: assets.find((a) => a.id === pickup.assetId)?.fileName ?? pickup.assetId,
+    sublabel: 'pickup VO',
+    startMs: Math.max(0, pickup.timeMs - 500),
+    endMs: pickup.timeMs + 500,
+    tone: 'danger',
+  }));
+
+  const onMusicChange = (next: TimelineBlock[]) => {
+    const nextTracks = snapshot.music.map((track) => {
+      const block = next.find((b) => b.id === track.id);
+      return block ? { ...track, inMs: block.startMs, outMs: block.endMs } : track;
+    });
+    onChange({ ...snapshot, music: nextTracks });
+  };
+
+  const onPickupChange = (next: TimelineBlock[]) => {
+    const nextPickups = snapshot.pickups.map((pickup) => {
+      const block = next.find((b) => b.id === pickup.id);
+      return block ? { ...pickup, timeMs: block.startMs + 500 } : pickup;
+    });
+    onChange({ ...snapshot, pickups: nextPickups });
+  };
 
   const addTrack = () => {
     if (!assetId) return;
-    const track: MusicTrack = { id: crypto.randomUUID(), assetId, inMs: 0, outMs: 30000, duckUnderSpeech: true };
+    const track: MusicTrack = { id: crypto.randomUUID(), assetId, inMs: 0, outMs: Math.min(30000, durationMs), duckUnderSpeech: true };
     onChange({ ...snapshot, music: [...snapshot.music, track] });
     setAssetId('');
   };
 
-  const updateTrack = (id: string, patch: Partial<MusicTrack>) => {
-    onChange({ ...snapshot, music: snapshot.music.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
-  };
-
-  const removeTrack = (id: string) => {
-    onChange({ ...snapshot, music: snapshot.music.filter((t) => t.id !== id) });
-  };
-
   return (
-    <div className="rounded-[1.25rem] border-2 border-[#d6cbb9] bg-[#fff4e6] p-5">
-      <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#e55b4c]">
-        <Music4 className="h-4 w-4" />
-        Music &amp; score
-      </div>
-      {assets.length === 0 ? (
-        <p className="mt-3 text-sm text-[#77717a]">Upload a music or SFX file (kind: B-roll or reference) to score the emotional arc.</p>
-      ) : (
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <select
-            value={assetId}
-            onChange={(event) => setAssetId(event.target.value)}
-            className="focus-house flex-1 rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-3 py-2.5 text-sm text-[#292b45]"
-            data-testid="sound-select-music"
-          >
-            <option value="">Pick a track…</option>
-            {assets.map((a) => (
-              <option key={a.id} value={a.id}>{a.fileName}</option>
-            ))}
-          </select>
-          {canEdit && (
-            <button
-              type="button"
-              onClick={addTrack}
-              disabled={!assetId}
-              className="focus-house inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#286254] px-4 py-2.5 text-sm font-bold text-[#fff4e6] hover:bg-[#1d5048] disabled:cursor-not-allowed disabled:opacity-50"
-              data-testid="button-add-music"
-            >
-              <Plus className="h-4 w-4" />
-              Add track
-            </button>
-          )}
+    <div className="space-y-4">
+      <div className="paper-card">
+        <div className="inline-heading">
+          <span className="eyebrow"><AudioLines size={13} /> The mix — waveform scrub</span>
+          <span className="mono-label">{formatTimecode(playheadMs)}</span>
         </div>
-      )}
-
-      {snapshot.music.length > 0 && (
-        <div className="mt-4 space-y-2">
-          {snapshot.music.map((track) => (
-            <div key={track.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-[#e5d7c5] bg-[#f7eddf] px-3.5 py-2.5" data-testid={`music-track-${track.id}`}>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-bold text-[#292b45]">{assets.find((a) => a.id === track.assetId)?.fileName ?? track.assetId}</p>
-                <p className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#98909a]">{formatTimecode(track.inMs)} → {formatTimecode(track.outMs)}</p>
-              </div>
-              {canEdit && (
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 rounded-full bg-[#e5f1e8] px-3 py-1.5 text-xs font-bold text-[#286254]" title="Sidechain-duck music under speech">
-                    <input
-                      type="checkbox"
-                      checked={track.duckUnderSpeech}
-                      onChange={(event) => updateTrack(track.id, { duckUnderSpeech: event.target.checked })}
-                      className="accent-[#286254]"
-                      data-testid={`music-duck-${track.id}`}
-                    />
-                    Duck under speech
-                  </label>
-                  <button type="button" onClick={() => removeTrack(track.id)} className="rounded-full p-1.5 text-[#98909a] hover:bg-[#ffe9df] hover:text-[#a33d31]">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Pickup list
-// ---------------------------------------------------------------------------
-
-function PickupList({
-  snapshot,
-  onChange,
-  assets,
-  canEdit,
-}: {
-  snapshot: SoundSnapshot;
-  onChange: (next: SoundSnapshot) => void;
-  assets: Array<{ id: string; fileName: string }>;
-  canEdit: boolean;
-}) {
-  const remove = (id: string) => {
-    onChange({ ...snapshot, pickups: snapshot.pickups.filter((p) => p.id !== id) });
-  };
-
-  if (snapshot.pickups.length === 0) return null;
-
-  return (
-    <div className="rounded-[1.25rem] border-2 border-[#8dc2ad] bg-[#e5f1e8] p-5">
-      <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#286254]">
-        <Mic className="h-4 w-4" />
-        Pickup VOs in place
+        <WaveformStrip seed={audioSeed} durationMs={durationMs} playheadMs={playheadMs} onScrub={onScrub} canEdit={canEdit} />
+        <p className="den-footnote mt-2">
+          <Play size={12} />
+          Click or drag the waveform to scrub the mix · music and pickup pins sit on the tracks below.
+        </p>
       </div>
-      <div className="mt-3 space-y-2">
-        {snapshot.pickups.map((pickup) => (
-          <div key={pickup.id} className="flex items-center justify-between gap-3 rounded-xl border-2 border-[#8dc2ad] bg-[#fff4e6] px-3.5 py-2.5" data-testid={`pickup-${pickup.id}`}>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-[#292b45]">{assets.find((a) => a.id === pickup.assetId)?.fileName ?? pickup.assetId}</p>
-              <p className="font-mono-ui text-[9px] uppercase tracking-[.14em] text-[#286254]">pinned at {formatTimecode(pickup.timeMs)}</p>
-            </div>
+
+      <Timeline
+        title={`Music & score — ${snapshot.music.length} tracks`}
+        hint="Drag to move · pull edges to trim · duck toggles below"
+        blocks={musicBlocks}
+        durationMs={durationMs}
+        playheadMs={playheadMs}
+        canEdit={canEdit}
+        onChange={onMusicChange}
+        onScrub={onScrub}
+      />
+
+      <Timeline
+        title={`Pickup VO pins — ${snapshot.pickups.length}`}
+        hint="Drag a pin to move it to a new timecode"
+        blocks={pickupBlocks}
+        durationMs={durationMs}
+        playheadMs={playheadMs}
+        canEdit={canEdit}
+        onChange={onPickupChange}
+        onScrub={onScrub}
+      />
+
+      <div className="paper-card">
+        <div className="inline-heading">
+          <span className="eyebrow"><Music4 size={13} /> Add music</span>
+        </div>
+        {assets.length === 0 ? (
+          <p className="setting-copy">Upload a music or SFX file (kind: B-roll or reference) to score the emotional arc.</p>
+        ) : (
+          <div className="mt-3 flex gap-2">
+            <select value={assetId} onChange={(event) => setAssetId(event.target.value)} className="flex-1" data-testid="sound-select-music">
+              <option value="">Pick a track…</option>
+              {assets.map((a) => (
+                <option key={a.id} value={a.id}>{a.fileName}</option>
+              ))}
+            </select>
             {canEdit && (
-              <button type="button" onClick={() => remove(pickup.id)} className="rounded-full p-1.5 text-[#98909a] hover:bg-[#ffe9df] hover:text-[#a33d31]">
-                <X className="h-4 w-4" />
+              <button type="button" onClick={addTrack} disabled={!assetId} className="secondary-btn" data-testid="button-add-music">
+                <Plus size={13} /> Add track
               </button>
             )}
           </div>
-        ))}
+        )}
+
+        {snapshot.music.length > 0 && (
+          <div className="den-stack mt-4">
+            {snapshot.music.map((track) => (
+              <div key={track.id} className="list-row" data-testid={`music-track-${track.id}`}>
+                <span className="world-symbol"><Music4 size={13} /></span>
+                <span>
+                  <b>{assets.find((a) => a.id === track.assetId)?.fileName ?? track.assetId}</b>
+                  <small>{formatTimecode(track.inMs)} → {formatTimecode(track.outMs)}</small>
+                </span>
+                {canEdit && (
+                  <>
+                    <label className="den-tag teal cursor-pointer" title="Sidechain-duck music under speech">
+                      <input
+                        type="checkbox"
+                        checked={track.duckUnderSpeech}
+                        onChange={(event) => onChange({ ...snapshot, music: snapshot.music.map((t) => (t.id === track.id ? { ...t, duckUnderSpeech: event.target.checked } : t)) })}
+                        className="mr-1 accent-[hsl(164_33%_45%)]"
+                        data-testid={`music-duck-${track.id}`}
+                      />
+                      Duck
+                    </label>
+                    <button type="button" onClick={() => onChange({ ...snapshot, music: snapshot.music.filter((t) => t.id !== track.id) })} className="danger-icon" title="Remove track">
+                      <X size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -416,6 +459,9 @@ export default function ContentCreatorsSoundPage() {
   const [working, setWorking] = useState<SoundSnapshot>(EMPTY_SOUND);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState('');
+  const [playheadMs, setPlayheadMs] = useState(0);
+  const [aiResult, setAiResult] = useState<{ title: string; body: string; meta: { providerId: string; modelId: string } | null } | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
 
   const project = useGetVideoProject(projectId);
   const soundTimeline = useGetVideoTimeline(projectId, 'SOUND');
@@ -441,6 +487,13 @@ export default function ContentCreatorsSoundPage() {
   const member = project.data?.members.find((m) => m.userId === user?.id);
   const role = member?.role ?? project.data?.myRole;
   const canEdit = role === 'CAPTAIN' || role === 'SOUND_DESIGNER';
+
+  const timelineDuration = Math.max(
+    60_000,
+    project.data?.assets.reduce((max, a) => Math.max(max, a.durationMs ?? 0), 0) ?? 60_000,
+  );
+
+  const onScrub = (ms: number) => setPlayheadMs(ms);
 
   const onRunAudio = (action: string) => {
     audio.mutate(
@@ -478,24 +531,102 @@ export default function ContentCreatorsSoundPage() {
   const saveError = save.error as { response?: { data?: { error?: string } } } | null;
   const audioError = audio.error as { response?: { data?: { error?: string } } } | null;
 
+  const oracleContext = useMemo(() => {
+    const passes = working.passes.map((p) => p.action).join(', ') || 'none yet';
+    const music = working.music.map((t) => `${assetsName(t.assetId)} @ ${formatTimecode(t.inMs)}–${formatTimecode(t.outMs)}${t.duckUnderSpeech ? ' (duck)' : ''}`).join('\n') || 'none yet';
+    const pickups = working.pickups.map((p) => `${assetsName(p.assetId)} @ ${formatTimecode(p.timeMs)}`).join('\n') || 'none yet';
+    const assetsList = (project.data?.assets ?? []).map((a) => `${a.fileName} (${a.kind}, ${a.durationMs ? formatTimecode(a.durationMs) : 'unknown'})`).join('\n') || 'none';
+    return [
+      `Project: ${project.data?.name ?? 'Untitled'}`,
+      `Timeline duration: ${formatTimecode(timelineDuration)}`,
+      `Assets:\n${assetsList}`,
+      `Audio passes applied: ${passes}`,
+      `Music:\n${music}`,
+      `Pickup VO pins:\n${pickups}`,
+    ].join('\n\n').slice(0, 12000);
+  }, [working, project.data, timelineDuration]);
+
+  function assetsName(assetId: string): string {
+    return project.data?.assets.find((a) => a.id === assetId)?.fileName ?? assetId;
+  }
+
+  const runOracleSuggestion = async (instruction: string): Promise<string | null> => {
+    setAiBusy(true);
+    try {
+      const result = await oracleChat({ messages: [{ role: 'system', content: 'You are the Sound Designer\'s assistant in a video relay. Be concise and concrete.' }, { role: 'user', content: `${instruction}\n\nContext:\n${oracleContext}` }] });
+      setAiResult((prev) => (prev ? { ...prev, meta: { providerId: result.providerId, modelId: result.modelId } } : prev));
+      return result.content;
+    } catch {
+      return null;
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const applyMusicFromAnswer = (text: string): number => {
+    const re = /(\d{1,2}):(\d{2})\s*[–—-]\s*(\d{1,2}):(\d{2})/g;
+    const ranges: Array<[number, number]> = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const inMs = (Number(m[1]) * 60 + Number(m[2])) * 1000;
+      const outMs = (Number(m[3]) * 60 + Number(m[4])) * 1000;
+      if (outMs > inMs && outMs <= timelineDuration) ranges.push([inMs, outMs]);
+    }
+    if (ranges.length === 0) return 0;
+    const fallbackAsset = project.data?.assets[0]?.id ?? '';
+    const tracks = working.music.map((t) => ({ ...t }));
+    let applied = 0;
+    for (let i = 0; i < ranges.length; i += 1) {
+      const [inMs, outMs] = ranges[i];
+      if (tracks[i]) {
+        tracks[i] = { ...tracks[i], inMs, outMs };
+      } else {
+        tracks.push({ id: crypto.randomUUID(), assetId: fallbackAsset, inMs, outMs, duckUnderSpeech: true });
+      }
+      applied += 1;
+    }
+    setWorking((prev) => ({ ...prev, music: tracks }));
+    setDirty(true);
+    return applied;
+  };
+
+  const quickActions = [
+    {
+      id: 'review-mix',
+      label: 'Review the mix',
+      busy: aiBusy,
+      run: () => {
+        setAiResult(null);
+        void runOracleSuggestion('Review the current mix: level balance, music placement, ducking, and pickup needs. Give concrete notes with timecodes. Be concise.').then((body) => {
+          if (body) setAiResult({ title: 'Mix review', body, meta: null });
+        });
+      },
+    },
+    {
+      id: 'suggest-music',
+      label: 'Suggest music placement',
+      busy: aiBusy,
+      run: () => {
+        setAiResult(null);
+        void runOracleSuggestion('Suggest where the score should play. Answer ONLY with lines of the form "MM:SS–MM:SS", one range per music bed, based on the beats and structure.').then((body) => {
+          if (!body) return;
+          const count = applyMusicFromAnswer(body);
+          setAiResult({ title: count > 0 ? `Music — ${count} range${count === 1 ? '' : 's'} placed` : 'Music suggestions (review below)', body, meta: null });
+        });
+      },
+    },
+  ];
+
   if (project.isLoading) {
-    return (
-      <div className="mx-auto max-w-[1280px]">
-        <div className="h-40 animate-pulse rounded-[1.5rem] bg-[#e5d7c5]" />
-        <div className="mt-6 h-96 animate-pulse rounded-[1.5rem] bg-[#e5d7c5]" />
-      </div>
-    );
+    return <div className="page"><div className="panel-empty">Opening the mix room…</div></div>;
   }
 
   if (project.isError || !project.data) {
     return (
-      <div className="mx-auto max-w-2xl py-16">
-        <SectionEyebrow>Mix room closed</SectionEyebrow>
-        <h1 className="mt-5 text-6xl font-extrabold tracking-[-0.08em]">This room is out of reach.</h1>
-        <Link href={`/projects/${projectId}`} className="focus-house mt-8 inline-flex items-center gap-2 rounded-full bg-[#292b45] px-5 py-3 text-sm font-bold text-[#fff4e6]">
-          <ArrowLeft className="h-4 w-4" />
-          Back to the vault
-        </Link>
+      <div className="page">
+        <div className="page-guide"><span className="guide-pin" /><div><b>MIX ROOM CLOSED</b><span>This room is out of reach.</span></div></div>
+        <h1 style={{ font: '700 43px var(--app-font-serif)', letterSpacing: '-.045em', margin: '9px 0 20px' }}>This room is out of reach.</h1>
+        <Link href={`/projects/${projectId}`} className="secondary-btn"><ArrowLeft size={14} /> Back to the vault</Link>
       </div>
     );
   }
@@ -504,57 +635,60 @@ export default function ContentCreatorsSoundPage() {
   const audioRunning = jobs.data?.some((job) => job.type === 'AUDIO' && ['QUEUED', 'RUNNING'].includes(job.status)) ?? false;
 
   return (
-    <div className="mx-auto max-w-[1280px]">
-      <Link href={`/projects/${p.id}`} className="focus-house inline-flex items-center gap-2 rounded-full py-1 text-xs font-bold text-[#77717a] hover:text-[#292b45]" data-testid="link-sound-back-vault">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Back to the vault
-      </Link>
-
-      <div className="reveal mt-4 flex flex-col justify-between gap-5 border-b-2 border-[#d6cbb9] pb-7 md:flex-row md:items-end">
+    <div className="page">
+      <div className="page-guide">
+        <span className="guide-pin" />
         <div>
-          <SectionEyebrow>Content creators / the mix room</SectionEyebrow>
-          <h1 className="mt-3 text-4xl font-extrabold leading-[.92] tracking-[-0.06em] text-[#292b45] sm:text-6xl">Audio restoration &amp; score.</h1>
-          <p className="mt-3 max-w-xl text-sm leading-[1.8] text-[#625f6d]">
-            Clean the captured audio, duck the score under speech, and re-record bad takes — then hand the Captain a sound-locked cut.
-          </p>
+          <b>CONTENT CREATORS · THE MIX ROOM</b>
+          <span>Clean the captured audio, duck the score under speech, and re-record bad takes — then hand the Captain a sound-locked cut.</span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {LEG_TABS.map((item) => {
-            const Icon = item.icon;
-            const active = item.leg === 'SOUND';
-            const href =
-              item.leg === 'SELECTS'
-                ? `/projects/${p.id}/selects`
-                : item.leg === 'CUT'
-                  ? `/projects/${p.id}/cut`
-                  : item.leg === 'SOUND'
-                    ? `/projects/${p.id}/sound`
-                    : `/projects/${p.id}/finish`;
-            return (
-              <Link
-                key={item.leg}
-                href={href}
-                className={`focus-house inline-flex items-center gap-2 rounded-full border-2 px-4 py-2 text-sm font-bold transition-colors ${active ? 'border-[#292b45] bg-[#292b45] text-[#fff4e6]' : 'border-[#d6cbb9] bg-[#fff4e6] text-[#625f6d] hover:border-[#8dc2ad]'}`}
-                data-testid={`sound-tab-leg-${item.leg}`}
-              >
-                <Icon className="h-4 w-4" />
-                {item.role}
-              </Link>
-            );
-          })}
+        <span className="guide-spark" />
+      </div>
+
+      <div className="page-header">
+        <div>
+          <SectionEyebrow>Sound Designer · restore &amp; score</SectionEyebrow>
+          <h1>Audio restoration &amp; score.</h1>
+          <p>Scrub the waveform, drag the score into place, and pin pickup lines where the originals fell short.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href={`/projects/${p.id}`} className="secondary-btn" data-testid="link-sound-back-vault">
+            <ArrowLeft size={14} />
+            The vault
+          </Link>
+          <span className={`den-tag ${canEdit ? 'teal' : 'muted'}`}>
+            <Check size={10} />
+            {canEdit ? 'Editing as Sound Designer' : 'Viewing'}
+          </span>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2 text-sm font-semibold text-[#286254]">
-        <Check className="h-4 w-4" />
-        {canEdit ? 'Editing as Sound Designer' : 'Viewing — Sound Designer can edit'}
+      <div className="role-tabs mb-5">
+        {RELAY_LEGS.map((item) => {
+          const Icon = item.icon;
+          const active = item.leg === 'SOUND';
+          const href =
+            item.leg === 'SELECTS'
+              ? `/projects/${p.id}/selects`
+              : item.leg === 'CUT'
+                ? `/projects/${p.id}/cut`
+                : item.leg === 'SOUND'
+                  ? `/projects/${p.id}/sound`
+                  : `/projects/${p.id}/finish`;
+          return (
+            <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`sound-tab-leg-${item.leg}`}>
+              <Icon size={13} />
+              {item.role}
+            </Link>
+          );
+        })}
       </div>
 
-      <div className="reveal reveal-1 mt-8 grid gap-6 lg:grid-cols-[1.05fr_.95fr]">
+      <div className="den-two-col">
         <div className="space-y-4">
           <AudioPassPanel projectId={p.id} passes={working.passes} onRun={onRunAudio} running={audioRunning || audio.isPending} />
           {audio.isError && (
-            <p className="text-sm font-semibold text-[#a33d31]" role="alert">
+            <p className="setting-copy" role="alert">
               {audioError?.response?.data?.error || 'The audio pass could not be queued.'}
             </p>
           )}
@@ -563,47 +697,61 @@ export default function ContentCreatorsSoundPage() {
         </div>
 
         <div className="space-y-4">
-          <MusicPanel snapshot={working} onChange={(next) => { setWorking(next); setDirty(true); }} assets={p.assets} canEdit={canEdit} />
-          <PickupList snapshot={working} onChange={(next) => { setWorking(next); setDirty(true); }} assets={p.assets} canEdit={canEdit} />
+          <SoundLayers
+            snapshot={working}
+            onChange={(next) => { setWorking(next); setDirty(true); }}
+            assets={p.assets}
+            canEdit={canEdit}
+            durationMs={timelineDuration}
+            playheadMs={playheadMs}
+            onScrub={onScrub}
+          />
 
-          {dirty && (
-            <p className="flex items-center gap-2 text-xs font-semibold text-[#a33d31]">
-              <Sparkles className="h-3.5 w-3.5" />
-              Unsaved changes
-            </p>
+          {aiResult && (
+            <AiResult
+              title={aiResult.title}
+              meta={aiResult.meta}
+              actions={[
+                <button key="dismiss" type="button" className="text-btn" onClick={() => setAiResult(null)}>Dismiss</button>,
+              ]}
+            >
+              {aiResult.body}
+            </AiResult>
           )}
 
-          <div className="rounded-[1.25rem] border-2 border-[#8dc2ad] bg-[#e5f1e8] p-5">
-            <div className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#286254]">
-              <Save className="h-4 w-4" />
-              Save this mix
+          <RoleOracle
+            leg="SOUND"
+            roleName="Sound Designer"
+            context={oracleContext}
+            quickActions={quickActions}
+            disabled={!canEdit}
+            placeholder="e.g. Where should the music duck under the host?"
+          />
+
+          <div className="paper-card accent-card">
+            <div className="inline-heading">
+              <span className="eyebrow"><Save size={13} /> Save this mix</span>
             </div>
             {canEdit ? (
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <div className="mt-3 flex gap-2">
                 <input
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   placeholder="What changed in this pass? (optional)"
                   maxLength={500}
-                  className="focus-house flex-1 rounded-xl border-2 border-[#8dc2ad] bg-[#f7eddf] px-4 py-2.5 text-sm text-[#292b45] placeholder:text-[#98909a]"
                   data-testid="sound-input-save-message"
                 />
-                <button
-                  type="button"
-                  onClick={onSave}
-                  disabled={save.isPending || !dirty}
-                  className="focus-house inline-flex items-center justify-center gap-2 rounded-xl bg-[#292b45] px-4 py-2.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#286254] disabled:cursor-not-allowed disabled:opacity-50"
-                  data-testid="sound-button-save"
-                >
-                  <Save className="h-4 w-4" />
+                <button type="button" onClick={onSave} disabled={save.isPending || !dirty} className="primary-btn" data-testid="sound-button-save">
+                  <Save size={13} />
                   {save.isPending ? 'Saving…' : 'Save mix'}
                 </button>
               </div>
             ) : (
-              <p className="mt-4 text-sm font-semibold text-[#286254]">Only the Sound Designer or the Captain can change this mix.</p>
+              <p className="setting-copy mt-3">Only the Sound Designer or the Captain can change this mix.</p>
             )}
+            {dirty && <p className="den-footnote mt-2"><Sparkles size={12} /> Unsaved changes</p>}
             {save.isError && (
-              <p className="mt-2 text-sm font-semibold text-[#a33d31]" role="alert">
+              <p className="setting-copy mt-2" role="alert">
                 {saveError?.response?.data?.error || 'The mix could not be saved.'}
               </p>
             )}
@@ -619,8 +767,8 @@ export default function ContentCreatorsSoundPage() {
         </div>
       </div>
 
-      <p className="reveal reveal-2 mt-10 flex items-center gap-3 border-t-2 border-[#d6cbb9] pt-3 text-xs text-[#77717a]">
-        <LockKeyhole className="h-4 w-4 text-[#e55b4c]" />
+      <p className="den-footnote mt-8">
+        <LockKeyhole size={13} />
         Clean audio marries the locked picture — when you submit, the Motion &amp; Color Director takes the relay.
       </p>
     </div>
