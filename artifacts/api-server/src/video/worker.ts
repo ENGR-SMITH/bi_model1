@@ -58,10 +58,55 @@ function renderDir(): string {
 // ---------------------------------------------------------------------------
 
 let _tools: { ffmpeg: boolean; ffprobe: boolean; whisper: boolean; melt: boolean } | null = null;
+let _ffmpegPath: string | null = null;
+let _ffprobePath: string | null = null;
 
-function hasCommand(command: string, args: string[]): boolean {
+function findFFmpeg(): string | null {
+  // First try standard PATH
   try {
-    const result = spawnSync(command, args, { stdio: "ignore", timeout: 15000 });
+    const result = spawnSync("ffmpeg", ["-version"], { stdio: "ignore", timeout: 5000 });
+    if (result.status === 0) {
+      return "ffmpeg";
+    }
+  } catch {}
+
+  // Try Windows WinGet installation path
+  const wingetPath = "C:\\Users\\USER\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\bin\\ffmpeg.exe";
+  try {
+    const result = spawnSync(wingetPath, ["-version"], { stdio: "ignore", timeout: 5000 });
+    if (result.status === 0) {
+      return wingetPath;
+    }
+  } catch {}
+
+  return null;
+}
+
+function findFFprobe(): string | null {
+  // First try standard PATH
+  try {
+    const result = spawnSync("ffprobe", ["-version"], { stdio: "ignore", timeout: 5000 });
+    if (result.status === 0) {
+      return "ffprobe";
+    }
+  } catch {}
+
+  // Try Windows WinGet installation path (ffprobe is usually in the same bin directory as ffmpeg)
+  const wingetPath = "C:\\Users\\USER\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\bin\\ffprobe.exe";
+  try {
+    const result = spawnSync(wingetPath, ["-version"], { stdio: "ignore", timeout: 5000 });
+    if (result.status === 0) {
+      return wingetPath;
+    }
+  } catch {}
+
+  return null;
+}
+
+function hasCommand(command: string, args: string[], useFullPath: boolean = false): boolean {
+  try {
+    const cmd = useFullPath && _ffmpegPath && command === "ffmpeg" ? _ffmpegPath : command;
+    const result = spawnSync(cmd, args, { stdio: "ignore", timeout: 15000 });
     return result.status === 0;
   } catch {
     return false;
@@ -83,13 +128,36 @@ export function detectTools(): { ffmpeg: boolean; ffprobe: boolean; whisper: boo
     return _tools;
   }
   if (_tools) return _tools;
+  
+  // Find FFmpeg and FFprobe and cache the paths
+  if (!_ffmpegPath) {
+    _ffmpegPath = findFFmpeg();
+  }
+  if (!_ffprobePath) {
+    _ffprobePath = findFFprobe();
+  }
+  
   _tools = {
-    ffmpeg: hasCommand("ffmpeg", ["-version"]),
-    ffprobe: hasCommand("ffprobe", ["-version"]),
+    ffmpeg: _ffmpegPath !== null,
+    ffprobe: _ffprobePath !== null,
     whisper: hasWhisper(),
     melt: hasCommand("melt", ["-version"]),
   };
   return _tools;
+}
+
+export function getFFmpegPath(): string | null {
+  if (!_ffmpegPath) {
+    _ffmpegPath = findFFmpeg();
+  }
+  return _ffmpegPath;
+}
+
+export function getFFprobePath(): string | null {
+  if (!_ffprobePath) {
+    _ffprobePath = findFFprobe();
+  }
+  return _ffprobePath;
 }
 
 export function isDemoMode(): boolean {
@@ -195,7 +263,7 @@ async function processProxy(asset: TandemVideoAsset): Promise<ProxyResult> {
     const outPath = path.join(uploadDir(), outKey);
 
     const probe = spawnSync(
-      "ffprobe",
+      getFFprobePath() || "ffprobe",
       ["-v", "error", "-show_entries", "format=duration", "-of", "json", sourcePath],
       { encoding: "utf8", timeout: 60000 },
     );
@@ -210,7 +278,7 @@ async function processProxy(asset: TandemVideoAsset): Promise<ProxyResult> {
     }
 
     const encode = spawnSync(
-      "ffmpeg",
+      getFFmpegPath() || "ffmpeg",
       [
         "-y",
         "-i",
@@ -469,7 +537,7 @@ function fft(data: Float32Array, inverse: boolean): void {
 // Extracts the first ~12s of mono 16 kHz audio as raw s16le PCM via ffmpeg.
 function extractPcm(filePath: string): Int16Array | null {
   const run = spawnSync(
-    "ffmpeg",
+    getFFmpegPath() || "ffmpeg",
     [
       "-y",
       "-i",
