@@ -24,10 +24,12 @@ import { Link, useParams } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import {
+  getGetVideoAssetQueryKey,
   getGetVideoProjectQueryKey,
   getGetVideoTimelineQueryKey,
   getListVideoJobsQueryKey,
   oracleChat,
+  useGetVideoAsset,
   useGetVideoProject,
   useGetVideoTimeline,
   useListVideoJobs,
@@ -35,11 +37,13 @@ import {
   useQueueVideoThumbnail,
   useSaveVideoTimeline,
 } from '@workspace/api-client-react';
+import type { VideoAssetDetail } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
-import { formatTimecode } from '@/components/timeline';
+import { Timeline, formatTimecode, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
+import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
 
 const LUT_PRESETS = ['NONE', 'WARM', 'COOL', 'CINEMA', 'PUNCHY'] as const;
 const CAPTION_STYLES = ['BOTTOM_CENTER', 'SPLIT', 'MINIMAL'] as const;
@@ -93,6 +97,173 @@ const EMPTY_FINISH: FinishSnapshot = {
 };
 
 const DEFAULT_GRADE: GradeNode = { lut: 'NONE', exposure: 0, warmth: 0 };
+
+/** Turn a grade node into a CSS filter so the proxy shows the look live. */
+function gradeFilter(grade: GradeNode): string {
+  const LUT_FILTERS: Record<GradeNode['lut'], string> = {
+    NONE: '',
+    WARM: 'sepia(0.22) saturate(1.06)',
+    COOL: 'saturate(0.88) hue-rotate(-6deg)',
+    CINEMA: 'contrast(1.12) saturate(0.85)',
+    PUNCHY: 'contrast(1.16) saturate(1.2)',
+  };
+  const parts: string[] = [];
+  if (LUT_FILTERS[grade.lut]) parts.push(LUT_FILTERS[grade.lut]);
+  if (grade.exposure !== 0) parts.push(`brightness(${(1 + grade.exposure / 200).toFixed(3)})`);
+  if (grade.warmth > 0) parts.push(`sepia(${(grade.warmth / 200).toFixed(3)})`);
+  else if (grade.warmth < 0) parts.push(`hue-rotate(${(grade.warmth / 5).toFixed(1)}deg)`);
+  return parts.join(' ') || 'none';
+}
+
+/** The caption line for the current playhead (from the Leg 1 transcript). */
+function captionFor(detail: VideoAssetDetail | undefined, playheadMs: number): string | null {
+  const segments = detail?.transcript?.segments ?? [];
+  const segment = segments.find((s) => playheadMs >= s.startMs && playheadMs < s.endMs);
+  return segment?.text ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Finish preview — the graded proxy with lower-thirds and captions overlaid.
+// ---------------------------------------------------------------------------
+
+function FinishPreview({
+  projectId,
+  snapshot,
+  assets,
+  durationMs,
+  playheadMs,
+  onTimeUpdate,
+  onScrub,
+}: {
+  projectId: string;
+  snapshot: FinishSnapshot;
+  assets: Array<{ id: string; fileName: string }>;
+  durationMs: number;
+  playheadMs: number;
+  onTimeUpdate: (ms: number) => void;
+  onScrub: (ms: number) => void;
+}) {
+  // Order clips by source in-point so scrubbing moves left → right.
+  const clips = useMemo(
+    () => [...snapshot.clips].sort((a, b) => a.inMs - b.inMs || a.id.localeCompare(b.id)),
+    [snapshot.clips],
+  );
+
+  // The clip under the playhead drives both the source asset and its grade.
+  const activeClip = useMemo(
+    () =>
+      clips.find(
+        (clip) => playheadMs >= clip.inMs && playheadMs < Math.max(clip.inMs + 1, clip.outMs),
+      ) ?? null,
+    [clips, playheadMs],
+  );
+
+  // Manual picker for the no-clips case; once clips exist the scrubber drives it.
+  const [fallbackAssetId, setFallbackAssetId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fallbackAssetId && assets.length > 0) setFallbackAssetId(assets[0].id);
+  }, [assets, fallbackAssetId]);
+
+  const previewAssetId = activeClip?.assetId ?? clips[0]?.assetId ?? fallbackAssetId ?? assets[0]?.id ?? null;
+  const detail = useGetVideoAsset(projectId, previewAssetId ?? '', {
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, previewAssetId ?? ''),
+      enabled: Boolean(previewAssetId),
+      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+    },
+  });
+
+  if (assets.length === 0) return null;
+
+  const asset = assets.find((a) => a.id === previewAssetId) ?? assets[0];
+  const grade = activeClip?.grade ?? clips.find((c) => c.assetId === asset.id)?.grade ?? DEFAULT_GRADE;
+  const caption = snapshot.captions.enabled ? captionFor(detail.data, playheadMs) : null;
+
+  const clipBlocks: TimelineBlock[] = clips.map((clip) => ({
+    id: clip.id,
+    label: assets.find((a) => a.id === clip.assetId)?.fileName ?? clip.assetId,
+    sublabel: `${clip.grade.lut} · ${formatTimecode(clip.inMs)} → ${formatTimecode(clip.outMs)}`,
+    startMs: clip.inMs,
+    endMs: Math.max(clip.outMs, clip.inMs + 500),
+    tone: 'accent',
+  }));
+
+  return (
+    <div className="paper-card" data-testid="panel-finish-preview">
+      <div className="inline-heading">
+        <span className="eyebrow"><Palette size={13} /> Graded preview</span>
+        <span className="mono-label">{clips.length} clip{clips.length === 1 ? '' : 's'}</span>
+        {clips.length === 0 && assets.length > 1 && (
+          <select
+            value={fallbackAssetId ?? ''}
+            onChange={(event) => setFallbackAssetId(event.target.value || null)}
+            className="!w-auto !text-xs"
+            data-testid="finish-select-preview-asset"
+          >
+            {assets.map((a) => (
+              <option key={a.id} value={a.id}>{a.fileName}</option>
+            ))}
+          </select>
+        )}
+      </div>
+      <p className="setting-copy">Scrub across the clips below — each clip applies its own grade, with lower thirds and captions overlaid live.</p>
+
+      <AssetPlayer
+        className="mt-3"
+        projectId={projectId}
+        assetId={asset.id}
+        detail={detail.data}
+        playheadMs={playheadMs}
+        onTimeUpdate={onTimeUpdate}
+        filter={gradeFilter(grade)}
+        title={`${asset.fileName} · ${grade.lut}`}
+      >
+        <div className="den-frame-overlay">
+          {snapshot.lowerThirds.map((lower) => (
+            <div
+              key={lower.id}
+              className="den-overlay-card"
+              style={{ left: `${lower.x}%`, top: `${lower.y}%`, width: lower.width }}
+              data-testid={`preview-lower-third-${lower.id}`}
+            >
+              <span className="den-overlay-title">{lower.title}</span>
+              {lower.subtitle && <span className="den-overlay-sub">{lower.subtitle}</span>}
+            </div>
+          ))}
+          {caption && (
+            <div className="den-caption-bar">
+              <span className="den-caption-text">{caption}</span>
+            </div>
+          )}
+        </div>
+      </AssetPlayer>
+
+      {clips.length > 0 && (
+        <div className="mt-4">
+          <Timeline
+            title="Grade clips — scrub to compare"
+            hint="Click or drag the ruler to move across clips · each clip applies its own grade"
+            blocks={clipBlocks}
+            durationMs={durationMs}
+            playheadMs={playheadMs}
+            canEdit={false}
+            scrubOnly
+            onScrub={onScrub}
+            activeId={activeClip?.id ?? null}
+          />
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="den-tag gold">{grade.lut}</span>
+        <span className="den-tag accent">exposure {grade.exposure > 0 ? '+' : ''}{grade.exposure}</span>
+        <span className="den-tag teal">warmth {grade.warmth > 0 ? '+' : ''}{grade.warmth}</span>
+        {snapshot.captions.enabled && <span className="den-tag muted">{snapshot.captions.style.replaceAll('_', ' ')} captions</span>}
+        {activeClip && <span className="den-tag muted">{assets.find((a) => a.id === activeClip.assetId)?.fileName ?? activeClip.assetId}</span>}
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Grade nodes
@@ -549,6 +720,7 @@ export default function ContentCreatorsFinishPage() {
   const [working, setWorking] = useState<FinishSnapshot>(EMPTY_FINISH);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState('');
+  const [playheadMs, setPlayheadMs] = useState(0);
   const [aiResult, setAiResult] = useState<{ title: string; body: string; meta: { providerId: string; modelId: string } | null } | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
 
@@ -754,13 +926,22 @@ export default function ContentCreatorsFinishPage() {
 
       <div className="den-two-col">
         <div className="space-y-4">
+          <FinishPreview
+            projectId={p.id}
+            snapshot={working}
+            assets={p.assets}
+            durationMs={timelineDuration}
+            playheadMs={playheadMs}
+            onTimeUpdate={setPlayheadMs}
+            onScrub={setPlayheadMs}
+          />
           <GradePanel snapshot={working} onChange={(next) => { setWorking(next); setDirty(true); }} assets={p.assets} canEdit={canEdit} />
           <LowerThirdsPanel
             snapshot={working}
             onChange={(next) => { setWorking(next); setDirty(true); }}
             canEdit={canEdit}
             durationMs={timelineDuration}
-            onScrub={(ms) => {}}
+            onScrub={setPlayheadMs}
           />
           <CaptionsPanel snapshot={working} onChange={(next) => { setWorking(next); setDirty(true); }} canEdit={canEdit} />
           <CommentsPanel projectId={p.id} leg="FINISH" />

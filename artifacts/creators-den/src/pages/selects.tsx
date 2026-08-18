@@ -51,8 +51,9 @@ import type {
 } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
-import { Timeline, formatTimecode, type TimelineBlock } from '@/components/timeline';
+import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult, type StudioLeg } from '@/components/role-oracle';
+import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
 
 const LEG_ROLES: Record<string, string> = {
   SELECTS: 'ARCHITECT',
@@ -341,6 +342,7 @@ function SelectsBuilder({
         canEdit={canEdit}
         onChange={onClipsChange}
         onScrub={onScrub}
+        activeId={activeBlockId(clipBlocks, playheadMs)}
       />
 
       <div className="paper-card">
@@ -358,6 +360,7 @@ function SelectsBuilder({
           canEdit={canEdit}
           onChange={onSceneChange}
           onScrub={onScrub}
+          activeId={activeBlockId(sceneBlocks, playheadMs)}
         />
         {canEdit && (
           <div className="den-chip-list mt-3">
@@ -611,7 +614,12 @@ export default function ContentCreatorsStudioPage() {
 
   const project = useGetVideoProject(projectId);
   const asset = useGetVideoAsset(projectId, assetId ?? '', {
-    query: { queryKey: getGetVideoAssetQueryKey(projectId, assetId ?? ''), enabled: Boolean(assetId) },
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, assetId ?? ''),
+      enabled: Boolean(assetId),
+      // Keep fetching until the proxy/transcript finish, then stop on its own.
+      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+    },
   });
   const timeline = useGetVideoTimeline(projectId, leg);
   const save = useSaveVideoTimeline();
@@ -642,8 +650,6 @@ export default function ContentCreatorsStudioPage() {
     }
   }, [project.data?.assets, assetId]);
 
-  const proxyUrl = assetId ? `/api/video/projects/${projectId}/assets/${assetId}/proxy` : null;
-  const hasProxy = (asset.data?.files ?? []).some((file) => file.kind === 'PROXY');
   const assetDuration = asset.data?.durationMs ?? Math.max(60_000, (project.data?.assets[0]?.durationMs ?? 60_000));
 
   const onSeek = (ms: number) => {
@@ -875,27 +881,15 @@ export default function ContentCreatorsStudioPage() {
               </div>
 
               {assetId ? (
-                hasProxy ? (
-                  <div className="den-player mt-3">
-                    <video
-                      ref={videoRef}
-                      key={assetId}
-                      src={proxyUrl ?? undefined}
-                      controls
-                      preload="metadata"
-                      onTimeUpdate={(event) => setPlayheadMs(Math.floor((event.target as HTMLVideoElement).currentTime * 1000))}
-                      data-testid="proxy-player"
-                    />
-                  </div>
-                ) : (
-                  <div className="den-player den-player-overlay mt-3 aspect-video">
-                    <div className="text-center">
-                      <Sparkles className="mx-auto mb-2 animate-pulse" size={22} />
-                      <p className="text-sm font-semibold">Building the proxy…</p>
-                      <p className="text-xs opacity-70">Refresh in a moment — processing runs in the background.</p>
-                    </div>
-                  </div>
-                )
+                <AssetPlayer
+                  className="mt-3"
+                  projectId={p.id}
+                  assetId={assetId}
+                  detail={asset.data}
+                  videoRef={videoRef}
+                  onTimeUpdate={setPlayheadMs}
+                  title={asset.data?.fileName}
+                />
               ) : (
                 <div className="den-player den-player-overlay mt-3 aspect-video">
                   <div className="text-center">

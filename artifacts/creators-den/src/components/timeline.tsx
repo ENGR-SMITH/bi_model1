@@ -29,6 +29,15 @@ export function formatDuration(ms: number): string {
   return `${minutes}m ${seconds}s`;
 }
 
+/** The block whose [start, end) window contains the playhead — or null. */
+export function activeBlockId(blocks: TimelineBlock[], playheadMs: number): string | null {
+  return (
+    blocks.find(
+      (block) => playheadMs >= block.startMs && playheadMs < Math.max(block.startMs + 1, block.endMs),
+    )?.id ?? null
+  );
+}
+
 const MIN_CLIP_MS = 250;
 
 type DragMode =
@@ -55,10 +64,12 @@ export function Timeline({
   onScrub,
   onSelect,
   selectedId,
+  activeId,
   renderBlock,
   title,
   hint,
   rows = 'single',
+  scrubOnly = false,
 }: {
   blocks: TimelineBlock[];
   durationMs: number;
@@ -68,10 +79,14 @@ export function Timeline({
   onScrub?: (ms: number) => void;
   onSelect?: (id: string | null) => void;
   selectedId?: string | null;
+  /** Block id currently under the playhead — highlighted as "playing". */
+  activeId?: string | null;
   renderBlock?: (block: TimelineBlock) => ReactNode;
   title?: string;
   hint?: string;
   rows?: 'single' | 'double';
+  /** Allow ruler scrubbing while keeping blocks non-editable (read-only review). */
+  scrubOnly?: boolean;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
@@ -158,7 +173,7 @@ export function Timeline({
         ref={rulerRef}
         className="timeline-ruler"
         onPointerDown={(event) => {
-          if (!canEdit) return;
+          if (!canEdit && !scrubOnly) return;
           event.currentTarget.setPointerCapture?.(event.pointerId);
           startScrub(event);
         }}
@@ -192,15 +207,20 @@ export function Timeline({
             const left = durationMs > 0 ? (block.startMs / durationMs) * 100 : 0;
             const width = durationMs > 0 ? (dur / durationMs) * 100 : 0;
             const selected = selectedId === block.id;
+            const active = activeId === block.id;
             const editable = canEdit && !block.locked;
             return (
               <div
                 key={block.id}
-                className={`timeline-block tone-${block.tone ?? 'accent'} ${draggingId === block.id ? 'dragging' : ''} ${selected ? 'selected' : ''} ${block.locked ? 'timeline-block-locked' : ''}`}
+                className={`timeline-block tone-${block.tone ?? 'accent'} ${draggingId === block.id ? 'dragging' : ''} ${selected ? 'selected' : ''} ${active ? 'active' : ''} ${block.locked ? 'timeline-block-locked' : ''}`}
                 style={{ left: `${left}%`, width: `${width}%` }}
                 data-testid={`timeline-block-${block.id}`}
                 onPointerDown={(event) => {
-                  if (!editable) return;
+                  if (!editable) {
+                    // Read-only review: clicking a block jumps the playhead to its start.
+                    if (scrubOnly && onScrub) onScrub(block.startMs);
+                    return;
+                  }
                   event.currentTarget.setPointerCapture?.(event.pointerId);
                   event.stopPropagation();
                   onSelect?.(block.id);

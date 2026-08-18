@@ -10,6 +10,7 @@ import {
   LockKeyhole,
   Mic2,
   Palette,
+  Play,
   Scissors,
   Sparkles,
   Upload,
@@ -20,6 +21,7 @@ import { Link, useParams } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getDownloadVideoFileUrl,
+  getGetVideoAssetQueryKey,
   getGetVideoProjectQueryKey,
   getListVideoDownloadsQueryKey,
   getListVideoGrantsQueryKey,
@@ -28,6 +30,7 @@ import {
   useAddVideoProjectMember,
   useApproveVideoSubmission,
   useCreateVideoGrant,
+  useGetVideoAsset,
   useGetVideoProject,
   useListVideoDownloads,
   useListVideoGrants,
@@ -40,6 +43,7 @@ import {
 import type { VideoAssetUploadInputKind } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
+import { AssetPlayer, isAudioKind, pollWhileProcessing } from '@/components/asset-preview';
 
 const LEG_META = {
   SELECTS: { label: 'Selects', role: 'Story Architect', icon: Film },
@@ -75,6 +79,69 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function AssetCard({ projectId, asset, released }: { projectId: string; asset: { id: string; fileName: string; kind: string; status: string; sizeBytes: number; version: number; durationMs: number | null }; released: boolean }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const detail = useGetVideoAsset(projectId, asset.id, {
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, asset.id),
+      enabled: previewOpen,
+      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+    },
+  });
+  const processing = asset.status !== 'PROCESSED';
+
+  return (
+    <div className="paper-card den-asset-card" data-testid={`card-asset-${asset.id}`}>
+      <div className="flex items-start gap-3">
+        <span className="world-symbol"><FileVideo2 size={14} /></span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <b className="truncate text-sm">{asset.fileName}</b>
+            <span className="den-tag gold">{KIND_LABELS[asset.kind] ?? asset.kind}</span>
+            {processing && <span className="den-tag accent">processing…</span>}
+          </div>
+          <p className="mono-label mt-1">
+            {formatBytes(asset.sizeBytes)} · v{asset.version} · {asset.status.replaceAll('_', ' ')}
+            {asset.durationMs ? ` · ${Math.floor(asset.durationMs / 60000)}m ${Math.floor((asset.durationMs % 60000) / 1000)}s` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {asset.status === 'PROCESSED' && (
+            <button type="button" onClick={() => setPreviewOpen((open) => !open)} className="secondary-btn" data-testid={`button-preview-${asset.id}`}>
+              <Play size={13} />
+              {previewOpen ? 'Close' : 'Preview'}
+            </button>
+          )}
+          {released ? (
+            <a href={getDownloadVideoFileUrl(projectId, asset.id)} download className="secondary-btn" data-testid={`link-download-${asset.id}`}>
+              <Download size={13} />
+            </a>
+          ) : (
+            <span className="den-tag teal">Locked</span>
+          )}
+        </div>
+      </div>
+
+      {previewOpen && (
+        <div className="mt-4" data-testid={`preview-${asset.id}`}>
+          <AssetPlayer projectId={projectId} assetId={asset.id} detail={detail.data} title={asset.fileName} audio={isAudioKind(asset.kind)} />
+        </div>
+      )}
+
+      {asset.status === 'PROCESSED' ? (
+        <Link href={`/projects/${projectId}/selects`} className="link-btn mt-3" data-testid={`link-studio-${asset.id}`}>
+          <Film size={13} /> Open the selects studio <ArrowLeft size={12} className="rotate-180" />
+        </Link>
+      ) : (
+        <p className="den-footnote mt-3">
+          <Sparkles size={12} />
+          Proxying and transcribing in the background — preview appears here automatically.
+        </p>
+      )}
+    </div>
+  );
 }
 
 function UploadForm({ projectId }: { projectId: string }) {
@@ -438,7 +505,18 @@ export default function ContentCreatorsProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
   // Live: jobs, submissions, grants, and asset processing stream in.
   useProjectRealtime(projectId, null);
-  const project = useGetVideoProject(projectId);
+  const project = useGetVideoProject(projectId, {
+    query: {
+      queryKey: getGetVideoProjectQueryKey(projectId),
+      // While anything is still processing, keep polling so the vault
+      // flips to preview-ready on its own.
+      refetchInterval: (query) => {
+        const data = query.state.data;
+        const processing = data?.assets.some((asset) => asset.status !== 'PROCESSED');
+        return processing ? 3000 : false;
+      },
+    },
+  });
 
   if (project.isLoading) {
     return (
@@ -504,32 +582,7 @@ export default function ContentCreatorsProjectPage() {
           {p.assets.length > 0 ? (
             <div className="den-stack">
               {p.assets.map((asset) => (
-                <div key={asset.id} className="paper-card" style={{ padding: 20 }} data-testid={`card-asset-${asset.id}`}>
-                  <div className="flex items-start gap-3">
-                    <span className="world-symbol"><FileVideo2 size={14} /></span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <b className="truncate text-sm">{asset.fileName}</b>
-                        <span className="den-tag gold">{KIND_LABELS[asset.kind] ?? asset.kind}</span>
-                      </div>
-                      <p className="mono-label mt-1">
-                        {formatBytes(asset.sizeBytes)} · v{asset.version} · {asset.status.replaceAll('_', ' ')}
-                      </p>
-                      {asset.status === 'PROCESSED' && (
-                        <Link href={`/projects/${p.id}/selects`} className="link-btn mt-2" data-testid={`link-studio-${asset.id}`}>
-                          <Film size={13} /> Open the selects studio <ArrowLeft size={12} className="rotate-180" />
-                        </Link>
-                      )}
-                    </div>
-                    {p.status === 'RELEASED' ? (
-                      <a href={getDownloadVideoFileUrl(p.id, asset.id)} download className="secondary-btn" data-testid={`link-download-${asset.id}`}>
-                        <Download size={13} /> Download
-                      </a>
-                    ) : (
-                      <span className="den-tag teal">Locked</span>
-                    )}
-                  </div>
-                </div>
+                <AssetCard key={asset.id} projectId={p.id} asset={asset} released={p.status === 'RELEASED'} />
               ))}
             </div>
           ) : (

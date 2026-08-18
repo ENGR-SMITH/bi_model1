@@ -40,8 +40,9 @@ import {
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
-import { Timeline, formatTimecode, formatDuration, type TimelineBlock } from '@/components/timeline';
+import { Timeline, formatTimecode, formatDuration, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
+import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
 
 interface CutClip {
   id: string;
@@ -81,30 +82,32 @@ function PlayerRail({
   projectId,
   assets,
   beats,
+  playheadMs,
   onSeek,
 }: {
   projectId: string;
   assets: Array<{ id: string; fileName: string }>;
   beats: CutSnapshot['sceneBlocks'];
+  playheadMs: number;
   onSeek: (ms: number) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [assetId, setAssetId] = useState<string | null>(assets[0]?.id ?? null);
-  const [playheadMs, setPlayheadMs] = useState(0);
   const asset = useGetVideoAsset(projectId, assetId ?? '', {
-    query: { queryKey: getGetVideoAssetQueryKey(projectId, assetId ?? ''), enabled: Boolean(assetId) },
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, assetId ?? ''),
+      enabled: Boolean(assetId),
+      // Keep fetching until the proxy/transcript finish, then stop on its own.
+      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+    },
   });
 
-  const hasProxy = (asset.data?.files ?? []).some((file) => file.kind === 'PROXY');
-  const proxyUrl = assetId ? `/api/video/projects/${projectId}/assets/${assetId}/proxy` : null;
-
   const seek = (ms: number) => {
-    setPlayheadMs(ms);
+    onSeek(ms);
     if (videoRef.current) {
       videoRef.current.currentTime = ms / 1000;
       void videoRef.current.play().catch(() => {});
     }
-    onSeek(ms);
   };
 
   return (
@@ -122,26 +125,16 @@ function PlayerRail({
         </div>
 
         {assetId ? (
-          hasProxy ? (
-            <div className="den-player mt-3">
-              <video
-                ref={videoRef}
-                key={assetId}
-                src={proxyUrl ?? undefined}
-                controls
-                preload="metadata"
-                onTimeUpdate={(event) => setPlayheadMs(Math.floor((event.target as HTMLVideoElement).currentTime * 1000))}
-                data-testid="cut-proxy-player"
-              />
-            </div>
-          ) : (
-            <div className="den-player den-player-overlay mt-3 aspect-video">
-              <div className="text-center">
-                <Sparkles className="mx-auto mb-2 animate-pulse" size={22} />
-                <p className="text-sm font-semibold">Building the proxy…</p>
-              </div>
-            </div>
-          )
+          <AssetPlayer
+            className="mt-3"
+            projectId={projectId}
+            assetId={assetId}
+            detail={asset.data}
+            videoRef={videoRef}
+            playheadMs={playheadMs}
+            onTimeUpdate={onSeek}
+            title={asset.data?.fileName}
+          />
         ) : (
           <div className="den-player den-player-overlay mt-3 aspect-video">
             <p className="text-sm font-semibold">No footage in the vault yet.</p>
@@ -344,6 +337,7 @@ function CutBuilder({
         canEdit={canEdit}
         onChange={onClipsChange}
         onScrub={onScrub}
+        activeId={activeBlockId(clipBlocks, playheadMs)}
       />
 
       <div className="paper-card">
@@ -400,6 +394,7 @@ function CutBuilder({
             canEdit={canEdit}
             onChange={onOverlaysChange}
             onScrub={onScrub}
+            activeId={activeBlockId(overlayBlocks, playheadMs)}
           />
         </div>
 
@@ -734,6 +729,7 @@ export default function ContentCreatorsCutPage() {
             projectId={p.id}
             assets={p.assets}
             beats={beats}
+            playheadMs={playheadMs}
             onSeek={onScrub}
           />
         </div>

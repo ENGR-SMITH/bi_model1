@@ -21,10 +21,12 @@ import { Link, useParams } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import {
+  getGetVideoAssetQueryKey,
   getGetVideoProjectQueryKey,
   getGetVideoTimelineQueryKey,
   getListVideoJobsQueryKey,
   oracleChat,
+  useGetVideoAsset,
   useGetVideoProject,
   useGetVideoTimeline,
   useListVideoJobs,
@@ -36,8 +38,9 @@ import type { VideoAssetDetail } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
-import { Timeline, formatTimecode, type TimelineBlock } from '@/components/timeline';
+import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
+import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
 
 const AUDIO_ACTIONS = [
   { action: 'NOISE_REDUCTION', label: 'Noise reduction', blurb: 'Hum, echo, wind, room tone.' },
@@ -134,6 +137,77 @@ function WaveformStrip({ seed, durationMs, playheadMs, onScrub, canEdit }: { see
       <span className="timeline-playhead" style={{ left: `${durationMs > 0 ? (playheadMs / durationMs) * 100 : 0}%` }}>
         <span className="timeline-playhead-label">{formatTimecode(playheadMs)}</span>
       </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Monitor — a live proxy player so the Sound Designer can actually hear the
+// footage while scrubbing the mix. Audio kinds render as an <audio> bar.
+// ---------------------------------------------------------------------------
+
+function SoundMonitor({
+  projectId,
+  assets,
+  playheadMs,
+  onTimeUpdate,
+}: {
+  projectId: string;
+  assets: Array<{ id: string; fileName: string; kind: string }>;
+  playheadMs: number;
+  onTimeUpdate: (ms: number) => void;
+}) {
+  const [assetId, setAssetId] = useState<string | null>(null);
+
+  // Default to an audio asset (or the first file) once the project loads.
+  useEffect(() => {
+    if (!assetId && assets.length > 0) {
+      const preferred =
+        assets.find((a) => a.kind === 'RAW_AUDIO' || a.kind === 'VO_PICKUP') ?? assets[0];
+      setAssetId(preferred.id);
+    }
+  }, [assets, assetId]);
+
+  const detail = useGetVideoAsset(projectId, assetId ?? '', {
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, assetId ?? ''),
+      enabled: Boolean(assetId),
+      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+    },
+  });
+
+  if (assets.length === 0) return null;
+  const asset = assets.find((a) => a.id === assetId) ?? assets[0];
+  const isAudio = asset.kind === 'RAW_AUDIO' || asset.kind === 'VO_PICKUP';
+
+  return (
+    <div className="paper-card" data-testid="panel-sound-monitor">
+      <div className="inline-heading">
+        <span className="eyebrow"><AudioLines size={13} /> Monitor</span>
+        {assets.length > 1 && (
+          <select
+            value={assetId ?? ''}
+            onChange={(event) => setAssetId(event.target.value || null)}
+            className="!w-auto !text-xs"
+            data-testid="sound-select-monitor-asset"
+          >
+            {assets.map((a) => (
+              <option key={a.id} value={a.id}>{a.fileName}</option>
+            ))}
+          </select>
+        )}
+      </div>
+      <p className="setting-copy">Hear the captured audio while you scrub — the waveform and pins below follow this monitor.</p>
+      <AssetPlayer
+        className="mt-3"
+        projectId={projectId}
+        assetId={asset.id}
+        detail={detail.data}
+        audio={isAudio}
+        playheadMs={playheadMs}
+        onTimeUpdate={onTimeUpdate}
+        title={asset.fileName}
+      />
     </div>
   );
 }
@@ -375,6 +449,7 @@ function SoundLayers({
         canEdit={canEdit}
         onChange={onMusicChange}
         onScrub={onScrub}
+        activeId={activeBlockId(musicBlocks, playheadMs)}
       />
 
       <Timeline
@@ -386,6 +461,7 @@ function SoundLayers({
         canEdit={canEdit}
         onChange={onPickupChange}
         onScrub={onScrub}
+        activeId={activeBlockId(pickupBlocks, playheadMs)}
       />
 
       <div className="paper-card">
@@ -686,6 +762,7 @@ export default function ContentCreatorsSoundPage() {
 
       <div className="den-two-col">
         <div className="space-y-4">
+          <SoundMonitor projectId={p.id} assets={p.assets} playheadMs={playheadMs} onTimeUpdate={onScrub} />
           <AudioPassPanel projectId={p.id} passes={working.passes} onRun={onRunAudio} running={audioRunning || audio.isPending} />
           {audio.isError && (
             <p className="setting-copy" role="alert">
