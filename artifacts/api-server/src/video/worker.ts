@@ -33,6 +33,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { logger } from "../lib/logger";
 import { emitJobProgress, emitToProject } from "../realtime";
@@ -58,59 +59,86 @@ function renderDir(): string {
 // ---------------------------------------------------------------------------
 
 let _tools: { ffmpeg: boolean; ffprobe: boolean; whisper: boolean; melt: boolean } | null = null;
-let _ffmpegPath: string | null = null;
-let _ffprobePath: string | null = null;
+// `undefined` = not probed yet, `null` = probed but not found.
+let _ffmpegPath: string | null | undefined;
+let _ffprobePath: string | null | undefined;
 
-function findFFmpeg(): string | null {
-  // First try standard PATH
+function runOk(command: string, args: string[]): boolean {
   try {
-    const result = spawnSync("ffmpeg", ["-version"], { stdio: "ignore", timeout: 5000 });
-    if (result.status === 0) {
-      return "ffmpeg";
-    }
-  } catch {}
-
-  // Try Windows WinGet installation path
-  const wingetPath = "C:\\Users\\USER\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\bin\\ffmpeg.exe";
-  try {
-    const result = spawnSync(wingetPath, ["-version"], { stdio: "ignore", timeout: 5000 });
-    if (result.status === 0) {
-      return wingetPath;
-    }
-  } catch {}
-
-  return null;
-}
-
-function findFFprobe(): string | null {
-  // First try standard PATH
-  try {
-    const result = spawnSync("ffprobe", ["-version"], { stdio: "ignore", timeout: 5000 });
-    if (result.status === 0) {
-      return "ffprobe";
-    }
-  } catch {}
-
-  // Try Windows WinGet installation path (ffprobe is usually in the same bin directory as ffmpeg)
-  const wingetPath = "C:\\Users\\USER\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\bin\\ffprobe.exe";
-  try {
-    const result = spawnSync(wingetPath, ["-version"], { stdio: "ignore", timeout: 5000 });
-    if (result.status === 0) {
-      return wingetPath;
-    }
-  } catch {}
-
-  return null;
-}
-
-function hasCommand(command: string, args: string[], useFullPath: boolean = false): boolean {
-  try {
-    const cmd = useFullPath && _ffmpegPath && command === "ffmpeg" ? _ffmpegPath : command;
-    const result = spawnSync(cmd, args, { stdio: "ignore", timeout: 15000 });
-    return result.status === 0;
+    return spawnSync(command, args, { stdio: "ignore", timeout: 8000 }).status === 0;
   } catch {
     return false;
   }
+}
+
+function existingFile(candidate: string): string | null {
+  try {
+    return fs.existsSync(candidate) ? candidate : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Well-known Windows install locations for FFmpeg (WinGet, Chocolatey, Scoop).
+ * The WinGet package directory is version-hashed, so we glob for any
+ * `Gyan.FFmpeg*` directory instead of hardcoding the hash or the username.
+ */
+function windowsFfmpegDirs(): string[] {
+  const dirs: string[] = [];
+  const home = os.homedir();
+  const localAppData = process.env.LOCALAPPDATA || path.join(home, "AppData", "Local");
+
+  const wingetPackages = path.join(localAppData, "Microsoft", "WinGet", "Packages");
+  try {
+    if (fs.existsSync(wingetPackages)) {
+      for (const entry of fs.readdirSync(wingetPackages)) {
+        if (/^Gyan\.FFmpeg/i.test(entry)) dirs.push(path.join(wingetPackages, entry, "bin"));
+      }
+    }
+  } catch {
+    // unreadable dir — skip
+  }
+
+  const programData = process.env.ProgramData || "C:\\ProgramData";
+  dirs.push(path.join(programData, "chocolatey", "bin"));
+  dirs.push(path.join(home, "scoop", "shims"));
+  return dirs;
+}
+
+/**
+ * Locate an FFmpeg-family binary: explicit env override → PATH → known Windows
+ * install dirs. Returns the bare command name (PATH hit) or the absolute path.
+ */
+function findTool(envVar: string, exeName: string): string | null {
+  const override = process.env[envVar];
+  if (override) {
+    const resolved = existingFile(override);
+    if (resolved && runOk(resolved, ["-version"])) return resolved;
+  }
+
+  if (runOk(exeName, ["-version"])) return exeName;
+
+  if (process.platform === "win32") {
+    for (const dir of windowsFfmpegDirs()) {
+      const resolved = existingFile(path.join(dir, exeName));
+      if (resolved && runOk(resolved, ["-version"])) return resolved;
+    }
+  }
+
+  return null;
+}
+
+function findFFmpeg(): string | null {
+  return findTool("FFMPEG_PATH", process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg");
+}
+
+function findFFprobe(): string | null {
+  return findTool("FFPROBE_PATH", process.platform === "win32" ? "ffprobe.exe" : "ffprobe");
+}
+
+function hasCommand(command: string, args: string[]): boolean {
+  return runOk(command, args);
 }
 
 function hasWhisper(): boolean {
@@ -128,15 +156,10 @@ export function detectTools(): { ffmpeg: boolean; ffprobe: boolean; whisper: boo
     return _tools;
   }
   if (_tools) return _tools;
-  
-  // Find FFmpeg and FFprobe and cache the paths
-  if (!_ffmpegPath) {
-    _ffmpegPath = findFFmpeg();
-  }
-  if (!_ffprobePath) {
-    _ffprobePath = findFFprobe();
-  }
-  
+
+  if (_ffmpegPath === undefined) _ffmpegPath = findFFmpeg();
+  if (_ffprobePath === undefined) _ffprobePath = findFFprobe();
+
   _tools = {
     ffmpeg: _ffmpegPath !== null,
     ffprobe: _ffprobePath !== null,
@@ -147,17 +170,13 @@ export function detectTools(): { ffmpeg: boolean; ffprobe: boolean; whisper: boo
 }
 
 export function getFFmpegPath(): string | null {
-  if (!_ffmpegPath) {
-    _ffmpegPath = findFFmpeg();
-  }
-  return _ffmpegPath;
+  if (_ffmpegPath === undefined) _ffmpegPath = findFFmpeg();
+  return _ffmpegPath ?? null;
 }
 
 export function getFFprobePath(): string | null {
-  if (!_ffprobePath) {
-    _ffprobePath = findFFprobe();
-  }
-  return _ffprobePath;
+  if (_ffprobePath === undefined) _ffprobePath = findFFprobe();
+  return _ffprobePath ?? null;
 }
 
 export function isDemoMode(): boolean {
@@ -284,7 +303,7 @@ async function processProxy(asset: TandemVideoAsset): Promise<ProxyResult> {
         "-i",
         sourcePath,
         "-vf",
-        "scale=-2:720",
+        "scale=-2:720,format=yuv420p",
         "-c:v",
         "libx264",
         "-preset",
@@ -299,10 +318,15 @@ async function processProxy(asset: TandemVideoAsset): Promise<ProxyResult> {
         "+faststart",
         outPath,
       ],
-      { stdio: "ignore", timeout: 60 * 60 * 1000 },
+      { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 60 * 60 * 1000 },
     );
     if (encode.status !== 0) {
-      throw new Error(`ffmpeg proxy encode failed (exit ${encode.status ?? "signal"})`);
+      const stderr = String(encode.stderr ?? "").trim();
+      throw new Error(
+        `ffmpeg proxy encode failed (exit ${encode.status ?? "signal"})${
+          stderr ? `: ${stderr.slice(-1200)}` : ""
+        }`,
+      );
     }
 
     const stat = fs.statSync(outPath);
@@ -695,7 +719,7 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
     const outKey = `renders/${job.id}.mp4`;
     const outPath = path.join(uploadDir(), outKey);
     const encode = spawnSync(
-      "ffmpeg",
+      getFFmpegPath() || "ffmpeg",
       [
         "-y",
         "-f",
@@ -705,7 +729,7 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
         "-i",
         concatFile,
         "-vf",
-        "scale=-2:720",
+        "scale=-2:720,format=yuv420p",
         "-c:v",
         "libx264",
         "-preset",
@@ -720,10 +744,15 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
         "+faststart",
         outPath,
       ],
-      { stdio: "ignore", timeout: 60 * 60 * 1000 },
+      { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 60 * 60 * 1000 },
     );
     if (encode.status !== 0) {
-      throw new Error(`ffmpeg render failed (exit ${encode.status ?? "signal"})`);
+      const stderr = String(encode.stderr ?? "").trim();
+      throw new Error(
+        `ffmpeg render failed (exit ${encode.status ?? "signal"})${
+          stderr ? `: ${stderr.slice(-1200)}` : ""
+        }`,
+      );
     }
 
     const stat = fs.statSync(outPath);
@@ -776,7 +805,7 @@ async function processAudio(asset: TandemVideoAsset, job: TandemVideoJob): Promi
     const outKey = `proxies/${job.id}-${action.toLowerCase()}.m4a`;
     const outPath = path.join(uploadDir(), outKey);
     const run = spawnSync(
-      "ffmpeg",
+      getFFmpegPath() || "ffmpeg",
       ["-y", "-i", sourcePath, "-vn", "-af", filter, "-c:a", "aac", "-b:a", "192k", outPath],
       { stdio: "ignore", timeout: 60 * 30 * 1000 },
     );
@@ -823,7 +852,7 @@ async function processExport(asset: TandemVideoAsset, job: TandemVideoJob): Prom
     const outKey = `renders/${job.id}-${safeFormat}.mp4`;
     const outPath = path.join(uploadDir(), outKey);
     const run = spawnSync(
-      "ffmpeg",
+      getFFmpegPath() || "ffmpeg",
       [
         "-y",
         "-i",
@@ -895,7 +924,7 @@ async function processThumbnail(asset: TandemVideoAsset, job: TandemVideoJob): P
     const outKey = `proxies/${job.id}-thumb.jpg`;
     const outPath = path.join(uploadDir(), outKey);
     const grab = spawnSync(
-      "ffmpeg",
+      getFFmpegPath() || "ffmpeg",
       ["-y", "-ss", String(timeMs / 1000), "-i", sourcePath, "-frames:v", "1", "-q:v", "2", outPath],
       { stdio: "ignore", timeout: 120000 },
     );
@@ -950,7 +979,7 @@ async function processReferenceAnalyze(asset: TandemVideoAsset, _job: TandemVide
   let sceneStarts: number[] = [];
   if (tools.ffmpeg && tools.ffprobe) {
     const probe = spawnSync(
-      "ffprobe",
+      getFFprobePath() || "ffprobe",
       ["-v", "error", "-show_entries", "format=duration", "-of", "json", sourcePath],
       { encoding: "utf8", timeout: 60000 },
     );
@@ -964,7 +993,7 @@ async function processReferenceAnalyze(asset: TandemVideoAsset, _job: TandemVide
     }
 
     const scene = spawnSync(
-      "ffmpeg",
+      getFFmpegPath() || "ffmpeg",
       ["-i", sourcePath, "-vf", "select='gt(scene,0.3)',showinfo", "-f", "null", "-"],
       { encoding: "utf8", timeout: 60 * 30 * 1000 },
     );

@@ -81,6 +81,7 @@ export function AssetPlayer({
   const internalVideoRef = useRef<HTMLVideoElement>(null);
   const internalAudioRef = useRef<HTMLAudioElement>(null);
   const [mediaError, setMediaError] = useState(false);
+  const [streamStatus, setStreamStatus] = useState<number | null>(null);
   const [retryKey, setRetryKey] = useState(0);
   const videoRef = externalVideoRef ?? internalVideoRef;
   // The seek effect reads whichever element is actually mounted.
@@ -93,6 +94,20 @@ export function AssetPlayer({
   const loading = detail === undefined;
   const proxyFile = detail?.files?.find((file) => file.kind === 'PROXY');
   const demoProxy = proxyFile?.metadata?.demo === true;
+
+  // Turn the silent media error into an actionable explanation. The probe below
+  // fetches the stream just for its status, so we can distinguish a server-side
+  // 401/403/404 from a genuine browser codec-decoding failure.
+  let errorMessage: string;
+  if (streamStatus === 401 || streamStatus === 403) {
+    errorMessage = `The proxy stream returned HTTP ${streamStatus} — the player isn't authorized to fetch it. Reload to refresh your session.`;
+  } else if (streamStatus === 404) {
+    errorMessage = 'The proxy file is missing on the server. Re-upload the asset and wait for processing to finish.';
+  } else if (demoProxy) {
+    errorMessage = 'The server is in demo mode (no ffmpeg detected), so the preview is your original file — browsers can only play H.264 MP4 or WebM here.';
+  } else {
+    errorMessage = "The proxy may still be finishing, or the file uses a codec this browser can't decode.";
+  }
 
   // Follow external playhead changes (timeline clicks / transcript seeks).
   // `assetId` is a dependency so a freshly-mounted element (a new clip) seeks
@@ -108,7 +123,25 @@ export function AssetPlayer({
   // A new asset mounts fresh — clear any error left by a previous clip.
   useEffect(() => {
     setMediaError(false);
+    setStreamStatus(null);
   }, [assetId]);
+
+  // When the media element fails, probe the stream ourselves so the message
+  // reflects the real cause (401/403/404 vs. an undecodable codec).
+  useEffect(() => {
+    if (!mediaError || !ready) return;
+    let cancelled = false;
+    fetch(proxyUrl, { headers: { Range: 'bytes=0-0' } })
+      .then((res) => {
+        if (!cancelled) setStreamStatus(res.status);
+      })
+      .catch(() => {
+        if (!cancelled) setStreamStatus(-1);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaError, ready, proxyUrl]);
 
   const emitTime = (element: HTMLMediaElement) => {
     onTimeUpdate?.(Math.floor(element.currentTime * 1000));
@@ -121,10 +154,13 @@ export function AssetPlayer({
           <div className="den-player-state" data-testid="asset-player-error">
             <TriangleAlert className="mb-2" size={22} />
             <p className="text-sm font-semibold">This footage couldn't play in the browser.</p>
-            <p className="text-xs opacity-70">
-              {demoProxy
-                ? 'The server is in demo mode (no ffmpeg installed), so the preview is your original file — browsers can only play H.264 MP4 or WebM here.'
-                : 'The proxy may still be finishing, or the file uses a codec this browser can\u2019t decode.'}
+            <p className="text-xs opacity-70">{errorMessage}</p>
+            <p className="mono-label mt-1">
+              {streamStatus === null
+                ? 'checking stream…'
+                : streamStatus === -1
+                  ? 'stream unreachable'
+                  : `stream HTTP ${streamStatus}`}
             </p>
             <div className="mt-3 flex flex-wrap justify-center gap-2">
               <button
