@@ -42,7 +42,7 @@ import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
 import { Timeline, formatTimecode, formatDuration, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
-import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
+import { AssetPlayer, EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
 
 interface CutClip {
   id: string;
@@ -136,9 +136,9 @@ function PlayerRail({
             title={asset.data?.fileName}
           />
         ) : (
-          <div className="den-player den-player-overlay mt-3 aspect-video">
+          <EmptyPlayer className="mt-3">
             <p className="text-sm font-semibold">No footage in the vault yet.</p>
-          </div>
+          </EmptyPlayer>
         )}
 
         <p className="den-footnote mt-3">

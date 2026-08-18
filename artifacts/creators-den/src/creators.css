@@ -105,8 +105,7 @@
 /* ---- Player panel ---- */
 .den-player { position: relative; border-radius: 5px; overflow: hidden; background: #0b0f13; border: 1px solid hsl(var(--border)); }
 .den-player video, .den-player img { display: block; width: 100%; aspect-ratio: 16 / 9; background: #0b0f13; object-fit: contain; }
-.den-player-overlay { position: absolute; inset: 0; display: grid; place-items: center; color: hsl(var(--muted-foreground)); background: #0b0f13; }
-.den-player-state { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; color: hsl(var(--muted-foreground)); background: #0b0f13; text-align: center; padding: 24px; }
+.den-player-state { position: relative; min-height: 240px; display: grid; place-content: center; justify-items: center; color: hsl(var(--muted-foreground)); background: #0b0f13; text-align: center; padding: 24px; }
 .den-player-bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 12px; background: linear-gradient(transparent, hsl(218 29% 8% / .85)); color: hsl(var(--primary-foreground)); font-size: 10px; pointer-events: none; }
 .den-player-bar .mono-label { color: hsl(var(--sidebar-primary)); }
 

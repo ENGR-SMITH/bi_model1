@@ -53,7 +53,7 @@ import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult, type StudioLeg } from '@/components/role-oracle';
-import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
+import { AssetPlayer, EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
 
 const LEG_ROLES: Record<string, string> = {
   SELECTS: 'ARCHITECT',
@@ -891,15 +891,12 @@ export default function ContentCreatorsStudioPage() {
                   title={asset.data?.fileName}
                 />
               ) : (
-                <div className="den-player den-player-overlay mt-3 aspect-video">
-                  <div className="text-center">
-                    <Play className="mx-auto mb-2" size={22} />
-                    <p className="text-sm font-semibold">No footage in the vault yet.</p>
-                    <Link href={`/projects/${p.id}`} className="link-btn mt-2">
-                      Upload raw footage <ArrowUpRight size={12} />
-                    </Link>
-                  </div>
-                </div>
+                <EmptyPlayer className="mt-3">
+                  <p className="text-sm font-semibold">No footage in the vault yet.</p>
+                  <Link href={`/projects/${p.id}`} className="link-btn mt-2">
+                    Upload raw footage <ArrowUpRight size={12} />
+                  </Link>
+                </EmptyPlayer>
               )}
 
               <p className="den-footnote mt-3">
