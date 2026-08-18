@@ -42,6 +42,12 @@ Install these on your PC first:
 - **PostgreSQL 16+** running locally on port `5432`. On Windows, install via the
   official installer or `winget install PostgreSQL.PostgreSQL.16`. Make sure the
   service is started.
+- **FFmpeg** (`ffmpeg` + `ffprobe`) for real video transcoding. Without it the API
+  server falls back to a "demo" proxy — a copy of your original file — which only
+  previews when the source is already a browser-native H.264 MP4/WebM.
+  - Replit: `ffmpeg` is already listed under `[nix] packages` in `.replit`.
+  - Linux: `sudo apt install ffmpeg` · macOS: `brew install ffmpeg` ·
+    Windows: `winget install Gyan.FFmpeg`.
 
 > **Windows (Git Bash / PowerShell) note:** prefix the dev-server commands with
 > `MSYS_NO_PATHCONV=1` (Git Bash) so Vite doesn't mangle the `BASE_PATH` value.
@@ -268,5 +274,8 @@ pnpm run dev
   target env var, e.g. `VITE_API_PROXY_TARGET`).
 - **Schema push hangs** — use `push-force` (the `--force` flag) so Drizzle doesn't
   prompt for confirmation.
+- **Vault previews show a codec error / black video** — ffmpeg isn't installed, so
+  the server serves your original file as the "proxy". Install ffmpeg (see
+  Prerequisites) and restart the API server so it transcodes to H.264 MP4.
 - **Windows path mangling** — use the `MSYS_NO_PATHCONV=1` prefix in Git Bash, or
   run the commands from PowerShell where this isn't an issue.

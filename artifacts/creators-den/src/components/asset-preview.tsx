@@ -8,8 +8,8 @@
 // `children`.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
-import { AudioLines, Loader2, Play, RotateCcw, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { AudioLines, Loader2, Play, RotateCcw, Sparkles, TriangleAlert } from 'lucide-react';
 import type { VideoAssetDetail } from '@workspace/api-client-react';
 
 export function proxyUrlFor(projectId: string, assetId: string): string {
@@ -80,6 +80,8 @@ export function AssetPlayer({
 }) {
   const internalVideoRef = useRef<HTMLVideoElement>(null);
   const internalAudioRef = useRef<HTMLAudioElement>(null);
+  const [mediaError, setMediaError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const videoRef = externalVideoRef ?? internalVideoRef;
   // The seek effect reads whichever element is actually mounted.
   const mediaRef: RefObject<HTMLMediaElement | null> = audio
@@ -89,6 +91,8 @@ export function AssetPlayer({
   const ready = hasProxyFile(detail);
   const processing = Boolean(detail) && detail!.status !== 'PROCESSED';
   const loading = detail === undefined;
+  const proxyFile = detail?.files?.find((file) => file.kind === 'PROXY');
+  const demoProxy = proxyFile?.metadata?.demo === true;
 
   // Follow external playhead changes (timeline clicks / transcript seeks).
   // `assetId` is a dependency so a freshly-mounted element (a new clip) seeks
@@ -101,6 +105,11 @@ export function AssetPlayer({
     }
   }, [playheadMs, ready, mediaRef, assetId]);
 
+  // A new asset mounts fresh — clear any error left by a previous clip.
+  useEffect(() => {
+    setMediaError(false);
+  }, [assetId]);
+
   const emitTime = (element: HTMLMediaElement) => {
     onTimeUpdate?.(Math.floor(element.currentTime * 1000));
   };
@@ -108,30 +117,60 @@ export function AssetPlayer({
   return (
     <div className={`den-player ${className}`} data-testid="asset-player">
       {ready ? (
-        audio ? (
+        mediaError ? (
+          <div className="den-player-state" data-testid="asset-player-error">
+            <TriangleAlert className="mb-2" size={22} />
+            <p className="text-sm font-semibold">This footage couldn't play in the browser.</p>
+            <p className="text-xs opacity-70">
+              {demoProxy
+                ? 'The server is in demo mode (no ffmpeg installed), so the preview is your original file — browsers can only play H.264 MP4 or WebM here.'
+                : 'The proxy may still be finishing, or the file uses a codec this browser can\u2019t decode.'}
+            </p>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => {
+                  setMediaError(false);
+                  setRetryKey((key) => key + 1);
+                }}
+                data-testid="asset-player-retry"
+              >
+                <RotateCcw size={13} /> Retry
+              </button>
+              <a href={proxyUrl} target="_blank" rel="noreferrer" className="secondary-btn" data-testid="asset-player-open">
+                Open stream
+              </a>
+            </div>
+          </div>
+        ) : audio ? (
           <div className="den-player-audio">
             <span className="den-player-audio-icon"><AudioLines size={18} /></span>
             <audio
               ref={internalAudioRef}
-              key={assetId}
+              key={`${assetId}-${retryKey}`}
               src={proxyUrl}
               controls
               preload="metadata"
               onTimeUpdate={(event) => emitTime(event.currentTarget)}
               onPlay={(event) => emitTime(event.currentTarget)}
+              onError={() => setMediaError(true)}
+              onLoadedData={() => setMediaError(false)}
               data-testid="asset-player-audio"
             />
           </div>
         ) : (
           <video
             ref={videoRef}
-            key={assetId}
+            key={`${assetId}-${retryKey}`}
             src={proxyUrl}
             controls
             preload="metadata"
             style={filter ? { filter } : undefined}
             onTimeUpdate={(event) => emitTime(event.currentTarget)}
             onPlay={(event) => emitTime(event.currentTarget)}
+            onError={() => setMediaError(true)}
+            onLoadedData={() => setMediaError(false)}
             data-testid="asset-player-video"
           />
         )
