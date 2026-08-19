@@ -200,6 +200,14 @@ export async function enqueueAssetJobs(asset: TandemVideoAsset): Promise<void> {
   }
 }
 
+/** Re-queues a single PROXY job for an asset whose file went missing on disk. */
+export async function requeueProxyJob(projectId: string, assetId: string): Promise<void> {
+  const job = { id: randomUUID(), projectId, assetId, type: "PROXY" as const };
+  await db.insert(tandemVideoJobsTable).values(job);
+  emitJobProgress({ projectId, jobId: job.id, type: job.type, status: "QUEUED" });
+  await enqueueBullMqJob(job);
+}
+
 /** Queues a multi-cam waveform sync between `assetId` (primary) and `targetAssetId`. */
 export async function enqueueSyncJob(
   projectId: string,

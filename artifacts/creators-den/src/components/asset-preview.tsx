@@ -101,6 +101,8 @@ export function AssetPlayer({
   let errorMessage: string;
   if (streamStatus === 401 || streamStatus === 403) {
     errorMessage = `The proxy stream returned HTTP ${streamStatus} — the player isn't authorized to fetch it. Reload to refresh your session.`;
+  } else if (streamStatus === 409) {
+    errorMessage = 'The proxy is being regenerated. This page will update automatically.';
   } else if (streamStatus === 404) {
     errorMessage = 'The proxy file is missing on the server. Re-upload the asset and wait for processing to finish.';
   } else if (demoProxy) {
@@ -125,6 +127,16 @@ export function AssetPlayer({
     setMediaError(false);
     setStreamStatus(null);
   }, [assetId]);
+
+  // When the proxy becomes unavailable (e.g. server re-queued regeneration)
+  // or the detail refetches with a new status, reset the error state so the
+  // component can transition to the processing / loading view.
+  useEffect(() => {
+    if (!ready || detail?.status !== 'PROCESSED') {
+      setMediaError(false);
+      setStreamStatus(null);
+    }
+  }, [ready, detail?.status]);
 
   // When the media element fails, probe the stream ourselves so the message
   // reflects the real cause (401/403/404 vs. an undecodable codec).
@@ -160,20 +172,26 @@ export function AssetPlayer({
                 ? 'checking stream…'
                 : streamStatus === -1
                   ? 'stream unreachable'
-                  : `stream HTTP ${streamStatus}`}
+                  : streamStatus === 409
+                    ? 'regenerating proxy…'
+                    : `stream HTTP ${streamStatus}`}
             </p>
             <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <button
-                type="button"
-                className="secondary-btn"
-                onClick={() => {
-                  setMediaError(false);
-                  setRetryKey((key) => key + 1);
-                }}
-                data-testid="asset-player-retry"
-              >
-                <RotateCcw size={13} /> Retry
-              </button>
+              {streamStatus === 409 ? (
+                <Loader2 className="spin" size={13} />
+              ) : (
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => {
+                    setMediaError(false);
+                    setRetryKey((key) => key + 1);
+                  }}
+                  data-testid="asset-player-retry"
+                >
+                  <RotateCcw size={13} /> Retry
+                </button>
+              )}
               <a href={proxyUrl} target="_blank" rel="noreferrer" className="secondary-btn" data-testid="asset-player-open">
                 Open stream
               </a>

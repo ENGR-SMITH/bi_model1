@@ -68,6 +68,7 @@ import {
   enqueueRenderJob,
   enqueueSyncJob,
   hasActiveRender,
+  requeueProxyJob,
   uploadDir,
 } from "../video/worker";
 
@@ -303,13 +304,45 @@ router.get(
 
     const filePath = path.join(uploadDir(), proxy.storageKey);
     if (!fs.existsSync(filePath)) {
-      res.status(404).json({ error: "Proxy file is missing on the server" });
+      // The proxy record exists in the DB but the file is gone from disk
+      // (common after a container restart on ephemeral storage). Clean up
+      // the stale record, re-queue the proxy job, and let the frontend
+      // polling loop pick up the regenerated file.
+      await db.delete(tandemVideoAssetFilesTable).where(eq(tandemVideoAssetFilesTable.id, proxy.id));
+      await requeueProxyJob(asset.projectId, asset.id);
+      await db.update(tandemVideoAssetsTable).set({ status: "UPLOADED" }).where(eq(tandemVideoAssetsTable.id, asset.id));
+      res.status(409).json({ error: "Proxy file is missing — regenerating" });
       return;
     }
 
-    res.setHeader("Content-Type", proxy.mimeType || "video/mp4");
-    res.setHeader("Accept-Ranges", "bytes");
-    res.sendFile(filePath);
+    // Stream the file directly instead of using res.sendFile — Express 5's
+    // send library can reject valid paths on some platforms.
+    const stat = fs.statSync(filePath);
+    const fileSize = stat.size;
+    const mimeType = proxy.mimeType || "video/mp4";
+    const range = req.headers.range;
+
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0] ?? "0", 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunkSize = end - start + 1;
+
+      res.writeHead(206, {
+        "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+        "Accept-Ranges": "bytes",
+        "Content-Length": chunkSize,
+        "Content-Type": mimeType,
+      });
+      fs.createReadStream(filePath, { start, end }).pipe(res);
+    } else {
+      res.writeHead(200, {
+        "Content-Length": fileSize,
+        "Content-Type": mimeType,
+        "Accept-Ranges": "bytes",
+      });
+      fs.createReadStream(filePath).pipe(res);
+    }
   },
 );
 
