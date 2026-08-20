@@ -71,6 +71,15 @@ import {
   requeueProxyJob,
   uploadDir,
 } from "../video/worker";
+import {
+  buildCheckoutManifest,
+  buildTimelineEdl,
+  parseTimelineEdl,
+  resolveEdlEvents,
+  type CheckoutMediaItem,
+  type EdlClip,
+  type ParsedEdlEvent,
+} from "../video/edl";
 
 const router: IRouter = Router();
 
@@ -1210,6 +1219,353 @@ router.post(
       .limit(1);
 
     res.status(201).json(RenderVideoTimelineResponse.parse(job));
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Checkout bridge (external-first) — export the leg's current snapshot as a
+// CMX3600 EDL + a media manifest so the editor can finish the cut in an
+// external NLE and re-import it later. Read-only; any member may check out.
+// ---------------------------------------------------------------------------
+
+async function buildCheckout(
+  projectId: string,
+  leg: string,
+): Promise<{
+  projectName: string;
+  version: number | null;
+  edl: string;
+  manifest: CheckoutMediaItem[];
+} | null> {
+  const [project] = await db
+    .select()
+    .from(tandemVideoProjectsTable)
+    .where(eq(tandemVideoProjectsTable.id, projectId))
+    .limit(1);
+  if (!project) return null;
+
+  const [timeline] = await db
+    .select()
+    .from(tandemVideoTimelinesTable)
+    .where(
+      and(
+        eq(tandemVideoTimelinesTable.projectId, projectId),
+        eq(tandemVideoTimelinesTable.leg, leg),
+      ),
+    )
+    .limit(1);
+  if (!timeline || !timeline.currentVersionId) return null;
+
+  const [version] = await db
+    .select()
+    .from(tandemVideoTimelineVersionsTable)
+    .where(eq(tandemVideoTimelineVersionsTable.id, timeline.currentVersionId))
+    .limit(1);
+  if (!version) return null;
+
+  const snapshot = (version.snapshot ?? {}) as { clips?: EdlClip[] };
+  const clips = Array.isArray(snapshot.clips) ? snapshot.clips : [];
+  const assetIds = [...new Set(clips.map((clip) => clip.assetId).filter(Boolean))];
+
+  const assets = assetIds.length
+    ? await db
+        .select()
+        .from(tandemVideoAssetsTable)
+        .where(inArray(tandemVideoAssetsTable.id, assetIds))
+    : [];
+  const assetById = new Map(
+    assets.map((asset) => [asset.id, { fileName: asset.fileName, kind: asset.kind }]),
+  );
+
+  const edl = buildTimelineEdl({
+    title: `${project.name} — ${leg}`,
+    version: version.version,
+    clips,
+    assetById,
+  });
+  const manifest = buildCheckoutManifest(clips, assetById);
+
+  return { projectName: project.name, version: version.version, edl, manifest };
+}
+
+function checkoutFilename(projectName: string, leg: string, version: number | null): string {
+  const slug = projectName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "project";
+  return `${slug}-${leg.toLowerCase()}-v${version ?? 0}.edl`;
+}
+
+// GET /video/projects/:projectId/timelines/:leg/checkout — the EDL file.
+router.get(
+  "/video/projects/:projectId/timelines/:leg/checkout",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Unknown leg" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const checkout = await buildCheckout(params.data.projectId, params.data.leg);
+    if (!checkout) {
+      res.status(400).json({ error: "Save a snapshot before checking out" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${checkoutFilename(checkout.projectName, params.data.leg, checkout.version)}"`,
+    );
+    res.send(checkout.edl);
+  },
+);
+
+// GET /video/projects/:projectId/timelines/:leg/checkout/manifest — the
+// referenced source media (for the re-import/bundle half of the round-trip).
+router.get(
+  "/video/projects/:projectId/timelines/:leg/checkout/manifest",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Unknown leg" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const checkout = await buildCheckout(params.data.projectId, params.data.leg);
+    if (!checkout) {
+      res.status(400).json({ error: "Save a snapshot before checking out" });
+      return;
+    }
+
+    res.json({
+      projectId: params.data.projectId,
+      leg: params.data.leg,
+      version: checkout.version,
+      media: checkout.manifest.map((item) => ({
+        ...item,
+        downloadPath: `/api/video/projects/${params.data.projectId}/files/${item.assetId}/download`,
+      })),
+    });
+  },
+);
+
+// POST /video/projects/:projectId/timelines/:leg/import — the push half of the
+// round-trip: parse an external EDL, relink sources to vault assets, save a
+// new timeline version, and (by default) submit it for Captain review.
+router.post(
+  "/video/projects/:projectId/timelines/:leg/import",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Unknown leg" });
+      return;
+    }
+
+    const rawBody = (req.body ?? {}) as { edl?: unknown; message?: unknown; submit?: unknown };
+    const edl = typeof rawBody.edl === "string" ? rawBody.edl : "";
+    const message = typeof rawBody.message === "string" ? rawBody.message.trim() : "";
+    const submit = rawBody.submit !== false;
+    if (!edl.trim()) {
+      res.status(400).json({ error: "No EDL content to import" });
+      return;
+    }
+
+    const member = await requireLegEditor(params.data.projectId, params.data.leg, userId);
+    if (!member) {
+      res.status(403).json({ error: "Only the leg role (or the Captain) can import this timeline" });
+      return;
+    }
+
+    let events: ParsedEdlEvent[];
+    try {
+      events = parseTimelineEdl(edl);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Could not parse the EDL" });
+      return;
+    }
+    if (events.length === 0) {
+      res.status(400).json({ error: "The EDL has no edit events" });
+      return;
+    }
+
+    const assets = await db
+      .select()
+      .from(tandemVideoAssetsTable)
+      .where(eq(tandemVideoAssetsTable.projectId, params.data.projectId));
+    const { clips, unresolved } = resolveEdlEvents(
+      events,
+      assets.map((asset) => ({ id: asset.id, fileName: asset.fileName })),
+    );
+    if (unresolved.length > 0) {
+      res.status(400).json({
+        error: "Some EDL sources are not in the vault — upload them first",
+        unresolved,
+      });
+      return;
+    }
+
+    // Save the imported cut as a new Git-style version (same shape as a save).
+    const [timeline] = await db
+      .select()
+      .from(tandemVideoTimelinesTable)
+      .where(
+        and(
+          eq(tandemVideoTimelinesTable.projectId, params.data.projectId),
+          eq(tandemVideoTimelinesTable.leg, params.data.leg),
+        ),
+      )
+      .limit(1);
+
+    let timelineId = timeline?.id ?? "";
+    if (!timeline) {
+      const [created] = await db
+        .insert(tandemVideoTimelinesTable)
+        .values({
+          id: randomUUID(),
+          projectId: params.data.projectId,
+          leg: params.data.leg,
+          status: "DRAFT",
+        })
+        .returning();
+      timelineId = created.id;
+    }
+
+    const [latest] = await db
+      .select()
+      .from(tandemVideoTimelineVersionsTable)
+      .where(eq(tandemVideoTimelineVersionsTable.timelineId, timelineId))
+      .orderBy(desc(tandemVideoTimelineVersionsTable.version))
+      .limit(1);
+
+    const versionNumber = (latest?.version ?? 0) + 1;
+    const snapshot = { clips, overlays: [], sceneBlocks: [], markers: [] };
+    const [version] = await db
+      .insert(tandemVideoTimelineVersionsTable)
+      .values({
+        id: randomUUID(),
+        timelineId,
+        version: versionNumber,
+        snapshot,
+        message: message || `Imported from EDL (${clips.length} clips)`,
+        createdById: userId,
+        parentVersionId: latest?.id ?? null,
+      })
+      .returning();
+
+    await db
+      .update(tandemVideoTimelinesTable)
+      .set({ currentVersionId: version.id, updatedAt: new Date() })
+      .where(eq(tandemVideoTimelinesTable.id, timelineId));
+
+    emitToProject(params.data.projectId, "timeline.saved", {
+      projectId: params.data.projectId,
+      leg: params.data.leg,
+      version: version.version,
+      versionId: version.id,
+      message: version.message,
+      createdById: userId,
+    });
+
+    // Default to submitting the imported cut for review (the round-trip push).
+    let submissionId: string | null = null;
+    if (submit) {
+      const [pending] = await db
+        .select()
+        .from(tandemVideoSubmissionsTable)
+        .where(
+          and(
+            eq(tandemVideoSubmissionsTable.projectId, params.data.projectId),
+            eq(tandemVideoSubmissionsTable.leg, params.data.leg),
+            eq(tandemVideoSubmissionsTable.status, "SUBMITTED"),
+          ),
+        )
+        .limit(1);
+
+      if (!pending) {
+        const [submission] = await db
+          .insert(tandemVideoSubmissionsTable)
+          .values({
+            id: randomUUID(),
+            projectId: params.data.projectId,
+            leg: params.data.leg,
+            timelineVersionId: version.id,
+            status: "SUBMITTED",
+            note: message || "Imported from an external editor",
+            submittedById: userId,
+          })
+          .returning();
+        submissionId = submission.id;
+
+        await db
+          .update(tandemVideoTimelinesTable)
+          .set({ status: "SUBMITTED", updatedAt: new Date() })
+          .where(eq(tandemVideoTimelinesTable.id, timelineId));
+
+        emitToProject(params.data.projectId, "submission.new", submission);
+
+        const [owner] = await db
+          .select()
+          .from(tandemVideoProjectsTable)
+          .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+          .limit(1);
+        if (owner && owner.ownerId !== userId) {
+          await notify(
+            owner.ownerId,
+            "video_submission",
+            `Leg ${params.data.leg} submitted for review`,
+            `The ${params.data.leg} leg was submitted from an external edit${version.message ? ` — “${version.message.slice(0, 120)}”` : ""}.`,
+            `/creators-den/projects/${params.data.projectId}`,
+            submission.id,
+          ).catch(() => {});
+        }
+
+        if (params.data.leg === "CUT") {
+          await enqueueRenderJob(
+            params.data.projectId,
+            params.data.leg,
+            "PICTURE_LOCK",
+            clips[0]?.assetId ?? timelineId,
+            version.id,
+          ).catch(() => {});
+        }
+      }
+    }
+
+    res.status(201).json({
+      version: version.version,
+      clips: clips.length,
+      submissionId,
+    });
   },
 );
 

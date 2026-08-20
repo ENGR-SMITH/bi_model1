@@ -40,6 +40,7 @@ vi.mock("@workspace/db", async () => {
 
 import videoRouter from "./video";
 import videoProductionRouter from "./video-production";
+import { formatEdlTimecode, parseEdlTimecode, parseTimelineEdl, resolveEdlEvents } from "../video/edl";
 import { runWorkerCycle } from "../video/worker";
 
 function createApp(): Express {
@@ -236,6 +237,169 @@ describe("timelines (Git-style versions)", () => {
     expect(rolled.body.snapshot.clips[0].id).toBe("v1clip");
     expect(rolled.body.version).toBe(3);
     expect(rolled.body.versions).toHaveLength(3);
+  });
+});
+
+describe("checkout (external-first EDL bridge)", () => {
+  it("formats EDL timecode as HH:MM:SS:FF at 25fps", () => {
+    expect(formatEdlTimecode(0)).toBe("00:00:00:00");
+    expect(formatEdlTimecode(1000)).toBe("00:00:01:00");
+    expect(formatEdlTimecode(60000)).toBe("00:01:00:00");
+    expect(formatEdlTimecode(3600000 + 2000)).toBe("01:00:02:00");
+  });
+
+  it("downloads a CMX3600 EDL for a saved cut and lists referenced media", async () => {
+    const project = await createProject();
+    const camA = await uploadAsset(project.id, "interview-cam-a.mp4");
+    const camB = await uploadAsset(project.id, "broll-shot.mp4");
+
+    state.userId = "captain-1";
+    const empty = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout`);
+    expect(empty.status).toBe(400);
+
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/CUT`)
+      .send({
+        snapshot: {
+          clips: [
+            { id: "clip-1", assetId: camA.id, inMs: 0, outMs: 5000 },
+            { id: "clip-2", assetId: camB.id, inMs: 5000, outMs: 9000 },
+          ],
+        },
+        message: "Rough cut",
+      });
+
+    const res = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout`);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-disposition"]).toContain("attachment");
+    expect(res.headers["content-disposition"]).toContain(".edl");
+    expect(res.text).toContain("TITLE:");
+    expect(res.text).toContain("FCM: NON-DROP FRAME");
+    expect(res.text).toContain("INTERVIEW-CAM-A");
+    expect(res.text).toContain("* FROM CLIP NAME: interview-cam-a.mp4");
+    expect(res.text).toContain("* MEDIA MANIFEST");
+    expect(res.text).toContain("broll-shot.mp4");
+
+    const manifest = await request(API).get(
+      `/api/video/projects/${project.id}/timelines/CUT/checkout/manifest`,
+    );
+    expect(manifest.status).toBe(200);
+    expect(manifest.body.media).toHaveLength(2);
+    expect(manifest.body.media[0].fileName).toBe("interview-cam-a.mp4");
+    expect(manifest.body.media[0].downloadPath).toContain(`/files/${camA.id}/download`);
+  });
+
+  it("restricts checkout to project members", async () => {
+    const project = await createProject();
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/CUT`)
+      .send({ snapshot: { clips: [{ id: "c1", assetId: "a1", inMs: 0, outMs: 1000 }] } });
+
+    state.userId = "stranger-1";
+    const forbidden = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout`);
+    expect(forbidden.status).toBe(403);
+
+    state.userId = null;
+    const unauth = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout`);
+    expect(unauth.status).toBe(401);
+  });
+});
+
+describe("import (external-first EDL round-trip)", () => {
+  it("round-trips timecode and parses events with comment metadata", () => {
+    expect(parseEdlTimecode(formatEdlTimecode(45240))).toBe(45240);
+
+    const events = parseTimelineEdl(`TITLE: x
+FCM: NON-DROP FRAME
+
+001  INTERVIEW-CAM-A  V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00
+* FROM CLIP NAME: interview-cam-a.mp4
+* FROM CLIP: asset-1
+`);
+    expect(events).toHaveLength(1);
+    expect(events[0].reel).toBe("INTERVIEW-CAM-A");
+    expect(events[0].fromClipName).toBe("interview-cam-a.mp4");
+    expect(events[0].fromClipId).toBe("asset-1");
+    expect(events[0].recInMs).toBe(0);
+    expect(events[0].recOutMs).toBe(5000);
+
+    const { clips, unresolved } = resolveEdlEvents(events, [
+      { id: "asset-1", fileName: "interview-cam-a.mp4" },
+    ]);
+    expect(clips).toHaveLength(1);
+    expect(clips[0].assetId).toBe("asset-1");
+    expect(unresolved).toEqual([]);
+  });
+
+  it("imports an EDL as a new version and submits it for review", async () => {
+    const project = await createProject();
+    const camA = await uploadAsset(project.id, "interview-cam-a.mp4");
+    const camB = await uploadAsset(project.id, "broll-shot.mp4");
+    state.userId = "captain-1";
+
+    const edl = `TITLE: imported cut
+FCM: NON-DROP FRAME
+
+001  INTERVIEW-CAM-A  V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00
+* FROM CLIP NAME: interview-cam-a.mp4
+
+002  BROLL-SHOT      V     C        00:00:00:00 00:00:03:00 00:00:05:00 00:00:08:00
+* FROM CLIP NAME: broll-shot.mp4
+`;
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ edl, message: "Finished in Premiere" });
+    expect(res.status).toBe(201);
+    expect(res.body.clips).toBe(2);
+    expect(res.body.version).toBe(1);
+    expect(res.body.submissionId).toBeTruthy();
+
+    const timeline = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT`);
+    expect(timeline.body.version).toBe(1);
+    expect(timeline.body.snapshot.clips).toHaveLength(2);
+    expect(timeline.body.snapshot.clips[0].assetId).toBe(camA.id);
+    expect(timeline.body.snapshot.clips[1].assetId).toBe(camB.id);
+
+    const submissions = await request(API).get(`/api/video/projects/${project.id}/submissions`);
+    expect(submissions.body).toHaveLength(1);
+    expect(submissions.body[0].status).toBe("SUBMITTED");
+    expect(submissions.body[0].note).toBe("Finished in Premiere");
+  });
+
+  it("rejects an EDL whose sources are not in the vault", async () => {
+    const project = await createProject();
+    await uploadAsset(project.id, "interview-cam-a.mp4");
+    state.userId = "captain-1";
+
+    const edl = `TITLE: x
+FCM: NON-DROP FRAME
+
+001  MISSING-CLIP  V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00
+* FROM CLIP NAME: missing-clip.mp4
+`;
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ edl });
+    expect(res.status).toBe(400);
+    expect(res.body.unresolved).toEqual(["missing-clip.mp4"]);
+  });
+
+  it("requires the leg role and non-empty EDL content", async () => {
+    const project = await createProject();
+
+    state.userId = "captain-1";
+    const empty = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ edl: "   " });
+    expect(empty.status).toBe(400);
+
+    state.userId = "stranger-1";
+    const forbidden = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ edl: "TITLE: x\n" });
+    expect(forbidden.status).toBe(403);
   });
 });
 

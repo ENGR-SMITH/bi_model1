@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import {
   ArrowLeft,
   ArrowRightLeft,
@@ -6,6 +6,7 @@ import {
   Check,
   ChevronsLeftRight,
   Clapperboard,
+  Download,
   Film,
   Layers,
   Link2,
@@ -21,6 +22,7 @@ import {
   Save,
   Scissors,
   Sparkles,
+  Upload,
   X,
 } from 'lucide-react';
 import { Link, useParams } from 'wouter';
@@ -31,6 +33,7 @@ import {
   getGetVideoProjectQueryKey,
   getGetVideoTimelineQueryKey,
   getListVideoJobsQueryKey,
+  getListVideoSubmissionsQueryKey,
   getListVideoSyncsQueryKey,
   oracleChat,
   useGetVideoAsset,
@@ -602,6 +605,168 @@ function RenderPanel({
 }
 
 // ---------------------------------------------------------------------------
+// Checkout (EDL) — external-first bridge: download the cut as a CMX3600 EDL
+// to finish in an external NLE, then re-import the new version.
+// ---------------------------------------------------------------------------
+
+function CheckoutPanel({
+  projectId,
+  projectName,
+  clips,
+  assets,
+}: {
+  projectId: string;
+  projectName: string;
+  clips: CutClip[];
+  assets: Array<{ id: string; fileName: string }>;
+}) {
+  const assetIds = useMemo(
+    () => [...new Set(clips.map((clip) => clip.assetId).filter(Boolean))],
+    [clips],
+  );
+  const media = assetIds
+    .map((id) => assets.find((asset) => asset.id === id))
+    .filter((asset): asset is { id: string; fileName: string } => Boolean(asset));
+
+  const downloadName =
+    (projectName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'cut') +
+    '-cut.edl';
+
+  return (
+    <div className="paper-card">
+      <div className="inline-heading">
+        <span className="eyebrow"><Download size={13} /> Checkout — EDL</span>
+      </div>
+      <p className="setting-copy">
+        Download this cut as a CMX3600 EDL to finish it in Premiere, Resolve, or Avid, then re-import the new version for review.
+      </p>
+      <a
+        href={`/api/video/projects/${projectId}/timelines/CUT/checkout`}
+        download={downloadName}
+        className="primary-btn"
+        data-testid="cut-button-checkout-edl"
+      >
+        <Download size={14} />
+        Download EDL
+      </a>
+      {media.length > 0 ? (
+        <div className="mt-3">
+          <span className="mono-label">{media.length} source file{media.length === 1 ? '' : 's'} referenced</span>
+          <ul className="mt-2 space-y-1">
+            {media.map((asset) => (
+              <li key={asset.id} className="den-footnote"><Film size={11} /> {asset.fileName}</li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="den-footnote mt-2">No clips on the timeline yet — add clips before checking out.</p>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Import (EDL) — the push half: bring back an edited .edl from an external
+// NLE as a new version, and submit it for review.
+// ---------------------------------------------------------------------------
+
+function ImportPanel({ projectId, canEdit }: { projectId: string; canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  const [message, setMessage] = useState('');
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const edlRef = useRef<string | null>(null);
+
+  const onPick = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    setError(null);
+    setResult(null);
+    if (!file) return;
+    setFileName(file.name);
+    edlRef.current = await file.text();
+  };
+
+  const onImport = async () => {
+    const edl = edlRef.current;
+    if (!edl) {
+      setError('Choose an .edl file first.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch(`/api/video/projects/${projectId}/timelines/CUT/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ edl, message: message.trim() || undefined, submit: true }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        unresolved?: string[];
+        version?: number;
+        clips?: number;
+        submissionId?: string | null;
+      };
+      if (!res.ok) {
+        const missing = Array.isArray(data.unresolved) && data.unresolved.length ? ` Missing: ${data.unresolved.join(', ')}` : '';
+        setError(`${data.error ?? 'Import failed'}${missing}`);
+        return;
+      }
+      setResult(
+        `Imported ${data.clips ?? 0} clips as v${data.version ?? '?'}${data.submissionId ? ' and submitted for review' : ''}`,
+      );
+      setMessage('');
+      setFileName(null);
+      edlRef.current = null;
+      if (fileRef.current) fileRef.current.value = '';
+      queryClient.invalidateQueries({ queryKey: getGetVideoTimelineQueryKey(projectId, 'CUT') });
+      queryClient.invalidateQueries({ queryKey: getListVideoSubmissionsQueryKey(projectId) });
+    } catch {
+      setError('The import could not be completed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="paper-card">
+      <div className="inline-heading">
+        <span className="eyebrow"><Upload size={13} /> Import — EDL</span>
+      </div>
+      <p className="setting-copy">
+        Bring back an edited .edl from Premiere/Resolve/Avid — it becomes a new version and is submitted for review.
+      </p>
+      {canEdit ? (
+        <div className="mt-3 space-y-2">
+          <input ref={fileRef} type="file" accept=".edl,text/plain" onChange={onPick} data-testid="cut-input-import-edl" />
+          {fileName && <p className="den-footnote"><Film size={11} /> {fileName}</p>}
+          <div className="flex gap-2">
+            <input
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              placeholder="What changed in this pass? (optional)"
+              maxLength={500}
+            />
+            <button type="button" onClick={onImport} disabled={busy} className="primary-btn" data-testid="cut-button-import-edl">
+              <Upload size={13} />
+              {busy ? 'Importing…' : 'Import & submit'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="setting-copy mt-3">Only the Visual Editor or the Captain can import an edited cut.</p>
+      )}
+      {result && <p className="den-footnote mt-2"><Check size={12} /> {result}</p>}
+      {error && <p className="setting-copy mt-2" role="alert">{error}</p>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -913,6 +1078,10 @@ export default function ContentCreatorsCutPage() {
           </div>
 
           <RenderPanel projectId={p.id} canEdit={canEdit} />
+
+          <CheckoutPanel projectId={p.id} projectName={p.name} clips={working.clips} assets={p.assets} />
+
+          <ImportPanel projectId={p.id} canEdit={canEdit} />
 
           <HistoryPanel
             projectId={p.id}
