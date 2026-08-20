@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  ArrowRightLeft,
   Camera,
   Check,
+  ChevronsLeftRight,
   Clapperboard,
   Film,
   Layers,
   Link2,
   LockKeyhole,
   Mic2,
+  MoveHorizontal,
+  MoveRight,
+  MousePointer2,
   Palette,
   Play,
   Plus,
@@ -40,7 +45,7 @@ import {
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
-import { Timeline, formatTimecode, formatDuration, activeBlockId, type TimelineBlock } from '@/components/timeline';
+import { Timeline, formatTimecode, formatDuration, activeBlockId, MIN_CLIP_MS, type TimelineBlock, type TimelineTool } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
 import { AssetPlayer, EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
 
@@ -50,6 +55,10 @@ interface CutClip {
   inMs: number;
   outMs: number;
   camera?: string | null;
+  /** Source-window start (which part of the asset is shown). Defaults to inMs. */
+  srcInMs?: number;
+  /** Source-window end (which part of the asset is shown). Defaults to outMs. */
+  srcOutMs?: number;
 }
 
 interface CutOverlay {
@@ -246,6 +255,53 @@ function SyncPanel({
 }
 
 // ---------------------------------------------------------------------------
+// Editing toolbox (Premiere Pro-style tool strip)
+// ---------------------------------------------------------------------------
+
+const CUT_TOOLS: Array<{ id: TimelineTool; label: string; key: string; hint: string; icon: typeof MousePointer2 }> = [
+  { id: 'select', label: 'Selection', key: 'V', hint: 'Drag to move · pull edges to trim · click the ruler to scrub', icon: MousePointer2 },
+  { id: 'razor', label: 'Razor', key: 'B', hint: 'Click inside a clip to split it at that point', icon: Scissors },
+  { id: 'ripple', label: 'Ripple trim', key: 'N', hint: 'Pull an edge — every clip that follows shifts to close the gap', icon: MoveRight },
+  { id: 'rolling', label: 'Rolling', key: 'C', hint: 'Pull a cut — the two adjacent clips trade time without moving the rest', icon: ArrowRightLeft },
+  { id: 'slip', label: 'Slip', key: 'S', hint: 'Drag a clip body — the source window slides underneath, position and duration stay put', icon: ChevronsLeftRight },
+  { id: 'slide', label: 'Slide', key: 'Y', hint: 'Drag a clip body — it slides between its neighbors, which trim to make room', icon: MoveHorizontal },
+];
+
+function Toolbox({
+  tool,
+  onToolChange,
+  canEdit,
+}: {
+  tool: TimelineTool;
+  onToolChange: (next: TimelineTool) => void;
+  canEdit: boolean;
+}) {
+  return (
+    <div className="den-toolbox" role="toolbar" aria-label="Editing tools" data-testid="cut-toolbox">
+      {CUT_TOOLS.map((t) => {
+        const Icon = t.icon;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            className={`den-tool-btn ${tool === t.id ? 'active' : ''}`}
+            onClick={() => onToolChange(t.id)}
+            disabled={!canEdit}
+            title={`${t.label} (${t.key}) — ${t.hint}`}
+            aria-pressed={tool === t.id}
+            data-testid={`cut-tool-${t.id}`}
+          >
+            <Icon size={14} />
+            <span>{t.label}</span>
+            <kbd>{t.key}</kbd>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Cut builder: main track + overlay layer with drag-and-drop
 // ---------------------------------------------------------------------------
 
@@ -258,15 +314,19 @@ function CutBuilder({
   durationMs,
   playheadMs,
   onScrub,
+  tool,
+  onToolChange,
 }: {
   snapshot: CutSnapshot;
   onChange: (next: CutSnapshot) => void;
-  assets: Array<{ id: string; fileName: string; kind: string }>;
+  assets: Array<{ id: string; fileName: string; kind: string; durationMs?: number | null }>;
   syncs: Array<{ primaryAssetId: string; targetAssetId: string; offsetMs: number }>;
   canEdit: boolean;
   durationMs: number;
   playheadMs: number;
   onScrub: (ms: number) => void;
+  tool: TimelineTool;
+  onToolChange: (next: TimelineTool) => void;
 }) {
   const [overlayAssetId, setOverlayAssetId] = useState('');
 
@@ -282,6 +342,9 @@ function CutBuilder({
       sublabel: sync ? formatOffset(sync.offsetMs) : formatDuration(clip.outMs - clip.inMs),
       startMs: clip.inMs,
       endMs: clip.outMs,
+      srcInMs: clip.srcInMs ?? clip.inMs,
+      srcOutMs: clip.srcOutMs ?? clip.outMs,
+      srcDurationMs: asset?.durationMs ?? durationMs,
       tone: 'accent',
     };
   });
@@ -298,7 +361,17 @@ function CutBuilder({
   const onClipsChange = (next: TimelineBlock[]) => {
     const nextClips = snapshot.clips.map((clip) => {
       const block = next.find((b) => b.id === clip.id);
-      return block ? { ...clip, inMs: block.startMs, outMs: block.endMs } : clip;
+      // Keep the source window (srcInMs/srcOutMs) in sync with the block so
+      // slip edits, source-aware trims, and razor splits all survive a save.
+      return block
+        ? {
+            ...clip,
+            inMs: block.startMs,
+            outMs: block.endMs,
+            srcInMs: block.srcInMs ?? clip.srcInMs,
+            srcOutMs: block.srcOutMs ?? clip.srcOutMs,
+          }
+        : clip;
     });
     onChange({ ...snapshot, clips: nextClips });
   };
@@ -326,11 +399,31 @@ function CutBuilder({
     onChange({ ...snapshot, clips: snapshot.clips.map((c) => (c.id === id ? { ...c, assetId } : c)) });
   };
 
+  // Razor: split a clip at the clicked timecode. The source window is cut at the
+  // matching source position (sourcePos = srcIn + (timelinePos - in)), so slip
+  // offsets survive the split.
+  const handleRazor = (ms: number) => {
+    const clip = snapshot.clips.find(
+      (c) => ms > c.inMs && ms < c.outMs && ms - c.inMs >= MIN_CLIP_MS && c.outMs - ms >= MIN_CLIP_MS,
+    );
+    if (!clip) return;
+    const srcIn = clip.srcInMs ?? clip.inMs;
+    const srcOut = clip.srcOutMs ?? clip.outMs;
+    const splitSrc = srcIn + (ms - clip.inMs);
+    const left: CutClip = { ...clip, outMs: ms, srcOutMs: splitSrc };
+    const right: CutClip = { ...clip, id: crypto.randomUUID(), inMs: ms, srcInMs: splitSrc };
+    onChange({ ...snapshot, clips: snapshot.clips.flatMap((c) => (c.id === clip.id ? [left, right] : [c])) });
+  };
+
+  const activeTool = CUT_TOOLS.find((t) => t.id === tool) ?? CUT_TOOLS[0];
+
   return (
     <div className="space-y-4">
+      <Toolbox tool={tool} onToolChange={onToolChange} canEdit={canEdit} />
+
       <Timeline
         title={`Main track — ${snapshot.clips.length} clips`}
-        hint="Drag to move · pull edges to trim · click the ruler to scrub"
+        hint={activeTool.hint}
         blocks={clipBlocks}
         durationMs={durationMs}
         playheadMs={playheadMs}
@@ -338,6 +431,8 @@ function CutBuilder({
         onChange={onClipsChange}
         onScrub={onScrub}
         activeId={activeBlockId(clipBlocks, playheadMs)}
+        tool={tool}
+        onRazor={handleRazor}
       />
 
       <div className="paper-card">
@@ -521,8 +616,25 @@ export default function ContentCreatorsCutPage() {
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState('');
   const [playheadMs, setPlayheadMs] = useState(0);
+  const [tool, setTool] = useState<TimelineTool>('select');
   const [aiResult, setAiResult] = useState<{ title: string; body: string; meta: { providerId: string; modelId: string } | null } | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
+
+  // Keyboard shortcuts mirror the Premiere Pro toolbox (V/B/N/C/S/Y).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return;
+      const hit = CUT_TOOLS.find((t) => t.key === event.key.toUpperCase());
+      if (hit) {
+        event.preventDefault();
+        setTool(hit.id);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const project = useGetVideoProject(projectId);
   const cutTimeline = useGetVideoTimeline(projectId, 'CUT');
@@ -746,6 +858,8 @@ export default function ContentCreatorsCutPage() {
             durationMs={timelineDuration}
             playheadMs={playheadMs}
             onScrub={onScrub}
+            tool={tool}
+            onToolChange={setTool}
           />
 
           {aiResult && (

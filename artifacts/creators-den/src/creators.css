@@ -165,3 +165,19 @@
 .den-two-col-wide { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; align-items: start; }
 .den-footnote { display: flex; align-items: center; gap: 7px; color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.55; }
 .den-footnote svg { flex: 0 0 auto; color: hsl(var(--accent)); }
+
+/* ---- Editing toolbox (Premiere Pro-style tool strip) ---- */
+.den-toolbox { display: flex; flex-wrap: wrap; gap: 6px; }
+.den-tool-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid hsl(var(--border)); border-radius: 5px; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 700; cursor: pointer; transition: all .12s; }
+.den-tool-btn:hover { border-color: hsl(var(--accent) / .5); color: hsl(var(--foreground)); }
+.den-tool-btn.active { border-color: hsl(var(--accent)); background: hsl(var(--accent) / .14); color: hsl(var(--accent)); box-shadow: 0 0 0 1px hsl(var(--accent) / .35); }
+.den-tool-btn:disabled { opacity: .5; cursor: default; }
+.den-tool-btn kbd { font: 8px var(--app-font-mono); padding: 1px 4px; border: 1px solid hsl(var(--border)); border-radius: 3px; background: hsl(var(--secondary) / .5); color: hsl(var(--muted-foreground)); }
+.den-tool-btn.active kbd { border-color: hsl(var(--accent) / .4); color: hsl(var(--accent)); }
+
+/* ---- Tool cursors on the timeline ---- */
+.timeline-shell.tool-razor .timeline-block { cursor: crosshair; }
+.timeline-shell.tool-razor .timeline-block:hover { border-color: hsl(var(--destructive) / .7); background: hsl(var(--destructive) / .12); }
+.timeline-shell.tool-razor .timeline-trim { display: none; }
+.timeline-shell.tool-grab .timeline-block { cursor: grab; }
+.timeline-shell.tool-grab .timeline-block.dragging { cursor: grabbing; }
