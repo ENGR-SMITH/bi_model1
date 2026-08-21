@@ -5,6 +5,7 @@ import {
   tandemVideoProjectsTable,
   tandemVideoMembersTable,
   tandemVideoAssetsTable,
+  tandemVideoAssetFilesTable,
 } from "@workspace/db";
 import {
   AddVideoProjectMemberBody,
@@ -52,6 +53,7 @@ const ALLOWED_ASSET_KINDS = [
   "REFERENCE",
   "VO_PICKUP",
   "GRAPHIC",
+  "THUMBNAIL_DESIGN",
 ] as const;
 
 const upload = multer({
@@ -383,13 +385,38 @@ router.post(
       })
       .returning();
 
-    // Kick off proxy + transcription; the in-process worker picks these up.
-    await enqueueAssetJobs(asset);
+    // A designed thumbnail is already a web-ready image — it needs no ffmpeg
+    // proxy or whisper transcript. The original doubles as the preview file.
+    if (rawKind === "THUMBNAIL_DESIGN") {
+      await db.insert(tandemVideoAssetFilesTable).values({
+        id: randomUUID(),
+        assetId: asset.id,
+        kind: "PROXY",
+        storageKey: asset.storageKey,
+        mimeType: asset.mimeType || "image/png",
+        sizeBytes: asset.sizeBytes,
+        metadata: { demo: false, degraded: false, original: true },
+      });
+      await db
+        .update(tandemVideoAssetsTable)
+        .set({ status: "PROCESSED" })
+        .where(eq(tandemVideoAssetsTable.id, asset.id));
+      emitToProject(params.data.projectId, "asset.processed", {
+        projectId: params.data.projectId,
+        assetId: asset.id,
+      });
+    } else {
+      // Kick off proxy + transcription; the in-process worker picks these up.
+      await enqueueAssetJobs(asset);
+    }
 
     // Realtime: the vault shows the new locked file as it lands.
     emitToProject(params.data.projectId, "asset.uploaded", asset);
 
-    res.status(201).json(UploadVideoAssetResponse.parse(asset));
+    // A designed thumbnail is preview-ready the moment it lands.
+    const response =
+      rawKind === "THUMBNAIL_DESIGN" ? { ...asset, status: "PROCESSED" } : asset;
+    res.status(201).json(UploadVideoAssetResponse.parse(response));
   },
 );
 

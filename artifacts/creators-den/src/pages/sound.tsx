@@ -41,6 +41,8 @@ import { CommentsPanel, HistoryPanel } from './selects';
 import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
 import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
+import { AnnotationCanvas } from '@/components/annotation-canvas';
+import { CheckoutPanel, ImportFlow } from '@/components/checkout-import';
 
 const AUDIO_ACTIONS = [
   { action: 'NOISE_REDUCTION', label: 'Noise reduction', blurb: 'Hum, echo, wind, room tone.' },
@@ -151,11 +153,17 @@ function SoundMonitor({
   assets,
   playheadMs,
   onTimeUpdate,
+  onSeek,
+  headVersionId,
 }: {
   projectId: string;
   assets: Array<{ id: string; fileName: string; kind: string }>;
   playheadMs: number;
   onTimeUpdate: (ms: number) => void;
+  /** Seek on pin-click (drives the player via its playhead prop). */
+  onSeek?: (ms: number) => void;
+  /** Scope on-frame pins to the SOUND leg's head snapshot. */
+  headVersionId?: string | null;
 }) {
   const [assetId, setAssetId] = useState<string | null>(null);
 
@@ -207,7 +215,16 @@ function SoundMonitor({
         playheadMs={playheadMs}
         onTimeUpdate={onTimeUpdate}
         title={asset.fileName}
-      />
+      >
+        <AnnotationCanvas
+          projectId={projectId}
+          leg="SOUND"
+          assetId={asset.id}
+          playheadMs={playheadMs}
+          onSeek={onSeek}
+          timelineVersionId={headVersionId}
+        />
+      </AssetPlayer>
     </div>
   );
 }
@@ -762,7 +779,14 @@ export default function ContentCreatorsSoundPage() {
 
       <div className="den-two-col">
         <div className="space-y-4">
-          <SoundMonitor projectId={p.id} assets={p.assets} playheadMs={playheadMs} onTimeUpdate={onScrub} />
+          <SoundMonitor
+            projectId={p.id}
+            assets={p.assets}
+            playheadMs={playheadMs}
+            onTimeUpdate={onScrub}
+            onSeek={onScrub}
+            headVersionId={soundTimeline.data?.versions.find((v) => v.version === soundTimeline.data?.version)?.id ?? null}
+          />
           <AudioPassPanel projectId={p.id} passes={working.passes} onRun={onRunAudio} running={audioRunning || audio.isPending} />
           {audio.isError && (
             <p className="setting-copy" role="alert">
@@ -841,6 +865,15 @@ export default function ContentCreatorsSoundPage() {
             currentVersion={soundTimeline.data?.version ?? null}
             canSubmit={canEdit}
           />
+
+          <CheckoutPanel
+            projectId={p.id}
+            projectName={p.name}
+            leg="SOUND"
+            savedVersion={soundTimeline.data?.version ?? null}
+          />
+
+          <ImportFlow projectId={p.id} leg="SOUND" canEdit={canEdit} />
         </div>
       </div>
 

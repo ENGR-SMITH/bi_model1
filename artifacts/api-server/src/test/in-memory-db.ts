@@ -345,6 +345,12 @@ export const tandemVideoCommentsTable = sqliteTable("tandem_video_comments", {
   body: text("body").notNull(),
   authorId: text("author_id").notNull(),
   parentId: text("parent_id"),
+  geometry: text("geometry", { mode: "json" }),
+  kind: text("kind").notNull().default("TIMECODE"),
+  color: text("color"),
+  label: text("label"),
+  submissionId: text("submission_id"),
+  timelineVersionId: text("timeline_version_id"),
   resolvedAt: integer("resolved_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
@@ -636,8 +642,10 @@ export async function buildInMemoryDb() {
     CREATE TABLE tandem_video_comments (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       leg TEXT, asset_id TEXT, timecode_ms INTEGER, body TEXT NOT NULL,
-      author_id TEXT NOT NULL, parent_id TEXT, resolved_at INTEGER,
-      created_at INTEGER NOT NULL
+      author_id TEXT NOT NULL, parent_id TEXT,
+      geometry TEXT, kind TEXT NOT NULL DEFAULT 'TIMECODE', color TEXT,
+      label TEXT, submission_id TEXT, timeline_version_id TEXT,
+      resolved_at INTEGER, created_at INTEGER NOT NULL
     );
     CREATE TABLE tandem_video_jobs (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,

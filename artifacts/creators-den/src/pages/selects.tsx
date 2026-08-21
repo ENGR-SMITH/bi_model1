@@ -6,10 +6,12 @@ import {
   Clapperboard,
   Compass,
   Film,
+  GitCompareArrows,
   LockKeyhole,
   MessageSquare,
   Mic2,
   Palette,
+  Pin,
   Play,
   Plus,
   RotateCcw,
@@ -54,6 +56,9 @@ import { useProjectRealtime } from '@/lib/realtime';
 import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult, type StudioLeg } from '@/components/role-oracle';
 import { AssetPlayer, EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
+import { CheckoutPanel, ImportFlow } from '@/components/checkout-import';
+import { DiffView, type WipeFilter } from '@/components/diff-view';
+import { AnnotationCanvas } from '@/components/annotation-canvas';
 
 const LEG_ROLES: Record<string, string> = {
   SELECTS: 'ARCHITECT',
@@ -402,17 +407,23 @@ export function HistoryPanel({
   versions,
   currentVersion,
   canSubmit,
+  wipeFilter,
 }: {
   projectId: string;
   leg: StudioLeg;
   versions: VideoTimelineVersionSummary[];
   currentVersion: number | null;
   canSubmit: boolean;
+  /** Optional live filter per version for the A/B wipe (FINISH grades). */
+  wipeFilter?: WipeFilter;
 }) {
   const queryClient = useQueryClient();
   const rollback = useRollbackVideoTimeline();
   const submit = useCreateVideoSubmission();
   const [note, setNote] = useState('');
+  const [compareId, setCompareId] = useState<string | null>(null);
+
+  const headId = versions.find((version) => version.version === currentVersion)?.id ?? null;
 
   const onRollback = (versionId: string) => {
     rollback.mutate(
@@ -456,6 +467,17 @@ export function HistoryPanel({
                 <b>v{version.version} {version.version === currentVersion && <span className="den-tag teal ml-1">head</span>}</b>
                 {version.message && <small>{version.message}</small>}
               </span>
+              {version.version !== currentVersion && (
+                <button
+                  type="button"
+                  onClick={() => setCompareId(version.id)}
+                  className="link-btn"
+                  title="Diff this version against the head"
+                  data-testid={`version-compare-${version.version}`}
+                >
+                  <GitCompareArrows size={12} /> Compare
+                </button>
+              )}
               {canSubmit && version.version !== currentVersion && (
                 <button type="button" onClick={() => onRollback(version.id)} className="link-btn" title="Restore this snapshot as the new head">
                   <RotateCcw size={12} /> Restore
@@ -464,6 +486,18 @@ export function HistoryPanel({
             </div>
           ))}
         </div>
+      )}
+
+      {compareId && versions.length > 0 && (
+        <DiffView
+          key={compareId}
+          projectId={projectId}
+          leg={leg}
+          initialAId={headId}
+          initialBId={compareId}
+          onClose={() => setCompareId(null)}
+          wipeFilter={wipeFilter}
+        />
       )}
 
       {canSubmit && (
@@ -498,7 +532,19 @@ export function HistoryPanel({
 // Comments
 // ---------------------------------------------------------------------------
 
-export function CommentsPanel({ projectId, leg = 'SELECTS' }: { projectId: string; leg?: StudioLeg }) {
+export function CommentsPanel({
+  projectId,
+  leg = 'SELECTS',
+  submissionId,
+  timelineVersionId,
+}: {
+  projectId: string;
+  leg?: StudioLeg;
+  /** Scope the panel to a submission (PR) review — notes pin to that review. */
+  submissionId?: string | null;
+  /** Optional scope: the timeline version being reviewed. */
+  timelineVersionId?: string | null;
+}) {
   const queryClient = useQueryClient();
   const comments = useListVideoComments(projectId);
   const create = useCreateVideoComment();
@@ -506,11 +552,25 @@ export function CommentsPanel({ projectId, leg = 'SELECTS' }: { projectId: strin
   const [body, setBody] = useState('');
   const [timecodeMs, setTimecodeMs] = useState<number | null>(null);
 
+  // In PR review mode only that review's notes are listed.
+  const rows = submissionId
+    ? (comments.data ?? []).filter((comment) => comment.submissionId === submissionId)
+    : (comments.data ?? []);
+
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!body.trim()) return;
     create.mutate(
-      { projectId, data: { leg, body: body.trim(), timecodeMs: timecodeMs ?? undefined } },
+      {
+        projectId,
+        data: {
+          leg,
+          body: body.trim(),
+          timecodeMs: timecodeMs ?? undefined,
+          submissionId: submissionId ?? undefined,
+          timelineVersionId: timelineVersionId ?? undefined,
+        },
+      },
       {
         onSuccess: () => {
           setBody('');
@@ -535,7 +595,8 @@ export function CommentsPanel({ projectId, leg = 'SELECTS' }: { projectId: strin
   return (
     <div className="paper-card">
       <div className="inline-heading">
-        <span className="eyebrow"><MessageSquare size={13} /> Timecode notes</span>
+        <span className="eyebrow"><MessageSquare size={13} /> {submissionId ? 'PR review notes' : 'Timecode notes'}</span>
+        {submissionId && <span className="den-tag gold">scoped to review</span>}
       </div>
       <form className="space-y-2" onSubmit={submit} data-testid="form-comment">
         <textarea
@@ -562,14 +623,31 @@ export function CommentsPanel({ projectId, leg = 'SELECTS' }: { projectId: strin
         </div>
       </form>
 
-      {comments.data && comments.data.length > 0 ? (
+      {rows.length > 0 ? (
         <div className="den-stack mt-4">
-          {comments.data.map((comment) => (
+          {rows.map((comment) => (
             <div key={comment.id} className={`list-row ${comment.resolvedAt ? '' : 'selected'}`} data-testid={`comment-${comment.id}`}>
               <span className="world-symbol"><MessageSquare size={13} /></span>
               <span>
-                <b className="mono-label !text-[9px]">{comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'project note'}</b>
+                <b className="mono-label !text-[9px]">
+                  {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'project note'}
+                  {comment.kind && comment.kind !== 'TIMECODE' && (
+                    <span className="den-tag accent ml-1">{comment.kind}</span>
+                  )}
+                  {comment.geometry && (
+                    <span className="den-tag teal ml-1"><Pin size={9} /> on frame</span>
+                  )}
+                </b>
                 <small className="!normal-case">{comment.body}</small>
+                {comment.color && comment.label && (
+                  <small className="mt-1 flex items-center gap-1">
+                    <span className="annotation-pin-dot" style={{ background: comment.color, width: 14, height: 14, fontSize: 7 }}>
+                      {comment.label}
+                    </span>
+                    reviewer {comment.authorId.slice(0, 8)}
+                    {comment.submissionId && ` · review ${comment.submissionId.slice(0, 8)}`}
+                  </small>
+                )}
               </span>
               <button
                 type="button"
@@ -693,6 +771,8 @@ export default function ContentCreatorsStudioPage() {
   const saveError = save.error as { response?: { data?: { error?: string } } } | null;
 
   const legStatus = submissions.data?.find((s) => s.leg === leg);
+  // Scope on-frame annotations to the leg's current head version.
+  const headVersionId = timeline.data?.versions.find((v) => v.version === timeline.data?.version)?.id ?? null;
 
   // Build the AI context: transcript + current selects + scene blocks.
   const oracleContext = useMemo(() => {
@@ -836,7 +916,9 @@ export default function ContentCreatorsStudioPage() {
                 ? `/projects/${p.id}/sound`
                 : item.leg === 'FINISH'
                   ? `/projects/${p.id}/finish`
-                  : null;
+                  : item.leg === 'THUMBNAIL'
+                    ? `/projects/${p.id}/thumbnail`
+                    : null;
           const inner = (
             <>
               <Icon size={13} />
@@ -889,7 +971,16 @@ export default function ContentCreatorsStudioPage() {
                   videoRef={videoRef}
                   onTimeUpdate={setPlayheadMs}
                   title={asset.data?.fileName}
-                />
+                >
+                  <AnnotationCanvas
+                    projectId={p.id}
+                    leg={leg}
+                    assetId={assetId}
+                    playheadMs={playheadMs}
+                    onSeek={onSeek}
+                    timelineVersionId={headVersionId}
+                  />
+                </AssetPlayer>
               ) : (
                 <EmptyPlayer className="mt-3">
                   <p className="text-sm font-semibold">No footage in the vault yet.</p>
@@ -992,6 +1083,15 @@ export default function ContentCreatorsStudioPage() {
               currentVersion={timeline.data?.version ?? null}
               canSubmit={canSubmit}
             />
+
+            <CheckoutPanel
+              projectId={p.id}
+              projectName={p.name}
+              leg={leg}
+              savedVersion={timeline.data?.version ?? null}
+            />
+
+            <ImportFlow projectId={p.id} leg={leg} canEdit={canEdit} />
 
             {legStatus && (
               <p className="den-footnote">

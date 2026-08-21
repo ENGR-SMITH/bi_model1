@@ -64,6 +64,7 @@ import type {
   VideoAssetDetail,
   VideoAssetUploadInput,
   VideoAudioPassInput,
+  VideoCheckoutManifest,
   VideoComment,
   VideoCommentInput,
   VideoCommentResolveInput,
@@ -85,9 +86,12 @@ import type {
   VideoSync,
   VideoSyncInput,
   VideoThumbnailInput,
+  VideoTimelineImportInput,
+  VideoTimelineImportResponse,
   VideoTimelineRollbackInput,
   VideoTimelineSaveInput,
   VideoTimelineState,
+  VideoTimelineVersionDetail,
   VideoTimelineVersionSummary,
   VoiceConsistencyInput,
   VoiceConsistencyResult,
@@ -5418,7 +5422,7 @@ export function useGetVideoAssetProxy<TData = Awaited<ReturnType<typeof getVideo
 
 
 export const getGetVideoTimelineUrl = (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',) => {
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
 
 
 
@@ -5430,7 +5434,7 @@ export const getGetVideoTimelineUrl = (projectId: string,
  * @summary Read the current working timeline for a leg
  */
 export const getVideoTimeline = async (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH', options?: Parameters<typeof customFetch>[1]): Promise<VideoTimelineState> => {
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: Parameters<typeof customFetch>[1]): Promise<VideoTimelineState> => {
 
   return customFetch<VideoTimelineState>(getGetVideoTimelineUrl(projectId,leg),
   {
@@ -5446,7 +5450,7 @@ export const getVideoTimeline = async (projectId: string,
 
 
 export const getGetVideoTimelineQueryKey = (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',) => {
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
     return [
     `/api/video/projects/${projectId}/timelines/${leg}`
     ] as const;
@@ -5454,7 +5458,7 @@ export const getGetVideoTimelineQueryKey = (projectId: string,
 
 
 export const getGetVideoTimelineQueryOptions = <TData = Awaited<ReturnType<typeof getVideoTimeline>>, TError = ErrorType<ErrorResponse>>(projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -5482,7 +5486,7 @@ export type GetVideoTimelineQueryError = ErrorType<ErrorResponse>
 
 export function useGetVideoTimeline<TData = Awaited<ReturnType<typeof getVideoTimeline>>, TError = ErrorType<ErrorResponse>>(
  projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -5500,7 +5504,7 @@ export function useGetVideoTimeline<TData = Awaited<ReturnType<typeof getVideoTi
 
 
 export const getSaveVideoTimelineUrl = (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',) => {
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
 
 
 
@@ -5512,7 +5516,7 @@ export const getSaveVideoTimelineUrl = (projectId: string,
  * @summary Save a snapshot of the leg timeline (creates a version)
  */
 export const saveVideoTimeline = async (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
     videoTimelineSaveInput: VideoTimelineSaveInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoTimelineState> => {
 
   return customFetch<VideoTimelineState>(getSaveVideoTimelineUrl(projectId,leg),
@@ -5529,8 +5533,8 @@ export const saveVideoTimeline = async (projectId: string,
 
 
 export const getSaveVideoTimelineMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineSaveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof saveVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineSaveInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineSaveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineSaveInput>}, TContext> => {
 
 const mutationKey = ['saveVideoTimeline'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -5542,7 +5546,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveVideoTimeline>>, {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineSaveInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveVideoTimeline>>, {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineSaveInput>}> = (props) => {
           const {projectId,leg,data} = props ?? {};
 
           return  saveVideoTimeline(projectId,leg,data,requestOptions)
@@ -5563,18 +5567,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Save a snapshot of the leg timeline (creates a version)
  */
 export const useSaveVideoTimeline = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineSaveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineSaveInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof saveVideoTimeline>>,
         TError,
-        {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineSaveInput>},
+        {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineSaveInput>},
         TContext
       > => {
       return useMutation(getSaveVideoTimelineMutationOptions(options));
     }
 
 export const getListVideoTimelineVersionsUrl = (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',) => {
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
 
 
 
@@ -5586,7 +5590,7 @@ export const getListVideoTimelineVersionsUrl = (projectId: string,
  * @summary List the Git-style snapshot history of a leg timeline
  */
 export const listVideoTimelineVersions = async (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH', options?: Parameters<typeof customFetch>[1]): Promise<VideoTimelineVersionSummary[]> => {
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: Parameters<typeof customFetch>[1]): Promise<VideoTimelineVersionSummary[]> => {
 
   return customFetch<VideoTimelineVersionSummary[]>(getListVideoTimelineVersionsUrl(projectId,leg),
   {
@@ -5602,7 +5606,7 @@ export const listVideoTimelineVersions = async (projectId: string,
 
 
 export const getListVideoTimelineVersionsQueryKey = (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',) => {
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
     return [
     `/api/video/projects/${projectId}/timelines/${leg}/versions`
     ] as const;
@@ -5610,7 +5614,7 @@ export const getListVideoTimelineVersionsQueryKey = (projectId: string,
 
 
 export const getListVideoTimelineVersionsQueryOptions = <TData = Awaited<ReturnType<typeof listVideoTimelineVersions>>, TError = ErrorType<ErrorResponse>>(projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoTimelineVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoTimelineVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -5638,7 +5642,7 @@ export type ListVideoTimelineVersionsQueryError = ErrorType<ErrorResponse>
 
 export function useListVideoTimelineVersions<TData = Awaited<ReturnType<typeof listVideoTimelineVersions>>, TError = ErrorType<ErrorResponse>>(
  projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoTimelineVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoTimelineVersions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -5655,8 +5659,95 @@ export function useListVideoTimelineVersions<TData = Awaited<ReturnType<typeof l
 
 
 
+export const getGetVideoTimelineVersionUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
+    versionId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/versions/${versionId}`
+}
+
+/**
+ * @summary Read the full snapshot of one timeline version (for diffing / review)
+ */
+export const getVideoTimelineVersion = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
+    versionId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoTimelineVersionDetail> => {
+
+  return customFetch<VideoTimelineVersionDetail>(getGetVideoTimelineVersionUrl(projectId,leg,versionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoTimelineVersionQueryKey = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
+    versionId: string,) => {
+    return [
+    `/api/video/projects/${projectId}/timelines/${leg}/versions/${versionId}`
+    ] as const;
+    }
+
+
+export const getGetVideoTimelineVersionQueryOptions = <TData = Awaited<ReturnType<typeof getVideoTimelineVersion>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
+    versionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoTimelineVersionQueryKey(projectId,leg,versionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoTimelineVersion>>> = ({ signal }) => getVideoTimelineVersion(projectId,leg,versionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && leg !== null && leg !== undefined && versionId !== null && versionId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineVersion>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVideoTimelineVersionQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoTimelineVersion>>>
+export type GetVideoTimelineVersionQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the full snapshot of one timeline version (for diffing / review)
+ */
+
+export function useGetVideoTimelineVersion<TData = Awaited<ReturnType<typeof getVideoTimelineVersion>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
+    versionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineVersion>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVideoTimelineVersionQueryOptions(projectId,leg,versionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getRollbackVideoTimelineUrl = (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',) => {
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
 
 
 
@@ -5668,7 +5759,7 @@ export const getRollbackVideoTimelineUrl = (projectId: string,
  * @summary Restore a previous snapshot as the new working head
  */
 export const rollbackVideoTimeline = async (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
     videoTimelineRollbackInput: VideoTimelineRollbackInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoTimelineState> => {
 
   return customFetch<VideoTimelineState>(getRollbackVideoTimelineUrl(projectId,leg),
@@ -5685,8 +5776,8 @@ export const rollbackVideoTimeline = async (projectId: string,
 
 
 export const getRollbackVideoTimelineMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rollbackVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineRollbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof rollbackVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineRollbackInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rollbackVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineRollbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rollbackVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineRollbackInput>}, TContext> => {
 
 const mutationKey = ['rollbackVideoTimeline'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -5698,7 +5789,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rollbackVideoTimeline>>, {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineRollbackInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rollbackVideoTimeline>>, {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineRollbackInput>}> = (props) => {
           const {projectId,leg,data} = props ?? {};
 
           return  rollbackVideoTimeline(projectId,leg,data,requestOptions)
@@ -5719,14 +5810,503 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Restore a previous snapshot as the new working head
  */
 export const useRollbackVideoTimeline = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rollbackVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineRollbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rollbackVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineRollbackInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof rollbackVideoTimeline>>,
         TError,
-        {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoTimelineRollbackInput>},
+        {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineRollbackInput>},
         TContext
       > => {
       return useMutation(getRollbackVideoTimelineMutationOptions(options));
+    }
+
+export const getCheckoutVideoTimelineUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/checkout`
+}
+
+/**
+ * The checkout half of the external-first round-trip — the editor opens the cut in Premiere/Resolve/Avid, finishes it there, and re-imports the result. FCPXML export lives at /checkout/fcpxml.
+ * @summary Download the leg's current snapshot as a CMX3600 EDL for an external NLE
+ */
+export const checkoutVideoTimeline = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getCheckoutVideoTimelineUrl(projectId,leg),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckoutVideoTimelineQueryKey = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+    return [
+    `/api/video/projects/${projectId}/timelines/${leg}/checkout`
+    ] as const;
+    }
+
+
+export const getCheckoutVideoTimelineQueryOptions = <TData = Awaited<ReturnType<typeof checkoutVideoTimeline>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCheckoutVideoTimelineQueryKey(projectId,leg);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof checkoutVideoTimeline>>> = ({ signal }) => checkoutVideoTimeline(projectId,leg, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && leg !== null && leg !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimeline>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CheckoutVideoTimelineQueryResult = NonNullable<Awaited<ReturnType<typeof checkoutVideoTimeline>>>
+export type CheckoutVideoTimelineQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Download the leg's current snapshot as a CMX3600 EDL for an external NLE
+ */
+
+export function useCheckoutVideoTimeline<TData = Awaited<ReturnType<typeof checkoutVideoTimeline>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimeline>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCheckoutVideoTimelineQueryOptions(projectId,leg,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCheckoutVideoTimelineFcpxmlUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/checkout/fcpxml`
+}
+
+/**
+ * The FCPXML variant of the checkout — source media round-trips through the clip `uid`/`ref` attributes, so a re-import relinks exactly.
+ * @summary Download the leg's current snapshot as an FCPXML 1.9 project for Final Cut or Premiere
+ */
+export const checkoutVideoTimelineFcpxml = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getCheckoutVideoTimelineFcpxmlUrl(projectId,leg),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckoutVideoTimelineFcpxmlQueryKey = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+    return [
+    `/api/video/projects/${projectId}/timelines/${leg}/checkout/fcpxml`
+    ] as const;
+    }
+
+
+export const getCheckoutVideoTimelineFcpxmlQueryOptions = <TData = Awaited<ReturnType<typeof checkoutVideoTimelineFcpxml>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimelineFcpxml>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCheckoutVideoTimelineFcpxmlQueryKey(projectId,leg);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof checkoutVideoTimelineFcpxml>>> = ({ signal }) => checkoutVideoTimelineFcpxml(projectId,leg, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && leg !== null && leg !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimelineFcpxml>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CheckoutVideoTimelineFcpxmlQueryResult = NonNullable<Awaited<ReturnType<typeof checkoutVideoTimelineFcpxml>>>
+export type CheckoutVideoTimelineFcpxmlQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Download the leg's current snapshot as an FCPXML 1.9 project for Final Cut or Premiere
+ */
+
+export function useCheckoutVideoTimelineFcpxml<TData = Awaited<ReturnType<typeof checkoutVideoTimelineFcpxml>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimelineFcpxml>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCheckoutVideoTimelineFcpxmlQueryOptions(projectId,leg,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCheckoutVideoTimelineOtioUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/checkout/otio`
+}
+
+/**
+ * The OTIO variant of the checkout — the canonical interchange. Source media round-trips through `metadata.assetId`, so a re-import relinks exactly.
+ * @summary Download the leg's current snapshot as an OpenTimelineIO (OTIO) Timeline.1 document
+ */
+export const checkoutVideoTimelineOtio = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: Parameters<typeof customFetch>[1]): Promise<string> => {
+
+  return customFetch<string>(getCheckoutVideoTimelineOtioUrl(projectId,leg),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckoutVideoTimelineOtioQueryKey = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+    return [
+    `/api/video/projects/${projectId}/timelines/${leg}/checkout/otio`
+    ] as const;
+    }
+
+
+export const getCheckoutVideoTimelineOtioQueryOptions = <TData = Awaited<ReturnType<typeof checkoutVideoTimelineOtio>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimelineOtio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCheckoutVideoTimelineOtioQueryKey(projectId,leg);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof checkoutVideoTimelineOtio>>> = ({ signal }) => checkoutVideoTimelineOtio(projectId,leg, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && leg !== null && leg !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimelineOtio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CheckoutVideoTimelineOtioQueryResult = NonNullable<Awaited<ReturnType<typeof checkoutVideoTimelineOtio>>>
+export type CheckoutVideoTimelineOtioQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Download the leg's current snapshot as an OpenTimelineIO (OTIO) Timeline.1 document
+ */
+
+export function useCheckoutVideoTimelineOtio<TData = Awaited<ReturnType<typeof checkoutVideoTimelineOtio>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimelineOtio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCheckoutVideoTimelineOtioQueryOptions(projectId,leg,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCheckoutVideoTimelineAafUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/checkout/aaf`
+}
+
+/**
+ * The AAF variant of the checkout — export-only per the design (AAF is a binary Microsoft format intended for one-directional handoff to Avid/Premiere via AMA, not a round-trip interchange). Source media round-trips through the SourceMob UMIDs, matching the other formats' relink keys.
+ * @summary Download the leg's current snapshot as an AAF file (export-only)
+ */
+export const checkoutVideoTimelineAaf = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getCheckoutVideoTimelineAafUrl(projectId,leg),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getCheckoutVideoTimelineAafQueryKey = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+    return [
+    `/api/video/projects/${projectId}/timelines/${leg}/checkout/aaf`
+    ] as const;
+    }
+
+
+export const getCheckoutVideoTimelineAafQueryOptions = <TData = Awaited<ReturnType<typeof checkoutVideoTimelineAaf>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimelineAaf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getCheckoutVideoTimelineAafQueryKey(projectId,leg);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof checkoutVideoTimelineAaf>>> = ({ signal }) => checkoutVideoTimelineAaf(projectId,leg, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && leg !== null && leg !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimelineAaf>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type CheckoutVideoTimelineAafQueryResult = NonNullable<Awaited<ReturnType<typeof checkoutVideoTimelineAaf>>>
+export type CheckoutVideoTimelineAafQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Download the leg's current snapshot as an AAF file (export-only)
+ */
+
+export function useCheckoutVideoTimelineAaf<TData = Awaited<ReturnType<typeof checkoutVideoTimelineAaf>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof checkoutVideoTimelineAaf>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getCheckoutVideoTimelineAafQueryOptions(projectId,leg,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetVideoTimelineCheckoutManifestUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/checkout/manifest`
+}
+
+/**
+ * @summary List the source media referenced by a leg's checkout EDL
+ */
+export const getVideoTimelineCheckoutManifest = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: Parameters<typeof customFetch>[1]): Promise<VideoCheckoutManifest> => {
+
+  return customFetch<VideoCheckoutManifest>(getGetVideoTimelineCheckoutManifestUrl(projectId,leg),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoTimelineCheckoutManifestQueryKey = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+    return [
+    `/api/video/projects/${projectId}/timelines/${leg}/checkout/manifest`
+    ] as const;
+    }
+
+
+export const getGetVideoTimelineCheckoutManifestQueryOptions = <TData = Awaited<ReturnType<typeof getVideoTimelineCheckoutManifest>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineCheckoutManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoTimelineCheckoutManifestQueryKey(projectId,leg);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoTimelineCheckoutManifest>>> = ({ signal }) => getVideoTimelineCheckoutManifest(projectId,leg, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && leg !== null && leg !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineCheckoutManifest>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVideoTimelineCheckoutManifestQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoTimelineCheckoutManifest>>>
+export type GetVideoTimelineCheckoutManifestQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the source media referenced by a leg's checkout EDL
+ */
+
+export function useGetVideoTimelineCheckoutManifest<TData = Awaited<ReturnType<typeof getVideoTimelineCheckoutManifest>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineCheckoutManifest>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVideoTimelineCheckoutManifestQueryOptions(projectId,leg,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getImportVideoTimelineUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/import`
+}
+
+/**
+ * The push half of the round-trip — parse the CMX3600 EDL, FCPXML, or OpenTimelineIO document, relink its sources to vault assets, save a new Git-style version, and (by default) submit it for Captain review.
+ * @summary Re-import an edited interchange document (EDL, FCPXML, or OTIO) from an external NLE as a new timeline version
+ */
+export const importVideoTimeline = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
+    videoTimelineImportInput: VideoTimelineImportInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoTimelineImportResponse> => {
+
+  return customFetch<VideoTimelineImportResponse>(getImportVideoTimelineUrl(projectId,leg),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(videoTimelineImportInput)
+  }
+);}
+
+
+
+
+
+export const getImportVideoTimelineMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof importVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineImportInput>}, TContext> => {
+
+const mutationKey = ['importVideoTimeline'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof importVideoTimeline>>, {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineImportInput>}> = (props) => {
+          const {projectId,leg,data} = props ?? {};
+
+          return  importVideoTimeline(projectId,leg,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ImportVideoTimelineMutationResult = NonNullable<Awaited<ReturnType<typeof importVideoTimeline>>>
+    export type ImportVideoTimelineMutationBody = BodyType<VideoTimelineImportInput>
+    export type ImportVideoTimelineMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Re-import an edited interchange document (EDL, FCPXML, or OTIO) from an external NLE as a new timeline version
+ */
+export const useImportVideoTimeline = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof importVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineImportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof importVideoTimeline>>,
+        TError,
+        {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoTimelineImportInput>},
+        TContext
+      > => {
+      return useMutation(getImportVideoTimelineMutationOptions(options));
     }
 
 export const getListVideoSubmissionsUrl = (projectId: string,) => {
@@ -6476,7 +7056,7 @@ export function useListVideoSyncs<TData = Awaited<ReturnType<typeof listVideoSyn
 
 
 export const getRenderVideoTimelineUrl = (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',) => {
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
 
 
 
@@ -6488,7 +7068,7 @@ export const getRenderVideoTimelineUrl = (projectId: string,
  * @summary Queue a preview or picture-lock render of a leg timeline
  */
 export const renderVideoTimeline = async (projectId: string,
-    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH',
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
     videoRenderInput: VideoRenderInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoJob> => {
 
   return customFetch<VideoJob>(getRenderVideoTimelineUrl(projectId,leg),
@@ -6505,8 +7085,8 @@ export const renderVideoTimeline = async (projectId: string,
 
 
 export const getRenderVideoTimelineMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renderVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoRenderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof renderVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoRenderInput>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renderVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoRenderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof renderVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoRenderInput>}, TContext> => {
 
 const mutationKey = ['renderVideoTimeline'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -6518,7 +7098,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof renderVideoTimeline>>, {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoRenderInput>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof renderVideoTimeline>>, {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoRenderInput>}> = (props) => {
           const {projectId,leg,data} = props ?? {};
 
           return  renderVideoTimeline(projectId,leg,data,requestOptions)
@@ -6539,11 +7119,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Queue a preview or picture-lock render of a leg timeline
  */
 export const useRenderVideoTimeline = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renderVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoRenderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renderVideoTimeline>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoRenderInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof renderVideoTimeline>>,
         TError,
-        {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';data: BodyType<VideoRenderInput>},
+        {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data: BodyType<VideoRenderInput>},
         TContext
       > => {
       return useMutation(getRenderVideoTimelineMutationOptions(options));

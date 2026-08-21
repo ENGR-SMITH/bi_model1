@@ -17,4 +17,5 @@ export const VideoAssetUploadInputKind = {
   REFERENCE: 'REFERENCE',
   VO_PICKUP: 'VO_PICKUP',
   GRAPHIC: 'GRAPHIC',
+  THUMBNAIL_DESIGN: 'THUMBNAIL_DESIGN',
 } as const;

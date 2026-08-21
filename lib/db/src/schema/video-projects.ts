@@ -74,7 +74,7 @@ export const insertTandemVideoAssetSchema = createInsertSchema(tandemVideoAssets
 export type TandemVideoProject = typeof tandemVideoProjectsTable.$inferSelect;
 export type TandemVideoMember = typeof tandemVideoMembersTable.$inferSelect;
 export type TandemVideoAsset = typeof tandemVideoAssetsTable.$inferSelect;
-export type TandemVideoRole = "CAPTAIN" | "UPLOADER" | "ARCHITECT" | "VISUAL_EDITOR" | "SOUND_DESIGNER" | "MOTION_COLOR" | "VIEWER";
+export type TandemVideoRole = "CAPTAIN" | "UPLOADER" | "ARCHITECT" | "VISUAL_EDITOR" | "SOUND_DESIGNER" | "MOTION_COLOR" | "THUMBNAIL_DESIGNER" | "VIEWER";
 export const tandemVideoRoleSchema = z.enum([
   "CAPTAIN",
   "UPLOADER",
@@ -82,5 +82,6 @@ export const tandemVideoRoleSchema = z.enum([
   "VISUAL_EDITOR",
   "SOUND_DESIGNER",
   "MOTION_COLOR",
+  "THUMBNAIL_DESIGNER",
   "VIEWER",
 ]);

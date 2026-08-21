@@ -9,6 +9,7 @@ import {
   History,
   LockKeyhole,
   Mic2,
+  Image,
   Palette,
   Play,
   Scissors,
@@ -44,12 +45,14 @@ import type { VideoAssetUploadInputKind } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { AssetPlayer, isAudioKind, pollWhileProcessing } from '@/components/asset-preview';
+import { CommitLog } from '@/components/commit-log';
 
 const LEG_META = {
   SELECTS: { label: 'Selects', role: 'Story Architect', icon: Film },
   CUT: { label: 'Cut', role: 'Visual Editor', icon: Scissors },
   SOUND: { label: 'Sound', role: 'Sound Designer', icon: Mic2 },
   FINISH: { label: 'Finish', role: 'Motion & Color', icon: Palette },
+  THUMBNAIL: { label: 'Thumbnail', role: 'Thumbnail Designer', icon: Image },
 } as const;
 
 const KIND_LABELS: Record<string, string> = {
@@ -60,6 +63,7 @@ const KIND_LABELS: Record<string, string> = {
   REFERENCE: 'Reference video',
   VO_PICKUP: 'Pickup voiceover',
   GRAPHIC: 'Graphic',
+  THUMBNAIL_DESIGN: 'Thumbnail design',
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -69,10 +73,11 @@ const ROLE_LABELS: Record<string, string> = {
   VISUAL_EDITOR: 'Visual Editor',
   SOUND_DESIGNER: 'Sound Designer',
   MOTION_COLOR: 'Motion & Color',
+  THUMBNAIL_DESIGNER: 'Thumbnail Designer',
   VIEWER: 'Viewer',
 };
 
-const INVITE_ROLES = ['UPLOADER', 'ARCHITECT', 'VISUAL_EDITOR', 'SOUND_DESIGNER', 'MOTION_COLOR', 'VIEWER'] as const;
+const INVITE_ROLES = ['UPLOADER', 'ARCHITECT', 'VISUAL_EDITOR', 'SOUND_DESIGNER', 'MOTION_COLOR', 'THUMBNAIL_DESIGNER', 'VIEWER'] as const;
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -740,6 +745,8 @@ export default function ContentCreatorsProjectPage() {
           )}
         </section>
       </div>
+
+      <CommitLog projectId={p.id} />
 
       <p className="den-footnote mt-8">
         <LockKeyhole size={13} />

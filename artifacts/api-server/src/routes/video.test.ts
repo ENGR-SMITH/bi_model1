@@ -38,6 +38,7 @@ vi.mock("@workspace/db", async () => {
 });
 
 import videoRouter from "./video";
+import videoProductionRouter from "./video-production";
 
 function createApp(): Express {
   const app = express();
@@ -47,6 +48,7 @@ function createApp(): Express {
     next();
   });
   app.use("/api", videoRouter);
+  app.use("/api", videoProductionRouter);
   return app;
 }
 
@@ -271,5 +273,38 @@ describe("vault assets", () => {
       .from(state.tables.tandemVideoAssetsTable)
       .where(eq(state.tables.tandemVideoAssetsTable.id, res.body.id));
     expect(row.storageKey).toBeTruthy();
+  });
+
+  it("marks THUMBNAIL_DESIGN uploads processed immediately with the image as its proxy", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "THUMBNAIL_DESIGN")
+      .attach("file", Buffer.from("fake png"), "cover.png");
+    expect(res.status).toBe(201);
+    expect(res.body.kind).toBe("THUMBNAIL_DESIGN");
+    expect(res.body.status).toBe("PROCESSED");
+
+    // No ffmpeg/whisper jobs — the image needs no proxy encode or transcript.
+    const jobs = await state.db
+      .select()
+      .from(state.tables.tandemVideoJobsTable)
+      .where(eq(state.tables.tandemVideoJobsTable.assetId, res.body.id));
+    expect(jobs).toHaveLength(0);
+
+    // A PROXY row serves the original file straight to the browser.
+    const files = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetFilesTable)
+      .where(eq(state.tables.tandemVideoAssetFilesTable.assetId, res.body.id));
+    expect(files).toHaveLength(1);
+    expect(files[0].kind).toBe("PROXY");
+    expect(files[0].mimeType).toBe("image/png");
+
+    // The proxy stream serves the image for the thumbnail studio.
+    const proxy = await request(API).get(`/api/video/projects/${project.id}/assets/${res.body.id}/proxy`);
+    expect(proxy.status).toBe(200);
+    expect(proxy.headers["content-type"]).toContain("image/png");
   });
 });

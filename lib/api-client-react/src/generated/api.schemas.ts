@@ -878,6 +878,7 @@ export const VideoMemberInputRole = {
   VISUAL_EDITOR: 'VISUAL_EDITOR',
   SOUND_DESIGNER: 'SOUND_DESIGNER',
   MOTION_COLOR: 'MOTION_COLOR',
+  THUMBNAIL_DESIGNER: 'THUMBNAIL_DESIGNER',
   VIEWER: 'VIEWER',
 } as const;
 
@@ -897,6 +898,7 @@ export const VideoAssetUploadInputKind = {
   REFERENCE: 'REFERENCE',
   VO_PICKUP: 'VO_PICKUP',
   GRAPHIC: 'GRAPHIC',
+  THUMBNAIL_DESIGN: 'THUMBNAIL_DESIGN',
 } as const;
 
 /**
@@ -984,6 +986,19 @@ export interface VideoTimelineState {
   updatedAt: string;
 }
 
+export type VideoTimelineVersionDetailSnapshot = { [key: string]: unknown };
+
+export interface VideoTimelineVersionDetail {
+  id: string;
+  version: number;
+  message: string;
+  createdById: string;
+  /** @nullable */
+  parentVersionId: string | null;
+  createdAt: string;
+  snapshot: VideoTimelineVersionDetailSnapshot;
+}
+
 export type VideoTimelineSaveInputSnapshot = { [key: string]: unknown };
 
 export interface VideoTimelineSaveInput {
@@ -995,6 +1010,53 @@ export interface VideoTimelineSaveInput {
 export interface VideoTimelineRollbackInput {
   /** @minLength 1 */
   versionId: string;
+}
+
+export interface VideoCheckoutMediaItem {
+  assetId: string;
+  fileName: string;
+  kind: string;
+  reel: string;
+  clipIds: string[];
+  firstInMs: number;
+  lastOutMs: number;
+  downloadPath: string;
+}
+
+export interface VideoCheckoutManifest {
+  projectId: string;
+  leg: string;
+  /** @nullable */
+  version: number | null;
+  media: VideoCheckoutMediaItem[];
+}
+
+export type VideoTimelineImportInputFormat = typeof VideoTimelineImportInputFormat[keyof typeof VideoTimelineImportInputFormat];
+
+
+export const VideoTimelineImportInputFormat = {
+  EDL: 'EDL',
+  FCPXML: 'FCPXML',
+  OTIO: 'OTIO',
+} as const;
+
+/**
+ * An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1)
+ */
+export interface VideoTimelineImportInput {
+  format?: VideoTimelineImportInputFormat;
+  /** @minLength 1 */
+  document: string;
+  /** @maxLength 500 */
+  message?: string;
+  submit?: boolean;
+}
+
+export interface VideoTimelineImportResponse {
+  version: number;
+  clips: number;
+  /** @nullable */
+  submissionId: string | null;
 }
 
 export interface VideoSubmission {
@@ -1021,6 +1083,7 @@ export const VideoSubmissionInputLeg = {
   CUT: 'CUT',
   SOUND: 'SOUND',
   FINISH: 'FINISH',
+  THUMBNAIL: 'THUMBNAIL',
 } as const;
 
 export interface VideoSubmissionInput {
@@ -1028,6 +1091,11 @@ export interface VideoSubmissionInput {
   /** @maxLength 2000 */
   note?: string;
 }
+
+/**
+ * @nullable
+ */
+export type VideoCommentGeometry = { [key: string]: unknown } | null;
 
 export interface VideoComment {
   id: string;
@@ -1043,6 +1111,17 @@ export interface VideoComment {
   /** @nullable */
   parentId: string | null;
   /** @nullable */
+  geometry: VideoCommentGeometry;
+  kind: string;
+  /** @nullable */
+  color: string | null;
+  /** @nullable */
+  label: string | null;
+  /** @nullable */
+  submissionId: string | null;
+  /** @nullable */
+  timelineVersionId: string | null;
+  /** @nullable */
   resolvedAt: string | null;
   createdAt: string;
 }
@@ -1055,8 +1134,24 @@ export const VideoCommentInputLeg = {
   CUT: 'CUT',
   SOUND: 'SOUND',
   FINISH: 'FINISH',
+  THUMBNAIL: 'THUMBNAIL',
 } as const;
 
+export type VideoCommentInputKind = typeof VideoCommentInputKind[keyof typeof VideoCommentInputKind];
+
+
+export const VideoCommentInputKind = {
+  TIMECODE: 'TIMECODE',
+  PIN: 'PIN',
+  HIGHLIGHT: 'HIGHLIGHT',
+  MARK: 'MARK',
+} as const;
+
+export type VideoCommentInputGeometry = { [key: string]: unknown };
+
+/**
+ * A timecode note or a spatial annotation (kind PIN/HIGHLIGHT/MARK carries a normalized geometry)
+ */
 export interface VideoCommentInput {
   leg?: VideoCommentInputLeg;
   assetId?: string;
@@ -1068,6 +1163,13 @@ export interface VideoCommentInput {
      */
   body: string;
   parentId?: string;
+  kind?: VideoCommentInputKind;
+  geometry?: VideoCommentInputGeometry;
+  color?: string;
+  /** @maxLength 12 */
+  label?: string;
+  submissionId?: string;
+  timelineVersionId?: string;
 }
 
 export interface VideoCommentResolveInput {

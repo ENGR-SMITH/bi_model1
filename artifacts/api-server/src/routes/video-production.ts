@@ -31,6 +31,8 @@ import {
   GetVideoAssetResponse,
   GetVideoTimelineParams,
   GetVideoTimelineResponse,
+  GetVideoTimelineVersionParams,
+  GetVideoTimelineVersionResponse,
   ListVideoCommentsParams,
   ListVideoCommentsResponse,
   ListVideoJobsParams,
@@ -80,6 +82,19 @@ import {
   type EdlClip,
   type ParsedEdlEvent,
 } from "../video/edl";
+import {
+  buildTimelineFcpxml,
+  parseTimelineFcpxml,
+  resolveFcpxmlEvents,
+  type ParsedFcpxmlClip,
+} from "../video/fcpxml";
+import {
+  buildTimelineOtio,
+  parseTimelineOtio,
+  resolveOtioEvents,
+  type ParsedOtioClip,
+} from "../video/otio";
+import { buildTimelineAaf } from "../video/aaf";
 
 const router: IRouter = Router();
 
@@ -95,6 +110,7 @@ const LEG_ROLES: Record<string, string> = {
   CUT: "VISUAL_EDITOR",
   SOUND: "SOUND_DESIGNER",
   FINISH: "MOTION_COLOR",
+  THUMBNAIL: "THUMBNAIL_DESIGNER",
 } as const;
 
 async function requireMember(
@@ -524,6 +540,68 @@ router.get(
           createdAt: version.createdAt,
         })),
       ),
+    );
+  },
+);
+
+// GET /video/projects/:projectId/timelines/:leg/versions/:versionId — the full
+// snapshot of one version, so reviewers can diff two snapshots side-by-side
+// (the list endpoint returns summaries only).
+router.get(
+  "/video/projects/:projectId/timelines/:leg/versions/:versionId",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineVersionParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid version id" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const [timeline] = await db
+      .select()
+      .from(tandemVideoTimelinesTable)
+      .where(
+        and(
+          eq(tandemVideoTimelinesTable.projectId, params.data.projectId),
+          eq(tandemVideoTimelinesTable.leg, params.data.leg),
+        ),
+      )
+      .limit(1);
+    if (!timeline) {
+      res.status(404).json({ error: "This leg has no timeline yet" });
+      return;
+    }
+
+    const [version] = await db
+      .select()
+      .from(tandemVideoTimelineVersionsTable)
+      .where(eq(tandemVideoTimelineVersionsTable.id, params.data.versionId))
+      .limit(1);
+    if (!version || version.timelineId !== timeline.id) {
+      res.status(404).json({ error: "Timeline version not found" });
+      return;
+    }
+
+    res.json(
+      GetVideoTimelineVersionResponse.parse({
+        id: version.id,
+        version: version.version,
+        message: version.message,
+        createdById: version.createdById,
+        parentVersionId: version.parentVersionId,
+        createdAt: version.createdAt,
+        snapshot: version.snapshot,
+      }),
     );
   },
 );
@@ -963,6 +1041,14 @@ router.post(
         body: body.data.body,
         authorId: userId,
         parentId: body.data.parentId ?? null,
+        // Unified annotation model: spatial pins/highlights + reviewer identity
+        // + optional review (submission) / version scoping.
+        geometry: body.data.geometry ?? null,
+        kind: body.data.kind ?? "TIMECODE",
+        color: body.data.color ?? null,
+        label: body.data.label ?? null,
+        submissionId: body.data.submissionId ?? null,
+        timelineVersionId: body.data.timelineVersionId ?? null,
       })
       .returning();
 
@@ -1235,6 +1321,9 @@ async function buildCheckout(
   projectName: string;
   version: number | null;
   edl: string;
+  fcpxml: string;
+  otio: string;
+  aaf: Buffer;
   manifest: CheckoutMediaItem[];
 } | null> {
   const [project] = await db
@@ -1283,18 +1372,43 @@ async function buildCheckout(
     clips,
     assetById,
   });
+  const fcpxml = buildTimelineFcpxml({
+    title: `${project.name} — ${leg}`,
+    version: version.version,
+    clips,
+    assetById,
+  });
+  const otio = buildTimelineOtio({
+    title: `${project.name} — ${leg}`,
+    version: version.version,
+    clips,
+    assetById,
+  });
+  const aaf = buildTimelineAaf({
+    title: `${project.name} — ${leg}`,
+    version: version.version,
+    clips,
+    assetById,
+  });
   const manifest = buildCheckoutManifest(clips, assetById);
 
-  return { projectName: project.name, version: version.version, edl, manifest };
+  return { projectName: project.name, version: version.version, edl, fcpxml, otio, aaf, manifest };
 }
 
-function checkoutFilename(projectName: string, leg: string, version: number | null): string {
+function checkoutFilename(
+  projectName: string,
+  leg: string,
+  version: number | null,
+  format: "EDL" | "FCPXML" | "OTIO" | "AAF" = "EDL",
+): string {
   const slug = projectName
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60) || "project";
-  return `${slug}-${leg.toLowerCase()}-v${version ?? 0}.edl`;
+  const ext =
+    format === "FCPXML" ? "fcpxml" : format === "OTIO" ? "otio" : format === "AAF" ? "aaf" : "edl";
+  return `${slug}-${leg.toLowerCase()}-v${version ?? 0}.${ext}`;
 }
 
 // GET /video/projects/:projectId/timelines/:leg/checkout — the EDL file.
@@ -1327,9 +1441,121 @@ router.get(
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="${checkoutFilename(checkout.projectName, params.data.leg, checkout.version)}"`,
+      `attachment; filename="${checkoutFilename(checkout.projectName, params.data.leg, checkout.version, "EDL")}"`,
     );
     res.send(checkout.edl);
+  },
+);
+
+// GET /video/projects/:projectId/timelines/:leg/checkout/fcpxml — the FCPXML
+// variant of the checkout (Premiere/Final Cut native interchange).
+router.get(
+  "/video/projects/:projectId/timelines/:leg/checkout/fcpxml",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Unknown leg" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const checkout = await buildCheckout(params.data.projectId, params.data.leg);
+    if (!checkout) {
+      res.status(400).json({ error: "Save a snapshot before checking out" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${checkoutFilename(checkout.projectName, params.data.leg, checkout.version, "FCPXML")}"`,
+    );
+    res.send(checkout.fcpxml);
+  },
+);
+
+// GET /video/projects/:projectId/timelines/:leg/checkout/otio — the OTIO
+// variant of the checkout (OpenTimelineIO, the canonical interchange).
+router.get(
+  "/video/projects/:projectId/timelines/:leg/checkout/otio",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Unknown leg" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const checkout = await buildCheckout(params.data.projectId, params.data.leg);
+    if (!checkout) {
+      res.status(400).json({ error: "Save a snapshot before checking out" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${checkoutFilename(checkout.projectName, params.data.leg, checkout.version, "OTIO")}"`,
+    );
+    res.send(checkout.otio);
+  },
+);
+
+// GET /video/projects/:projectId/timelines/:leg/checkout/aaf — the AAF
+// variant of the checkout (Advanced Authoring Format, export-only per the
+// design; editors import it into Avid/Premiere via AMA).
+router.get(
+  "/video/projects/:projectId/timelines/:leg/checkout/aaf",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Unknown leg" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const checkout = await buildCheckout(params.data.projectId, params.data.leg);
+    if (!checkout) {
+      res.status(400).json({ error: "Save a snapshot before checking out" });
+      return;
+    }
+
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${checkoutFilename(checkout.projectName, params.data.leg, checkout.version, "AAF")}"`,
+    );
+    res.send(checkout.aaf);
   },
 );
 
@@ -1374,8 +1600,9 @@ router.get(
 );
 
 // POST /video/projects/:projectId/timelines/:leg/import — the push half of the
-// round-trip: parse an external EDL, relink sources to vault assets, save a
-// new timeline version, and (by default) submit it for Captain review.
+// round-trip: parse an external interchange document (CMX3600 EDL or FCPXML),
+// relink sources to vault assets, save a new timeline version, and (by
+// default) submit it for Captain review.
 router.post(
   "/video/projects/:projectId/timelines/:leg/import",
   async (req: Request, res: Response): Promise<void> => {
@@ -1391,12 +1618,21 @@ router.post(
       return;
     }
 
-    const rawBody = (req.body ?? {}) as { edl?: unknown; message?: unknown; submit?: unknown };
-    const edl = typeof rawBody.edl === "string" ? rawBody.edl : "";
+    const rawBody = (req.body ?? {}) as {
+      format?: unknown;
+      document?: unknown;
+      message?: unknown;
+      submit?: unknown;
+    };
+    const rawFormat =
+      typeof rawBody.format === "string" ? rawBody.format.toUpperCase() : "EDL";
+    const format: "EDL" | "FCPXML" | "OTIO" =
+      rawFormat === "FCPXML" || rawFormat === "OTIO" ? rawFormat : "EDL";
+    const document = typeof rawBody.document === "string" ? rawBody.document : "";
     const message = typeof rawBody.message === "string" ? rawBody.message.trim() : "";
     const submit = rawBody.submit !== false;
-    if (!edl.trim()) {
-      res.status(400).json({ error: "No EDL content to import" });
+    if (!document.trim()) {
+      res.status(400).json({ error: "No interchange document to import" });
       return;
     }
 
@@ -1406,29 +1642,67 @@ router.post(
       return;
     }
 
-    let events: ParsedEdlEvent[];
-    try {
-      events = parseTimelineEdl(edl);
-    } catch (error) {
-      res.status(400).json({ error: error instanceof Error ? error.message : "Could not parse the EDL" });
-      return;
-    }
-    if (events.length === 0) {
-      res.status(400).json({ error: "The EDL has no edit events" });
-      return;
-    }
-
     const assets = await db
       .select()
       .from(tandemVideoAssetsTable)
       .where(eq(tandemVideoAssetsTable.projectId, params.data.projectId));
-    const { clips, unresolved } = resolveEdlEvents(
-      events,
-      assets.map((asset) => ({ id: asset.id, fileName: asset.fileName })),
-    );
+    const assetRefs = assets.map((asset) => ({ id: asset.id, fileName: asset.fileName }));
+
+    let clips: EdlClip[];
+    let unresolved: string[];
+    let sourceLabel: string;
+    if (format === "FCPXML") {
+      let events: ParsedFcpxmlClip[];
+      try {
+        events = parseTimelineFcpxml(document);
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : "Could not parse the FCPXML" });
+        return;
+      }
+      if (events.length === 0) {
+        res.status(400).json({ error: "The FCPXML has no edit events" });
+        return;
+      }
+      const resolved = resolveFcpxmlEvents(events, assetRefs);
+      clips = resolved.clips;
+      unresolved = resolved.unresolved;
+      sourceLabel = "FCPXML";
+    } else if (format === "OTIO") {
+      let events: ParsedOtioClip[];
+      try {
+        events = parseTimelineOtio(document);
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : "Could not parse the OTIO" });
+        return;
+      }
+      if (events.length === 0) {
+        res.status(400).json({ error: "The OTIO has no edit events" });
+        return;
+      }
+      const resolved = resolveOtioEvents(events, assetRefs);
+      clips = resolved.clips;
+      unresolved = resolved.unresolved;
+      sourceLabel = "OTIO";
+    } else {
+      let events: ParsedEdlEvent[];
+      try {
+        events = parseTimelineEdl(document);
+      } catch (error) {
+        res.status(400).json({ error: error instanceof Error ? error.message : "Could not parse the EDL" });
+        return;
+      }
+      if (events.length === 0) {
+        res.status(400).json({ error: "The EDL has no edit events" });
+        return;
+      }
+      const resolved = resolveEdlEvents(events, assetRefs);
+      clips = resolved.clips;
+      unresolved = resolved.unresolved;
+      sourceLabel = "EDL";
+    }
     if (unresolved.length > 0) {
       res.status(400).json({
-        error: "Some EDL sources are not in the vault — upload them first",
+        error: `Some ${sourceLabel} sources are not in the vault — upload them first`,
         unresolved,
       });
       return;
@@ -1468,7 +1742,14 @@ router.post(
       .limit(1);
 
     const versionNumber = (latest?.version ?? 0) + 1;
-    const snapshot = { clips, overlays: [], sceneBlocks: [], markers: [] };
+    // Merge the imported clips into the current head snapshot so leg-specific
+    // fields survive an external edit (music/passes on SOUND, grades/lower
+    // thirds/captions on FINISH, scene blocks on SELECTS). Only `clips` is
+    // replaced by the EDL.
+    const snapshot = {
+      ...((latest?.snapshot ?? {}) as Record<string, unknown>),
+      clips,
+    };
     const [version] = await db
       .insert(tandemVideoTimelineVersionsTable)
       .values({
@@ -1476,7 +1757,7 @@ router.post(
         timelineId,
         version: versionNumber,
         snapshot,
-        message: message || `Imported from EDL (${clips.length} clips)`,
+        message: message || `Imported from ${sourceLabel} (${clips.length} clips)`,
         createdById: userId,
         parentVersionId: latest?.id ?? null,
       })

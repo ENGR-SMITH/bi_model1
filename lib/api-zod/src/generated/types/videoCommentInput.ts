@@ -5,8 +5,13 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { VideoCommentInputGeometry } from './videoCommentInputGeometry';
+import type { VideoCommentInputKind } from './videoCommentInputKind';
 import type { VideoCommentInputLeg } from './videoCommentInputLeg';
 
+/**
+ * A timecode note or a spatial annotation (kind PIN/HIGHLIGHT/MARK carries a normalized geometry)
+ */
 export interface VideoCommentInput {
   leg?: VideoCommentInputLeg;
   assetId?: string;
@@ -18,4 +23,11 @@ export interface VideoCommentInput {
      */
   body: string;
   parentId?: string;
+  kind?: VideoCommentInputKind;
+  geometry?: VideoCommentInputGeometry;
+  color?: string;
+  /** @maxLength 12 */
+  label?: string;
+  submissionId?: string;
+  timelineVersionId?: string;
 }

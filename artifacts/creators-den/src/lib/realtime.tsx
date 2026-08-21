@@ -29,6 +29,7 @@ import {
   getGetVideoReferenceQueryKey,
   getGetVideoTimelineQueryKey,
   getListVideoCommentsQueryKey,
+  getListVideoTimelineVersionsQueryKey,
   getListVideoDownloadsQueryKey,
   getListVideoGrantsQueryKey,
   getListVideoJobsQueryKey,
@@ -147,6 +148,8 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
       const leg = (payload.leg ?? '') as 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';
       invalidate([
         getGetVideoTimelineQueryKey(projectId, leg),
+        // The project-level CommitLog in the vault follows saves live too.
+        getListVideoTimelineVersionsQueryKey(projectId, leg),
         getListVideoSyncsQueryKey(projectId),
       ]);
     };

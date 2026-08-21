@@ -119,8 +119,13 @@ export const tandemVideoSubmissionsTable = pgTable("tandem_video_submissions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Timecode comments ("the lighting shift at 02:14 is jarring — can we grade
-// this?"). Pinned to a leg and/or asset at a moment in time.
+// Comments + annotations ("the lighting shift at 02:14 is jarring — can we
+// grade this?"). One primitive serves both timecode notes and spatial pins:
+// `geometry` (normalized x/y/w/h) turns a comment into a Frame.io-style pin
+// or highlight drawn over the frame; `kind` distinguishes TIMECODE notes from
+// PIN / HIGHLIGHT / MARK annotations; `color` + `label` identify the reviewer
+// on a shared canvas; `submissionId` / `timelineVersionId` scope the comment
+// to a specific review (PR) or version.
 export const tandemVideoCommentsTable = pgTable("tandem_video_comments", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
@@ -130,6 +135,17 @@ export const tandemVideoCommentsTable = pgTable("tandem_video_comments", {
   body: text("body").notNull(),
   authorId: text("author_id").notNull(),
   parentId: text("parent_id"),
+  // Normalized 0..1: { x, y, w?, h? } — null = timecode-only note.
+  geometry: jsonb("geometry"),
+  // TIMECODE | PIN | HIGHLIGHT | MARK
+  kind: text("kind").notNull().default("TIMECODE"),
+  // Reviewer's unique color / swatch on the annotation canvas.
+  color: text("color"),
+  // Short identifier, e.g. "A", "1", "FIX".
+  label: text("label"),
+  // Scope the comment to a submission (PR) or timeline version.
+  submissionId: text("submission_id"),
+  timelineVersionId: text("timeline_version_id"),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -270,7 +286,7 @@ export type TandemVideoSubmission = typeof tandemVideoSubmissionsTable.$inferSel
 export type TandemVideoComment = typeof tandemVideoCommentsTable.$inferSelect;
 export type TandemVideoJob = typeof tandemVideoJobsTable.$inferSelect;
 
-export const VIDEO_LEGS = ["SELECTS", "CUT", "SOUND", "FINISH"] as const;
+export const VIDEO_LEGS = ["SELECTS", "CUT", "SOUND", "FINISH", "THUMBNAIL"] as const;
 export type VideoLeg = (typeof VIDEO_LEGS)[number];
 export const VIDEO_JOB_TYPES = [
   "PROXY",

@@ -47,6 +47,7 @@ const LEG_ROLES: Record<string, string> = {
   CUT: "VISUAL_EDITOR",
   SOUND: "SOUND_DESIGNER",
   FINISH: "MOTION_COLOR",
+  THUMBNAIL: "THUMBNAIL_DESIGNER",
 } as const;
 
 async function requireMember(

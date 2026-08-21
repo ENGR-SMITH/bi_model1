@@ -4,7 +4,7 @@ import { oracleChat } from '@workspace/api-client-react';
 import type { OracleMessage } from '@workspace/api-client-react';
 import { Send, Sparkles } from 'lucide-react';
 
-export type StudioLeg = 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';
+export type StudioLeg = 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';
 
 const ROLE_PROMPTS: Record<StudioLeg, string> = {
   SELECTS:
@@ -27,6 +27,11 @@ const ROLE_PROMPTS: Record<StudioLeg, string> = {
     'You help with color grading (LUT presets, exposure, warmth), captions, lower thirds, thumbnails, ' +
     'and export formats. Suggest concrete grade values and placements with timecodes. ' +
     'Keep answers under ~180 words unless asked for a plan.',
+  THUMBNAIL:
+    "You are the Thumbnail Designer's assistant in a video relay (Creators Den). " +
+    'You help with the thumbnail document: which frame or design to pick, title text, style ' +
+    '(face close-up, split, text overlay, minimal), contrast, and legibility at small sizes. ' +
+    'Refer to the chosen design and video title when given. Keep answers under ~180 words unless asked for a plan.',
 };
 
 interface ChatMessage {

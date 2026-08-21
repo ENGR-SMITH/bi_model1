@@ -78,6 +78,7 @@ async function resetDb() {
   state.clerkEmailToUser = {
     "architect@example.com": "architect-1",
     "editor@example.com": "editor-1",
+    "thumb@example.com": "thumb-1",
     "stranger@example.com": "stranger-1",
   };
 }
@@ -201,6 +202,26 @@ describe("timelines (Git-style versions)", () => {
     expect(second.body.versions[0].message).toBe("Add the payoff");
   });
 
+  it("reads one version's full snapshot for diffing", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const first = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+      .send({ snapshot: { clips: [{ id: "c1", assetId: "a1", inMs: 0, outMs: 5000 }] }, message: "v1" });
+    const v1Id = first.body.versions[0].id;
+
+    const detail = await request(API).get(`/api/video/projects/${project.id}/timelines/SELECTS/versions/${v1Id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.version).toBe(1);
+    expect(detail.body.message).toBe("v1");
+    expect(detail.body.snapshot.clips[0].id).toBe("c1");
+    expect(detail.body.parentVersionId).toBeNull();
+
+    // A version from another timeline (or a bogus id) is not found.
+    const missing = await request(API).get(`/api/video/projects/${project.id}/timelines/SELECTS/versions/nope`);
+    expect(missing.status).toBe(404);
+  });
+
   it("only the leg role (or Captain) can save a timeline", async () => {
     const project = await createProject();
     await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
@@ -237,6 +258,76 @@ describe("timelines (Git-style versions)", () => {
     expect(rolled.body.snapshot.clips[0].id).toBe("v1clip");
     expect(rolled.body.version).toBe(3);
     expect(rolled.body.versions).toHaveLength(3);
+  });
+});
+
+describe("thumbnail leg (5th leg)", () => {
+  it("saves thumbnail documents (chosen design + title + style) as versions", async () => {
+    const project = await createProject();
+    await addMember(project.id, "thumb@example.com", "THUMBNAIL_DESIGNER");
+
+    state.userId = "thumb-1";
+    const first = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/THUMBNAIL`)
+      .send({ snapshot: { designs: [{ id: "d1", assetId: "design-a", title: "I Tested the $10k Camera", style: "TEXT_OVERLAY" }] }, message: "First cover" });
+    expect(first.status).toBe(200);
+    expect(first.body.leg).toBe("THUMBNAIL");
+    expect(first.body.version).toBe(1);
+    expect(first.body.snapshot.designs[0].style).toBe("TEXT_OVERLAY");
+
+    const second = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/THUMBNAIL`)
+      .send({ snapshot: { designs: [{ id: "d1", assetId: "design-b", title: "I Tested the $10k Camera", style: "FACE_CLOSEUP" }] }, message: "Swap the image" });
+    expect(second.status).toBe(200);
+    expect(second.body.version).toBe(2);
+    expect(second.body.versions).toHaveLength(2);
+  });
+
+  it("only the Thumbnail Designer (or Captain) can edit the THUMBNAIL leg", async () => {
+    const project = await createProject();
+    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+
+    state.userId = "editor-1";
+    const forbidden = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/THUMBNAIL`)
+      .send({ snapshot: { designs: [{ assetId: "design-a" }] } });
+    expect(forbidden.status).toBe(403);
+
+    state.userId = "thumb-1"; // not a member
+    const notMember = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/THUMBNAIL`)
+      .send({ snapshot: { designs: [{ assetId: "design-a" }] } });
+    expect(notMember.status).toBe(403);
+
+    state.userId = "captain-1";
+    const captain = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/THUMBNAIL`)
+      .send({ snapshot: { designs: [{ assetId: "design-a" }] } });
+    expect(captain.status).toBe(200);
+  });
+
+  it("submits a thumbnail pass for the Captain to review", async () => {
+    const project = await createProject();
+    await addMember(project.id, "thumb@example.com", "THUMBNAIL_DESIGNER");
+
+    state.userId = "thumb-1";
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/THUMBNAIL`)
+      .send({ snapshot: { designs: [{ assetId: "design-a", title: "Title", style: "MINIMAL" }] }, message: "v1" });
+
+    const submitted = await request(API)
+      .post(`/api/video/projects/${project.id}/submissions`)
+      .send({ leg: "THUMBNAIL", note: "Cover v1" });
+    expect(submitted.status).toBe(201);
+    expect(submitted.body.leg).toBe("THUMBNAIL");
+    expect(submitted.body.status).toBe("SUBMITTED");
+
+    state.userId = "captain-1";
+    const approved = await request(API).post(
+      `/api/video/projects/${project.id}/submissions/${submitted.body.id}/approve`,
+    );
+    expect(approved.status).toBe(200);
+    expect(approved.body.status).toBe("APPROVED");
   });
 });
 
@@ -349,7 +440,7 @@ FCM: NON-DROP FRAME
 
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
-      .send({ edl, message: "Finished in Premiere" });
+      .send({ document: edl, message: "Finished in Premiere" });
     expect(res.status).toBe(201);
     expect(res.body.clips).toBe(2);
     expect(res.body.version).toBe(1);
@@ -367,6 +458,50 @@ FCM: NON-DROP FRAME
     expect(submissions.body[0].note).toBe("Finished in Premiere");
   });
 
+  it("merges imported clips into the existing snapshot so leg-specific fields survive", async () => {
+    const project = await createProject();
+    const camA = await uploadAsset(project.id, "interview-cam-a.mp4");
+    state.userId = "captain-1";
+
+    // A SOUND timeline already carries music/passes — the import must not wipe them.
+    const save = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SOUND`)
+      .send({
+        snapshot: {
+          clips: [],
+          music: [{ id: "music-1", assetId: camA.id, inMs: 0, outMs: 30000, duckUnderSpeech: true }],
+          passes: [{ id: "pass-1", action: "NOISE_REDUCTION", assetId: camA.id }],
+          pickups: [],
+          sceneBlocks: [],
+          markers: [],
+        },
+        message: "first mix",
+      });
+    expect(save.status).toBe(200);
+
+    const edl = `TITLE: edited mix
+FCM: NON-DROP FRAME
+
+001  INTERVIEW-CAM-A  V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00
+* FROM CLIP NAME: interview-cam-a.mp4
+`;
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/SOUND/import`)
+      .send({ document: edl, message: "Re-cut from Premiere", submit: false });
+    expect(res.status).toBe(201);
+    expect(res.body.version).toBe(2);
+
+    const timeline = await request(API).get(`/api/video/projects/${project.id}/timelines/SOUND`);
+    expect(timeline.body.version).toBe(2);
+    expect(timeline.body.snapshot.clips).toHaveLength(1);
+    expect(timeline.body.snapshot.clips[0].assetId).toBe(camA.id);
+    // Leg-specific fields survive the import.
+    expect(timeline.body.snapshot.music).toHaveLength(1);
+    expect(timeline.body.snapshot.music[0].id).toBe("music-1");
+    expect(timeline.body.snapshot.passes).toHaveLength(1);
+  });
+
   it("rejects an EDL whose sources are not in the vault", async () => {
     const project = await createProject();
     await uploadAsset(project.id, "interview-cam-a.mp4");
@@ -381,7 +516,7 @@ FCM: NON-DROP FRAME
 
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
-      .send({ edl });
+      .send({ document: edl });
     expect(res.status).toBe(400);
     expect(res.body.unresolved).toEqual(["missing-clip.mp4"]);
   });
@@ -392,14 +527,235 @@ FCM: NON-DROP FRAME
     state.userId = "captain-1";
     const empty = await request(API)
       .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
-      .send({ edl: "   " });
+      .send({ document: "   " });
     expect(empty.status).toBe(400);
 
     state.userId = "stranger-1";
     const forbidden = await request(API)
       .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
-      .send({ edl: "TITLE: x\n" });
+      .send({ document: "TITLE: x\n" });
     expect(forbidden.status).toBe(403);
+  });
+});
+
+describe("import (FCPXML round-trip)", () => {
+  it("exports an FCPXML 1.9 project and re-imports it, relinking by uid", async () => {
+    const project = await createProject();
+    const camA = await uploadAsset(project.id, "interview-cam-a.mp4");
+    const camB = await uploadAsset(project.id, "broll-shot.mp4");
+    state.userId = "captain-1";
+
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/CUT`)
+      .send({
+        snapshot: {
+          clips: [
+            { id: "clip-1", assetId: camA.id, inMs: 0, outMs: 5000 },
+            { id: "clip-2", assetId: camB.id, inMs: 5000, outMs: 9000 },
+          ],
+        },
+        message: "Rough cut",
+      });
+
+    const res = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout/fcpxml`);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/xml");
+    expect(res.headers["content-disposition"]).toContain(".fcpxml");
+    expect(res.text).toContain(`<fcpxml version="1.9"`);
+    expect(res.text).toContain(`<spine>`);
+    expect(res.text).toContain(`ref="${camA.id}"`);
+    expect(res.text).toContain(`uid="${camB.id}"`);
+
+    // The push half: the exported document comes back, relinked by uid/ref.
+    const imported = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ format: "FCPXML", document: res.text, message: "Back from Final Cut" });
+    expect(imported.status).toBe(201);
+    expect(imported.body.clips).toBe(2);
+    expect(imported.body.version).toBe(2);
+    expect(imported.body.submissionId).toBeTruthy();
+
+    const timeline = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT`);
+    expect(timeline.body.snapshot.clips).toHaveLength(2);
+    expect(timeline.body.snapshot.clips[0].assetId).toBe(camA.id);
+    expect(timeline.body.snapshot.clips[0].outMs).toBe(5000);
+  });
+
+  it("relinks FCPXML sources by file name for documents exported by an NLE", async () => {
+    const project = await createProject();
+    const camA = await uploadAsset(project.id, "interview-cam-a.mp4");
+    state.userId = "captain-1";
+
+    const doc = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fcpxml>
+<fcpxml version="1.9">
+  <resources>
+    <format id="r1" name="FFVideoFormat1080p25" frameDuration="1/25s" width="1920" height="1080"/>
+    <asset id="r2" name="interview-cam-a.mp4" src="file:///Volumes/Media/interview-cam-a.mp4" start="0s" duration="12000/25s" hasVideo="1" hasAudio="1" format="r1"/>
+  </resources>
+  <library>
+    <event name="E"><project name="P"><sequence format="r1" duration="125/25s"><spine>
+      <clip name="interview-cam-a.mp4" ref="r2" offset="0s" duration="125/25s" start="0s" format="r1" tcFormat="NDF"/>
+    </spine></sequence></project></event>
+  </library>
+</fcpxml>`;
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ format: "FCPXML", document: doc });
+    expect(res.status).toBe(201);
+    expect(res.body.clips).toBe(1);
+
+    const timeline = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT`);
+    expect(timeline.body.snapshot.clips[0].assetId).toBe(camA.id);
+    expect(timeline.body.snapshot.clips[0].inMs).toBe(0);
+    expect(timeline.body.snapshot.clips[0].outMs).toBe(5000);
+    expect(timeline.body.snapshot.clips[0].srcInMs).toBe(0);
+  });
+
+  it("rejects an FCPXML whose sources are not in the vault", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+
+    const doc = `<?xml version="1.0" encoding="UTF-8"?>
+<fcpxml version="1.9">
+  <resources>
+    <format id="r1" name="FFVideoFormat1080p25" frameDuration="1/25s" width="1920" height="1080"/>
+    <asset id="r2" name="missing-clip.mp4" src="file:///vault/missing-clip.mp4" start="0s" duration="125/25s" format="r1"/>
+  </resources>
+  <library><event name="E"><project name="P"><sequence format="r1" duration="125/25s"><spine>
+    <clip name="missing-clip.mp4" ref="r2" offset="0s" duration="125/25s" start="0s" format="r1"/>
+  </spine></sequence></project></event></library>
+</fcpxml>`;
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ format: "FCPXML", document: doc });
+    expect(res.status).toBe(400);
+    expect(res.body.unresolved).toEqual(["missing-clip.mp4"]);
+  });
+});
+
+describe("import (OTIO round-trip)", () => {
+  it("exports an OTIO Timeline and re-imports it, relinking by metadata.assetId", async () => {
+    const project = await createProject();
+    const camA = await uploadAsset(project.id, "interview-cam-a.mp4");
+    const camB = await uploadAsset(project.id, "broll-shot.mp4");
+    state.userId = "captain-1";
+
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/CUT`)
+      .send({
+        snapshot: {
+          clips: [
+            { id: "clip-1", assetId: camA.id, inMs: 0, outMs: 5000 },
+            { id: "clip-2", assetId: camB.id, inMs: 5000, outMs: 9000 },
+          ],
+        },
+        message: "Rough cut",
+      });
+
+    const res = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout/otio`);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/json");
+    expect(res.headers["content-disposition"]).toContain(".otio");
+    expect(res.text).toContain('"OTIO_SCHEMA": "Timeline.1"');
+    expect(res.text).toContain('"kind": "Video"');
+    expect(res.text).toContain(`"assetId": "${camB.id}"`);
+
+    // The push half: the exported document comes back, relinked by assetId.
+    const imported = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ format: "OTIO", document: res.text, message: "Back through OTIO" });
+    expect(imported.status).toBe(201);
+    expect(imported.body.clips).toBe(2);
+    expect(imported.body.version).toBe(2);
+    expect(imported.body.submissionId).toBeTruthy();
+
+    const timeline = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT`);
+    expect(timeline.body.snapshot.clips).toHaveLength(2);
+    expect(timeline.body.snapshot.clips[0].assetId).toBe(camA.id);
+    expect(timeline.body.snapshot.clips[0].inMs).toBe(0);
+    expect(timeline.body.snapshot.clips[0].outMs).toBe(5000);
+    expect(timeline.body.snapshot.clips[1].assetId).toBe(camB.id);
+    expect(timeline.body.snapshot.clips[1].outMs).toBe(9000);
+  });
+
+  it("rejects an OTIO whose sources are not in the vault", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+
+    const doc = JSON.stringify({
+      OTIO_SCHEMA: "Timeline.1",
+      name: "P",
+      tracks: {
+        children: [
+          {
+            kind: "Video",
+            children: [
+              {
+                OTIO_SCHEMA: "Clip.1",
+                name: "missing-clip.mp4",
+                source_range: { start_time: { value: 0, rate: 25 }, duration: { value: 125, rate: 25 } },
+                media_references: { target_url: "file:///vault/missing-clip.mp4" },
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ format: "OTIO", document: doc });
+    expect(res.status).toBe(400);
+    expect(res.body.unresolved).toEqual(["file:///vault/missing-clip.mp4"]);
+  });
+});
+
+describe("checkout AAF (export-only)", () => {
+  it("downloads a binary .aaf with a valid CFB container and MasterMob", async () => {
+    const project = await createProject();
+    const camA = await uploadAsset(project.id, "interview-cam-a.mp4");
+    const camB = await uploadAsset(project.id, "broll-shot.mp4");
+    state.userId = "captain-1";
+
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/CUT`)
+      .send({
+        snapshot: {
+          clips: [
+            { id: "clip-1", assetId: camA.id, inMs: 0, outMs: 5000 },
+            { id: "clip-2", assetId: camB.id, inMs: 5000, outMs: 9000 },
+          ],
+        },
+        message: "Rough cut",
+      });
+
+    const res = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout/aaf`);
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toContain("application/octet-stream");
+    expect(res.headers["content-disposition"]).toContain(".aaf");
+
+    const buf = res.body as Buffer;
+    // CFB magic + little-endian sector shift 12 (4096-byte sectors)
+    expect(buf.subarray(0, 8).toString("hex")).toBe("d0cf11e0a1b11ae1");
+    expect(buf.readUInt16LE(28)).toBe(0xfffe);
+    expect(buf.readUInt16LE(30)).toBe(12);
+    // The project title + source names appear as UTF-16LE in the directory tree.
+    const utf16le = (s: string) => Buffer.from(`${s}\u0000`, "utf16le");
+    expect(buf.indexOf(utf16le("The Salt Road Vlog — CUT"))).toBeGreaterThan(-1);
+    expect(buf.indexOf(utf16le("interview-cam-a.mp4"))).toBeGreaterThan(-1);
+    expect(buf.indexOf(utf16le("broll-shot.mp4"))).toBeGreaterThan(-1);
+    // AAF properties streams begin with the little-endian marker 0x4c.
+    expect(buf.indexOf(Buffer.from([0x4c, 0x20]))).toBeGreaterThan(-1);
+  });
+
+  it("rejects AAF checkout when no snapshot exists", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const res = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout/aaf`);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -509,6 +865,46 @@ describe("timecode comments", () => {
       .patch(`/api/video/projects/${project.id}/comments/${created.body.id}`)
       .send({ resolved: true });
     expect(forbidden.status).toBe(403);
+  });
+
+  it("stores spatial annotations (geometry/kind/color/label) with review scoping", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const asset = await uploadAsset(project.id);
+
+    const pin = await request(API)
+      .post(`/api/video/projects/${project.id}/comments`)
+      .send({
+        leg: "SELECTS",
+        assetId: asset.id,
+        timecodeMs: 42000,
+        body: "The mic boom dips into frame here.",
+        kind: "PIN",
+        geometry: { x: 0.62, y: 0.3 },
+        color: "#e05252",
+        label: "A",
+        submissionId: "sub-1",
+        timelineVersionId: "ver-9",
+      });
+    expect(pin.status).toBe(201);
+    expect(pin.body.kind).toBe("PIN");
+    expect(pin.body.geometry).toEqual({ x: 0.62, y: 0.3 });
+    expect(pin.body.color).toBe("#e05252");
+    expect(pin.body.label).toBe("A");
+    expect(pin.body.submissionId).toBe("sub-1");
+    expect(pin.body.timelineVersionId).toBe("ver-9");
+
+    // Plain timecode notes default to kind TIMECODE with no geometry.
+    const note = await request(API)
+      .post(`/api/video/projects/${project.id}/comments`)
+      .send({ leg: "SELECTS", body: "Project-level note." });
+    expect(note.status).toBe(201);
+    expect(note.body.kind).toBe("TIMECODE");
+    expect(note.body.geometry).toBeNull();
+
+    const list = await request(API).get(`/api/video/projects/${project.id}/comments`);
+    expect(list.body).toHaveLength(2);
+    expect(list.body.find((c: any) => c.kind === "PIN").timelineVersionId).toBe("ver-9");
   });
 
   it("rejects comments pinned to an asset from another project", async () => {
