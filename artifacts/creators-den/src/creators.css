@@ -1,8 +1,15 @@
 /* ============================================================================
    Creators Den — role workspaces
-   Direct-manipulation timeline, canvas board, waveform, AI oracle, role tabs.
+   Read-only review timeline, annotation canvas, AI oracle, role tabs,
+   and the external-first version-control bridge.
    Built on top of the Author Den design system (index.css).
    ============================================================================ */
+
+/* ---- Stage column header (grouping the review / version-control halves) ---- */
+.stage-col-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin: 2px 0 16px; }
+.stage-col-head > div { min-width: 0; }
+.stage-col-head h2 { font: 700 19px var(--app-font-serif); letter-spacing: -.02em; margin: 6px 0 0; }
+.stage-col-head p { color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.55; max-width: 430px; margin: 6px 0 0; }
 
 /* ---- Role tabs (the four legs) ---- */
 .role-tabs { display: flex; flex-wrap: wrap; gap: 3px; padding: 3px; border: 1px solid hsl(var(--border)); background: hsl(var(--card) / .86); box-shadow: var(--shadow-xs); border-radius: 999px; }
@@ -49,21 +56,6 @@
 .timeline-hover-tip b { display: block; font: 700 11px var(--app-font-serif); color: hsl(var(--foreground)); }
 .timeline-hover-tip small { color: hsl(var(--muted-foreground)); font: 8px var(--app-font-mono); }
 .timeline-empty { padding: 26px 18px; text-align: center; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.6; }
-
-/* ---- Waveform strip (Sound) ---- */
-.den-waveform { position: relative; height: 110px; overflow: hidden; border: 1px solid hsl(var(--border)); border-radius: 5px; background: hsl(var(--secondary) / .4); cursor: crosshair; touch-action: none; }
-.den-waveform-bars { position: absolute; inset: 0; display: flex; align-items: center; gap: 1px; padding: 0 2px; pointer-events: none; }
-.den-waveform-bars span { flex: 1; background: hsl(var(--accent) / .4); border-radius: 1px; min-width: 1px; }
-
-/* ---- Canvas board (Finish) ---- */
-.den-canvas { position: relative; min-height: 320px; overflow: hidden; border: 1px dashed hsl(var(--border)); border-radius: 6px; background: linear-gradient(135deg, hsl(var(--card)), hsl(var(--background))); }
-.den-canvas-grid { position: absolute; inset: 0; opacity: .5; background-image: linear-gradient(hsl(var(--border) / .5) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--border) / .5) 1px, transparent 1px); background-size: 26px 26px; pointer-events: none; }
-.den-canvas-item { position: absolute; min-width: 130px; min-height: 58px; cursor: grab; border: 2px solid hsl(var(--accent)); background: hsl(var(--card)); box-shadow: var(--shadow-sm); z-index: 1; touch-action: none; padding: 9px 12px; border-radius: 4px; }
-.den-canvas-item:active { cursor: grabbing; }
-.den-canvas-item.selected { box-shadow: 0 0 0 3px hsl(var(--accent) / .25), var(--shadow-md); }
-.den-canvas-label { display: block; font: 700 13px var(--app-font-serif); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.den-canvas-sub { display: block; margin-top: 3px; color: hsl(var(--muted-foreground)); font: 8px var(--app-font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.den-canvas-remove { position: absolute; right: -10px; top: -10px; width: 21px; height: 21px; border: 0; border-radius: 50%; display: grid; place-items: center; background: hsl(var(--destructive)); color: white; box-shadow: var(--shadow-sm); }
 
 /* ---- Role AI oracle ---- */
 .den-oracle { border: 1px solid hsl(var(--accent) / .32); background: hsl(var(--card)); box-shadow: var(--shadow-sm); border-radius: 6px; overflow: hidden; }
@@ -140,10 +132,6 @@
 .den-upload-cancel { flex: 0 0 auto; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--destructive)); padding: 4px 9px; border-radius: 5px; font-size: 10px; font-weight: 600; transition: border-color .16s, background .16s; }
 .den-upload-cancel:hover { border-color: hsl(var(--destructive) / .6); background: hsl(var(--destructive) / .08); }
 
-/* ---- Waveform progress fill (Sound) ---- */
-.den-waveform .played { background: hsl(var(--accent)); }
-.den-waveform .queued { background: hsl(var(--accent) / .22); }
-
 /* ---- Review marker rail (design §10: comment pins clickable on the player) ---- */
 .den-marker-rail { position: relative; height: 14px; border-top: 1px solid hsl(var(--border)); background: hsl(var(--secondary) / .35); cursor: crosshair; }
 .den-marker-pin { position: absolute; top: 3px; bottom: 3px; width: 4px; border: 0; border-radius: 2px; background: hsl(var(--accent)); cursor: pointer; padding: 0; transition: transform .12s, filter .12s; }
@@ -182,22 +170,6 @@
 .den-two-col-wide { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; align-items: start; }
 .den-footnote { display: flex; align-items: center; gap: 7px; color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.55; }
 .den-footnote svg { flex: 0 0 auto; color: hsl(var(--accent)); }
-
-/* ---- Editing toolbox (Premiere Pro-style tool strip) ---- */
-.den-toolbox { display: flex; flex-wrap: wrap; gap: 6px; }
-.den-tool-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid hsl(var(--border)); border-radius: 5px; background: hsl(var(--card)); color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 700; cursor: pointer; transition: all .12s; }
-.den-tool-btn:hover { border-color: hsl(var(--accent) / .5); color: hsl(var(--foreground)); }
-.den-tool-btn.active { border-color: hsl(var(--accent)); background: hsl(var(--accent) / .14); color: hsl(var(--accent)); box-shadow: 0 0 0 1px hsl(var(--accent) / .35); }
-.den-tool-btn:disabled { opacity: .5; cursor: default; }
-.den-tool-btn kbd { font: 8px var(--app-font-mono); padding: 1px 4px; border: 1px solid hsl(var(--border)); border-radius: 3px; background: hsl(var(--secondary) / .5); color: hsl(var(--muted-foreground)); }
-.den-tool-btn.active kbd { border-color: hsl(var(--accent) / .4); color: hsl(var(--accent)); }
-
-/* ---- Tool cursors on the timeline ---- */
-.timeline-shell.tool-razor .timeline-block { cursor: crosshair; }
-.timeline-shell.tool-razor .timeline-block:hover { border-color: hsl(var(--destructive) / .7); background: hsl(var(--destructive) / .12); }
-.timeline-shell.tool-razor .timeline-trim { display: none; }
-.timeline-shell.tool-grab .timeline-block { cursor: grab; }
-.timeline-shell.tool-grab .timeline-block.dragging { cursor: grabbing; }
 
 /* ---- Annotation canvas (spatial review over the proxy frame) ---- */
 .annotation-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: visible; }

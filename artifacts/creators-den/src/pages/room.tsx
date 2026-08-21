@@ -179,8 +179,9 @@ export default function ContentCreatorsPage() {
           <span className="eyebrow-line" /><span className="eyebrow">Welcome in, {name}</span>
           <h1>Your footage<br /><em>has a room.</em></h1>
           <p>
-            Drop raw files into a locked vault, hand each role its studio, and relay the picture
-            down the line — selects, cut, sound, finish, thumbnail — until the Captain releases the master.
+            Store footage, track every change, and collaborate like it&apos;s code — drop raw files into a locked
+            vault, hand each role its stage, and relay the picture down the line — selects, cut, sound, finish,
+            thumbnail — until the Captain releases the master.
           </p>
           <button type="button" className="hero-new-project" onClick={() => setModalOpen(true)} data-testid="button-new-project">
             <Clapperboard size={16} />
@@ -221,8 +222,8 @@ export default function ContentCreatorsPage() {
               </div>
               <div className="card-rule" />
               <div className="project-meta">
-                <span><Sparkles size={11} /> direct manipulation + AI</span>
-                <span>studio</span>
+                <span><Sparkles size={11} /> version control + review</span>
+                <span>stage</span>
               </div>
             </div>
           );
@@ -272,7 +273,7 @@ export default function ContentCreatorsPage() {
           </div>
           <div>
             <Sparkles size={14} />
-            <span>Every role gets direct-manipulation tools and a role-aware AI oracle.</span>
+            <span>Every stage is versioned like a repo — checkout, edit in your NLE, import back.</span>
           </div>
           <div>
             <Film size={14} />

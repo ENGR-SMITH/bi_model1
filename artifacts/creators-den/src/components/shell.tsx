@@ -21,6 +21,30 @@ export function SectionEyebrow({ children }: { children: ReactNode }) {
   return <span className="eyebrow">{children}</span>;
 }
 
+/** A labelled column header that groups the review vs. version-control halves of a stage page. */
+export function ColumnSection({
+  eyebrow,
+  title,
+  hint,
+  right,
+}: {
+  eyebrow: string;
+  title: string;
+  hint?: string;
+  right?: ReactNode;
+}) {
+  return (
+    <div className="stage-col-head">
+      <div>
+        <span className="eyebrow">{eyebrow}</span>
+        <h2>{title}</h2>
+        {hint && <p>{hint}</p>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
 export const RELAY_LEGS = [
   { slug: 'selects', leg: 'SELECTS', number: '01', label: 'Selects', role: 'Story Architect', icon: Film },
   { slug: 'cut', leg: 'CUT', number: '02', label: 'Cut', role: 'Visual Editor', icon: Scissors },

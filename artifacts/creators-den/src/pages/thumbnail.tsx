@@ -18,7 +18,7 @@ import {
   useListVideoSubmissions,
   useSaveVideoTimeline,
 } from '@workspace/api-client-react';
-import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
+import { SectionEyebrow, ColumnSection, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { ImageStage, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
@@ -243,6 +243,12 @@ export default function ThumbnailStudioPage() {
 
       <div className="den-two-col">
         <div className="space-y-4">
+          <ColumnSection
+            eyebrow="Review"
+            title="Watch & annotate"
+            hint="The design streams read-only. Mark and highlight the frame as review annotations — design itself happens externally and is uploaded to the vault."
+          />
+
           <div className="paper-card">
             <div className="inline-heading">
               <span className="eyebrow"><ImageIcon size={13} /> Design canvas</span>
@@ -295,6 +301,12 @@ export default function ThumbnailStudioPage() {
         </div>
 
         <div className="space-y-4">
+          <ColumnSection
+            eyebrow="Version control"
+            title="The document & review"
+            hint="The chosen image + title + style is the stage's document — saved as a Git-style snapshot and submitted to the Captain."
+          />
+
           <div className="paper-card accent-card">
             <div className="inline-heading">
               <span className="eyebrow"><ImageIcon size={13} /> The thumbnail document</span>

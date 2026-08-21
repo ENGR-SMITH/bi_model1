@@ -3,31 +3,23 @@ import {
   ArrowLeft,
   ArrowUpRight,
   Check,
-  Clapperboard,
   Compass,
-  Film,
   GitCompareArrows,
   LockKeyhole,
   MessageSquare,
-  Mic2,
-  Palette,
   Pin,
   Play,
   Plus,
   RotateCcw,
-  Save,
-  Scissors,
   Search,
   Send,
   Sparkles,
-  X,
 } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import {
   getGetVideoAssetQueryKey,
-  getGetVideoProjectQueryKey,
   getGetVideoReferenceQueryKey,
   getGetVideoTimelineQueryKey,
   getListVideoCommentsQueryKey,
@@ -43,7 +35,6 @@ import {
   useListVideoSubmissions,
   useResolveVideoComment,
   useRollbackVideoTimeline,
-  useSaveVideoTimeline,
   oracleChat,
 } from '@workspace/api-client-react';
 import type {
@@ -51,7 +42,7 @@ import type {
   VideoTranscriptSegment,
   VideoTimelineVersionSummary,
 } from '@workspace/api-client-react';
-import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
+import { SectionEyebrow, ColumnSection, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult, type StudioLeg } from '@/components/role-oracle';
@@ -91,13 +82,22 @@ interface SceneBlock {
   endMs: number;
 }
 
-interface WorkingSnapshot {
+interface SelectsSnapshot {
   clips: Clip[];
   sceneBlocks: SceneBlock[];
   markers: Array<{ id: string; label: string; timeMs: number }>;
 }
 
-const EMPTY_SNAPSHOT: WorkingSnapshot = { clips: [], sceneBlocks: [], markers: [] };
+const EMPTY_SNAPSHOT: SelectsSnapshot = { clips: [], sceneBlocks: [], markers: [] };
+
+function parseSnapshot(raw: unknown): SelectsSnapshot {
+  const snapshot = raw as Partial<SelectsSnapshot> | null | undefined;
+  return {
+    clips: Array.isArray(snapshot?.clips) ? snapshot.clips : [],
+    sceneBlocks: Array.isArray(snapshot?.sceneBlocks) ? snapshot.sceneBlocks : [],
+    markers: Array.isArray(snapshot?.markers) ? snapshot.markers : [],
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Reference guide (M4) — viral reference pacing, side-by-side
@@ -158,7 +158,7 @@ function ReferenceGuide({ projectId, assets, onSeek }: { projectId: string; asse
               <span className="world-symbol"><Play size={12} /></span>
               <span>
                 <b>{section.label}</b>
-                <small>{Math.floor(section.startMs / 1000 / 60)}:{String(Math.floor((section.startMs / 1000) % 60)).padStart(2, '0')}</small>
+                <small>{formatTimecode(section.startMs)}</small>
               </span>
             </button>
           ))}
@@ -180,19 +180,17 @@ function ReferenceGuide({ projectId, assets, onSeek }: { projectId: string; asse
 }
 
 // ---------------------------------------------------------------------------
-// Player + transcript (left rail)
+// Transcript — search + jump to timecode + pin a note (read-only review)
 // ---------------------------------------------------------------------------
 
 function TranscriptPanel({
   asset,
   onSeek,
-  onSelect,
-  onComment,
+  onNote,
 }: {
   asset: VideoAssetDetail | undefined;
   onSeek: (ms: number) => void;
-  onSelect: (segment: VideoTranscriptSegment) => void;
-  onComment: (segment: VideoTranscriptSegment) => void;
+  onNote: (segment: VideoTranscriptSegment) => void;
 }) {
   const [query, setQuery] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -250,22 +248,12 @@ function TranscriptPanel({
                       <span
                         role="button"
                         tabIndex={0}
-                        onClick={(event) => { event.stopPropagation(); onSelect(segment); }}
-                        onKeyDown={(event) => { if (event.key === 'Enter') { event.stopPropagation(); onSelect(segment); } }}
+                        onClick={(event) => { event.stopPropagation(); onNote(segment); }}
+                        onKeyDown={(event) => { if (event.key === 'Enter') { event.stopPropagation(); onNote(segment); } }}
                         className="link-btn !text-[10px]"
-                        title="Mark as a select"
+                        title="Pin a note at this timecode"
                       >
-                        <Plus size={11} /> mark select
-                      </span>
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(event) => { event.stopPropagation(); onComment(segment); }}
-                        onKeyDown={(event) => { if (event.key === 'Enter') { event.stopPropagation(); onComment(segment); } }}
-                        className="link-btn !text-[10px]"
-                        title="Comment at this timecode"
-                      >
-                        <MessageSquare size={11} /> comment
+                        <MessageSquare size={11} /> note here
                       </span>
                     </span>
                   </span>
@@ -285,20 +273,16 @@ function TranscriptPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Selects builder (right rail) — direct-manipulation timeline
+// Read-only selects review — the diffable artifact, scrubbed but not edited.
 // ---------------------------------------------------------------------------
 
-function SelectsBuilder({
+function SelectsReview({
   snapshot,
-  onChange,
-  canEdit,
   durationMs,
   playheadMs,
   onScrub,
 }: {
-  snapshot: WorkingSnapshot;
-  onChange: (next: WorkingSnapshot) => void;
-  canEdit: boolean;
+  snapshot: SelectsSnapshot;
   durationMs: number;
   playheadMs: number;
   onScrub: (ms: number) => void;
@@ -321,85 +305,36 @@ function SelectsBuilder({
     tone: SCENE_TONES[block.type] ?? 'accent',
   }));
 
-  const onClipsChange = (next: TimelineBlock[]) => {
-    const nextClips = snapshot.clips.map((clip) => {
-      const block = next.find((b) => b.id === clip.id);
-      return block ? { ...clip, inMs: block.startMs, outMs: block.endMs } : clip;
-    });
-    onChange({ ...snapshot, clips: nextClips });
-  };
-
-  const onSceneChange = (next: TimelineBlock[]) => {
-    const nextBlocks = snapshot.sceneBlocks.map((block) => {
-      const bar = next.find((b) => b.id === block.id);
-      return bar ? { ...block, startMs: bar.startMs, endMs: bar.endMs } : block;
-    });
-    onChange({ ...snapshot, sceneBlocks: nextBlocks });
-  };
-
   return (
     <div className="space-y-4">
       <Timeline
         title={`Selects — ${snapshot.clips.length} marked`}
-        hint="Drag to move · pull edges to trim · click the ruler to scrub"
+        hint="Scrub the ruler to review · selects are edited in an external NLE and imported back"
         blocks={clipBlocks}
         durationMs={durationMs}
         playheadMs={playheadMs}
-        canEdit={canEdit}
-        onChange={onClipsChange}
+        canEdit={false}
+        scrubOnly
         onScrub={onScrub}
         activeId={activeBlockId(clipBlocks, playheadMs)}
       />
-
-      <div className="paper-card">
-        <div className="inline-heading">
-          <span className="eyebrow">Scene blocks · the narrative spine</span>
-          <span className="mono-label">Hook → Setup → Core → Payoff → CTA</span>
-        </div>
-        <p className="setting-copy mb-3">Drag each beat to place it in the timeline — the spine that drives the cut.</p>
-        <Timeline
-          title=""
-          hint=""
-          blocks={sceneBlocks}
-          durationMs={durationMs}
-          playheadMs={playheadMs}
-          canEdit={canEdit}
-          onChange={onSceneChange}
-          onScrub={onScrub}
-          activeId={activeBlockId(sceneBlocks, playheadMs)}
-        />
-        {canEdit && (
-          <div className="den-chip-list mt-3">
-            {SCENE_TYPES.map((type) => {
-              const exists = snapshot.sceneBlocks.some((b) => b.type === type);
-              return (
-                <button
-                  key={type}
-                  type="button"
-                  className={`den-chip ${exists ? '' : 'text-[hsl(var(--accent))] border-[hsl(var(--accent)/.5)]'}`}
-                  onClick={() => {
-                    const existing = snapshot.sceneBlocks.find((b) => b.type === type);
-                    const next = existing
-                      ? snapshot.sceneBlocks.filter((b) => b.type !== type)
-                      : [...snapshot.sceneBlocks, { id: crypto.randomUUID(), type, startMs: 0, endMs: 0 }];
-                    onChange({ ...snapshot, sceneBlocks: next });
-                  }}
-                  data-testid={`scene-block-${type}`}
-                >
-                  {exists ? <X size={10} /> : <Plus size={10} />}
-                  {type} {exists && '· placed'}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <Timeline
+        title="Scene blocks · the narrative spine"
+        hint="Hook → Setup → Core → Payoff → CTA"
+        blocks={sceneBlocks}
+        durationMs={durationMs}
+        playheadMs={playheadMs}
+        canEdit={false}
+        scrubOnly
+        onScrub={onScrub}
+        activeId={activeBlockId(sceneBlocks, playheadMs)}
+      />
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Version history + submit
+// Version history + submit (shared across every stage page)
 // ---------------------------------------------------------------------------
 
 export function HistoryPanel({
@@ -459,7 +394,7 @@ export function HistoryPanel({
         <span className="mono-label">v{currentVersion ?? 0}</span>
       </div>
       {versions.length === 0 ? (
-        <p className="setting-copy">No snapshots yet — save your first pass above.</p>
+        <p className="setting-copy">No versions yet — import an edited pass to create the first one.</p>
       ) : (
         <div className="den-stack max-h-56 overflow-y-auto pr-1">
           {versions.map((version) => (
@@ -530,7 +465,7 @@ export function HistoryPanel({
 }
 
 // ---------------------------------------------------------------------------
-// Comments
+// Comments (shared across every stage page)
 // ---------------------------------------------------------------------------
 
 export function CommentsPanel({
@@ -673,22 +608,19 @@ export function CommentsPanel({
 // Page
 // ---------------------------------------------------------------------------
 
+const LEG = 'SELECTS' as const;
+
 export default function ContentCreatorsStudioPage() {
   const { projectId } = useParams<{ projectId: string }>();
-  const queryClient = useQueryClient();
   const { user } = useUser();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const [leg, setLeg] = useState<StudioLeg>('SELECTS');
   // Live: comments, submissions, and timeline saves stream in per leg.
-  useProjectRealtime(projectId, leg);
+  useProjectRealtime(projectId, LEG);
   const [assetId, setAssetId] = useState<string | null>(null);
   const [playheadMs, setPlayheadMs] = useState(0);
-  const [message, setMessage] = useState('');
-  const [working, setWorking] = useState<WorkingSnapshot>(EMPTY_SNAPSHOT);
-  const [dirty, setDirty] = useState(false);
-  // One-click AI results
-  const [aiResult, setAiResult] = useState<{ kind: 'selects' | 'spine'; title: string; body: string; meta: { providerId: string; modelId: string } | null } | null>(null);
+  // One-click advisory AI results (suggestions only — nothing edits in-browser).
+  const [aiResult, setAiResult] = useState<{ title: string; body: string; meta: { providerId: string; modelId: string } | null } | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
 
   const project = useGetVideoProject(projectId);
@@ -696,32 +628,18 @@ export default function ContentCreatorsStudioPage() {
     query: {
       queryKey: getGetVideoAssetQueryKey(projectId, assetId ?? ''),
       enabled: Boolean(assetId),
-      // Keep fetching until the proxy/transcript finish, then stop on its own.
       refetchInterval: (query) => pollWhileProcessing(query.state.data),
     },
   });
-  const timeline = useGetVideoTimeline(projectId, leg);
-  const save = useSaveVideoTimeline();
+  const timeline = useGetVideoTimeline(projectId, LEG);
   const submissions = useListVideoSubmissions(projectId);
   const comments = useListVideoComments(projectId);
 
-  // Seed working state from the timeline head whenever it changes.
-  useEffect(() => {
-    if (timeline.data?.snapshot) {
-      const snapshot = timeline.data.snapshot as unknown as WorkingSnapshot;
-      setWorking({
-        clips: Array.isArray(snapshot.clips) ? snapshot.clips : [],
-        sceneBlocks: Array.isArray(snapshot.sceneBlocks) ? snapshot.sceneBlocks : [],
-        markers: Array.isArray(snapshot.markers) ? snapshot.markers : [],
-      });
-      setDirty(false);
-    }
-  }, [timeline.data?.snapshot, timeline.data?.version]);
+  const snapshot = useMemo(() => parseSnapshot(timeline.data?.snapshot), [timeline.data?.snapshot]);
 
   const member = project.data?.members.find((m) => m.userId === user?.id);
   const role = member?.role ?? project.data?.myRole;
-  const canEdit = role === 'CAPTAIN' || role === LEG_ROLES[leg];
-  const canSubmit = canEdit;
+  const canPush = role === 'CAPTAIN' || role === LEG_ROLES[LEG];
 
   // Default the player to the first asset once the project loads.
   useEffect(() => {
@@ -740,39 +658,17 @@ export default function ContentCreatorsStudioPage() {
     }
   };
 
-  const onSelectFromTranscript = (segment: VideoTranscriptSegment) => {
-    const clip: Clip = { id: crypto.randomUUID(), assetId: assetId ?? '', inMs: segment.startMs, outMs: segment.endMs };
-    setWorking((prev) => ({ ...prev, clips: [...prev.clips, clip] }));
-    setDirty(true);
-  };
-
   // Scrub from the timeline ruler without auto-playing.
   const onScrub = (ms: number) => {
     setPlayheadMs(ms);
     if (videoRef.current) videoRef.current.currentTime = ms / 1000;
   };
 
-  const onCommentFromTranscript = (segment: VideoTranscriptSegment) => {
+  const onNoteFromTranscript = (segment: VideoTranscriptSegment) => {
     setPlayheadMs(segment.startMs);
     if (videoRef.current) videoRef.current.currentTime = segment.startMs / 1000;
   };
 
-  const onSave = () => {
-    save.mutate(
-      { projectId, leg, data: { snapshot: working as unknown as Record<string, unknown>, message: message.trim() || undefined } },
-      {
-        onSuccess: () => {
-          setMessage('');
-          setDirty(false);
-          queryClient.invalidateQueries({ queryKey: getGetVideoTimelineQueryKey(projectId, leg) });
-        },
-      },
-    );
-  };
-
-  const saveError = save.error as { response?: { data?: { error?: string } } } | null;
-
-  const legStatus = submissions.data?.find((s) => s.leg === leg);
   // Scope on-frame annotations to the leg's current head version.
   const headVersionId = timeline.data?.versions.find((v) => v.version === timeline.data?.version)?.id ?? null;
 
@@ -781,8 +677,8 @@ export default function ContentCreatorsStudioPage() {
     const lines = (asset.data?.transcript?.segments ?? [])
       .map((s) => `${formatTimecode(s.startMs)}–${formatTimecode(s.endMs)}: ${s.text}`)
       .join('\n');
-    const selects = working.clips.map((c, i) => `#${i + 1} ${formatTimecode(c.inMs)}–${formatTimecode(c.outMs)}`).join(', ') || 'none yet';
-    const spine = working.sceneBlocks.map((b) => `${b.type}@${formatTimecode(b.startMs)}`).join(', ') || 'none yet';
+    const selects = snapshot.clips.map((c, i) => `#${i + 1} ${formatTimecode(c.inMs)}–${formatTimecode(c.outMs)}`).join(', ') || 'none yet';
+    const spine = snapshot.sceneBlocks.map((b) => `${b.type}@${formatTimecode(b.startMs)}`).join(', ') || 'none yet';
     return [
       `Project: ${project.data?.name ?? 'Untitled'}`,
       `Asset: ${asset.data?.fileName ?? 'unknown'} (duration ${formatTimecode(assetDuration)})`,
@@ -790,34 +686,7 @@ export default function ContentCreatorsStudioPage() {
       `Current selects: ${selects}`,
       `Scene blocks: ${spine}`,
     ].join('\n\n').slice(0, 12000);
-  }, [asset.data, working, project.data?.name, assetDuration]);
-
-  // Parse "0:05–0:12" ranges out of an oracle answer and apply them as selects.
-  const applySelectsFromAnswer = (text: string) => {
-    const ranges = parseTimecodeRanges(text);
-    if (ranges.length === 0) return 0;
-    const added: Clip[] = ranges
-      .filter(([inMs, outMs]) => inMs < outMs)
-      .map(([inMs, outMs]) => ({ id: crypto.randomUUID(), assetId: assetId ?? '', inMs, outMs }));
-    setWorking((prev) => ({ ...prev, clips: [...prev.clips, ...added] }));
-    setDirty(true);
-    return added.length;
-  };
-
-  // Parse "TYPE @ 0:05" beat placements out of an oracle answer and apply them.
-  const applySpineFromAnswer = (text: string) => {
-    const placements: Array<{ type: (typeof SCENE_TYPES)[number]; startMs: number }> = [];
-    for (const type of SCENE_TYPES) {
-      const re = new RegExp(`${type}\\s*[@:]\\s*(\\d{1,2}):(\\d{2})`, 'i');
-      const m = text.match(re);
-      if (m) placements.push({ type, startMs: (Number(m[1]) * 60 + Number(m[2])) * 1000 });
-    }
-    if (placements.length === 0) return 0;
-    const next = snapshotSceneBlocksWith(working, placements);
-    setWorking((prev) => ({ ...prev, sceneBlocks: next }));
-    setDirty(true);
-    return placements.length;
-  };
+  }, [asset.data, snapshot, project.data?.name, assetDuration]);
 
   // Runs a one-shot oracle prompt for the quick actions and returns the text.
   const runOracleSuggestion = async (instruction: string): Promise<string | null> => {
@@ -835,7 +704,7 @@ export default function ContentCreatorsStudioPage() {
 
   const quickActions = [
     {
-      id: 'auto-selects',
+      id: 'suggest-selects',
       label: 'Suggest selects from transcript',
       busy: aiBusy,
       run: () => {
@@ -843,22 +712,20 @@ export default function ContentCreatorsStudioPage() {
         void runOracleSuggestion(
           'Mark the strongest moments as selects. Answer ONLY with lines of the form "start–end | reason", one per line, using MM:SS timecodes from the transcript.',
         ).then((body) => {
-          if (!body) return;
-          setAiResult({ kind: 'selects', title: 'Selects suggestions (review, then Apply)', body, meta: null });
+          if (body) setAiResult({ title: 'Selects suggestions', body, meta: null });
         });
       },
     },
     {
-      id: 'auto-spine',
-      label: 'Place the 5-beat spine',
+      id: 'suggest-spine',
+      label: 'Suggest the 5-beat spine',
       busy: aiBusy,
       run: () => {
         setAiResult(null);
         void runOracleSuggestion(
-          'Place the narrative spine on this footage. Answer ONLY with lines of the form "TYPE @ MM:SS" for HOOK, SETUP, CORE, PAYOFF, CTA using timecodes from the transcript.',
+          'Suggest the narrative spine on this footage. Answer ONLY with lines of the form "TYPE @ MM:SS" for HOOK, SETUP, CORE, PAYOFF, CTA using timecodes from the transcript.',
         ).then((body) => {
-          if (!body) return;
-          setAiResult({ kind: 'spine', title: 'Spine suggestions (review, then place)', body, meta: null });
+          if (body) setAiResult({ title: 'Spine suggestions', body, meta: null });
         });
       },
     },
@@ -886,7 +753,7 @@ export default function ContentCreatorsStudioPage() {
         <span className="guide-pin" />
         <div>
           <b>CONTENT CREATORS · THE STUDIO</b>
-          <span>Marks the golden takes and builds the narrative spine: Hook → Setup → Core → Payoff → CTA. Drag the timeline, scrub, and ask the oracle.</span>
+          <span>Review the selects and the narrative spine (Hook → Setup → Core → Payoff → CTA), pin feedback, and hand the cut off to the external NLE.</span>
         </div>
         <span className="guide-spark" />
       </div>
@@ -895,226 +762,158 @@ export default function ContentCreatorsStudioPage() {
         <div>
           <SectionEyebrow>Story Architect · selects</SectionEyebrow>
           <h1>The selects studio.</h1>
-          <p>Hover a transcript line to mark a select, drag clips on the timeline to rework the paper edit, and let the oracle draft the spine.</p>
+          <p>Search the transcript, review the marked takes and spine, comment frame-by-frame — then checkout for Premiere/Resolve and import the result back.</p>
         </div>
         <div className="flex items-center gap-3">
           <Link href={`/projects/${p.id}`} className="secondary-btn" data-testid="link-studio-back-vault">
             <ArrowLeft size={14} />
             The vault
           </Link>
-          <span className={`den-tag ${canEdit ? 'teal' : 'muted'}`}>{canEdit ? 'Editing' : 'Viewing'}</span>
+          <span className={`den-tag ${canPush ? 'teal' : 'muted'}`}>{canPush ? 'Can push & submit' : 'Read-only review'}</span>
         </div>
       </div>
 
       <div className="role-tabs mb-5">
         {RELAY_LEGS.map((item) => {
           const Icon = item.icon;
-          const active = item.leg === leg;
+          const active = item.leg === LEG;
           const status = submissions.data?.find((s) => s.leg === item.leg);
           const href =
-            item.leg === 'CUT'
-              ? `/projects/${p.id}/cut`
-              : item.leg === 'SOUND'
-                ? `/projects/${p.id}/sound`
-                : item.leg === 'FINISH'
-                  ? `/projects/${p.id}/finish`
-                  : item.leg === 'THUMBNAIL'
-                    ? `/projects/${p.id}/thumbnail`
-                    : null;
-          const inner = (
-            <>
+            item.leg === 'SELECTS'
+              ? `/projects/${p.id}/selects`
+              : item.leg === 'CUT'
+                ? `/projects/${p.id}/cut`
+                : item.leg === 'SOUND'
+                  ? `/projects/${p.id}/sound`
+                  : item.leg === 'FINISH'
+                    ? `/projects/${p.id}/finish`
+                    : `/projects/${p.id}/thumbnail`;
+          return (
+            <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`tab-leg-${item.leg}`}>
               <Icon size={13} />
               {item.role}
               {status && <span className={`leg-badge ${status.status === 'APPROVED' ? 'text-[#286254]' : status.status === 'REJECTED' ? 'text-[#a33d31]' : ''}`}>{status.status}</span>}
-            </>
-          );
-          if (href) {
-            return (
-              <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`tab-leg-${item.leg}`}>
-                {inner}
-              </Link>
-            );
-          }
-          return (
-            <button key={item.leg} type="button" className={active ? 'active' : ''} onClick={() => setLeg(item.leg)} data-testid={`tab-leg-${item.leg}`}>
-              {inner}
-            </button>
+            </Link>
           );
         })}
       </div>
 
-      {leg !== 'SELECTS' ? (
-        <div className="empty-state">
-          <Clapperboard size={24} />
-          <h3>This stage is next in the relay.</h3>
-          <p>The {RELAY_LEGS.find((l) => l.leg === leg)?.role} studio lives at its own address — use the tabs above to jump between the four rooms.</p>
-        </div>
-      ) : (
-        <div className="den-two-col">
-          <div className="space-y-4">
-            <div className="paper-card">
-              <div className="inline-heading">
-                <span className="eyebrow">Proxy player</span>
-                {p.assets.length > 1 && (
-                  <select value={assetId ?? ''} onChange={(event) => setAssetId(event.target.value || null)} className="!w-auto !text-xs" data-testid="select-player-asset">
-                    {p.assets.map((a) => (
-                      <option key={a.id} value={a.id}>{a.fileName}</option>
-                    ))}
-                  </select>
-                )}
-              </div>
+      <div className="den-two-col">
+        <div className="space-y-4">
+          <ColumnSection
+            eyebrow="Review"
+            title="Watch & annotate"
+            hint="The proxy streams read-only. Scrub, jump the transcript, and drop frame or timecode pins — editing happens in the external NLE."
+          />
 
-              {assetId ? (
-                <AssetPlayer
-                  className="mt-3"
-                  projectId={p.id}
-                  assetId={assetId}
-                  detail={asset.data}
-                  videoRef={videoRef}
-                  onTimeUpdate={setPlayheadMs}
-                  markers={(comments.data ?? [])
-                    .filter((comment) => comment.timecodeMs !== null && comment.assetId === assetId)
-                    .map((comment) => ({
-                      id: comment.id,
-                      ms: comment.timecodeMs as number,
-                      tone: comment.kind === 'MARK' ? ('gold' as const) : ('accent' as const),
-                      label: comment.label ?? undefined,
-                    }))}
-                  title={asset.data?.fileName}
-                >
-                  <AnnotationCanvas
-                    projectId={p.id}
-                    leg={leg}
-                    assetId={assetId}
-                    playheadMs={playheadMs}
-                    onSeek={onSeek}
-                    timelineVersionId={headVersionId}
-                  />
-                </AssetPlayer>
-              ) : (
-                <EmptyPlayer className="mt-3">
-                  <p className="text-sm font-semibold">No footage in the vault yet.</p>
-                  <Link href={`/projects/${p.id}`} className="link-btn mt-2">
-                    Upload raw footage <ArrowUpRight size={12} />
-                  </Link>
-                </EmptyPlayer>
+          <div className="paper-card">
+            <div className="inline-heading">
+              <span className="eyebrow">Proxy player</span>
+              {p.assets.length > 1 && (
+                <select value={assetId ?? ''} onChange={(event) => setAssetId(event.target.value || null)} className="!w-auto !text-xs" data-testid="select-player-asset">
+                  {p.assets.map((a) => (
+                    <option key={a.id} value={a.id}>{a.fileName}</option>
+                  ))}
+                </select>
               )}
-
-              <p className="den-footnote mt-3">
-                <LockKeyhole size={13} />
-                Streaming the degraded proxy — the locked original never leaves the server.
-              </p>
             </div>
 
-            <ReferenceGuide projectId={p.id} assets={p.assets} onSeek={onSeek} />
-            <TranscriptPanel asset={asset.data} onSeek={onSeek} onSelect={onSelectFromTranscript} onComment={onCommentFromTranscript} />
-            <CommentsPanel projectId={p.id} />
-          </div>
-
-          <div className="space-y-4">
-            <SelectsBuilder
-              snapshot={working}
-              onChange={(next) => { setWorking(next); setDirty(true); }}
-              canEdit={canEdit}
-              durationMs={assetDuration}
-              playheadMs={playheadMs}
-              onScrub={onScrub}
-            />
-
-            {aiResult && (
-              <AiResult
-                title={aiResult.title}
-                meta={aiResult.meta}
-                actions={
-                  aiResult.kind === 'selects'
-                    ? [
-                        <button key="apply" type="button" className="secondary-btn" onClick={() => { const n = applySelectsFromAnswer(aiResult.body); setAiResult({ ...aiResult, title: n > 0 ? `Suggestions — ${n} applied` : aiResult.title }); }}>
-                          <Plus size={13} /> Apply selects
-                        </button>,
-                        <button key="dismiss" type="button" className="text-btn" onClick={() => setAiResult(null)}>Dismiss</button>,
-                      ]
-                    : [
-                        <button key="apply" type="button" className="secondary-btn" onClick={() => { const n = applySpineFromAnswer(aiResult.body); setAiResult({ ...aiResult, title: n > 0 ? `Spine — ${n} beats placed` : aiResult.title }); }}>
-                          <Plus size={13} /> Place beats
-                        </button>,
-                        <button key="dismiss" type="button" className="text-btn" onClick={() => setAiResult(null)}>Dismiss</button>,
-                      ]
-                }
+            {assetId ? (
+              <AssetPlayer
+                className="mt-3"
+                projectId={p.id}
+                assetId={assetId}
+                detail={asset.data}
+                videoRef={videoRef}
+                onTimeUpdate={setPlayheadMs}
+                markers={(comments.data ?? [])
+                  .filter((comment) => comment.timecodeMs !== null && comment.assetId === assetId)
+                  .map((comment) => ({
+                    id: comment.id,
+                    ms: comment.timecodeMs as number,
+                    tone: comment.kind === 'MARK' ? ('gold' as const) : ('accent' as const),
+                    label: comment.label ?? undefined,
+                  }))}
+                title={asset.data?.fileName}
               >
-                {aiResult.body}
-              </AiResult>
+                <AnnotationCanvas
+                  projectId={p.id}
+                  leg={LEG}
+                  assetId={assetId}
+                  playheadMs={playheadMs}
+                  onSeek={onSeek}
+                  timelineVersionId={headVersionId}
+                />
+              </AssetPlayer>
+            ) : (
+              <EmptyPlayer className="mt-3">
+                <p className="text-sm font-semibold">No footage in the vault yet.</p>
+                <Link href={`/projects/${p.id}`} className="link-btn mt-2">
+                  Upload raw footage <ArrowUpRight size={12} />
+                </Link>
+              </EmptyPlayer>
             )}
 
-            <RoleOracle
-              leg="SELECTS"
-              roleName="Story Architect"
-              context={oracleContext}
-              quickActions={quickActions}
-              disabled={!canEdit}
-              placeholder="e.g. Which three transcript lines should open the video?"
-            />
-
-            <div className="paper-card accent-card">
-              <div className="inline-heading">
-                <span className="eyebrow"><Save size={13} /> Save this pass</span>
-              </div>
-              <p className="setting-copy">
-                Every save creates a Git-style snapshot — roll back to any past version, the Captain can always see what changed.
-              </p>
-              {canEdit ? (
-                <div className="mt-3 flex gap-2">
-                  <input
-                    value={message}
-                    onChange={(event) => setMessage(event.target.value)}
-                    placeholder="What changed in this pass? (optional)"
-                    maxLength={500}
-                    data-testid="input-save-message"
-                  />
-                  <button type="button" onClick={onSave} disabled={save.isPending || !dirty} className="primary-btn" data-testid="button-save-snapshot">
-                    <Save size={13} />
-                    {save.isPending ? 'Saving…' : 'Save snapshot'}
-                  </button>
-                </div>
-              ) : (
-                <p className="setting-copy mt-3">You&apos;re viewing this stage — only the Story Architect or the Captain can edit it.</p>
-              )}
-              {dirty && <p className="den-footnote mt-2"><Sparkles size={12} /> Unsaved changes</p>}
-              {save.isError && (
-                <p className="setting-copy mt-2" role="alert">
-                  {saveError?.response?.data?.error || 'The snapshot could not be saved.'}
-                </p>
-              )}
-            </div>
-
-            <HistoryPanel
-              projectId={p.id}
-              leg={leg}
-              versions={timeline.data?.versions ?? []}
-              currentVersion={timeline.data?.version ?? null}
-              canSubmit={canSubmit}
-            />
-
-            <ActivityFeed projectId={p.id} leg={leg} className="" />
-
-            <CheckoutPanel
-              projectId={p.id}
-              projectName={p.name}
-              leg={leg}
-              savedVersion={timeline.data?.version ?? null}
-            />
-
-            <ImportFlow projectId={p.id} leg={leg} canEdit={canEdit} />
-
-            {legStatus && (
-              <p className="den-footnote">
-                <Sparkles size={13} />
-                Stage status: {legStatus.status.toLowerCase()}
-                {legStatus.decidedAt && ` · decided ${new Date(legStatus.decidedAt).toLocaleDateString()}`}
-              </p>
-            )}
+            <p className="den-footnote mt-3">
+              <LockKeyhole size={13} />
+              Streaming the degraded proxy — the locked original never leaves the server.
+            </p>
           </div>
+
+          <SelectsReview snapshot={snapshot} durationMs={assetDuration} playheadMs={playheadMs} onScrub={onScrub} />
+          <ReferenceGuide projectId={p.id} assets={p.assets} onSeek={onSeek} />
+          <TranscriptPanel asset={asset.data} onSeek={onSeek} onNote={onNoteFromTranscript} />
+          <CommentsPanel projectId={p.id} />
         </div>
-      )}
+
+        <div className="space-y-4">
+          <ColumnSection
+            eyebrow="Version control"
+            title="Checkout, import & review"
+            hint="The timeline is the diffable artifact. Checkout to edit externally, import the result as a new version, then submit it for review."
+          />
+
+          <CheckoutPanel
+            projectId={p.id}
+            projectName={p.name}
+            leg={LEG}
+            savedVersion={timeline.data?.version ?? null}
+          />
+
+          <ImportFlow projectId={p.id} leg={LEG} canEdit={canPush} />
+
+          <HistoryPanel
+            projectId={p.id}
+            leg={LEG}
+            versions={timeline.data?.versions ?? []}
+            currentVersion={timeline.data?.version ?? null}
+            canSubmit={canPush}
+          />
+
+          <RoleOracle
+            leg={LEG}
+            roleName="Story Architect"
+            context={oracleContext}
+            quickActions={quickActions}
+            disabled={!canPush}
+            placeholder="e.g. Which three transcript lines should open the video?"
+          />
+
+          {aiResult && (
+            <AiResult
+              title={aiResult.title}
+              meta={aiResult.meta}
+              actions={[
+                <button key="dismiss" type="button" className="text-btn" onClick={() => setAiResult(null)}>Dismiss</button>,
+              ]}
+            >
+              {aiResult.body}
+            </AiResult>
+          )}
+
+          <ActivityFeed projectId={p.id} leg={LEG} className="" />
+        </div>
+      </div>
 
       <p className="den-footnote mt-8">
         <LockKeyhole size={13} />
@@ -1122,33 +921,4 @@ export default function ContentCreatorsStudioPage() {
       </p>
     </div>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function parseTimecodeRanges(text: string): Array<[number, number]> {
-  const ranges: Array<[number, number]> = [];
-  const re = /(\d{1,2}):(\d{2})\s*[–—-]\s*(\d{1,2}):(\d{2})/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const start = (Number(m[1]) * 60 + Number(m[2])) * 1000;
-    const end = (Number(m[3]) * 60 + Number(m[4])) * 1000;
-    if (end > start) ranges.push([start, end]);
-  }
-  return ranges;
-}
-
-function snapshotSceneBlocksWith(snapshot: WorkingSnapshot, placements: Array<{ type: (typeof SCENE_TYPES)[number]; startMs: number }>): SceneBlock[] {
-  const next = snapshot.sceneBlocks.map((b) => ({ ...b }));
-  for (const placement of placements) {
-    const index = next.findIndex((b) => b.type === placement.type);
-    if (index >= 0) {
-      next[index] = { ...next[index], startMs: placement.startMs, endMs: placement.startMs };
-    } else {
-      next.push({ id: crypto.randomUUID(), type: placement.type, startMs: placement.startMs, endMs: placement.startMs });
-    }
-  }
-  return next;
 }
