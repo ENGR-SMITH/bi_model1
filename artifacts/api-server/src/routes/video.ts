@@ -5,7 +5,6 @@ import {
   tandemVideoProjectsTable,
   tandemVideoMembersTable,
   tandemVideoAssetsTable,
-  tandemVideoAssetFilesTable,
 } from "@workspace/db";
 import {
   AddVideoProjectMemberBody,
@@ -23,12 +22,12 @@ import {
 } from "@workspace/api-zod";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
-import multer from "multer";
 import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import type { TandemVideoMember } from "@workspace/db";
-import { enqueueAssetJobs } from "../video/worker";
+import { upload } from "../video/upload";
+import { createAssetFromUpload } from "../video/content-address";
+import { recordVideoActivity } from "../video/activity";
+import { resolveUserNames } from "../lib/user-names";
 
 const router: IRouter = Router();
 
@@ -38,12 +37,6 @@ const router: IRouter = Router();
 // proxy + processing milestone). Files land on disk today, object storage
 // later — `VIDEO_UPLOAD_DIR` overrides the location (tests point it at tmp).
 // ---------------------------------------------------------------------------
-
-const DEFAULT_UPLOAD_DIR = path.resolve(process.cwd(), ".uploads", "video");
-
-function uploadDir(): string {
-  return process.env.VIDEO_UPLOAD_DIR || DEFAULT_UPLOAD_DIR;
-}
 
 const ALLOWED_ASSET_KINDS = [
   "RAW_VIDEO",
@@ -55,21 +48,6 @@ const ALLOWED_ASSET_KINDS = [
   "GRAPHIC",
   "THUMBNAIL_DESIGN",
 ] as const;
-
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: (_req, _file, cb) => {
-      const dir = uploadDir();
-      fs.mkdirSync(dir, { recursive: true });
-      cb(null, dir);
-    },
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname).slice(0, 12);
-      cb(null, `${randomUUID()}${ext}`);
-    },
-  }),
-  limits: { fileSize: 10 * 1024 * 1024 * 1024 }, // 10 GB cap for raw footage
-});
 
 async function requireMember(
   projectId: string,
@@ -171,11 +149,13 @@ router.post("/video/projects", async (req, res): Promise<void> => {
     return [created, captain] as const;
   });
 
+  const captainNames = await resolveUserNames([member.userId]);
+
   res.status(201).json(
     CreateVideoProjectResponse.parse({
       ...project,
       myRole: member.role,
-      members: [member],
+      members: [{ ...member, name: captainNames[member.userId] ?? null }],
       assets: [],
     }),
   );
@@ -228,11 +208,15 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
     .where(eq(tandemVideoAssetsTable.projectId, project.id))
     .orderBy(desc(tandemVideoAssetsTable.createdAt));
 
+  // Resolve member ids to Clerk display names (cached, best-effort) so the
+  // vault roster and the commit log read names instead of raw ids.
+  const memberNames = await resolveUserNames(members.map((member) => member.userId));
+
   res.json(
     GetVideoProjectResponse.parse({
       ...project,
       myRole: member.role,
-      members,
+      members: members.map((row) => ({ ...row, name: memberNames[row.userId] ?? null })),
       assets,
     }),
   );
@@ -296,7 +280,13 @@ router.post(
           status: "ACTIVE",
         })
         .returning();
-      res.status(201).json(AddVideoProjectMemberResponse.parse(member));
+      const invitedNames = await resolveUserNames([clerkUserId]);
+      res.status(201).json(
+        AddVideoProjectMemberResponse.parse({
+          ...member,
+          name: invitedNames[clerkUserId] ?? null,
+        }),
+      );
     } catch {
       res.status(409).json({ error: "That user is already a member" });
     }
@@ -368,55 +358,37 @@ router.post(
       return;
     }
 
-    const [asset] = await db
-      .insert(tandemVideoAssetsTable)
-      .values({
-        id: randomUUID(),
-        projectId: params.data.projectId,
-        uploaderId: userId,
-        kind: rawKind,
-        fileName: req.file.originalname,
-        mimeType: req.file.mimetype || "application/octet-stream",
-        sizeBytes: req.file.size,
-        durationMs: null,
-        storageKey: req.file.filename,
-        status: "UPLOADED",
-        version: 0,
-      })
-      .returning();
+    const { asset, status, deduplicated } = await createAssetFromUpload({
+      projectId: params.data.projectId,
+      uploaderId: userId,
+      kind: rawKind,
+      fileName: req.file.originalname,
+      mimeType: req.file.mimetype || "application/octet-stream",
+      sizeBytes: req.file.size,
+      filePath: req.file.path,
+      storageKey: req.file.filename,
+    });
 
-    // A designed thumbnail is already a web-ready image — it needs no ffmpeg
-    // proxy or whisper transcript. The original doubles as the preview file.
-    if (rawKind === "THUMBNAIL_DESIGN") {
-      await db.insert(tandemVideoAssetFilesTable).values({
-        id: randomUUID(),
-        assetId: asset.id,
-        kind: "PROXY",
-        storageKey: asset.storageKey,
-        mimeType: asset.mimeType || "image/png",
-        sizeBytes: asset.sizeBytes,
-        metadata: { demo: false, degraded: false, original: true },
-      });
-      await db
-        .update(tandemVideoAssetsTable)
-        .set({ status: "PROCESSED" })
-        .where(eq(tandemVideoAssetsTable.id, asset.id));
+    // Realtime: the vault shows the new locked file as it lands (and a fully
+    // reused blob is preview-ready the moment it arrives).
+    emitToProject(params.data.projectId, "asset.uploaded", { ...asset, status });
+    if (status === "PROCESSED") {
       emitToProject(params.data.projectId, "asset.processed", {
         projectId: params.data.projectId,
         assetId: asset.id,
       });
-    } else {
-      // Kick off proxy + transcription; the in-process worker picks these up.
-      await enqueueAssetJobs(asset);
     }
 
-    // Realtime: the vault shows the new locked file as it lands.
-    emitToProject(params.data.projectId, "asset.uploaded", asset);
+    // Activity feed: the vault entry lands on the project timeline.
+    await recordVideoActivity({
+      projectId: params.data.projectId,
+      eventType: "asset_uploaded",
+      summary: `${asset.fileName} uploaded to the vault${deduplicated ? " — already in vault, reused" : ""}`,
+      actorId: userId,
+      resourceId: asset.id,
+    });
 
-    // A designed thumbnail is preview-ready the moment it lands.
-    const response =
-      rawKind === "THUMBNAIL_DESIGN" ? { ...asset, status: "PROCESSED" } : asset;
-    res.status(201).json(UploadVideoAssetResponse.parse(response));
+    res.status(201).json(UploadVideoAssetResponse.parse({ ...asset, status }));
   },
 );
 

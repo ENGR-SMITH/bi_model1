@@ -88,6 +88,8 @@ export const collaborationActivityEventsTable = pgTable(
     eventType: text("event_type").notNull(),
     summary: text("summary").notNull(),
     resourceId: text("resource_id"),
+    /** Creator Den only — the leg the event belongs to (SELECTS/CUT/SOUND/FINISH/THUMBNAIL); null for vault-wide events like uploads. Author Den events leave this unset. */
+    leg: text("leg"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
 );

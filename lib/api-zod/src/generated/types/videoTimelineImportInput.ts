@@ -8,7 +8,7 @@
 import type { VideoTimelineImportInputFormat } from './videoTimelineImportInputFormat';
 
 /**
- * An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1)
+ * An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1). `media` optionally carries the rendered master / stems to land in the vault with the push (content-addressed, so unchanged files dedupe).
  */
 export interface VideoTimelineImportInput {
   format?: VideoTimelineImportInputFormat;
@@ -17,4 +17,6 @@ export interface VideoTimelineImportInput {
   /** @maxLength 500 */
   message?: string;
   submit?: boolean;
+  /** Optional rendered master / stems attached to the push */
+  media?: Blob[];
 }

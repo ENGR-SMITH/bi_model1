@@ -194,9 +194,12 @@ export function isDemoMode(): boolean {
 // Job enqueueing
 // ---------------------------------------------------------------------------
 
-export async function enqueueAssetJobs(asset: TandemVideoAsset): Promise<void> {
+export async function enqueueAssetJobs(
+  asset: TandemVideoAsset,
+  types: ReadonlyArray<"PROXY" | "TRANSCRIBE"> = ["PROXY", "TRANSCRIBE"],
+): Promise<void> {
   const jobs: Array<{ id: string; projectId: string; assetId: string; type: string }> = [];
-  for (const type of ["PROXY", "TRANSCRIBE"] as const) {
+  for (const type of types) {
     jobs.push({ id: randomUUID(), projectId: asset.projectId, assetId: asset.id, type });
   }
   await db.insert(tandemVideoJobsTable).values(jobs);

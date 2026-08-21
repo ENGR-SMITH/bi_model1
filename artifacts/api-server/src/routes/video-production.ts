@@ -16,6 +16,8 @@ import {
   tandemVideoTranscriptSegmentsTable,
   tandemVideoTranscriptsTable,
   tandemVideoJobsTable,
+  collaborationActivityEventsTable,
+  type TandemVideoAsset,
   type TandemVideoMember,
 } from "@workspace/db";
 import {
@@ -29,6 +31,9 @@ import {
   CreateVideoSubmissionResponse,
   GetVideoAssetParams,
   GetVideoAssetResponse,
+  GetVideoProjectParams,
+  ListVideoActivityResponse,
+  ListVideoGenealogyResponse,
   ExportVideoTimelineCheckoutBody,
   ExportVideoTimelineCheckoutResponse,
   GetVideoTimelineCheckoutBundleResponse,
@@ -95,6 +100,10 @@ import {
   type ParsedOtioClip,
 } from "../video/otio";
 import { buildCheckout } from "../video/checkout";
+import { upload } from "../video/upload";
+import { createAssetFromUpload } from "../video/content-address";
+import { recordVideoActivity } from "../video/activity";
+import { resolveUserNames } from "../lib/user-names";
 
 const router: IRouter = Router();
 
@@ -189,6 +198,7 @@ async function buildTimelineResponse(projectId: string, leg: string) {
       version: version.version,
       message: version.message,
       createdById: version.createdById,
+      parentVersionId: version.parentVersionId,
       createdAt: version.createdAt,
     })),
     updatedAt: timeline.updatedAt,
@@ -383,7 +393,7 @@ router.get(
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -417,7 +427,7 @@ router.put(
 
     const member = await requireLegEditor(params.data.projectId, params.data.leg, userId);
     if (!member) {
-      res.status(403).json({ error: "Only the leg role (or the Captain) can edit this timeline" });
+      res.status(403).json({ error: "Only the stage role (or the Captain) can edit this timeline" });
       return;
     }
 
@@ -482,6 +492,18 @@ router.put(
       createdById: userId,
     });
 
+    // Activity feed: the save shows up on the vault's project timeline.
+    await recordVideoActivity({
+      projectId: params.data.projectId,
+      eventType: "version_saved",
+      leg: params.data.leg,
+      summary: `Saved ${params.data.leg} v${versionNumber}${
+        version.message ? ` — “${version.message.slice(0, 120)}”` : ""
+      }`,
+      actorId: userId,
+      resourceId: version.id,
+    });
+
     const state = await buildTimelineResponse(params.data.projectId, params.data.leg);
     res.json(SaveVideoTimelineResponse.parse(state));
   },
@@ -499,7 +521,7 @@ router.get(
 
     const params = ListVideoTimelineVersionsParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -537,6 +559,7 @@ router.get(
           version: version.version,
           message: version.message,
           createdById: version.createdById,
+          parentVersionId: version.parentVersionId,
           createdAt: version.createdAt,
         })),
       ),
@@ -578,7 +601,7 @@ router.get(
       )
       .limit(1);
     if (!timeline) {
-      res.status(404).json({ error: "This leg has no timeline yet" });
+      res.status(404).json({ error: "This stage has no timeline yet" });
       return;
     }
 
@@ -626,7 +649,7 @@ router.post(
 
     const member = await requireLegEditor(params.data.projectId, params.data.leg, userId);
     if (!member) {
-      res.status(403).json({ error: "Only the leg role (or the Captain) can edit this timeline" });
+      res.status(403).json({ error: "Only the stage role (or the Captain) can edit this timeline" });
       return;
     }
 
@@ -641,7 +664,7 @@ router.post(
       )
       .limit(1);
     if (!timeline) {
-      res.status(400).json({ error: "This leg has no timeline yet" });
+      res.status(400).json({ error: "This stage has no timeline yet" });
       return;
     }
 
@@ -687,6 +710,15 @@ router.post(
       versionId: restored.id,
       message: restored.message,
       createdById: userId,
+    });
+
+    await recordVideoActivity({
+      projectId: params.data.projectId,
+      eventType: "version_rolled_back",
+      leg: params.data.leg,
+      summary: `Rolled ${params.data.leg} back to v${target.version} (now v${restored.version})`,
+      actorId: userId,
+      resourceId: restored.id,
     });
 
     const state = await buildTimelineResponse(params.data.projectId, params.data.leg);
@@ -739,13 +771,13 @@ router.post(
     const params = CreateVideoSubmissionParams.safeParse(req.params);
     const body = CreateVideoSubmissionBody.safeParse(req.body);
     if (!params.success || !body.success) {
-      res.status(400).json({ error: "Invalid submission request" });
+      res.status(400).json({ error: "Invalid pull request" });
       return;
     }
 
     const member = await requireLegEditor(params.data.projectId, body.data.leg, userId);
     if (!member) {
-      res.status(403).json({ error: "Only the leg role (or the Captain) can submit this leg" });
+      res.status(403).json({ error: "Only the stage role (or the Captain) can submit this stage" });
       return;
     }
 
@@ -760,7 +792,7 @@ router.post(
       )
       .limit(1);
     if (!timeline || !timeline.currentVersionId) {
-      res.status(400).json({ error: "This leg has no saved snapshot to submit" });
+      res.status(400).json({ error: "This stage has no saved snapshot to submit" });
       return;
     }
 
@@ -776,7 +808,7 @@ router.post(
       )
       .limit(1);
     if (pending) {
-      res.status(409).json({ error: "A submission for this leg is already pending review" });
+      res.status(409).json({ error: "A pull request for this stage is already pending review" });
       return;
     }
 
@@ -802,6 +834,21 @@ router.post(
     // "pending review" the moment the leg is handed over.
     emitToProject(params.data.projectId, "submission.new", submission);
 
+    // Activity feed: the relay hand-off lands on the project timeline.
+    const [pinnedVersion] = await db
+      .select({ version: tandemVideoTimelineVersionsTable.version })
+      .from(tandemVideoTimelineVersionsTable)
+      .where(eq(tandemVideoTimelineVersionsTable.id, timeline.currentVersionId!))
+      .limit(1);
+    await recordVideoActivity({
+      projectId: params.data.projectId,
+      eventType: "submission_created",
+      leg: body.data.leg,
+      summary: `Submitted ${body.data.leg}${pinnedVersion ? ` v${pinnedVersion.version}` : ""} for review`,
+      actorId: userId,
+      resourceId: submission.id,
+    });
+
     // Notify the Captain a leg is ready for review (M4).
     const [owner] = await db
       .select()
@@ -812,8 +859,8 @@ router.post(
       await notify(
         owner.ownerId,
         "video_submission",
-        `Leg ${body.data.leg} submitted for review`,
-        `The ${body.data.leg} leg was submitted${body.data.note ? ` — “${body.data.note.slice(0, 120)}”` : ""}.`,
+        `Stage ${body.data.leg} submitted for review`,
+        `The ${body.data.leg} stage was submitted${body.data.note ? ` — “${body.data.note.slice(0, 120)}”` : ""}.`,
         `/creators-den/projects/${params.data.projectId}`,
         submission.id,
       ).catch(() => {});
@@ -859,7 +906,7 @@ async function decideSubmission(
 
   const params = ApproveVideoSubmissionParams.safeParse(req.params);
   if (!params.success) {
-    res.status(400).json({ error: "Invalid submission id" });
+    res.status(400).json({ error: "Invalid pull request id" });
     return;
   }
 
@@ -883,11 +930,11 @@ async function decideSubmission(
     .where(eq(tandemVideoSubmissionsTable.id, params.data.submissionId))
     .limit(1);
   if (!submission || submission.projectId !== params.data.projectId) {
-    res.status(404).json({ error: "Submission not found" });
+    res.status(404).json({ error: "Pull request not found" });
     return;
   }
   if (submission.status !== "SUBMITTED") {
-    res.status(409).json({ error: "This submission is not pending review" });
+    res.status(409).json({ error: "This pull request is not pending review" });
     return;
   }
 
@@ -909,6 +956,24 @@ async function decideSubmission(
 
   // Realtime: the submitter's studio learns the decision instantly.
   emitToProject(submission.projectId, "submission.decided", updated);
+
+  // Activity feed: the Captain's decision lands on the project timeline.
+  const [decidedVersion] = await db
+    .select({ version: tandemVideoTimelineVersionsTable.version })
+    .from(tandemVideoTimelineVersionsTable)
+    .where(eq(tandemVideoTimelineVersionsTable.id, submission.timelineVersionId))
+    .limit(1);
+  await recordVideoActivity({
+    projectId: submission.projectId,
+    eventType: decision === "APPROVED" ? "submission_approved" : "submission_rejected",
+    leg: submission.leg,
+    summary:
+      decision === "APPROVED"
+        ? `Approved ${submission.leg}${decidedVersion ? ` v${decidedVersion.version}` : ""} — merged as the new baseline`
+        : `Rejected ${submission.leg}${decidedVersion ? ` v${decidedVersion.version}` : ""} — sent back for another pass`,
+    actorId: userId,
+    resourceId: submission.id,
+  });
 
   // Lock release (M3): approving the FINISH leg flips the project to RELEASED,
   // enabling downloads for the whole team.
@@ -943,8 +1008,8 @@ async function decideSubmission(
       decision === "APPROVED" ? "video_approved" : "video_rejected",
       decision === "APPROVED" ? `Leg ${submission.leg} approved` : `Leg ${submission.leg} needs another pass`,
       decision === "APPROVED"
-        ? "The Captain approved your submission — on to the next leg."
-        : "The Captain sent your submission back — revise and resubmit.",
+        ? "The Captain approved your pull request — on to the next stage."
+        : "The Captain sent your pull request back — revise and resubmit.",
       `/creators-den/projects/${submission.projectId}`,
       submission.id,
     ).catch(() => {});
@@ -1247,12 +1312,12 @@ router.post(
 
     const member = await requireLegEditor(params.data.projectId, params.data.leg, userId);
     if (!member) {
-      res.status(403).json({ error: "Only the leg role (or the Captain) can render" });
+      res.status(403).json({ error: "Only the stage role (or the Captain) can render" });
       return;
     }
 
     if (await hasActiveRender(params.data.projectId, params.data.leg)) {
-      res.status(409).json({ error: "A render is already queued for this leg" });
+      res.status(409).json({ error: "A render is already queued for this stage" });
       return;
     }
 
@@ -1344,7 +1409,7 @@ router.get(
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -1381,7 +1446,7 @@ router.get(
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -1418,7 +1483,7 @@ router.get(
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -1456,7 +1521,7 @@ router.get(
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -1493,7 +1558,7 @@ router.get(
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -1536,7 +1601,7 @@ router.post(
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -1582,7 +1647,7 @@ router.get(
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -1630,7 +1695,7 @@ router.get(
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -1682,22 +1747,53 @@ router.get(
   },
 );
 
+// Best-effort cleanup of multer temp files on early failure paths (auth, bad
+// params, forbidden) so an unauthorized or malformed import leaves nothing on
+// disk. Called before any media has been stored — once a file is stored it
+// belongs to its asset and must never be deleted here.
+function discardUploadedFiles(req: Request): void {
+  if (!Array.isArray(req.files)) return;
+  for (const file of req.files as Express.Multer.File[]) {
+    try {
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
+    } catch {
+      // best-effort
+    }
+  }
+}
+
+const AUDIO_EXTENSIONS = new Set([".wav", ".mp3", ".m4a", ".aac", ".flac", ".ogg", ".wma", ".aif", ".aiff"]);
+
+/** Masters are RAW_VIDEO; stems (audio) are RAW_AUDIO. Inferred from mime + extension. */
+function inferImportMediaKind(file: Express.Multer.File): string {
+  const mime = file.mimetype || "";
+  if (mime.startsWith("audio/")) return "RAW_AUDIO";
+  if (mime.startsWith("video/")) return "RAW_VIDEO";
+  const ext = path.extname(file.originalname).toLowerCase();
+  return AUDIO_EXTENSIONS.has(ext) ? "RAW_AUDIO" : "RAW_VIDEO";
+}
+
 // POST /video/projects/:projectId/timelines/:leg/import — the push half of the
 // round-trip: parse an external interchange document (CMX3600 EDL or FCPXML),
 // relink sources to vault assets, save a new timeline version, and (by
-// default) submit it for Captain review.
+// default) submit it for Captain review. Accepts optional attached media
+// (rendered master / stems) that lands in the vault content-addressed before
+// the document's sources are resolved (VCS design §8 phase 2).
 router.post(
   "/video/projects/:projectId/timelines/:leg/import",
+  upload.array("media", 20),
   async (req: Request, res: Response): Promise<void> => {
     const userId = getAuth(req).userId;
     if (!userId) {
+      discardUploadedFiles(req);
       res.status(401).json({ error: "Authentication required" });
       return;
     }
 
     const params = GetVideoTimelineParams.safeParse(req.params);
     if (!params.success) {
-      res.status(400).json({ error: "Unknown leg" });
+      discardUploadedFiles(req);
+      res.status(400).json({ error: "Unknown stage" });
       return;
     }
 
@@ -1715,14 +1811,61 @@ router.post(
     const message = typeof rawBody.message === "string" ? rawBody.message.trim() : "";
     const submit = rawBody.submit !== false;
     if (!document.trim()) {
+      discardUploadedFiles(req);
       res.status(400).json({ error: "No interchange document to import" });
       return;
     }
 
     const member = await requireLegEditor(params.data.projectId, params.data.leg, userId);
     if (!member) {
+      discardUploadedFiles(req);
       res.status(403).json({ error: "Only the leg role (or the Captain) can import this timeline" });
       return;
+    }
+
+    // Optional attached media (master/stems): land each file as a vault asset,
+    // content-addressed so unchanged masters cost nothing to re-push. The
+    // document below resolves against these newly-landed assets too.
+    const mediaFiles: Express.Multer.File[] = Array.isArray(req.files)
+      ? (req.files as Express.Multer.File[])
+      : [];
+    const landedMedia: Array<{ asset: TandemVideoAsset; deduplicated: boolean }> = [];
+    for (let i = 0; i < mediaFiles.length; i++) {
+      const file = mediaFiles[i];
+      try {
+        const { asset, status, deduplicated } = await createAssetFromUpload({
+          projectId: params.data.projectId,
+          uploaderId: userId,
+          kind: inferImportMediaKind(file),
+          fileName: file.originalname,
+          mimeType: file.mimetype || "application/octet-stream",
+          sizeBytes: file.size,
+          filePath: file.path,
+          storageKey: file.filename,
+        });
+        landedMedia.push({ asset, deduplicated });
+        emitToProject(params.data.projectId, "asset.uploaded", { ...asset, status });
+        if (status === "PROCESSED") {
+          emitToProject(params.data.projectId, "asset.processed", {
+            projectId: params.data.projectId,
+            assetId: asset.id,
+          });
+        }
+      } catch (error) {
+        // Discard the temp files that haven't landed yet; already-stored files
+        // stay (they are legit vault uploads) and the import is aborted.
+        for (const rest of mediaFiles.slice(i)) {
+          try {
+            if (fs.existsSync(rest.path)) fs.unlinkSync(rest.path);
+          } catch {
+            // best-effort
+          }
+        }
+        res.status(400).json({
+          error: `Attached media “${file.originalname}” could not be stored: ${(error as Error).message}`,
+        });
+        return;
+      }
     }
 
     const assets = await db
@@ -1896,6 +2039,14 @@ router.post(
           .where(eq(tandemVideoTimelinesTable.id, timelineId));
 
         emitToProject(params.data.projectId, "submission.new", submission);
+        await recordVideoActivity({
+          projectId: params.data.projectId,
+          eventType: "submission_created",
+          leg: params.data.leg,
+          summary: `Submitted ${params.data.leg} v${version.version} for review`,
+          actorId: userId,
+          resourceId: submission.id,
+        });
 
         const [owner] = await db
           .select()
@@ -1906,8 +2057,8 @@ router.post(
           await notify(
             owner.ownerId,
             "video_submission",
-            `Leg ${params.data.leg} submitted for review`,
-            `The ${params.data.leg} leg was submitted from an external edit${version.message ? ` — “${version.message.slice(0, 120)}”` : ""}.`,
+            `Stage ${params.data.leg} submitted for review`,
+            `The ${params.data.leg} stage was submitted from an external edit${version.message ? ` — “${version.message.slice(0, 120)}”` : ""}.`,
             `/creators-den/projects/${params.data.projectId}`,
             submission.id,
           ).catch(() => {});
@@ -1925,11 +2076,156 @@ router.post(
       }
     }
 
+    await recordVideoActivity({
+      projectId: params.data.projectId,
+      eventType: "version_imported",
+      leg: params.data.leg,
+      summary: `Imported ${params.data.leg} v${versionNumber} from ${sourceLabel}${
+        version.message && !version.message.startsWith("Imported from")
+          ? ` — “${version.message.slice(0, 120)}”`
+          : ""
+      }${landedMedia.length > 0 ? ` · ${landedMedia.length} media file${landedMedia.length === 1 ? "" : "s"} attached` : ""}`,
+      actorId: userId,
+      resourceId: version.id,
+    });
+
     res.status(201).json({
       version: version.version,
       clips: clips.length,
       submissionId,
+      media: landedMedia.map(({ asset, deduplicated }) => ({
+        id: asset.id,
+        fileName: asset.fileName,
+        kind: asset.kind,
+        deduplicated,
+      })),
     });
+  },
+);
+
+// GET /video/projects/:projectId/activity — the project activity feed:
+// saves, imports, rollbacks, submissions, decisions, and vault uploads, newest
+// first. Members only.
+router.get(
+  "/video/projects/:projectId/activity",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoProjectParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid project id" });
+      return;
+    }
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const events = await db
+      .select()
+      .from(collaborationActivityEventsTable)
+      .where(eq(collaborationActivityEventsTable.projectId, params.data.projectId))
+      .orderBy(desc(collaborationActivityEventsTable.createdAt))
+      .limit(50);
+
+    // Resolve actor ids to display names (cached, best-effort) so the feed
+    // reads "Ada saved CUT v3" instead of a raw Clerk id.
+    const actorNames = await resolveUserNames([
+      ...new Set(events.map((event) => event.actorId)),
+    ]);
+
+    res.json(
+      ListVideoActivityResponse.parse(
+        events.map((event) => ({
+          id: event.id,
+          actorId: event.actorId,
+          actorName: actorNames[event.actorId] ?? null,
+          eventType: event.eventType,
+          summary: event.summary,
+          resourceId: event.resourceId,
+          leg: event.leg,
+          createdAt: event.createdAt,
+        })),
+      ),
+    );
+  },
+);
+
+// GET /video/projects/:projectId/genealogy — version provenance (VCS design §4
+// "git blame / provenance"): every version across every leg, chained to its
+// parent version, with the review decision that pinned it. Members only.
+router.get(
+  "/video/projects/:projectId/genealogy",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoProjectParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid project id" });
+      return;
+    }
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const timelines = await db
+      .select()
+      .from(tandemVideoTimelinesTable)
+      .where(eq(tandemVideoTimelinesTable.projectId, params.data.projectId));
+    const versions = await db
+      .select()
+      .from(tandemVideoTimelineVersionsTable)
+      .where(
+        inArray(
+          tandemVideoTimelineVersionsTable.timelineId,
+          timelines.map((timeline) => timeline.id),
+        ),
+      )
+      .orderBy(asc(tandemVideoTimelineVersionsTable.createdAt));
+    const submissions = await db
+      .select()
+      .from(tandemVideoSubmissionsTable)
+      .where(eq(tandemVideoSubmissionsTable.projectId, params.data.projectId));
+
+    const legFor = new Map(timelines.map((timeline) => [timeline.id, timeline.leg]));
+    const versionNumberFor = new Map(versions.map((version) => [version.id, version.version]));
+
+    res.json(
+      ListVideoGenealogyResponse.parse(
+        versions.map((version) => {
+          const submission =
+            submissions.find((s) => s.timelineVersionId === version.id) ?? null;
+          return {
+            id: version.id,
+            leg: legFor.get(version.timelineId) ?? version.timelineId,
+            version: version.version,
+            message: version.message,
+            createdById: version.createdById,
+            parentVersionId: version.parentVersionId,
+            parentVersion: version.parentVersionId
+              ? versionNumberFor.get(version.parentVersionId) ?? null
+              : null,
+            createdAt: version.createdAt,
+            submission: submission
+              ? {
+                  status: submission.status,
+                  decidedById: submission.decidedById,
+                  decidedAt: submission.decidedAt,
+                }
+              : null,
+          };
+        }),
+      ),
+    );
   },
 );
 

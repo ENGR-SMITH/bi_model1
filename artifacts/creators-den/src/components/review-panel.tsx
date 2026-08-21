@@ -120,7 +120,7 @@ export function ReviewPanel({
   return (
     <div className="paper-card accent-card mt-4" data-testid="review-panel">
       <div className="inline-heading">
-        <span className="eyebrow"><GitPullRequest size={13} /> PR review — {leg.toLowerCase()} v{version.data?.version ?? '…'}</span>
+        <span className="eyebrow"><GitPullRequest size={13} /> Pull request — {leg.toLowerCase()} v{version.data?.version ?? '…'}</span>
         <span className="flex items-center gap-2">
           <span className={`den-tag ${submission.status === 'APPROVED' ? 'teal' : submission.status === 'REJECTED' ? 'danger' : 'gold'}`}>
             {submission.status}
@@ -135,7 +135,7 @@ export function ReviewPanel({
       )}
 
       {!assetId ? (
-        <p className="setting-copy mt-3">This version has no clips or designs to preview — open the diff below to review the submission itself.</p>
+        <p className="setting-copy mt-3">This version has no clips or designs to preview — open the diff below to review the pull request itself.</p>
       ) : (
         <div className="mt-3">
           {leg === 'THUMBNAIL' && design ? (
@@ -204,7 +204,7 @@ export function ReviewPanel({
             <span className="eyebrow"><Clapperboard size={13} /> Decision</span>
           </div>
           <p className="setting-copy">
-            Approving merges this version as the new baseline for the {leg.toLowerCase()} leg. Rejecting sends it back for another pass.
+            Approving merges this version as the new baseline for the {leg.toLowerCase()} stage. Rejecting sends it back for another pass.
           </p>
           {isCaptain && isPending ? (
             <div className="mt-3 flex gap-2">

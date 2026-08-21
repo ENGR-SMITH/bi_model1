@@ -38,6 +38,7 @@ import type { VideoAssetDetail } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
+import { ActivityFeed } from '@/components/activity-feed';
 import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
 import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
@@ -865,6 +866,8 @@ export default function ContentCreatorsSoundPage() {
             currentVersion={soundTimeline.data?.version ?? null}
             canSubmit={canEdit}
           />
+
+          <ActivityFeed projectId={p.id} leg="SOUND" className="" />
 
           <CheckoutPanel
             projectId={p.id}

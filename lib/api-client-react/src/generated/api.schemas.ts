@@ -835,6 +835,11 @@ export interface VideoMember {
   id: string;
   projectId: string;
   userId: string;
+  /**
+     * Resolved Clerk display name
+     * @nullable
+     */
+  name: string | null;
   role: string;
   status: string;
   createdAt: string;
@@ -850,6 +855,8 @@ export interface VideoAsset {
   sizeBytes: number;
   /** @nullable */
   durationMs: number | null;
+  /** @nullable */
+  contentHash: string | null;
   status: string;
   version: number;
   createdAt: string;
@@ -952,6 +959,8 @@ export interface VideoAssetDetail {
   sizeBytes: number;
   /** @nullable */
   durationMs: number | null;
+  /** @nullable */
+  contentHash: string | null;
   status: string;
   version: number;
   createdAt: string;
@@ -970,6 +979,8 @@ export interface VideoTimelineVersionSummary {
   version: number;
   message: string;
   createdById: string;
+  /** @nullable */
+  parentVersionId: string | null;
   createdAt: string;
 }
 
@@ -984,6 +995,62 @@ export interface VideoTimelineState {
   snapshot: VideoTimelineStateSnapshot;
   versions: VideoTimelineVersionSummary[];
   updatedAt: string;
+}
+
+/**
+ * One immutable line on the project activity feed
+ */
+export interface VideoActivityEvent {
+  id: string;
+  actorId: string;
+  /**
+     * Resolved Clerk display name
+     * @nullable
+     */
+  actorName: string | null;
+  eventType: string;
+  summary: string;
+  /** @nullable */
+  resourceId: string | null;
+  /**
+     * The leg the event belongs to (SELECTS/CUT/SOUND/FINISH/THUMBNAIL); null for vault-wide events like uploads
+     * @nullable
+     */
+  leg: string | null;
+  createdAt: string;
+}
+
+/**
+ * The review decision (if any) that pinned this version
+ * @nullable
+ */
+export type VideoGenealogyEntrySubmission = {
+  status: string;
+  /** @nullable */
+  decidedById: string | null;
+  /** @nullable */
+  decidedAt: string | null;
+} | null;
+
+/**
+ * One version's provenance — its author, its parent in the chain, and the review decision that pinned it
+ */
+export interface VideoGenealogyEntry {
+  id: string;
+  leg: string;
+  version: number;
+  message: string;
+  createdById: string;
+  /** @nullable */
+  parentVersionId: string | null;
+  /** @nullable */
+  parentVersion: number | null;
+  createdAt: string;
+  /**
+     * The review decision (if any) that pinned this version
+     * @nullable
+     */
+  submission: VideoGenealogyEntrySubmission;
 }
 
 export type VideoTimelineVersionDetailSnapshot = { [key: string]: unknown };
@@ -1041,7 +1108,7 @@ export const VideoTimelineImportInputFormat = {
 } as const;
 
 /**
- * An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1)
+ * An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1). `media` optionally carries the rendered master / stems to land in the vault with the push (content-addressed, so unchanged files dedupe).
  */
 export interface VideoTimelineImportInput {
   format?: VideoTimelineImportInputFormat;
@@ -1050,6 +1117,19 @@ export interface VideoTimelineImportInput {
   /** @maxLength 500 */
   message?: string;
   submit?: boolean;
+  /** Optional rendered master / stems attached to the push */
+  media?: Blob[];
+}
+
+/**
+ * A media file that landed in the vault with the import
+ */
+export interface VideoTimelineImportMediaItem {
+  id: string;
+  fileName: string;
+  kind: string;
+  /** True when identical bytes already existed and the stored blob was reused (Git-LFS dedupe) */
+  deduplicated: boolean;
 }
 
 export interface VideoTimelineImportResponse {
@@ -1057,6 +1137,7 @@ export interface VideoTimelineImportResponse {
   clips: number;
   /** @nullable */
   submissionId: string | null;
+  media: VideoTimelineImportMediaItem[];
 }
 
 /**

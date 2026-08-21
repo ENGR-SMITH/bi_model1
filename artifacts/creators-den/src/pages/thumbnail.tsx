@@ -24,6 +24,7 @@ import { ImageStage, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { RoleOracle } from '@/components/role-oracle';
 import { CommentsPanel, HistoryPanel } from '@/pages/selects';
+import { ActivityFeed } from '@/components/activity-feed';
 
 // ---------------------------------------------------------------------------
 // The THUMBNAIL 5th leg (VCS design §11). The thumbnail's \"document\" — the
@@ -300,7 +301,7 @@ export default function ThumbnailStudioPage() {
               <span className="mono-label">{designAssets.length} design{designAssets.length === 1 ? '' : 's'} in vault</span>
             </div>
             <p className="setting-copy">
-              The chosen image + title + style is the leg&apos;s document — saved as a Git-style snapshot, submitted to the Captain, and reviewed with pins on the frame.
+              The chosen image + title + style is the stage&apos;s document — saved as a Git-style snapshot, submitted to the Captain, and reviewed with pins on the frame.
             </p>
 
             <div className="field mt-3">
@@ -368,7 +369,7 @@ export default function ThumbnailStudioPage() {
                   </button>
                 </div>
               ) : (
-                <p className="setting-copy mt-3">You&apos;re viewing this leg — only the Thumbnail Designer or the Captain can edit it.</p>
+                <p className="setting-copy mt-3">You&apos;re viewing this stage — only the Thumbnail Designer or the Captain can edit it.</p>
               )}
               {dirty && <p className="den-footnote mt-2"><Sparkles size={12} /> Unsaved changes</p>}
               {save.isError && (
@@ -395,13 +396,15 @@ export default function ThumbnailStudioPage() {
             canSubmit={canEdit}
           />
 
+          <ActivityFeed projectId={p.id} leg="THUMBNAIL" className="" />
+
           {(() => {
             const legStatus = submissions.data?.find((s) => s.leg === 'THUMBNAIL');
             if (!legStatus) return null;
             return (
               <p className="den-footnote">
                 <Sparkles size={13} />
-                Leg status: {legStatus.status.toLowerCase()}
+                Stage status: {legStatus.status.toLowerCase()}
                 {legStatus.decidedAt && ` · decided ${new Date(legStatus.decidedAt).toLocaleDateString()}`}
               </p>
             );

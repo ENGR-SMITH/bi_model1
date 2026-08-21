@@ -1707,6 +1707,7 @@ export const CreateVideoProjectResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "userId": zod.string(),
+  "name": zod.string().nullable().describe('Resolved Clerk display name'),
   "role": zod.string(),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -1720,6 +1721,7 @@ export const CreateVideoProjectResponse = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date()
@@ -1750,6 +1752,7 @@ export const GetVideoProjectResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "userId": zod.string(),
+  "name": zod.string().nullable().describe('Resolved Clerk display name'),
   "role": zod.string(),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -1763,6 +1766,7 @@ export const GetVideoProjectResponse = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date()
@@ -1791,6 +1795,7 @@ export const AddVideoProjectMemberResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "userId": zod.string(),
+  "name": zod.string().nullable().describe('Resolved Clerk display name'),
   "role": zod.string(),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -1816,6 +1821,7 @@ export const ListVideoAssetsResponseItem = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date()
@@ -1847,6 +1853,7 @@ export const UploadVideoAssetResponse = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date()
@@ -1874,6 +1881,7 @@ export const GetVideoAssetResponse = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date(),
@@ -1940,6 +1948,7 @@ export const GetVideoTimelineResponse = zod.object({
   "version": zod.number().int(),
   "message": zod.string(),
   "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })),
   "updatedAt": zod.coerce.date()
@@ -1978,6 +1987,7 @@ export const SaveVideoTimelineResponse = zod.object({
   "version": zod.number().int(),
   "message": zod.string(),
   "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })),
   "updatedAt": zod.coerce.date()
@@ -2000,6 +2010,7 @@ export const ListVideoTimelineVersionsResponseItem = zod.object({
   "version": zod.number().int(),
   "message": zod.string(),
   "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })
 export const ListVideoTimelineVersionsResponse = zod.array(ListVideoTimelineVersionsResponseItem)
@@ -2059,6 +2070,7 @@ export const RollbackVideoTimelineResponse = zod.object({
   "version": zod.number().int(),
   "message": zod.string(),
   "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })),
   "updatedAt": zod.coerce.date()
@@ -2250,14 +2262,72 @@ export const ImportVideoTimelineBody = zod.object({
   "format": zod.enum(['EDL', 'FCPXML', 'OTIO']).default(importVideoTimelineBodyFormatDefault),
   "document": zod.string().min(1),
   "message": zod.string().max(importVideoTimelineBodyMessageMax).optional(),
-  "submit": zod.boolean().default(importVideoTimelineBodySubmitDefault)
-}).describe('An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1)')
+  "submit": zod.boolean().default(importVideoTimelineBodySubmitDefault),
+  "media": zod.array(zod.instanceof(File)).optional().describe('Optional rendered master \/ stems attached to the push')
+}).describe('An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1). `media` optionally carries the rendered master \/ stems to land in the vault with the push (content-addressed, so unchanged files dedupe).')
 
 export const ImportVideoTimelineResponse = zod.object({
   "version": zod.number().int(),
   "clips": zod.number().int(),
-  "submissionId": zod.string().nullable()
+  "submissionId": zod.string().nullable(),
+  "media": zod.array(zod.object({
+  "id": zod.string(),
+  "fileName": zod.string(),
+  "kind": zod.string(),
+  "deduplicated": zod.boolean().describe('True when identical bytes already existed and the stored blob was reused (Git-LFS dedupe)')
+}).describe('A media file that landed in the vault with the import'))
 })
+
+
+/**
+ * @summary Project activity feed (saves, imports, rollbacks, submissions, decisions, uploads)
+ */
+
+
+
+export const ListVideoActivityParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const ListVideoActivityResponseItem = zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "actorName": zod.string().nullable().describe('Resolved Clerk display name'),
+  "eventType": zod.string(),
+  "summary": zod.string(),
+  "resourceId": zod.string().nullable(),
+  "leg": zod.string().nullable().describe('The leg the event belongs to (SELECTS\/CUT\/SOUND\/FINISH\/THUMBNAIL); null for vault-wide events like uploads'),
+  "createdAt": zod.coerce.date()
+}).describe('One immutable line on the project activity feed')
+export const ListVideoActivityResponse = zod.array(ListVideoActivityResponseItem)
+
+
+/**
+ * @summary Version provenance (every version chained to its parent, with review decisions)
+ */
+
+
+
+export const ListVideoGenealogyParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const ListVideoGenealogyResponseItem = zod.object({
+  "id": zod.string(),
+  "leg": zod.string(),
+  "version": zod.number().int(),
+  "message": zod.string(),
+  "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
+  "parentVersion": zod.number().int().nullable(),
+  "createdAt": zod.coerce.date(),
+  "submission": zod.object({
+  "status": zod.string(),
+  "decidedById": zod.string().nullable(),
+  "decidedAt": zod.coerce.date().nullable()
+}).nullable().describe('The review decision (if any) that pinned this version')
+}).describe('One version\'s provenance — its author, its parent in the chain, and the review decision that pinned it')
+export const ListVideoGenealogyResponse = zod.array(ListVideoGenealogyResponseItem)
 
 
 /**

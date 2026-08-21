@@ -60,6 +60,9 @@ export const tandemVideoAssetsTable = pgTable("tandem_video_assets", {
   sizeBytes: integer("size_bytes").notNull().default(0),
   durationMs: integer("duration_ms"),
   storageKey: text("storage_key").notNull(),
+  // Content address (SHA-256 of the original bytes) for Git-LFS-style dedupe:
+  // identical uploads share one blob instead of storing duplicate copies.
+  contentHash: text("content_hash"),
   // UPLOADED → PROCESSING → READY → FAILED
   status: text("status").notNull().default("UPLOADED"),
   // Raw upload is version 0; processed artifacts increment it (Git-style).

@@ -60,6 +60,7 @@ import type {
   ToneRewriteInput,
   ToneRewriteResult,
   UserProfile,
+  VideoActivityEvent,
   VideoAsset,
   VideoAssetDetail,
   VideoAssetUploadInput,
@@ -73,6 +74,7 @@ import type {
   VideoCommentResolveInput,
   VideoDownload,
   VideoExportInput,
+  VideoGenealogyEntry,
   VideoGrant,
   VideoGrantInput,
   VideoJob,
@@ -6493,13 +6495,27 @@ export const getImportVideoTimelineUrl = (projectId: string,
 export const importVideoTimeline = async (projectId: string,
     leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
     videoTimelineImportInput: VideoTimelineImportInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoTimelineImportResponse> => {
+    const formData = new FormData();
+if(videoTimelineImportInput.format !== undefined) {
+ formData.append(`format`, videoTimelineImportInput.format);
+ }
+formData.append(`document`, videoTimelineImportInput.document);
+if(videoTimelineImportInput.message !== undefined) {
+ formData.append(`message`, videoTimelineImportInput.message);
+ }
+if(videoTimelineImportInput.submit !== undefined) {
+ formData.append(`submit`, videoTimelineImportInput.submit.toString())
+ }
+if(videoTimelineImportInput.media !== undefined) {
+ videoTimelineImportInput.media.forEach(value => formData.append(`media`, value));
+ }
 
   return customFetch<VideoTimelineImportResponse>(getImportVideoTimelineUrl(projectId,leg),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(videoTimelineImportInput)
+    method: 'POST'
+    ,
+    body: formData
   }
 );}
 
@@ -6551,6 +6567,160 @@ export const useImportVideoTimeline = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getImportVideoTimelineMutationOptions(options));
     }
+
+export const getListVideoActivityUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/activity`
+}
+
+/**
+ * @summary Project activity feed (saves, imports, rollbacks, submissions, decisions, uploads)
+ */
+export const listVideoActivity = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoActivityEvent[]> => {
+
+  return customFetch<VideoActivityEvent[]>(getListVideoActivityUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVideoActivityQueryKey = (projectId: string,) => {
+    return [
+    `/api/video/projects/${projectId}/activity`
+    ] as const;
+    }
+
+
+export const getListVideoActivityQueryOptions = <TData = Awaited<ReturnType<typeof listVideoActivity>>, TError = ErrorType<ErrorResponse>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVideoActivityQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoActivity>>> = ({ signal }) => listVideoActivity(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVideoActivity>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVideoActivityQueryResult = NonNullable<Awaited<ReturnType<typeof listVideoActivity>>>
+export type ListVideoActivityQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Project activity feed (saves, imports, rollbacks, submissions, decisions, uploads)
+ */
+
+export function useListVideoActivity<TData = Awaited<ReturnType<typeof listVideoActivity>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVideoActivityQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListVideoGenealogyUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/genealogy`
+}
+
+/**
+ * @summary Version provenance (every version chained to its parent, with review decisions)
+ */
+export const listVideoGenealogy = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoGenealogyEntry[]> => {
+
+  return customFetch<VideoGenealogyEntry[]>(getListVideoGenealogyUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVideoGenealogyQueryKey = (projectId: string,) => {
+    return [
+    `/api/video/projects/${projectId}/genealogy`
+    ] as const;
+    }
+
+
+export const getListVideoGenealogyQueryOptions = <TData = Awaited<ReturnType<typeof listVideoGenealogy>>, TError = ErrorType<ErrorResponse>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoGenealogy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVideoGenealogyQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoGenealogy>>> = ({ signal }) => listVideoGenealogy(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVideoGenealogy>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVideoGenealogyQueryResult = NonNullable<Awaited<ReturnType<typeof listVideoGenealogy>>>
+export type ListVideoGenealogyQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Version provenance (every version chained to its parent, with review decisions)
+ */
+
+export function useListVideoGenealogy<TData = Awaited<ReturnType<typeof listVideoGenealogy>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoGenealogy>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVideoGenealogyQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListVideoSubmissionsUrl = (projectId: string,) => {
 

@@ -41,6 +41,7 @@ import type { VideoAssetDetail } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
+import { ActivityFeed } from '@/components/activity-feed';
 import { Timeline, formatTimecode, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
 import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
@@ -406,7 +407,7 @@ function CaptionsPanel({
           </button>
         )}
       </div>
-      <p className="setting-copy">Captions are generated from the Leg 1 transcript — never re-transcribed.</p>
+      <p className="setting-copy">Captions are generated from the Stage 1 transcript — never re-transcribed.</p>
       {snapshot.captions.enabled && canEdit && (
         <div className="den-chip-list mt-3">
           {CAPTION_STYLES.map((style) => (
@@ -1036,6 +1037,8 @@ export default function ContentCreatorsFinishPage() {
               return clip ? gradeFilter(clip.grade) : undefined;
             }}
           />
+
+          <ActivityFeed projectId={p.id} leg="FINISH" className="" />
 
           <CheckoutPanel
             projectId={p.id}

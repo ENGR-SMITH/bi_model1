@@ -5,10 +5,12 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { VideoTimelineImportMediaItem } from './videoTimelineImportMediaItem';
 
 export interface VideoTimelineImportResponse {
   version: number;
   clips: number;
   /** @nullable */
   submissionId: string | null;
+  media: VideoTimelineImportMediaItem[];
 }

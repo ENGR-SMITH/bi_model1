@@ -28,6 +28,7 @@ import {
   getGetVideoProjectQueryKey,
   getGetVideoReferenceQueryKey,
   getGetVideoTimelineQueryKey,
+  getListVideoActivityQueryKey,
   getListVideoCommentsQueryKey,
   getListVideoTimelineVersionsQueryKey,
   getListVideoDownloadsQueryKey,
@@ -134,6 +135,8 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
       invalidate([
         getListVideoSubmissionsQueryKey(projectId),
         getGetVideoProjectQueryKey(projectId),
+        // The vault's activity feed follows submissions + decisions live.
+        getListVideoActivityQueryKey(projectId),
       ]);
     };
     const onAsset = (payload: { projectId: string; assetId?: string }) => {
@@ -141,6 +144,7 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
       invalidate([
         getGetVideoProjectQueryKey(projectId),
         ...(payload.assetId ? [getGetVideoAssetQueryKey(projectId, payload.assetId)] : []),
+        getListVideoActivityQueryKey(projectId),
       ]);
     };
     const onTimeline = (payload: { projectId: string; leg?: string }) => {
@@ -151,6 +155,7 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
         // The project-level CommitLog in the vault follows saves live too.
         getListVideoTimelineVersionsQueryKey(projectId, leg),
         getListVideoSyncsQueryKey(projectId),
+        getListVideoActivityQueryKey(projectId),
       ]);
     };
     const onGrant = (payload: { projectId: string }) => {

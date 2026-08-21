@@ -28,6 +28,7 @@ async function buildAll() {
   await esbuild({
     entryPoints: [
       path.resolve(artifactDir, "src/index.ts"),
+      path.resolve(artifactDir, "src/scripts/backfill-content-hashes.ts"),
       ...workerEntryPoints,
     ],
     platform: "node",

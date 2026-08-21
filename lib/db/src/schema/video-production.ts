@@ -24,6 +24,9 @@ export const tandemVideoAssetFilesTable = pgTable("tandem_video_asset_files", {
   assetId: text("asset_id"),
   kind: text("kind").notNull(),
   storageKey: text("storage_key").notNull(),
+  // Content address (SHA-256) of this physical blob — lets a re-imported pass
+  // reference an already-stored file (Git-LFS-style pointer) without a copy.
+  contentHash: text("content_hash"),
   mimeType: text("mime_type").notNull().default("application/octet-stream"),
   sizeBytes: integer("size_bytes").notNull().default(0),
   // e.g. { width, height, fps, durationMs, model, degraded }

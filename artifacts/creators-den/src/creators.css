@@ -144,6 +144,12 @@
 .den-waveform .played { background: hsl(var(--accent)); }
 .den-waveform .queued { background: hsl(var(--accent) / .22); }
 
+/* ---- Activity feed leg filter ---- */
+.feed-tabs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid hsl(var(--border)); background: hsl(var(--card) / .86); border-radius: 999px; }
+.feed-tab { border: 0; border-radius: 999px; padding: 4px 9px; color: hsl(var(--muted-foreground)); background: transparent; font: 8px var(--app-font-mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; transition: color .15s, background .15s; }
+.feed-tab:hover { color: hsl(var(--foreground)); }
+.feed-tab.is-active { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+
 /* ---- Presence strip ---- */
 .den-presence { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 7px 42px; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--secondary) / .35); font-size: 10px; color: hsl(var(--muted-foreground)); }
 .den-presence b { color: hsl(var(--foreground)); font-weight: 600; }

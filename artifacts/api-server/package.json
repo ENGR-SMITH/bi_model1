@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "workers": "node --enable-source-maps ./dist/workers/all.mjs",
+    "backfill:hashes": "node --enable-source-maps ./dist/scripts/backfill-content-hashes.mjs",
     "worker:proxy": "node --enable-source-maps ./dist/workers/proxy-worker.mjs",
     "worker:transcribe": "node --enable-source-maps ./dist/workers/transcribe-worker.mjs",
     "worker:sync": "node --enable-source-maps ./dist/workers/sync-worker.mjs",

@@ -14,13 +14,14 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { Check, Download, Film, Package, Upload } from 'lucide-react';
+import { Check, Download, Film, Package, Upload, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getCheckoutVideoTimelineAafUrl,
   getCheckoutVideoTimelineFcpxmlUrl,
   getCheckoutVideoTimelineOtioUrl,
   getCheckoutVideoTimelineUrl,
+  getGetVideoProjectQueryKey,
   getGetVideoTimelineCheckoutManifestQueryKey,
   getGetVideoTimelineQueryKey,
   getListVideoJobsQueryKey,
@@ -176,7 +177,7 @@ export function CheckoutPanel({
           Download {format}
         </a>
       ) : (
-        <p className="setting-copy mt-3">Save a snapshot first — the checkout exports the saved version of this leg.</p>
+        <p className="setting-copy mt-3">Save a snapshot first — the checkout exports the saved version of this stage.</p>
       )}
       {media.length > 0 && (
         <div className="mt-3">
@@ -285,9 +286,11 @@ export function ImportFlow({
   const [format, setFormat] = useState<ImportFormat>('EDL');
   const [message, setMessage] = useState('');
   const [fileName, setFileName] = useState<string | null>(null);
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mediaRef = useRef<HTMLInputElement>(null);
   const documentRef = useRef<string | null>(null);
 
   const onPick = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -299,6 +302,14 @@ export function ImportFlow({
     documentRef.current = await file.text();
   };
 
+  const onPickMedia = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    setError(null);
+    setResult(null);
+    if (files.length === 0) return;
+    setMediaFiles((prev) => [...prev, ...files]);
+  };
+
   const onImport = () => {
     const document = documentRef.current;
     if (!document) {
@@ -306,18 +317,38 @@ export function ImportFlow({
       return;
     }
     importMutation.mutate(
-      { projectId, leg, data: { format, document, message: message.trim() || undefined, submit: true } },
+      {
+        projectId,
+        leg,
+        data: {
+          format,
+          document,
+          message: message.trim() || undefined,
+          submit: true,
+          media: mediaFiles.length > 0 ? mediaFiles : undefined,
+        },
+      },
       {
         onSuccess: (data) => {
+          const attached = data.media ?? [];
+          const dedupedCount = attached.filter((m) => m.deduplicated).length;
+          const mediaNote =
+            attached.length > 0
+              ? ` · ${attached.length} file${attached.length === 1 ? '' : 's'} attached` +
+                (dedupedCount > 0 ? ` (${dedupedCount} already in vault — no re-upload)` : '')
+              : '';
           setResult(
-            `Imported ${data.clips} clip${data.clips === 1 ? '' : 's'} as v${data.version}${data.submissionId ? ' and submitted for review' : ''}`,
+            `Imported ${data.clips} clip${data.clips === 1 ? '' : 's'} as v${data.version}${data.submissionId ? ' and submitted for review' : ''}${mediaNote}`,
           );
           setMessage('');
           setFileName(null);
+          setMediaFiles([]);
           documentRef.current = null;
           if (fileRef.current) fileRef.current.value = '';
+          if (mediaRef.current) mediaRef.current.value = '';
           queryClient.invalidateQueries({ queryKey: getGetVideoTimelineQueryKey(projectId, leg) });
           queryClient.invalidateQueries({ queryKey: getListVideoSubmissionsQueryKey(projectId) });
+          queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
         },
         onError: (err) => {
           const data = (err as { response?: { data?: { error?: string; unresolved?: string[] } } }).response?.data;
@@ -334,7 +365,7 @@ export function ImportFlow({
         <span className="eyebrow"><Upload size={13} /> Import — interchange</span>
       </div>
       <p className="setting-copy">
-        Bring back an edited .edl, .fcpxml, or .otio from Premiere/Resolve/Avid/Final Cut — it becomes a new version of this leg and is submitted for review.
+        Bring back an edited .edl, .fcpxml, or .otio from Premiere/Resolve/Avid/Final Cut — it becomes a new version of this stage and is submitted for review. Optionally attach the rendered master / stems with the push; identical files are deduped, never re-uploaded.
       </p>
       <div className="den-chip-list mt-3">
         {IMPORT_FORMATS.map((option) => (
@@ -359,6 +390,35 @@ export function ImportFlow({
             data-testid={`${leg.toLowerCase()}-input-import-${format.toLowerCase()}`}
           />
           {fileName && <p className="den-footnote"><Film size={11} /> {fileName}</p>}
+          <input
+            ref={mediaRef}
+            type="file"
+            multiple
+            accept="video/*,audio/*,.mp4,.mov,.m4v,.mkv,.webm,.wav,.mp3,.m4a,.aac,.flac,.ogg,.aif,.aiff"
+            onChange={onPickMedia}
+            data-testid={`${leg.toLowerCase()}-input-import-media`}
+          />
+          {mediaFiles.length > 0 && (
+            <div className="den-stack" data-testid={`${leg.toLowerCase()}-media-list`}>
+              {mediaFiles.map((file, index) => (
+                <div key={`${file.name}-${index}`} className="list-row" data-testid={`${leg.toLowerCase()}-media-${index}`}>
+                  <span className="min-w-0 flex-1">
+                    <b className="truncate">{file.name}</b>
+                    <small>{(file.size / (1024 * 1024)).toFixed(1)} MB</small>
+                  </span>
+                  <button
+                    type="button"
+                    className="danger-icon"
+                    onClick={() => setMediaFiles((prev) => prev.filter((_, idx) => idx !== index))}
+                    title="Remove"
+                    data-testid={`${leg.toLowerCase()}-remove-media-${index}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2">
             <input
               value={message}
@@ -373,7 +433,7 @@ export function ImportFlow({
           </div>
         </div>
       ) : (
-        <p className="setting-copy mt-3">Only the leg role or the Captain can import an edited cut.</p>
+        <p className="setting-copy mt-3">Only the stage role or the Captain can import an edited cut.</p>
       )}
       {result && <p className="den-footnote mt-2"><Check size={12} /> {result}</p>}
       {error && (

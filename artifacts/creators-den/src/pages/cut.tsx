@@ -45,6 +45,7 @@ import {
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
+import { ActivityFeed } from '@/components/activity-feed';
 import { Timeline, formatTimecode, formatDuration, activeBlockId, MIN_CLIP_MS, type TimelineBlock, type TimelineTool } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
 import { AssetPlayer, EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
@@ -590,7 +591,7 @@ function RenderPanel({
         <span className="eyebrow"><Clapperboard size={13} /> Render preview</span>
       </div>
       <p className="setting-copy">
-        Render the current cut so the Captain reviews the picture, not the JSON. Submitting this leg also queues a picture-lock render automatically.
+        Render the current cut so the Captain reviews the picture, not the JSON. Submitting this stage also queues a picture-lock render automatically.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {canEdit && (
@@ -945,6 +946,8 @@ export default function ContentCreatorsCutPage() {
             currentVersion={cutTimeline.data?.version ?? null}
             canSubmit={canEdit}
           />
+
+          <ActivityFeed projectId={p.id} leg="CUT" className="" />
         </div>
       </div>
 

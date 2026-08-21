@@ -57,6 +57,7 @@ import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/c
 import { RoleOracle, AiResult, type StudioLeg } from '@/components/role-oracle';
 import { AssetPlayer, EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
 import { CheckoutPanel, ImportFlow } from '@/components/checkout-import';
+import { ActivityFeed } from '@/components/activity-feed';
 import { DiffView, type WipeFilter } from '@/components/diff-view';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 
@@ -503,7 +504,7 @@ export function HistoryPanel({
       {canSubmit && (
         <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
           <span className="eyebrow">Submit for review</span>
-          <p className="setting-copy mt-1">Pins the current head snapshot and hands the leg to the Captain.</p>
+          <p className="setting-copy mt-1">Pins the current head snapshot and hands the stage to the Captain.</p>
           <div className="mt-3 flex gap-2">
             <input
               value={note}
@@ -519,7 +520,7 @@ export function HistoryPanel({
           </div>
           {submit.isError && (
             <p className="setting-copy mt-2" role="alert">
-              {submitError?.response?.data?.error || 'The submission could not be created.'}
+              {submitError?.response?.data?.error || 'The pull request could not be created.'}
             </p>
           )}
         </div>
@@ -944,7 +945,7 @@ export default function ContentCreatorsStudioPage() {
       {leg !== 'SELECTS' ? (
         <div className="empty-state">
           <Clapperboard size={24} />
-          <h3>This leg is next in the relay.</h3>
+          <h3>This stage is next in the relay.</h3>
           <p>The {RELAY_LEGS.find((l) => l.leg === leg)?.role} studio lives at its own address — use the tabs above to jump between the four rooms.</p>
         </div>
       ) : (
@@ -1066,7 +1067,7 @@ export default function ContentCreatorsStudioPage() {
                   </button>
                 </div>
               ) : (
-                <p className="setting-copy mt-3">You&apos;re viewing this leg — only the Story Architect or the Captain can edit it.</p>
+                <p className="setting-copy mt-3">You&apos;re viewing this stage — only the Story Architect or the Captain can edit it.</p>
               )}
               {dirty && <p className="den-footnote mt-2"><Sparkles size={12} /> Unsaved changes</p>}
               {save.isError && (
@@ -1084,6 +1085,8 @@ export default function ContentCreatorsStudioPage() {
               canSubmit={canSubmit}
             />
 
+            <ActivityFeed projectId={p.id} leg={leg} className="" />
+
             <CheckoutPanel
               projectId={p.id}
               projectName={p.name}
@@ -1096,7 +1099,7 @@ export default function ContentCreatorsStudioPage() {
             {legStatus && (
               <p className="den-footnote">
                 <Sparkles size={13} />
-                Leg status: {legStatus.status.toLowerCase()}
+                Stage status: {legStatus.status.toLowerCase()}
                 {legStatus.decidedAt && ` · decided ${new Date(legStatus.decidedAt).toLocaleDateString()}`}
               </p>
             )}

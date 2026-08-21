@@ -16,6 +16,8 @@ export interface VideoAsset {
   sizeBytes: number;
   /** @nullable */
   durationMs: number | null;
+  /** @nullable */
+  contentHash: string | null;
   status: string;
   version: number;
   createdAt: Date;

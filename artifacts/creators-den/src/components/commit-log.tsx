@@ -31,7 +31,7 @@ const LEG_TONES: Record<string, string> = {
 };
 
 const FILTERS: Array<{ value: 'ALL' | StudioLeg; label: string }> = [
-  { value: 'ALL', label: 'All legs' },
+  { value: 'ALL', label: 'All stages' },
   ...RELAY_LEGS.map((leg) => ({ value: leg.leg as StudioLeg, label: leg.label })),
 ];
 
@@ -53,7 +53,14 @@ interface CommitRow {
   submission?: VideoSubmission;
 }
 
-export function CommitLog({ projectId }: { projectId: string }) {
+export function CommitLog({
+  projectId,
+  members = [],
+}: {
+  projectId: string;
+  /** Project members with resolved Clerk names (for author labels). */
+  members?: Array<{ userId: string; name: string | null }>;
+}) {
   const selects = useListVideoTimelineVersions(projectId, 'SELECTS');
   const cut = useListVideoTimelineVersions(projectId, 'CUT');
   const sound = useListVideoTimelineVersions(projectId, 'SOUND');
@@ -91,6 +98,21 @@ export function CommitLog({ projectId }: { projectId: string }) {
 
   const rows = filter === 'ALL' ? all : all.filter((row) => row.leg === filter);
 
+  // Version id → version number, so each commit can show its parent in the
+  // chain ("v4 · from v3") — the version-level genealogy (VCS design §4).
+  const versionNumberById = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const query of [selects, cut, sound, finish, thumbnail]) {
+      for (const version of query.data ?? []) map.set(version.id, version.version);
+    }
+    return map;
+  }, [selects.data, cut.data, sound.data, finish.data, thumbnail.data]);
+
+  const memberNameById = useMemo(
+    () => new Map(members.map((member) => [member.userId, member.name])),
+    [members],
+  );
+
   // Newest row per leg = that leg's head (the version a Compare starts from).
   const headIdFor = (leg: string): string | null =>
     all.find((row) => row.leg === leg)?.version.id ?? null;
@@ -102,10 +124,10 @@ export function CommitLog({ projectId }: { projectId: string }) {
     <div className="paper-card mt-5" data-testid="panel-commit-log">
       <div className="inline-heading">
         <span className="eyebrow"><GitBranch size={13} /> The commit log</span>
-        <span className="mono-label">{all.length} commit{all.length === 1 ? '' : 's'} · 5 legs</span>
+        <span className="mono-label">{all.length} commit{all.length === 1 ? '' : 's'} · 5 stages</span>
       </div>
       <p className="setting-copy">
-        Every snapshot from every leg, newest first — the story of the cut. A submission (PR) rides on the version it pinned; compare any commit against its leg&apos;s head.
+        Every snapshot from every stage, newest first — the story of the cut. A pull request rides on the version it pinned; compare any commit against its stage&apos;s head.
       </p>
 
       <div className="den-chip-list mt-3">
@@ -135,6 +157,9 @@ export function CommitLog({ projectId }: { projectId: string }) {
           {rows.map((row) => {
             const legMeta = RELAY_LEGS.find((leg) => leg.leg === row.leg);
             const submission = row.submission;
+            const parentVersion = row.version.parentVersionId
+              ? versionNumberById.get(row.version.parentVersionId) ?? null
+              : null;
             return (
               <div key={`${row.leg}-${row.version.id}`} className="list-row" data-testid={`commit-${row.leg}-${row.version.version}`}>
                 <span className={`den-tag ${LEG_TONES[row.leg]}`}>{legMeta?.label ?? row.leg}</span>
@@ -144,7 +169,8 @@ export function CommitLog({ projectId }: { projectId: string }) {
                     {row.version.message && <span className="ml-1 font-normal text-[hsl(var(--muted-foreground))]">· {row.version.message}</span>}
                   </b>
                   <small>
-                    {row.version.createdById.slice(0, 8)} · {timeAgo(row.version.createdAt)}
+                    {(memberNameById.get(row.version.createdById) ?? row.version.createdById.slice(0, 8))} · {timeAgo(row.version.createdAt)}
+                    {parentVersion !== null && ` · from v${parentVersion}`}
                     {submission && ` · submitted${submission.note ? ` — “${submission.note.slice(0, 80)}”` : ''}`}
                   </small>
                 </span>

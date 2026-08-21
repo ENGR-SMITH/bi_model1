@@ -1892,7 +1892,7 @@ paths:
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema: { $ref: "#/components/schemas/VideoTimelineImportInput" }
       responses:
         "201":
@@ -1907,6 +1907,46 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         "403":
           description: Not allowed (not the leg role / Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/activity:
+    get:
+      operationId: listVideoActivity
+      tags: [content-creators]
+      summary: Project activity feed (saves, imports, rollbacks, submissions, decisions, uploads)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Activity events, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoActivityEvent" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/genealogy:
+    get:
+      operationId: listVideoGenealogy
+      tags: [content-creators]
+      summary: Version provenance (every version chained to its parent, with review decisions)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Version genealogy, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoGenealogyEntry" }
+        "403":
+          description: Not allowed
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -3338,10 +3378,11 @@ components:
         id: { type: string }
         projectId: { type: string }
         userId: { type: string }
+        name: { type: ["string", "null"], description: Resolved Clerk display name, when available (falls back to the raw id client-side) }
         role: { type: string }
         status: { type: string }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, userId, role, status, createdAt]
+      required: [id, projectId, userId, name, role, status, createdAt]
     VideoMemberInput:
       type: object
       properties:
@@ -3361,10 +3402,11 @@ components:
         mimeType: { type: string }
         sizeBytes: { type: integer }
         durationMs: { type: ["integer", "null"] }
+        contentHash: { type: ["string", "null"] }
         status: { type: string }
         version: { type: integer }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, status, version, createdAt]
+      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, contentHash, status, version, createdAt]
     VideoAssetUploadInput:
       type: object
       description: Multipart upload of a raw asset into the project vault
@@ -3418,6 +3460,7 @@ components:
         mimeType: { type: string }
         sizeBytes: { type: integer }
         durationMs: { type: ["integer", "null"] }
+        contentHash: { type: ["string", "null"] }
         status: { type: string }
         version: { type: integer }
         createdAt: { type: string, format: date-time }
@@ -3425,7 +3468,7 @@ components:
           type: array
           items: { $ref: "#/components/schemas/VideoAssetFile" }
         transcript: { type: ["object", "null"], allOf: [{ $ref: "#/components/schemas/VideoTranscript" }] }
-      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, status, version, createdAt, files, transcript]
+      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, contentHash, status, version, createdAt, files, transcript]
     VideoTimelineState:
       type: object
       properties:
@@ -3447,8 +3490,43 @@ components:
         version: { type: integer }
         message: { type: string }
         createdById: { type: string }
+        parentVersionId: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
-      required: [id, version, message, createdById, createdAt]
+      required: [id, version, message, createdById, parentVersionId, createdAt]
+    VideoActivityEvent:
+      type: object
+      description: One immutable line on the project activity feed
+      properties:
+        id: { type: string }
+        actorId: { type: string }
+        actorName: { type: ["string", "null"], description: Resolved Clerk display name, when available (falls back to short id client-side) }
+        eventType: { type: string }
+        summary: { type: string }
+        resourceId: { type: ["string", "null"] }
+        leg: { type: ["string", "null"], description: "The leg the event belongs to (SELECTS/CUT/SOUND/FINISH/THUMBNAIL); null for vault-wide events like uploads" }
+        createdAt: { type: string, format: date-time }
+      required: [id, actorId, actorName, eventType, summary, resourceId, leg, createdAt]
+    VideoGenealogyEntry:
+      type: object
+      description: One version's provenance — its author, its parent in the chain, and the review decision that pinned it
+      properties:
+        id: { type: string }
+        leg: { type: string }
+        version: { type: integer }
+        message: { type: string }
+        createdById: { type: string }
+        parentVersionId: { type: ["string", "null"] }
+        parentVersion: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        submission:
+          type: ["object", "null"]
+          description: The review decision (if any) that pinned this version
+          properties:
+            status: { type: string }
+            decidedById: { type: ["string", "null"] }
+            decidedAt: { type: ["string", "null"], format: date-time }
+          required: [status, decidedById, decidedAt]
+      required: [id, leg, version, message, createdById, parentVersionId, parentVersion, createdAt, submission]
     VideoTimelineVersionDetail:
       type: object
       properties:
@@ -3497,20 +3575,36 @@ components:
       required: [projectId, leg, version, media]
     VideoTimelineImportInput:
       type: object
-      description: An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1)
+      description: An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1). `media` optionally carries the rendered master / stems to land in the vault with the push (content-addressed, so unchanged files dedupe).
       properties:
         format: { type: string, enum: [EDL, FCPXML, OTIO], default: EDL }
         document: { type: string, minLength: 1 }
         message: { type: string, maxLength: 500 }
         submit: { type: boolean, default: true }
+        media:
+          type: array
+          description: Optional rendered master / stems attached to the push
+          items: { type: string, format: binary }
       required: [document]
+    VideoTimelineImportMediaItem:
+      type: object
+      description: A media file that landed in the vault with the import
+      properties:
+        id: { type: string }
+        fileName: { type: string }
+        kind: { type: string }
+        deduplicated: { type: boolean, description: True when identical bytes already existed and the stored blob was reused (Git-LFS dedupe) }
+      required: [id, fileName, kind, deduplicated]
     VideoTimelineImportResponse:
       type: object
       properties:
         version: { type: integer }
         clips: { type: integer }
         submissionId: { type: ["string", "null"] }
-      required: [version, clips, submissionId]
+        media:
+          type: array
+          items: { $ref: "#/components/schemas/VideoTimelineImportMediaItem" }
+      required: [version, clips, submissionId, media]
     VideoCheckoutExportInput:
       type: object
       description: Request a background checkout bundle build for a leg

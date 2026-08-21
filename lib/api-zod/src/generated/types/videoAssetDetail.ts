@@ -18,6 +18,8 @@ export interface VideoAssetDetail {
   sizeBytes: number;
   /** @nullable */
   durationMs: number | null;
+  /** @nullable */
+  contentHash: string | null;
   status: string;
   version: number;
   createdAt: Date;

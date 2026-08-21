@@ -46,6 +46,7 @@ import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { AssetPlayer, isAudioKind, pollWhileProcessing } from '@/components/asset-preview';
 import { CommitLog } from '@/components/commit-log';
+import { ActivityFeed } from '@/components/activity-feed';
 
 const LEG_META = {
   SELECTS: { label: 'Selects', role: 'Story Architect', icon: Film },
@@ -86,7 +87,17 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function AssetCard({ projectId, asset, released }: { projectId: string; asset: { id: string; fileName: string; kind: string; status: string; sizeBytes: number; version: number; durationMs: number | null }; released: boolean }) {
+/** True when an earlier vault asset holds the exact same bytes (Git-LFS dedupe). */
+function isDuplicateContent(assets: Array<{ contentHash: string | null }>, index: number): boolean {
+  const hash = assets[index].contentHash;
+  if (!hash) return false;
+  for (let i = 0; i < index; i++) {
+    if (assets[i].contentHash === hash) return true;
+  }
+  return false;
+}
+
+function AssetCard({ projectId, asset, released, deduplicated }: { projectId: string; asset: { id: string; fileName: string; kind: string; status: string; sizeBytes: number; version: number; durationMs: number | null }; released: boolean; deduplicated?: boolean }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const detail = useGetVideoAsset(projectId, asset.id, {
     query: {
@@ -105,6 +116,7 @@ function AssetCard({ projectId, asset, released }: { projectId: string; asset: {
           <div className="flex flex-wrap items-center gap-2">
             <b className="truncate text-sm">{asset.fileName}</b>
             <span className="den-tag gold">{KIND_LABELS[asset.kind] ?? asset.kind}</span>
+            {deduplicated && <span className="den-tag teal" title="Identical bytes are already in the vault — this entry points at the stored file, no second copy">Already in vault</span>}
             {processing && <span className="den-tag accent">processing…</span>}
           </div>
           <p className="mono-label mt-1">
@@ -559,7 +571,7 @@ function SubmissionsPanel({ projectId, myRole }: { projectId: string; myRole: st
   return (
     <div className="paper-card mt-4" data-testid="panel-submissions">
       <div className="inline-heading">
-        <span className="eyebrow"><Film size={13} /> The relay — leg submissions</span>
+        <span className="eyebrow"><Film size={13} /> The relay — pull requests</span>
       </div>
       <div className="den-stack">
         {rows.map((submission) => {
@@ -595,7 +607,7 @@ function SubmissionsPanel({ projectId, myRole }: { projectId: string; myRole: st
         })}
       </div>
       {pending.length > 0 && !isCaptain && (
-        <p className="setting-copy mt-3">Waiting on the Captain to approve or reject the pending leg.</p>
+        <p className="setting-copy mt-3">Waiting on the Captain to approve or reject the pending stage.</p>
       )}
     </div>
   );
@@ -681,8 +693,8 @@ export default function ContentCreatorsProjectPage() {
 
           {p.assets.length > 0 ? (
             <div className="den-stack">
-              {p.assets.map((asset) => (
-                <AssetCard key={asset.id} projectId={p.id} asset={asset} released={p.status === 'RELEASED'} />
+              {p.assets.map((asset, index) => (
+                <AssetCard key={asset.id} projectId={p.id} asset={asset} released={p.status === 'RELEASED'} deduplicated={isDuplicateContent(p.assets, index)} />
               ))}
             </div>
           ) : (
@@ -706,6 +718,7 @@ export default function ContentCreatorsProjectPage() {
         <section className="space-y-4">
           <GrantsPanel projectId={p.id} myRole={myRole} members={p.members} assets={p.assets} />
           <SubmissionsPanel projectId={p.id} myRole={myRole} />
+          <ActivityFeed projectId={p.id} />
           <DownloadAuditPanel projectId={p.id} myRole={myRole} />
 
           <div className="card-heading mt-5">
@@ -718,11 +731,14 @@ export default function ContentCreatorsProjectPage() {
             {p.members.map((member) => (
               <div key={member.id} className="list-row" data-testid={`card-member-${member.userId}`}>
                 <span className="person-dot" style={{ background: member.role === 'CAPTAIN' ? 'hsl(var(--accent))' : 'hsl(164 33% 45%)' }}>
-                  {member.userId.slice(0, 2).toUpperCase()}
+                  {(member.name ?? member.userId).slice(0, 2).toUpperCase()}
                 </span>
                 <span>
-                  <b>{member.userId}</b>
-                  <small>{ROLE_LABELS[member.role] ?? member.role}</small>
+                  <b>{member.name ?? member.userId}</b>
+                  <small>
+                    {ROLE_LABELS[member.role] ?? member.role}
+                    {member.name ? ` · ${member.userId}` : ''}
+                  </small>
                 </span>
                 {member.role === 'CAPTAIN' && <span className="den-tag danger">Captain</span>}
               </div>
@@ -734,19 +750,19 @@ export default function ContentCreatorsProjectPage() {
               <div className="inline-heading">
                 <span className="eyebrow"><UserPlus size={13} /> Invite a teammate</span>
               </div>
-              <p className="setting-copy">Assign the four legs — Architect, Visual Editor, Sound Designer, Motion &amp; Color — or add an uploader.</p>
+              <p className="setting-copy">Assign the four stages — Architect, Visual Editor, Sound Designer, Motion &amp; Color — or add an uploader.</p>
               <InviteForm projectId={p.id} />
             </div>
           ) : (
             <p className="den-footnote mt-5">
               <Sparkles size={13} />
-              Only the Captain can invite teammates. When a leg is assigned to you, its studio appears here.
+              Only the Captain can invite teammates. When a stage is assigned to you, its studio appears here.
             </p>
           )}
         </section>
       </div>
 
-      <CommitLog projectId={p.id} />
+      <CommitLog projectId={p.id} members={p.members} />
 
       <p className="den-footnote mt-8">
         <LockKeyhole size={13} />

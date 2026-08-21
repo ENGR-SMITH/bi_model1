@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
+import { eq } from "drizzle-orm";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -15,14 +16,29 @@ const state = vi.hoisted(() => ({
   db: null as any,
   tables: null as any,
   clerkEmailToUser: {} as Record<string, string | null>,
+  clerkIdToName: {} as Record<string, string>,
 }));
 
 vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: state.userId }),
   clerkClient: {
     users: {
-      getUserList: async ({ emailAddress }: { emailAddress: string[] }) => {
-        const email = emailAddress[0];
+      getUserList: async (params: { emailAddress?: string[]; userId?: string[] }) => {
+        if (params.userId) {
+          return {
+            data: params.userId.map((id) => {
+              const [first, ...rest] = (state.clerkIdToName[id] ?? "").split(" ");
+              return {
+                id,
+                firstName: first || null,
+                lastName: rest.join(" ") || null,
+                username: null,
+                emailAddresses: [],
+              };
+            }),
+          };
+        }
+        const email = params.emailAddress?.[0] ?? "";
         const id = state.clerkEmailToUser[email] ?? null;
         return { data: id ? [{ id }] : [] };
       },
@@ -43,6 +59,7 @@ import videoProductionRouter from "./video-production";
 import { formatEdlTimecode, parseEdlTimecode, parseTimelineEdl, resolveEdlEvents } from "../video/edl";
 import { runWorkerCycle } from "../video/worker";
 import { listZipEntries, readZipEntry } from "../video/zip";
+import { clearUserNameCache } from "../lib/user-names";
 
 function createApp(): Express {
   const app = express();
@@ -76,11 +93,18 @@ async function resetDb() {
   await state.db.delete(t.tandemVideoMembersTable);
   await state.db.delete(t.tandemVideoProjectsTable);
   state.userId = null;
+  clearUserNameCache();
   state.clerkEmailToUser = {
     "architect@example.com": "architect-1",
     "editor@example.com": "editor-1",
     "thumb@example.com": "thumb-1",
     "stranger@example.com": "stranger-1",
+  };
+  state.clerkIdToName = {
+    "captain-1": "Ada Captain",
+    "architect-1": "Riley Architect",
+    "editor-1": "Sam Editor",
+    "thumb-1": "Noah Thumb",
   };
 }
 
@@ -536,6 +560,208 @@ FCM: NON-DROP FRAME
       .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
       .send({ document: "TITLE: x\n" });
     expect(forbidden.status).toBe(403);
+  });
+});
+
+describe("import with attached media (phase 2 tail)", () => {
+  it("lands the attached master in the vault and resolves the EDL against it", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+
+    const edl = `TITLE: pushed cut
+FCM: NON-DROP FRAME
+
+001  MASTER  V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00
+* FROM CLIP NAME: master.mov
+`;
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .field("format", "EDL")
+      .field("document", edl)
+      .field("message", "Pushed the master")
+      .attach("media", Buffer.from("rendered master from premiere"), "master.mov");
+    expect(res.status).toBe(201);
+    expect(res.body.clips).toBe(1);
+    expect(res.body.version).toBe(1);
+    expect(res.body.submissionId).toBeTruthy();
+    expect(res.body.media).toHaveLength(1);
+    expect(res.body.media[0].fileName).toBe("master.mov");
+    expect(res.body.media[0].kind).toBe("RAW_VIDEO");
+    expect(res.body.media[0].deduplicated).toBe(false);
+
+    // The attached file landed as a vault asset and the EDL relinked to it.
+    const timeline = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT`);
+    expect(timeline.body.snapshot.clips).toHaveLength(1);
+    expect(timeline.body.snapshot.clips[0].assetId).toBe(res.body.media[0].id);
+
+    // It enqueues the usual preview jobs (no dedupe hit on a fresh file). A
+    // CUT import also auto-queues a PICTURE_LOCK render.
+    const jobs = await state.db
+      .select()
+      .from(state.tables.tandemVideoJobsTable)
+      .where(eq(state.tables.tandemVideoJobsTable.assetId, res.body.media[0].id));
+    expect(jobs.map((job: any) => job.type).sort()).toEqual(["PROXY", "RENDER", "TRANSCRIBE"]);
+  });
+
+  it("dedupes attached media against existing vault content (no re-upload)", async () => {
+    const project = await createProject();
+    const existing = await uploadAsset(project.id, "master.mov");
+    state.userId = "captain-1";
+
+    const edl = `TITLE: re-push
+FCM: NON-DROP FRAME
+
+001  MASTER  V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00
+* FROM CLIP NAME: master.mov
+`;
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .field("format", "EDL")
+      .field("document", edl)
+      .attach("media", Buffer.from("fake video bytes"), "master.mov");
+    expect(res.status).toBe(201);
+    expect(res.body.media).toHaveLength(1);
+    expect(res.body.media[0].deduplicated).toBe(true);
+    expect(res.body.media[0].id).not.toBe(existing.id);
+
+    // The new asset is a pointer to the existing blob — no second copy.
+    const [existingRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.id, existing.id));
+    const [attachedRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.id, res.body.media[0].id));
+    expect(attachedRow.storageKey).toBe(existingRow.storageKey);
+  });
+
+  it("attaches multiple files and infers master vs stem kinds", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+
+    const edl = `TITLE: x
+FCM: NON-DROP FRAME
+
+001  CAM-A  V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00
+* FROM CLIP NAME: cam-a.mp4
+`;
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .field("format", "EDL")
+      .field("document", edl)
+      .attach("media", Buffer.from("cam bytes"), "cam-a.mp4")
+      .attach("media", Buffer.from("stem bytes"), "dialogue-stem.wav");
+    expect(res.status).toBe(201);
+    expect(res.body.media).toHaveLength(2);
+    expect(res.body.clips).toBe(1);
+
+    const video = res.body.media.find((m: any) => m.fileName === "cam-a.mp4");
+    const audio = res.body.media.find((m: any) => m.fileName === "dialogue-stem.wav");
+    expect(video.kind).toBe("RAW_VIDEO");
+    expect(audio.kind).toBe("RAW_AUDIO");
+  });
+});
+
+describe("activity feed + version genealogy", () => {
+  it("records and lists activity events across the relay, members only", async () => {
+    const project = await createProject();
+    const camA = await uploadAsset(project.id, "interview-cam-a.mp4");
+    state.userId = "captain-1";
+
+    const edl = `TITLE: cut\nFCM: NON-DROP FRAME\n\n001  INTERVIEW-CAM-A  V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00\n* FROM CLIP NAME: interview-cam-a.mp4\n`;
+    const imported = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ document: edl });
+    expect(imported.status).toBe(201);
+
+    // A save lands a version_saved line too.
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/CUT`)
+      .send({ snapshot: { clips: [], sceneBlocks: [], markers: [] }, message: "tighter ending" });
+
+    const feed = await request(API).get(`/api/video/projects/${project.id}/activity`);
+    expect(feed.status).toBe(200);
+    // (sqlite stores timestamps at second precision, so within one test the
+    // newest-first order can tie — assert the set and per-event content.)
+    const types = feed.body.map((event: any) => event.eventType);
+    expect(types).toEqual(
+      expect.arrayContaining(["asset_uploaded", "version_imported", "submission_created", "version_saved"]),
+    );
+    const saved = feed.body.find((event: any) => event.eventType === "version_saved");
+    expect(saved.summary).toContain("Saved CUT v2");
+    expect(saved.summary).toContain("tighter ending");
+    expect(saved.actorId).toBe("captain-1");
+    // Actor ids resolve to Clerk display names (falling back to short ids).
+    expect(saved.actorName).toBe("Ada Captain");
+    // Leg-scoped events carry their leg; vault-wide events (uploads) carry none.
+    expect(saved.leg).toBe("CUT");
+    const importEvent = feed.body.find((event: any) => event.eventType === "version_imported");
+    expect(importEvent.summary).toContain("Imported CUT v1 from EDL");
+    expect(importEvent.resourceId).toBeTruthy();
+    expect(importEvent.actorName).toBe("Ada Captain");
+    expect(importEvent.leg).toBe("CUT");
+    const uploaded = feed.body.find((event: any) => event.eventType === "asset_uploaded");
+    expect(uploaded.leg).toBeNull();
+
+    // The Captain's decision lands on the feed.
+    const submissions = await request(API).get(`/api/video/projects/${project.id}/submissions`);
+    await request(API).post(
+      `/api/video/projects/${project.id}/submissions/${submissions.body[0].id}/approve`,
+    );
+    const after = await request(API).get(`/api/video/projects/${project.id}/activity`);
+    const approved = after.body.find((event: any) => event.eventType === "submission_approved");
+    expect(approved.summary).toContain("Approved CUT v1");
+    expect(approved.leg).toBe("CUT");
+
+    // Strangers cannot read the feed.
+    state.userId = "stranger-1";
+    expect((await request(API).get(`/api/video/projects/${project.id}/activity`)).status).toBe(403);
+  });
+
+  it("reports version genealogy chained to parents with review decisions", async () => {
+    const project = await createProject();
+    await uploadAsset(project.id, "interview-cam-a.mp4");
+    state.userId = "captain-1";
+
+    const edl = `TITLE: cut\nFCM: NON-DROP FRAME\n\n001  INTERVIEW-CAM-A  V     C        00:00:00:00 00:00:05:00 00:00:00:00 00:00:05:00\n* FROM CLIP NAME: interview-cam-a.mp4\n`;
+    await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ document: edl });
+    await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/import`)
+      .send({ document: edl.replace("00:00:05:00 00:00:00:00", "00:00:06:00 00:00:00:00") });
+
+    const genealogy = await request(API).get(`/api/video/projects/${project.id}/genealogy`);
+    expect(genealogy.status).toBe(200);
+    const cut = genealogy.body.filter((entry: any) => entry.leg === "CUT");
+    expect(cut).toHaveLength(2);
+    expect(cut[0].version).toBe(1);
+    expect(cut[0].parentVersion).toBeNull();
+    expect(cut[1].version).toBe(2);
+    expect(cut[1].parentVersionId).toBe(cut[0].id);
+    expect(cut[1].parentVersion).toBe(1);
+
+    // The first import auto-submitted v1, so the approval attaches to v1 —
+    // the exact version the submission pinned. v2 has no review of its own.
+    const submissions = await request(API).get(`/api/video/projects/${project.id}/submissions`);
+    const pending = submissions.body.find((s: any) => s.leg === "CUT");
+    await request(API).post(
+      `/api/video/projects/${project.id}/submissions/${pending.id}/approve`,
+    );
+    const after = await request(API).get(`/api/video/projects/${project.id}/genealogy`);
+    const v1 = after.body.find((entry: any) => entry.leg === "CUT" && entry.version === 1);
+    const v2 = after.body.find((entry: any) => entry.leg === "CUT" && entry.version === 2);
+    expect(v1.submission.status).toBe("APPROVED");
+    expect(v1.submission.decidedById).toBe("captain-1");
+    expect(v1.submission.decidedAt).toBeTruthy();
+    expect(v2.submission).toBeNull();
+
+    state.userId = "stranger-1";
+    expect((await request(API).get(`/api/video/projects/${project.id}/genealogy`)).status).toBe(403);
   });
 });
 
