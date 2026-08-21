@@ -57,6 +57,7 @@ export function AssetPlayer({
   videoRef: externalVideoRef,
   audio = false,
   controls = true,
+  markers,
 }: {
   projectId: string;
   assetId: string;
@@ -80,6 +81,8 @@ export function AssetPlayer({
   audio?: boolean;
   /** Show the native transport controls. Hidden for the A/B wipe's top layer. */
   controls?: boolean;
+  /** Review markers (design §10): comments pinned at a timecode, drawn as a clickable rail under the frame. */
+  markers?: Array<{ id: string; ms: number; tone?: 'accent' | 'gold' | 'danger' | 'teal' | 'muted'; label?: string }>;
 }) {
   const internalVideoRef = useRef<HTMLVideoElement>(null);
   const internalAudioRef = useRef<HTMLAudioElement>(null);
@@ -99,6 +102,17 @@ export function AssetPlayer({
   const demoProxy = proxyFile?.metadata?.demo === true;
   // Static images (designed thumbnails) are their own proxy — render an <img>.
   const isImage = Boolean(proxyFile) && Boolean(proxyFile!.mimeType?.startsWith('image/'));
+  const durationMs = assetDurationMs(detail, 0);
+
+  // Seek the mounted media element and tell the caller the playhead moved
+  // (used by the review marker rail — design §10 "clickable pins in the player").
+  const seekTo = (ms: number) => {
+    const media = mediaRef.current;
+    if (media) {
+      media.currentTime = Math.min(durationMs, Math.max(0, ms)) / 1000;
+    }
+    onPlayheadChange?.(ms);
+  };
 
   // Turn the silent media error into an actionable explanation. The probe below
   // fetches the stream just for its status, so we can distinguish a server-side
@@ -274,6 +288,38 @@ export function AssetPlayer({
       )}
 
       {children}
+
+      {markers && markers.length > 0 && !audio && !isImage && durationMs > 0 && (
+        <div
+          className="den-marker-rail"
+          role="slider"
+          aria-label="Review markers — click to seek"
+          aria-valuemin={0}
+          aria-valuemax={durationMs}
+          aria-valuenow={Math.min(playheadMs ?? 0, durationMs)}
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+            seekTo(ratio * durationMs);
+          }}
+          data-testid="marker-rail"
+        >
+          {markers.map((marker) => (
+            <button
+              key={marker.id}
+              type="button"
+              className={`den-marker-pin ${marker.tone ?? 'accent'}`}
+              style={{ left: `${Math.min(100, Math.max(0, (marker.ms / durationMs) * 100))}%` }}
+              title={marker.label ?? formatClock(marker.ms)}
+              onClick={(event) => {
+                event.stopPropagation();
+                seekTo(marker.ms);
+              }}
+              data-testid="marker-pin"
+            />
+          ))}
+        </div>
+      )}
 
       {title && (
         <div className="den-player-bar">

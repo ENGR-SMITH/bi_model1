@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 import {
   db,
   tandemVideoAssetsTable,
@@ -280,6 +280,162 @@ export async function backfillContentHashes(
         ),
       );
     result.hashed += 1;
+  }
+
+  return result;
+}
+
+export interface ContentConsolidationResult {
+  /** Content hashes that had more than one physical copy on disk. */
+  hashes: number;
+  /** asset_files rows repointed at the kept copy (planned count, also in dry-run). */
+  rowsRepointed: number;
+  /** asset rows repointed at the kept copy (planned count, also in dry-run). */
+  assetsRepointed: number;
+  /** Duplicate files deleted from disk (always 0 in dry-run). */
+  filesDeleted: number;
+  /** Bytes freed on disk (or that would be freed, in dry-run). */
+  bytesReclaimed: number;
+  /** Duplicate keys whose file was already gone from disk. */
+  missingFiles: number;
+}
+
+/**
+ * Optional follow-up to the backfill: reclaim the disk that legacy duplicates
+ * still occupy. For every content hash with more than one physical copy, the
+ * earliest copy is kept and the rest are deleted, with all rows (asset_files
+ * and assets) repointed at the kept blob — same "earliest wins" rule as
+ * `findAssetByContentHash`.
+ *
+ * Defaults to `dryRun: true` from the CLI — pass `--apply` to actually delete.
+ * A hash is skipped entirely (counted as missing) when its kept copy is gone
+ * from disk, so consolidation can never orphan the last remaining copy.
+ */
+export async function consolidateContentHashes(
+  uploadDirPath: string,
+  opts: { dryRun?: boolean } = {},
+): Promise<ContentConsolidationResult> {
+  const dryRun = opts.dryRun ?? false;
+  const result: ContentConsolidationResult = {
+    hashes: 0,
+    rowsRepointed: 0,
+    assetsRepointed: 0,
+    filesDeleted: 0,
+    bytesReclaimed: 0,
+    missingFiles: 0,
+  };
+
+  const fileRows = await db
+    .select()
+    .from(tandemVideoAssetFilesTable)
+    .where(isNotNull(tandemVideoAssetFilesTable.contentHash));
+
+  // Group file rows by content hash, remembering the earliest row (the keeper)
+  // and how many rows reference each distinct storage key.
+  const groups = new Map<
+    string,
+    { earliest: (typeof fileRows)[number]; keys: Map<string, number> }
+  >();
+  for (const row of fileRows) {
+    if (!row.contentHash) continue;
+    let group = groups.get(row.contentHash);
+    if (!group) {
+      group = { earliest: row, keys: new Map() };
+      groups.set(row.contentHash, group);
+    }
+    group.keys.set(row.storageKey, (group.keys.get(row.storageKey) ?? 0) + 1);
+    if (
+      row.createdAt.getTime() < group.earliest.createdAt.getTime() ||
+      (row.createdAt.getTime() === group.earliest.createdAt.getTime() &&
+        row.id < group.earliest.id)
+    ) {
+      group.earliest = row;
+    }
+  }
+
+  const canonicalByHash = new Map<string, string>();
+  for (const [hash, group] of groups) {
+    canonicalByHash.set(hash, group.earliest.storageKey);
+    if (group.keys.size < 2) continue;
+
+    const keeper = group.earliest.storageKey;
+    if (!fs.existsSync(path.join(uploadDirPath, keeper))) {
+      // The kept copy is gone — never consolidate onto a missing blob.
+      result.missingFiles += 1;
+      continue;
+    }
+    result.hashes += 1;
+
+    for (const [key, count] of group.keys) {
+      if (key === keeper) continue;
+      const filePath = path.join(uploadDirPath, key);
+      if (fs.existsSync(filePath)) {
+        result.bytesReclaimed += fs.statSync(filePath).size;
+        if (!dryRun) {
+          fs.unlinkSync(filePath);
+          result.filesDeleted += 1;
+        }
+      } else {
+        result.missingFiles += 1;
+      }
+      result.rowsRepointed += count;
+      if (!dryRun) {
+        await db
+          .update(tandemVideoAssetFilesTable)
+          .set({ storageKey: keeper })
+          .where(
+            and(
+              eq(tandemVideoAssetFilesTable.contentHash, hash),
+              eq(tandemVideoAssetFilesTable.storageKey, key),
+            ),
+          );
+      }
+    }
+  }
+
+  // Assets: repoint each row's storageKey at the canonical blob for its hash
+  // (hashes that only ever lived on assets use the earliest asset's key).
+  const assetRows = await db
+    .select()
+    .from(tandemVideoAssetsTable)
+    .where(isNotNull(tandemVideoAssetsTable.contentHash));
+  for (const asset of assetRows) {
+    if (!asset.contentHash || canonicalByHash.has(asset.contentHash)) continue;
+    canonicalByHash.set(asset.contentHash, asset.storageKey);
+  }
+
+  for (const asset of assetRows) {
+    if (!asset.contentHash) continue;
+    const canonical = canonicalByHash.get(asset.contentHash);
+    if (!canonical || asset.storageKey === canonical) continue;
+    if (!fs.existsSync(path.join(uploadDirPath, canonical))) {
+      result.missingFiles += 1;
+      continue;
+    }
+    const oldKey = asset.storageKey;
+    result.assetsRepointed += 1;
+    if (!dryRun) {
+      await db
+        .update(tandemVideoAssetsTable)
+        .set({ storageKey: canonical })
+        .where(eq(tandemVideoAssetsTable.id, asset.id));
+      // Unlink the old file only once nothing references it anymore.
+      const [stillAsset] = await db
+        .select({ id: tandemVideoAssetsTable.id })
+        .from(tandemVideoAssetsTable)
+        .where(eq(tandemVideoAssetsTable.storageKey, oldKey))
+        .limit(1);
+      const [stillFile] = await db
+        .select({ id: tandemVideoAssetFilesTable.id })
+        .from(tandemVideoAssetFilesTable)
+        .where(eq(tandemVideoAssetFilesTable.storageKey, oldKey))
+        .limit(1);
+      const oldPath = path.join(uploadDirPath, oldKey);
+      if (!stillAsset && !stillFile && fs.existsSync(oldPath)) {
+        fs.unlinkSync(oldPath);
+        result.filesDeleted += 1;
+      }
+    }
   }
 
   return result;

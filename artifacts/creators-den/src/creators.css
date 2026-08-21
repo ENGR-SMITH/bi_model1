@@ -144,6 +144,15 @@
 .den-waveform .played { background: hsl(var(--accent)); }
 .den-waveform .queued { background: hsl(var(--accent) / .22); }
 
+/* ---- Review marker rail (design §10: comment pins clickable on the player) ---- */
+.den-marker-rail { position: relative; height: 14px; border-top: 1px solid hsl(var(--border)); background: hsl(var(--secondary) / .35); cursor: crosshair; }
+.den-marker-pin { position: absolute; top: 3px; bottom: 3px; width: 4px; border: 0; border-radius: 2px; background: hsl(var(--accent)); cursor: pointer; padding: 0; transition: transform .12s, filter .12s; }
+.den-marker-pin:hover { transform: scaleY(1.5); filter: brightness(1.15); }
+.den-marker-pin.gold { background: hsl(var(--sidebar-primary)); }
+.den-marker-pin.danger { background: hsl(var(--destructive)); }
+.den-marker-pin.teal { background: hsl(164 33% 45%); }
+.den-marker-pin.muted { background: hsl(var(--muted-foreground)); }
+
 /* ---- Activity feed leg filter ---- */
 .feed-tabs { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid hsl(var(--border)); background: hsl(var(--card) / .86); border-radius: 999px; }
 .feed-tab { border: 0; border-radius: 999px; padding: 4px 9px; color: hsl(var(--muted-foreground)); background: transparent; font: 8px var(--app-font-mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; transition: color .15s, background .15s; }

@@ -20,7 +20,11 @@ vi.mock("@workspace/db", async () => {
   return built.exports;
 });
 
-import { backfillContentHashes, findAssetByContentHash } from "./content-address";
+import {
+  backfillContentHashes,
+  consolidateContentHashes,
+  findAssetByContentHash,
+} from "./content-address";
 
 async function resetDb() {
   const t = state.tables;
@@ -172,5 +176,108 @@ describe("content-hash backfill", () => {
     expect(a.contentHash).toBe(expected);
     expect(b.contentHash).toBe(expected);
     expect((await findAssetByContentHash(expected))?.id).toBe("asset-dup-a.mp4");
+  });
+});
+
+describe("content-hash consolidation", () => {
+  const bytesA = () => Buffer.from("identical bytes across two uploads");
+
+  async function seedDuplicateSet(extraFileRows: string[] = []) {
+    const dir = process.env.VIDEO_UPLOAD_DIR!;
+    const bytes = bytesA();
+    const hash = crypto.createHash("sha256").update(bytes).digest("hex");
+    fs.writeFileSync(path.join(dir, "v1.mp4"), bytes);
+    fs.writeFileSync(path.join(dir, "v2.mp4"), bytes);
+
+    await seedProject();
+    await state.db.insert(state.tables.tandemVideoAssetsTable).values([
+      { id: "asset-1", projectId: "project-1", uploaderId: "captain-1", kind: "RAW_VIDEO", fileName: "v1.mp4", mimeType: "video/mp4", sizeBytes: bytes.length, storageKey: "v1.mp4", contentHash: hash, status: "PROCESSED", version: 0, createdAt: new Date("2026-01-01") },
+      { id: "asset-2", projectId: "project-1", uploaderId: "captain-1", kind: "RAW_VIDEO", fileName: "v2.mp4", mimeType: "video/mp4", sizeBytes: bytes.length, storageKey: "v2.mp4", contentHash: hash, status: "PROCESSED", version: 0, createdAt: new Date("2026-01-02") },
+    ]);
+    await state.db.insert(state.tables.tandemVideoAssetFilesTable).values([
+      { id: "file-1", assetId: "asset-1", kind: "ORIGINAL", storageKey: "v1.mp4", contentHash: hash, mimeType: "video/mp4", sizeBytes: bytes.length, createdAt: new Date("2026-01-01") },
+      { id: "file-2", assetId: "asset-2", kind: "ORIGINAL", storageKey: "v2.mp4", contentHash: hash, mimeType: "video/mp4", sizeBytes: bytes.length, createdAt: new Date("2026-01-02") },
+      ...extraFileRows.map((id) => ({
+        id,
+        assetId: "asset-2",
+        kind: "PROXY",
+        storageKey: "v2.mp4",
+        contentHash: hash,
+        mimeType: "video/mp4",
+        sizeBytes: bytes.length,
+        createdAt: new Date("2026-01-03"),
+      })),
+    ]);
+    return { hash, dir };
+  }
+
+  it("dry-runs: reports what would be reclaimed without touching disk or rows", async () => {
+    const { dir } = await seedDuplicateSet();
+
+    const result = await consolidateContentHashes(dir, { dryRun: true });
+    expect(result.hashes).toBe(1);
+    expect(result.rowsRepointed).toBe(1);
+    expect(result.assetsRepointed).toBe(1);
+    expect(result.filesDeleted).toBe(0);
+    expect(result.bytesReclaimed).toBe(bytesA().length);
+
+    // Nothing deleted, nothing repointed.
+    expect(fs.existsSync(path.join(dir, "v2.mp4"))).toBe(true);
+    const [file2] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetFilesTable)
+      .where(eq(state.tables.tandemVideoAssetFilesTable.id, "file-2"));
+    expect(file2.storageKey).toBe("v2.mp4");
+  });
+
+  it("applies: deletes duplicates, repoints rows and assets at the earliest copy", async () => {
+    const { dir } = await seedDuplicateSet(["file-proxy"]);
+
+    const result = await consolidateContentHashes(dir, { dryRun: false });
+    expect(result.hashes).toBe(1);
+    expect(result.rowsRepointed).toBe(2); // file-2 + file-proxy both pointed at v2.mp4
+    expect(result.assetsRepointed).toBe(1);
+    expect(result.filesDeleted).toBe(1);
+    expect(result.bytesReclaimed).toBe(bytesA().length);
+
+    // The duplicate is gone; the keeper survives.
+    expect(fs.existsSync(path.join(dir, "v2.mp4"))).toBe(false);
+    expect(fs.existsSync(path.join(dir, "v1.mp4"))).toBe(true);
+
+    const [file2] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetFilesTable)
+      .where(eq(state.tables.tandemVideoAssetFilesTable.id, "file-2"));
+    expect(file2.storageKey).toBe("v1.mp4");
+    const [proxy] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetFilesTable)
+      .where(eq(state.tables.tandemVideoAssetFilesTable.id, "file-proxy"));
+    expect(proxy.storageKey).toBe("v1.mp4");
+    const [asset2] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.id, "asset-2"));
+    expect(asset2.storageKey).toBe("v1.mp4");
+  });
+
+  it("never consolidates onto a missing keeper copy", async () => {
+    const { dir, hash } = await seedDuplicateSet();
+    // The earliest copy disappears from disk; the duplicate is the only survivor.
+    fs.unlinkSync(path.join(dir, "v1.mp4"));
+
+    const result = await consolidateContentHashes(dir, { dryRun: false });
+    expect(result.hashes).toBe(0);
+    expect(result.filesDeleted).toBe(0);
+    expect(result.missingFiles).toBeGreaterThanOrEqual(1);
+
+    // The surviving duplicate must not be deleted.
+    expect(fs.existsSync(path.join(dir, "v2.mp4"))).toBe(true);
+    const [file2] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetFilesTable)
+      .where(eq(state.tables.tandemVideoAssetFilesTable.id, "file-2"));
+    expect(file2.storageKey).toBe("v2.mp4");
+    expect(file2.contentHash).toBe(hash);
   });
 });

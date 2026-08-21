@@ -44,6 +44,7 @@ import type {
   HealthStatus,
   InboxThread,
   ListCollaborationSeedsParams,
+  ListVideoActivityParams,
   OracleChatInput,
   OracleResult,
   OutlineAssistInput,
@@ -6568,20 +6569,29 @@ export const useImportVideoTimeline = <TError = ErrorType<ErrorResponse>,
       return useMutation(getImportVideoTimelineMutationOptions(options));
     }
 
-export const getListVideoActivityUrl = (projectId: string,) => {
+export const getListVideoActivityUrl = (projectId: string,
+    params?: ListVideoActivityParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/video/projects/${projectId}/activity`
+  return stringifiedParams.length > 0 ? `/api/video/projects/${projectId}/activity?${stringifiedParams}` : `/api/video/projects/${projectId}/activity`
 }
 
 /**
  * @summary Project activity feed (saves, imports, rollbacks, submissions, decisions, uploads)
  */
-export const listVideoActivity = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoActivityEvent[]> => {
+export const listVideoActivity = async (projectId: string,
+    params?: ListVideoActivityParams, options?: Parameters<typeof customFetch>[1]): Promise<VideoActivityEvent[]> => {
 
-  return customFetch<VideoActivityEvent[]>(getListVideoActivityUrl(projectId),
+  return customFetch<VideoActivityEvent[]>(getListVideoActivityUrl(projectId,params),
   {
     ...options,
     method: 'GET'
@@ -6594,23 +6604,25 @@ export const listVideoActivity = async (projectId: string, options?: Parameters<
 
 
 
-export const getListVideoActivityQueryKey = (projectId: string,) => {
+export const getListVideoActivityQueryKey = (projectId: string,
+    params?: ListVideoActivityParams,) => {
     return [
-    `/api/video/projects/${projectId}/activity`
+    `/api/video/projects/${projectId}/activity`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListVideoActivityQueryOptions = <TData = Awaited<ReturnType<typeof listVideoActivity>>, TError = ErrorType<ErrorResponse>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListVideoActivityQueryOptions = <TData = Awaited<ReturnType<typeof listVideoActivity>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    params?: ListVideoActivityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListVideoActivityQueryKey(projectId);
+  const queryKey =  queryOptions?.queryKey ?? getListVideoActivityQueryKey(projectId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoActivity>>> = ({ signal }) => listVideoActivity(projectId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoActivity>>> = ({ signal }) => listVideoActivity(projectId,params, { signal, ...requestOptions });
 
 
 
@@ -6628,11 +6640,12 @@ export type ListVideoActivityQueryError = ErrorType<ErrorResponse>
  */
 
 export function useListVideoActivity<TData = Awaited<ReturnType<typeof listVideoActivity>>, TError = ErrorType<ErrorResponse>>(
- projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ projectId: string,
+    params?: ListVideoActivityParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoActivity>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListVideoActivityQueryOptions(projectId,options)
+  const queryOptions = getListVideoActivityQueryOptions(projectId,params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

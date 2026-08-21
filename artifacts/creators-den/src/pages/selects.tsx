@@ -703,6 +703,7 @@ export default function ContentCreatorsStudioPage() {
   const timeline = useGetVideoTimeline(projectId, leg);
   const save = useSaveVideoTimeline();
   const submissions = useListVideoSubmissions(projectId);
+  const comments = useListVideoComments(projectId);
 
   // Seed working state from the timeline head whenever it changes.
   useEffect(() => {
@@ -971,6 +972,14 @@ export default function ContentCreatorsStudioPage() {
                   detail={asset.data}
                   videoRef={videoRef}
                   onTimeUpdate={setPlayheadMs}
+                  markers={(comments.data ?? [])
+                    .filter((comment) => comment.timecodeMs !== null && comment.assetId === assetId)
+                    .map((comment) => ({
+                      id: comment.id,
+                      ms: comment.timecodeMs as number,
+                      tone: comment.kind === 'MARK' ? ('gold' as const) : ('accent' as const),
+                      label: comment.label ?? undefined,
+                    }))}
                   title={asset.data?.fileName}
                 >
                   <AnnotationCanvas

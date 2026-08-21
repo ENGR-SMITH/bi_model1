@@ -9,9 +9,9 @@
 // offers an "All stages" toggle; the vault shows everything by default.
 // ---------------------------------------------------------------------------
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Check, FileVideo2, GitPullRequest, History, RotateCcw, Upload, X } from 'lucide-react';
-import { useListVideoActivity } from '@workspace/api-client-react';
+import { useListVideoActivity, type VideoActivityLegQueryParameter } from '@workspace/api-client-react';
 
 const EVENT_META: Record<string, { icon: typeof History; tone: string }> = {
   version_saved: { icon: History, tone: 'muted' },
@@ -45,14 +45,14 @@ export function ActivityFeed({
   leg?: string;
   className?: string;
 }) {
-  const activity = useListVideoActivity(projectId);
-  const events = activity.data ?? [];
+  // The leg filter is applied server-side (?leg=) so a busy relay never drowns
+  // a studio's feed with the other stages' events (VCS design §8 phase 0).
   const [filter, setFilter] = useState<'leg' | 'all'>(leg ? 'leg' : 'all');
-
-  const visible = useMemo(
-    () => (filter === 'all' || !leg ? events : events.filter((event) => event.leg === leg)),
-    [events, filter, leg],
+  const activity = useListVideoActivity(
+    projectId,
+    filter === 'leg' && leg ? { leg: leg as VideoActivityLegQueryParameter } : undefined,
   );
+  const events = activity.data ?? [];
 
   return (
     <div className={`paper-card ${className ?? 'mt-4'}`} data-testid="panel-activity">
@@ -81,7 +81,7 @@ export function ActivityFeed({
           </div>
         )}
       </div>
-      {visible.length === 0 ? (
+      {events.length === 0 ? (
         <p className="setting-copy mt-3">
           {filter === 'leg'
             ? `Nothing for ${leg} yet — saves, imports, and pull requests land here as this stage moves.`
@@ -89,7 +89,7 @@ export function ActivityFeed({
         </p>
       ) : (
         <div className="den-stack mt-3 max-h-[360px] overflow-y-auto pr-1">
-          {visible.map((event) => {
+          {events.map((event) => {
             const meta = EVENT_META[event.eventType] ?? { icon: History, tone: 'muted' };
             const Icon = meta.icon;
             return (

@@ -717,6 +717,14 @@ describe("activity feed + version genealogy", () => {
     expect(approved.summary).toContain("Approved CUT v1");
     expect(approved.leg).toBe("CUT");
 
+    // The ?leg= query scopes the feed server-side to one stage's events.
+    const cutOnly = await request(API).get(`/api/video/projects/${project.id}/activity?leg=CUT`);
+    expect(cutOnly.status).toBe(200);
+    expect(cutOnly.body.length).toBeGreaterThan(0);
+    expect(cutOnly.body.every((event: any) => event.leg === "CUT")).toBe(true);
+    // Vault-wide events (uploads) are not CUT-scoped and must not appear.
+    expect(cutOnly.body.some((event: any) => event.eventType === "asset_uploaded")).toBe(false);
+
     // Strangers cannot read the feed.
     state.userId = "stranger-1";
     expect((await request(API).get(`/api/video/projects/${project.id}/activity`)).status).toBe(403);

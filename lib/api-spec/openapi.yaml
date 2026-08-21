@@ -1917,6 +1917,7 @@ paths:
       summary: Project activity feed (saves, imports, rollbacks, submissions, decisions, uploads)
       parameters:
         - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoActivityLegQuery" }
       responses:
         "200":
           description: Activity events, newest first
@@ -2576,6 +2577,14 @@ components:
       in: path
       required: true
       schema: { type: string, minLength: 1 }
+    VideoActivityLegQuery:
+      name: leg
+      in: query
+      required: false
+      description: Optional leg (stage) filter — returns only that leg's events
+      schema:
+        type: string
+        enum: [SELECTS, CUT, SOUND, FINISH, THUMBNAIL]
     VideoAssetId:
       name: assetId
       in: path

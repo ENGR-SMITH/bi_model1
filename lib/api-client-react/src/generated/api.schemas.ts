@@ -1448,11 +1448,29 @@ export type ProtocolQueryParameter = string;
 
 export type AvailabilityQueryParameter = string;
 
+export type VideoActivityLegQueryParameter = typeof VideoActivityLegQueryParameter[keyof typeof VideoActivityLegQueryParameter];
+
+
+export const VideoActivityLegQueryParameter = {
+  SELECTS: 'SELECTS',
+  CUT: 'CUT',
+  SOUND: 'SOUND',
+  FINISH: 'FINISH',
+  THUMBNAIL: 'THUMBNAIL',
+} as const;
+
 export type ListCollaborationSeedsParams = {
 genre?: GenreQueryParameter;
 unit?: UnitQueryParameter;
 language?: LanguageQueryParameter;
 protocol?: ProtocolQueryParameter;
 availability?: AvailabilityQueryParameter;
+};
+
+export type ListVideoActivityParams = {
+/**
+ * Optional leg (stage) filter — returns only that leg's events
+ */
+leg?: VideoActivityLegQueryParameter;
 };
 

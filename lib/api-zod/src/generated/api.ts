@@ -2289,6 +2289,10 @@ export const ListVideoActivityParams = zod.object({
   "projectId": zod.coerce.string().min(1)
 })
 
+export const ListVideoActivityQueryParams = zod.object({
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL']).optional().describe('Optional leg (stage) filter — returns only that leg\'s events')
+})
+
 export const ListVideoActivityResponseItem = zod.object({
   "id": zod.string(),
   "actorId": zod.string(),

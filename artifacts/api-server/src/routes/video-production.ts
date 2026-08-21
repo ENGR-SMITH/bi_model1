@@ -2125,10 +2125,20 @@ router.get(
       return;
     }
 
+    // Optional ?leg= filter (VCS design §8 phase 0 refresh): studios only want
+    // their own stage's events without drowning in the other legs' noise.
+    const leg = typeof req.query.leg === "string" ? req.query.leg : undefined;
     const events = await db
       .select()
       .from(collaborationActivityEventsTable)
-      .where(eq(collaborationActivityEventsTable.projectId, params.data.projectId))
+      .where(
+        leg
+          ? and(
+              eq(collaborationActivityEventsTable.projectId, params.data.projectId),
+              eq(collaborationActivityEventsTable.leg, leg),
+            )
+          : eq(collaborationActivityEventsTable.projectId, params.data.projectId),
+      )
       .orderBy(desc(collaborationActivityEventsTable.createdAt))
       .limit(50);
 

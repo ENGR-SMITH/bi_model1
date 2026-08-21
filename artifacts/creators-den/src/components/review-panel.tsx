@@ -23,6 +23,7 @@ import {
   useGetVideoAsset,
   useGetVideoProject,
   useGetVideoTimelineVersion,
+  useListVideoComments,
   useRejectVideoSubmission,
 } from '@workspace/api-client-react';
 import type { VideoSubmission } from '@workspace/api-client-react';
@@ -75,6 +76,22 @@ export function ReviewPanel({
       refetchInterval: (query) => pollWhileProcessing(query.state.data),
     },
   });
+
+  // Review markers (design §10): this PR's timecode comments on the current
+  // asset, drawn as a clickable rail under the player frame.
+  const comments = useListVideoComments(projectId);
+  const markers = useMemo(
+    () =>
+      (comments.data ?? [])
+        .filter((comment) => comment.timecodeMs !== null && comment.submissionId === submission.id && comment.assetId === assetId)
+        .map((comment) => ({
+          id: comment.id,
+          ms: comment.timecodeMs as number,
+          tone: comment.kind === 'MARK' ? ('gold' as const) : ('accent' as const),
+          label: comment.label ?? undefined,
+        })),
+    [comments.data, submission.id, assetId],
+  );
 
   const approve = useApproveVideoSubmission();
   const reject = useRejectVideoSubmission();
@@ -160,6 +177,7 @@ export function ReviewPanel({
               videoRef={videoRef}
               playheadMs={playheadMs}
               onTimeUpdate={setPlayheadMs}
+              markers={markers}
               title={`${assetName(assetId)} · ${leg.toLowerCase()} v${version.data?.version ?? ''}`}
             >
               <AnnotationCanvas
