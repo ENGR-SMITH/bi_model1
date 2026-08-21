@@ -2154,6 +2154,82 @@ export const GetVideoTimelineCheckoutManifestResponse = zod.object({
 
 
 /**
+ * The background half of the checkout — materializes the leg's saved snapshot as a single downloadable zip (EDL + FCPXML + OTIO + AAF + media manifest, plus the referenced originals when includeMedia is set) and streams `job.progress` to the project room while it runs. Returns 409 if a bundle is already building for this leg.
+ * @summary Enqueue a background checkout bundle build (EXPORT_BUNDLE job) for a leg
+ */
+
+
+
+export const ExportVideoTimelineCheckoutParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const exportVideoTimelineCheckoutBodyIncludeMediaDefault = false;
+
+export const ExportVideoTimelineCheckoutBody = zod.object({
+  "includeMedia": zod.boolean().default(exportVideoTimelineCheckoutBodyIncludeMediaDefault).describe('Embed the referenced originals in the zip (self-contained bundle) instead of just the interchange docs + manifest')
+}).describe('Request a background checkout bundle build for a leg')
+
+export const ExportVideoTimelineCheckoutResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "assetId": zod.string().nullable(),
+  "type": zod.string(),
+  "status": zod.string(),
+  "attempts": zod.number().int(),
+  "error": zod.string().nullable(),
+  "params": zod.record(zod.string(), zod.unknown()).nullable(),
+  "result": zod.record(zod.string(), zod.unknown()).nullable(),
+  "createdAt": zod.coerce.date(),
+  "startedAt": zod.coerce.date().nullable(),
+  "finishedAt": zod.coerce.date().nullable()
+}).describe('The enqueued EXPORT_BUNDLE job')
+
+
+/**
+ * @summary Get the latest EXPORT_BUNDLE job for a leg (queue state + artifact)
+ */
+
+
+
+export const GetVideoTimelineCheckoutBundleParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const GetVideoTimelineCheckoutBundleResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "assetId": zod.string().nullable(),
+  "type": zod.string(),
+  "status": zod.string(),
+  "attempts": zod.number().int(),
+  "error": zod.string().nullable(),
+  "params": zod.record(zod.string(), zod.unknown()).nullable(),
+  "result": zod.record(zod.string(), zod.unknown()).nullable(),
+  "createdAt": zod.coerce.date(),
+  "startedAt": zod.coerce.date().nullable(),
+  "finishedAt": zod.coerce.date().nullable()
+}).describe('The latest EXPORT_BUNDLE job for a leg (queue state + artifact location)')
+
+
+/**
+ * Streams the zip produced by the latest SUCCEEDED EXPORT_BUNDLE job for this leg.
+ * @summary Download the built checkout bundle zip for a leg
+ */
+
+
+
+export const GetVideoTimelineCheckoutBundleDownloadParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const GetVideoTimelineCheckoutBundleDownloadResponse = zod.unknown()
+
+
+/**
  * The push half of the round-trip — parse the CMX3600 EDL, FCPXML, or OpenTimelineIO document, relink its sources to vault assets, save a new Git-style version, and (by default) submit it for Captain review.
  * @summary Re-import an edited interchange document (EDL, FCPXML, or OTIO) from an external NLE as a new timeline version
  */
@@ -2431,7 +2507,7 @@ export const ListVideoJobsParams = zod.object({
 export const ListVideoJobsResponseItem = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2467,7 +2543,7 @@ export const SyncVideoAssetBody = zod.object({
 export const SyncVideoAssetResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2524,7 +2600,7 @@ export const RenderVideoTimelineBody = zod.object({
 export const RenderVideoTimelineResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2555,7 +2631,7 @@ export const QueueAudioPassBody = zod.object({
 export const QueueAudioPassResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2588,7 +2664,7 @@ export const QueueVideoExportBody = zod.object({
 export const QueueVideoExportResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2624,7 +2700,7 @@ export const QueueVideoThumbnailBody = zod.object({
 export const QueueVideoThumbnailResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2688,7 +2764,7 @@ export const AnalyzeVideoReferenceParams = zod.object({
 export const AnalyzeVideoReferenceResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),

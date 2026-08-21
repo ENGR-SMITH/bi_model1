@@ -19,7 +19,9 @@ import {
 // add the rest. Versioned like Git — raw upload is v0.
 export const tandemVideoAssetFilesTable = pgTable("tandem_video_asset_files", {
   id: text("id").primaryKey(),
-  assetId: text("asset_id").notNull(),
+  // Nullable — project-scoped artifacts (e.g. INTERCHANGE checkout bundles)
+  // are not anchored to a single asset.
+  assetId: text("asset_id"),
   kind: text("kind").notNull(),
   storageKey: text("storage_key").notNull(),
   mimeType: text("mime_type").notNull().default("application/octet-stream"),
@@ -245,7 +247,9 @@ export const tandemVideoDownloadsTable = pgTable("tandem_video_downloads", {
 export const tandemVideoJobsTable = pgTable("tandem_video_jobs", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
-  assetId: text("asset_id").notNull(),
+  // Nullable — project/leg-scoped jobs (e.g. EXPORT_BUNDLE checkout) have no
+  // anchor asset.
+  assetId: text("asset_id"),
   type: text("type").notNull(),
   // QUEUED → RUNNING → SUCCEEDED | FAILED
   status: text("status").notNull().default("QUEUED"),
@@ -297,5 +301,7 @@ export const VIDEO_JOB_TYPES = [
   "EXPORT",
   "THUMBNAIL",
   "REFERENCE_ANALYZE",
+  "INTERCHANGE",
+  "EXPORT_BUNDLE",
 ] as const;
 export type VideoJobType = (typeof VIDEO_JOB_TYPES)[number];

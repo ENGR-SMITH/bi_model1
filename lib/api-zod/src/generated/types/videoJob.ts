@@ -11,7 +11,8 @@ import type { VideoJobResult } from './videoJobResult';
 export interface VideoJob {
   id: string;
   projectId: string;
-  assetId: string;
+  /** @nullable */
+  assetId: string | null;
   type: string;
   status: string;
   attempts: number;

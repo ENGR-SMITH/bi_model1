@@ -254,7 +254,7 @@ export const tandemVideoAssetsTable = sqliteTable("tandem_video_assets", {
 
 export const tandemVideoAssetFilesTable = sqliteTable("tandem_video_asset_files", {
   id: text("id").primaryKey(),
-  assetId: text("asset_id").notNull(),
+  assetId: text("asset_id"),
   kind: text("kind").notNull(),
   storageKey: text("storage_key").notNull(),
   mimeType: text("mime_type").notNull().default("application/octet-stream"),
@@ -425,7 +425,7 @@ export const tandemVideoSyncsTable = sqliteTable(
 export const tandemVideoJobsTable = sqliteTable("tandem_video_jobs", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
-  assetId: text("asset_id").notNull(),
+  assetId: text("asset_id"),
   type: text("type").notNull(),
   status: text("status").notNull().default("QUEUED"),
   attempts: integer("attempts").notNull().default(0),
@@ -599,7 +599,7 @@ export async function buildInMemoryDb() {
       version INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
     );
     CREATE TABLE tandem_video_asset_files (
-      id TEXT PRIMARY KEY NOT NULL, asset_id TEXT NOT NULL,
+      id TEXT PRIMARY KEY NOT NULL, asset_id TEXT,
       kind TEXT NOT NULL, storage_key TEXT NOT NULL,
       mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
       size_bytes INTEGER NOT NULL DEFAULT 0, metadata TEXT,
@@ -649,7 +649,7 @@ export async function buildInMemoryDb() {
     );
     CREATE TABLE tandem_video_jobs (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
-      asset_id TEXT NOT NULL, type TEXT NOT NULL,
+      asset_id TEXT, type TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'QUEUED', attempts INTEGER NOT NULL DEFAULT 0,
       error TEXT, params TEXT, result TEXT,
       created_at INTEGER NOT NULL, started_at INTEGER, finished_at INTEGER

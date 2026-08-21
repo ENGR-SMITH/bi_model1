@@ -177,6 +177,8 @@ export function emitJobProgress(payload: {
   type: string;
   status: string;
   error?: string | null;
+  /** 0–100 percentage for multi-step jobs (e.g. EXPORT_BUNDLE). */
+  progress?: number;
 }): void {
   emitToProject(payload.projectId, "job.progress", payload);
 }

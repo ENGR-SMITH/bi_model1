@@ -42,6 +42,7 @@ import videoRouter from "./video";
 import videoProductionRouter from "./video-production";
 import { formatEdlTimecode, parseEdlTimecode, parseTimelineEdl, resolveEdlEvents } from "../video/edl";
 import { runWorkerCycle } from "../video/worker";
+import { listZipEntries, readZipEntry } from "../video/zip";
 
 function createApp(): Express {
   const app = express();
@@ -755,6 +756,102 @@ describe("checkout AAF (export-only)", () => {
     const project = await createProject();
     state.userId = "captain-1";
     const res = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout/aaf`);
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("checkout export bundle (EXPORT_BUNDLE job)", () => {
+  it("enqueues, processes, and downloads a zip of all interchange docs", async () => {
+    const project = await createProject();
+    const camA = await uploadAsset(project.id, "interview-cam-a.mp4");
+    const camB = await uploadAsset(project.id, "broll-shot.mp4");
+    state.userId = "captain-1";
+
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/CUT`)
+      .send({
+        snapshot: {
+          clips: [
+            { id: "clip-1", assetId: camA.id, inMs: 0, outMs: 5000 },
+            { id: "clip-2", assetId: camB.id, inMs: 5000, outMs: 9000 },
+          ],
+        },
+        message: "Rough cut",
+      });
+
+    // No bundle yet → 404 on state + download.
+    const none = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout/bundle`);
+    expect(none.status).toBe(404);
+    const noDownload = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout/bundle/download`);
+    expect(noDownload.status).toBe(404);
+
+    // Enqueue — with includeMedia so the originals ride along.
+    const enqueued = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/checkout/export`)
+      .send({ includeMedia: true });
+    expect(enqueued.status).toBe(201);
+    expect(enqueued.body.type).toBe("EXPORT_BUNDLE");
+    expect(enqueued.body.status).toBe("QUEUED");
+    expect(enqueued.body.assetId).toBeNull(); // project-scoped, no anchor asset
+
+    // Dedupe while one is already queued/running.
+    const dup = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/checkout/export`)
+      .send({});
+    expect(dup.status).toBe(409);
+
+    // The bundle state endpoint reports the queued job.
+    const bundleState = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout/bundle`);
+    expect(bundleState.status).toBe(200);
+    expect(bundleState.body.type).toBe("EXPORT_BUNDLE");
+    expect(bundleState.body.params.leg).toBe("CUT");
+
+    // Process it through the real worker pipeline.
+    await runWorkerCycle();
+    const done = await request(API).get(`/api/video/projects/${project.id}/timelines/CUT/checkout/bundle`);
+    expect(done.status).toBe(200);
+    expect(done.body.status).toBe("SUCCEEDED");
+    expect(done.body.result.storageKey).toContain(".zip");
+
+    // Download is a valid store ZIP with every interchange doc + media.
+    // superagent parses unknown content types as text, so grab the raw bytes.
+    const dl = await request(API)
+      .get(`/api/video/projects/${project.id}/timelines/CUT/checkout/bundle/download`)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () => cb(null, Buffer.concat(chunks)));
+      });
+    expect(dl.status).toBe(200);
+    expect(dl.headers["content-type"]).toContain("application/zip");
+    const zip = dl.body as Buffer;
+    expect(zip.readUInt32LE(0)).toBe(0x04034b50); // local file header magic
+    const names = listZipEntries(zip);
+    expect(names.some((n) => n.endsWith(".edl"))).toBe(true);
+    expect(names.some((n) => n.endsWith(".fcpxml"))).toBe(true);
+    expect(names.some((n) => n.endsWith(".otio"))).toBe(true);
+    expect(names.some((n) => n.endsWith(".aaf"))).toBe(true);
+    expect(names.some((n) => n.endsWith(".manifest.json"))).toBe(true);
+    expect(names.some((n) => n.startsWith("media/"))).toBe(true);
+
+    // Manifest lists both referenced sources; the EDL contains both clips.
+    const manifest = JSON.parse(
+      readZipEntry(zip, names.find((n) => n.endsWith(".manifest.json"))!)!.toString("utf8"),
+    );
+    expect(manifest.leg).toBe("CUT");
+    expect(manifest.media).toHaveLength(2);
+    const edl = readZipEntry(zip, names.find((n) => n.endsWith(".edl"))!)!.toString("utf8");
+    expect(edl).toContain("INTERVIEW-CAM-A");
+    expect(edl).toContain("BROLL-SHOT");
+  });
+
+  it("rejects an export when no snapshot exists", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/timelines/CUT/checkout/export`)
+      .send({});
     expect(res.status).toBe(400);
   });
 });

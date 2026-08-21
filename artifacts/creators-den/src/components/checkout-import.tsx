@@ -13,8 +13,8 @@
 // share one implementation instead of each hand-rolling fetch calls.
 // ---------------------------------------------------------------------------
 
-import { useRef, useState, type ChangeEvent } from 'react';
-import { Check, Download, Film, Upload } from 'lucide-react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { Check, Download, Film, Package, Upload } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getCheckoutVideoTimelineAafUrl,
@@ -23,11 +23,16 @@ import {
   getCheckoutVideoTimelineUrl,
   getGetVideoTimelineCheckoutManifestQueryKey,
   getGetVideoTimelineQueryKey,
+  getListVideoJobsQueryKey,
   getListVideoSubmissionsQueryKey,
+  getGetVideoTimelineCheckoutBundleDownloadUrl,
+  useExportVideoTimelineCheckout,
   useGetVideoTimelineCheckoutManifest,
   useImportVideoTimeline,
+  useListVideoJobs,
 } from '@workspace/api-client-react';
 import type { StudioLeg } from '@/components/role-oracle';
+import { useRealtimeSocket } from '@/lib/realtime';
 
 type InterchangeFormat = 'EDL' | 'FCPXML' | 'OTIO' | 'AAF';
 
@@ -77,7 +82,48 @@ export function CheckoutPanel({
   /** The leg's saved head version — null before the first snapshot is saved. */
   savedVersion: number | null;
 }) {
+  const queryClient = useQueryClient();
   const [format, setFormat] = useState<InterchangeFormat>('EDL');
+  const [includeMedia, setIncludeMedia] = useState(false);
+  const [liveProgress, setLiveProgress] = useState<number | null>(null);
+
+  // The latest EXPORT_BUNDLE job for this leg. The server streams job.progress
+  // events into the project room and invalidates the jobs list, so this query
+  // moves QUEUED → RUNNING → SUCCEEDED without a manual refresh.
+  const jobs = useListVideoJobs(projectId);
+  const bundleJob = (jobs.data ?? [])
+    .filter((job) => job.type === 'EXPORT_BUNDLE' && (job.params as { leg?: string } | null)?.leg === leg)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const exportMutation = useExportVideoTimelineCheckout();
+
+  // Track the live 0–100 percentage straight off the socket (the jobs list
+  // only carries status, not the transient progress value).
+  const socket = useRealtimeSocket();
+  useEffect(() => {
+    if (!socket || !bundleJob) return;
+    const onProgress = (payload: { projectId: string; jobId: string; progress?: number }) => {
+      if (payload.projectId !== projectId || payload.jobId !== bundleJob.id) return;
+      if (typeof payload.progress === 'number') setLiveProgress(payload.progress);
+    };
+    socket.on('job.progress', onProgress);
+    return () => {
+      socket.off('job.progress', onProgress);
+    };
+  }, [socket, bundleJob, projectId]);
+
+  const onBuildBundle = () => {
+    exportMutation.mutate(
+      { projectId, leg, data: { includeMedia } },
+      {
+        onSuccess: () => {
+          setLiveProgress(null);
+          // The enqueued job lands in the jobs list; the socket invalidates it live.
+          queryClient.invalidateQueries({ queryKey: getListVideoJobsQueryKey(projectId) });
+        },
+      },
+    );
+  };
+
   // Keyed on savedVersion so a fresh save refetches the manifest automatically.
   const manifest = useGetVideoTimelineCheckoutManifest(projectId, leg, {
     query: {
@@ -149,6 +195,72 @@ export function CheckoutPanel({
           </ul>
         </div>
       )}
+
+      {/* Background export bundle — the whole interchange ladder + manifest in
+          one zip, built in the queue with live progress (design §8.5). */}
+      <div className="mt-4 border-t border-[hsl(var(--border))] pt-4">
+        <div className="inline-heading">
+          <span className="eyebrow"><Package size={13} /> Export bundle</span>
+          {bundleJob && bundleJob.status === 'SUCCEEDED' && <span className="den-tag teal">ready</span>}
+          {bundleJob && ['QUEUED', 'RUNNING'].includes(bundleJob.status) && <span className="den-tag gold">{bundleJob.status.toLowerCase()}</span>}
+          {bundleJob && bundleJob.status === 'FAILED' && <span className="den-tag">failed</span>}
+        </div>
+        <p className="setting-copy">
+          Build one downloadable zip with every interchange doc (EDL, FCPXML, OTIO, AAF) plus the manifest — optionally embedding the referenced originals for a fully self-contained handoff.
+        </p>
+        <label className="den-footnote mt-2 flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={includeMedia}
+            onChange={(event) => setIncludeMedia(event.target.checked)}
+            disabled={!ready || exportMutation.isPending || (bundleJob != null && ['QUEUED', 'RUNNING'].includes(bundleJob.status))}
+            data-testid={`${leg.toLowerCase()}-checkout-bundle-include-media`}
+          />
+          Include referenced media ({media.length} file{media.length === 1 ? '' : 's'})
+        </label>
+        {!bundleJob || ['FAILED', 'SUCCEEDED'].includes(bundleJob.status) ? (
+          <button
+            type="button"
+            onClick={onBuildBundle}
+            disabled={!ready || exportMutation.isPending}
+            className="secondary-btn mt-3"
+            data-testid={`${leg.toLowerCase()}-button-checkout-bundle`}
+          >
+            <Package size={13} />
+            {exportMutation.isPending ? 'Enqueuing…' : bundleJob ? 'Rebuild bundle' : 'Build bundle'}
+          </button>
+        ) : null}
+        {bundleJob && ['QUEUED', 'RUNNING'].includes(bundleJob.status) && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between">
+              <span className="den-footnote">{bundleJob.status === 'QUEUED' ? 'Queued behind other jobs…' : 'Building…'}</span>
+              <span className="mono-label">{liveProgress != null ? `${liveProgress}%` : '…'}</span>
+            </div>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[hsl(var(--border))]">
+              <div
+                className="h-full bg-[hsl(var(--accent))] transition-all duration-300"
+                style={{ width: `${liveProgress ?? 5}%` }}
+              />
+            </div>
+          </div>
+        )}
+        {bundleJob && bundleJob.status === 'SUCCEEDED' && (
+          <a
+            href={getGetVideoTimelineCheckoutBundleDownloadUrl(projectId, leg)}
+            download={`${checkoutFilename(projectName, leg, savedVersion, format).replace(/\.(edl|fcpxml|otio|aaf)$/, '')}-bundle.zip`}
+            className="primary-btn mt-3"
+            data-testid={`${leg.toLowerCase()}-button-checkout-bundle-download`}
+          >
+            <Download size={14} />
+            Download bundle (.zip)
+          </a>
+        )}
+        {bundleJob && bundleJob.status === 'FAILED' && (
+          <p className="setting-copy mt-2" role="alert">
+            {bundleJob.error ?? 'The bundle build failed.'}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -64,6 +64,9 @@ import type {
   VideoAssetDetail,
   VideoAssetUploadInput,
   VideoAudioPassInput,
+  VideoCheckoutBundleStatus,
+  VideoCheckoutExportInput,
+  VideoCheckoutExportResponse,
   VideoCheckoutManifest,
   VideoComment,
   VideoCommentInput,
@@ -6222,6 +6225,246 @@ export function useGetVideoTimelineCheckoutManifest<TData = Awaited<ReturnType<t
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetVideoTimelineCheckoutManifestQueryOptions(projectId,leg,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getExportVideoTimelineCheckoutUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/checkout/export`
+}
+
+/**
+ * The background half of the checkout — materializes the leg's saved snapshot as a single downloadable zip (EDL + FCPXML + OTIO + AAF + media manifest, plus the referenced originals when includeMedia is set) and streams `job.progress` to the project room while it runs. Returns 409 if a bundle is already building for this leg.
+ * @summary Enqueue a background checkout bundle build (EXPORT_BUNDLE job) for a leg
+ */
+export const exportVideoTimelineCheckout = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',
+    videoCheckoutExportInput?: VideoCheckoutExportInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoCheckoutExportResponse> => {
+
+  return customFetch<VideoCheckoutExportResponse>(getExportVideoTimelineCheckoutUrl(projectId,leg),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(videoCheckoutExportInput)
+  }
+);}
+
+
+
+
+
+export const getExportVideoTimelineCheckoutMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportVideoTimelineCheckout>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data?: BodyType<VideoCheckoutExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof exportVideoTimelineCheckout>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data?: BodyType<VideoCheckoutExportInput>}, TContext> => {
+
+const mutationKey = ['exportVideoTimelineCheckout'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof exportVideoTimelineCheckout>>, {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data?: BodyType<VideoCheckoutExportInput>}> = (props) => {
+          const {projectId,leg,data} = props ?? {};
+
+          return  exportVideoTimelineCheckout(projectId,leg,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExportVideoTimelineCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof exportVideoTimelineCheckout>>>
+    export type ExportVideoTimelineCheckoutMutationBody = BodyType<VideoCheckoutExportInput> | undefined
+    export type ExportVideoTimelineCheckoutMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Enqueue a background checkout bundle build (EXPORT_BUNDLE job) for a leg
+ */
+export const useExportVideoTimelineCheckout = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exportVideoTimelineCheckout>>, TError,{projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data?: BodyType<VideoCheckoutExportInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof exportVideoTimelineCheckout>>,
+        TError,
+        {projectId: string;leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';data?: BodyType<VideoCheckoutExportInput>},
+        TContext
+      > => {
+      return useMutation(getExportVideoTimelineCheckoutMutationOptions(options));
+    }
+
+export const getGetVideoTimelineCheckoutBundleUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/checkout/bundle`
+}
+
+/**
+ * @summary Get the latest EXPORT_BUNDLE job for a leg (queue state + artifact)
+ */
+export const getVideoTimelineCheckoutBundle = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: Parameters<typeof customFetch>[1]): Promise<VideoCheckoutBundleStatus> => {
+
+  return customFetch<VideoCheckoutBundleStatus>(getGetVideoTimelineCheckoutBundleUrl(projectId,leg),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoTimelineCheckoutBundleQueryKey = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+    return [
+    `/api/video/projects/${projectId}/timelines/${leg}/checkout/bundle`
+    ] as const;
+    }
+
+
+export const getGetVideoTimelineCheckoutBundleQueryOptions = <TData = Awaited<ReturnType<typeof getVideoTimelineCheckoutBundle>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundle>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoTimelineCheckoutBundleQueryKey(projectId,leg);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundle>>> = ({ signal }) => getVideoTimelineCheckoutBundle(projectId,leg, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && leg !== null && leg !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundle>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVideoTimelineCheckoutBundleQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundle>>>
+export type GetVideoTimelineCheckoutBundleQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Get the latest EXPORT_BUNDLE job for a leg (queue state + artifact)
+ */
+
+export function useGetVideoTimelineCheckoutBundle<TData = Awaited<ReturnType<typeof getVideoTimelineCheckoutBundle>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundle>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVideoTimelineCheckoutBundleQueryOptions(projectId,leg,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetVideoTimelineCheckoutBundleDownloadUrl = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/timelines/${leg}/checkout/bundle/download`
+}
+
+/**
+ * Streams the zip produced by the latest SUCCEEDED EXPORT_BUNDLE job for this leg.
+ * @summary Download the built checkout bundle zip for a leg
+ */
+export const getVideoTimelineCheckoutBundleDownload = async (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetVideoTimelineCheckoutBundleDownloadUrl(projectId,leg),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoTimelineCheckoutBundleDownloadQueryKey = (projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL',) => {
+    return [
+    `/api/video/projects/${projectId}/timelines/${leg}/checkout/bundle/download`
+    ] as const;
+    }
+
+
+export const getGetVideoTimelineCheckoutBundleDownloadQueryOptions = <TData = Awaited<ReturnType<typeof getVideoTimelineCheckoutBundleDownload>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundleDownload>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoTimelineCheckoutBundleDownloadQueryKey(projectId,leg);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundleDownload>>> = ({ signal }) => getVideoTimelineCheckoutBundleDownload(projectId,leg, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && leg !== null && leg !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundleDownload>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVideoTimelineCheckoutBundleDownloadQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundleDownload>>>
+export type GetVideoTimelineCheckoutBundleDownloadQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Download the built checkout bundle zip for a leg
+ */
+
+export function useGetVideoTimelineCheckoutBundleDownload<TData = Awaited<ReturnType<typeof getVideoTimelineCheckoutBundleDownload>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string,
+    leg: 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL', options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoTimelineCheckoutBundleDownload>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVideoTimelineCheckoutBundleDownloadQueryOptions(projectId,leg,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

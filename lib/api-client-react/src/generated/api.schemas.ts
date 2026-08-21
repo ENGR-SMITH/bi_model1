@@ -1059,6 +1059,55 @@ export interface VideoTimelineImportResponse {
   submissionId: string | null;
 }
 
+/**
+ * Request a background checkout bundle build for a leg
+ */
+export interface VideoCheckoutExportInput {
+  /** Embed the referenced originals in the zip (self-contained bundle) instead of just the interchange docs + manifest */
+  includeMedia?: boolean;
+}
+
+/**
+ * @nullable
+ */
+export type VideoJobParams = { [key: string]: unknown } | null;
+
+/**
+ * @nullable
+ */
+export type VideoJobResult = { [key: string]: unknown } | null;
+
+export interface VideoJob {
+  id: string;
+  projectId: string;
+  /** @nullable */
+  assetId: string | null;
+  type: string;
+  status: string;
+  attempts: number;
+  /** @nullable */
+  error: string | null;
+  /** @nullable */
+  params: VideoJobParams;
+  /** @nullable */
+  result: VideoJobResult;
+  createdAt: string;
+  /** @nullable */
+  startedAt: string | null;
+  /** @nullable */
+  finishedAt: string | null;
+}
+
+/**
+ * The enqueued EXPORT_BUNDLE job
+ */
+export type VideoCheckoutExportResponse = VideoJob;
+
+/**
+ * The latest EXPORT_BUNDLE job for a leg (queue state + artifact location)
+ */
+export type VideoCheckoutBundleStatus = VideoJob;
+
 export interface VideoSubmission {
   id: string;
   projectId: string;
@@ -1174,36 +1223,6 @@ export interface VideoCommentInput {
 
 export interface VideoCommentResolveInput {
   resolved: boolean;
-}
-
-/**
- * @nullable
- */
-export type VideoJobParams = { [key: string]: unknown } | null;
-
-/**
- * @nullable
- */
-export type VideoJobResult = { [key: string]: unknown } | null;
-
-export interface VideoJob {
-  id: string;
-  projectId: string;
-  assetId: string;
-  type: string;
-  status: string;
-  attempts: number;
-  /** @nullable */
-  error: string | null;
-  /** @nullable */
-  params: VideoJobParams;
-  /** @nullable */
-  result: VideoJobResult;
-  createdAt: string;
-  /** @nullable */
-  startedAt: string | null;
-  /** @nullable */
-  finishedAt: string | null;
 }
 
 export interface VideoSyncInput {

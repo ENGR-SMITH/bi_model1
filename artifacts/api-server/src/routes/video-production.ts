@@ -29,6 +29,9 @@ import {
   CreateVideoSubmissionResponse,
   GetVideoAssetParams,
   GetVideoAssetResponse,
+  ExportVideoTimelineCheckoutBody,
+  ExportVideoTimelineCheckoutResponse,
+  GetVideoTimelineCheckoutBundleResponse,
   GetVideoTimelineParams,
   GetVideoTimelineResponse,
   GetVideoTimelineVersionParams,
@@ -67,34 +70,31 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  enqueueExportBundleJob,
   enqueueRenderJob,
   enqueueSyncJob,
+  hasActiveExportBundle,
   hasActiveRender,
   requeueProxyJob,
   uploadDir,
 } from "../video/worker";
 import {
-  buildCheckoutManifest,
-  buildTimelineEdl,
   parseTimelineEdl,
   resolveEdlEvents,
-  type CheckoutMediaItem,
   type EdlClip,
   type ParsedEdlEvent,
 } from "../video/edl";
 import {
-  buildTimelineFcpxml,
   parseTimelineFcpxml,
   resolveFcpxmlEvents,
   type ParsedFcpxmlClip,
 } from "../video/fcpxml";
 import {
-  buildTimelineOtio,
   parseTimelineOtio,
   resolveOtioEvents,
   type ParsedOtioClip,
 } from "../video/otio";
-import { buildTimelineAaf } from "../video/aaf";
+import { buildCheckout } from "../video/checkout";
 
 const router: IRouter = Router();
 
@@ -1312,88 +1312,9 @@ router.post(
 // Checkout bridge (external-first) — export the leg's current snapshot as a
 // CMX3600 EDL + a media manifest so the editor can finish the cut in an
 // external NLE and re-import it later. Read-only; any member may check out.
+// The document builder lives in ../video/checkout (shared with the
+// EXPORT_BUNDLE worker processor).
 // ---------------------------------------------------------------------------
-
-async function buildCheckout(
-  projectId: string,
-  leg: string,
-): Promise<{
-  projectName: string;
-  version: number | null;
-  edl: string;
-  fcpxml: string;
-  otio: string;
-  aaf: Buffer;
-  manifest: CheckoutMediaItem[];
-} | null> {
-  const [project] = await db
-    .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.id, projectId))
-    .limit(1);
-  if (!project) return null;
-
-  const [timeline] = await db
-    .select()
-    .from(tandemVideoTimelinesTable)
-    .where(
-      and(
-        eq(tandemVideoTimelinesTable.projectId, projectId),
-        eq(tandemVideoTimelinesTable.leg, leg),
-      ),
-    )
-    .limit(1);
-  if (!timeline || !timeline.currentVersionId) return null;
-
-  const [version] = await db
-    .select()
-    .from(tandemVideoTimelineVersionsTable)
-    .where(eq(tandemVideoTimelineVersionsTable.id, timeline.currentVersionId))
-    .limit(1);
-  if (!version) return null;
-
-  const snapshot = (version.snapshot ?? {}) as { clips?: EdlClip[] };
-  const clips = Array.isArray(snapshot.clips) ? snapshot.clips : [];
-  const assetIds = [...new Set(clips.map((clip) => clip.assetId).filter(Boolean))];
-
-  const assets = assetIds.length
-    ? await db
-        .select()
-        .from(tandemVideoAssetsTable)
-        .where(inArray(tandemVideoAssetsTable.id, assetIds))
-    : [];
-  const assetById = new Map(
-    assets.map((asset) => [asset.id, { fileName: asset.fileName, kind: asset.kind }]),
-  );
-
-  const edl = buildTimelineEdl({
-    title: `${project.name} — ${leg}`,
-    version: version.version,
-    clips,
-    assetById,
-  });
-  const fcpxml = buildTimelineFcpxml({
-    title: `${project.name} — ${leg}`,
-    version: version.version,
-    clips,
-    assetById,
-  });
-  const otio = buildTimelineOtio({
-    title: `${project.name} — ${leg}`,
-    version: version.version,
-    clips,
-    assetById,
-  });
-  const aaf = buildTimelineAaf({
-    title: `${project.name} — ${leg}`,
-    version: version.version,
-    clips,
-    assetById,
-  });
-  const manifest = buildCheckoutManifest(clips, assetById);
-
-  return { projectName: project.name, version: version.version, edl, fcpxml, otio, aaf, manifest };
-}
 
 function checkoutFilename(
   projectName: string,
@@ -1596,6 +1517,168 @@ router.get(
         downloadPath: `/api/video/projects/${params.data.projectId}/files/${item.assetId}/download`,
       })),
     });
+  },
+);
+
+// POST /video/projects/:projectId/timelines/:leg/checkout/export — enqueue a
+// background EXPORT_BUNDLE job that materializes the leg's saved snapshot as
+// a single downloadable zip (all four interchange docs + manifest, plus the
+// referenced media when requested). Progress streams to the project room via
+// `job.progress`, so the client shows queue state instead of a blocking call.
+router.post(
+  "/video/projects/:projectId/timelines/:leg/checkout/export",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Unknown leg" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const checkout = await buildCheckout(params.data.projectId, params.data.leg);
+    if (!checkout) {
+      res.status(400).json({ error: "Save a snapshot before checking out" });
+      return;
+    }
+
+    const body = ExportVideoTimelineCheckoutBody.safeParse(req.body ?? {});
+    const includeMedia = body.success ? (body.data.includeMedia ?? false) : false;
+
+    if (await hasActiveExportBundle(params.data.projectId, params.data.leg)) {
+      res.status(409).json({ error: "A bundle is already being built for this leg" });
+      return;
+    }
+
+    const job = await enqueueExportBundleJob(
+      params.data.projectId,
+      params.data.leg,
+      includeMedia,
+    );
+    res.status(201).json(ExportVideoTimelineCheckoutResponse.parse(job));
+  },
+);
+
+// GET /video/projects/:projectId/timelines/:leg/checkout/bundle — the current
+// bundle-build job for this leg (or the latest one, if no build is running).
+// Lets the client poll queue state and, when SUCCEEDED, download the zip.
+router.get(
+  "/video/projects/:projectId/timelines/:leg/checkout/bundle",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Unknown leg" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const [job] = await db
+      .select()
+      .from(tandemVideoJobsTable)
+      .where(
+        and(
+          eq(tandemVideoJobsTable.projectId, params.data.projectId),
+          eq(tandemVideoJobsTable.type, "EXPORT_BUNDLE"),
+        ),
+      )
+      .orderBy(desc(tandemVideoJobsTable.createdAt))
+      .limit(1);
+
+    if (!job) {
+      res.status(404).json({ error: "No bundle has been built for this leg yet" });
+      return;
+    }
+    const legMatch = (job.params as { leg?: string } | null)?.leg === params.data.leg;
+    if (!legMatch) {
+      res.status(404).json({ error: "No bundle has been built for this leg yet" });
+      return;
+    }
+
+    res.json(GetVideoTimelineCheckoutBundleResponse.parse(job));
+  },
+);
+
+// GET /video/projects/:projectId/timelines/:leg/checkout/bundle/download —
+// stream the built bundle zip (404 until an EXPORT_BUNDLE job succeeds).
+router.get(
+  "/video/projects/:projectId/timelines/:leg/checkout/bundle/download",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoTimelineParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Unknown leg" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const [job] = await db
+      .select()
+      .from(tandemVideoJobsTable)
+      .where(
+        and(
+          eq(tandemVideoJobsTable.projectId, params.data.projectId),
+          eq(tandemVideoJobsTable.type, "EXPORT_BUNDLE"),
+        ),
+      )
+      .orderBy(desc(tandemVideoJobsTable.createdAt))
+      .limit(1);
+
+    const legMatch = (job?.params as { leg?: string } | null)?.leg === params.data.leg;
+    if (!job || !legMatch || job.status !== "SUCCEEDED") {
+      res.status(404).json({ error: "The bundle is not ready yet" });
+      return;
+    }
+
+    const result = (job.result ?? {}) as { storageKey?: string; sizeBytes?: number };
+    if (!result.storageKey) {
+      res.status(404).json({ error: "The bundle file is missing" });
+      return;
+    }
+
+    const filePath = path.join(uploadDir(), result.storageKey);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: "The bundle file is missing from disk" });
+      return;
+    }
+
+    const stat = fs.statSync(filePath);
+    const version = (job.result as { version?: number | null } | null)?.version ?? 0;
+    const slug = `project-${params.data.projectId.slice(0, 8)}`;
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${slug}-${params.data.leg.toLowerCase()}-v${version}.zip"`,
+    );
+    res.setHeader("Content-Length", stat.size);
+    fs.createReadStream(filePath).pipe(res);
   },
 );
 

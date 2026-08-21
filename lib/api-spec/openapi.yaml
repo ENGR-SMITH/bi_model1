@@ -1796,6 +1796,90 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/export:
+    post:
+      operationId: exportVideoTimelineCheckout
+      tags: [content-creators]
+      summary: Enqueue a background checkout bundle build (EXPORT_BUNDLE job) for a leg
+      description: The background half of the checkout — materializes the leg's saved snapshot as a single downloadable zip (EDL + FCPXML + OTIO + AAF + media manifest, plus the referenced originals when includeMedia is set) and streams `job.progress` to the project room while it runs. Returns 409 if a bundle is already building for this leg.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoCheckoutExportInput" }
+      responses:
+        "201":
+          description: The enqueued EXPORT_BUNDLE job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoCheckoutExportResponse" }
+        "400":
+          description: No snapshot saved for this leg yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: A bundle is already building for this leg
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/bundle:
+    get:
+      operationId: getVideoTimelineCheckoutBundle
+      tags: [content-creators]
+      summary: Get the latest EXPORT_BUNDLE job for a leg (queue state + artifact)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: The latest bundle job for this leg
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoCheckoutBundleStatus" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: No bundle has been built for this leg yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/bundle/download:
+    get:
+      operationId: getVideoTimelineCheckoutBundleDownload
+      tags: [content-creators]
+      summary: Download the built checkout bundle zip for a leg
+      description: Streams the zip produced by the latest SUCCEEDED EXPORT_BUNDLE job for this leg.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: The bundle zip
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: The bundle is not ready yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/projects/{projectId}/timelines/{leg}/import:
     post:
       operationId: importVideoTimeline
@@ -3427,6 +3511,24 @@ components:
         clips: { type: integer }
         submissionId: { type: ["string", "null"] }
       required: [version, clips, submissionId]
+    VideoCheckoutExportInput:
+      type: object
+      description: Request a background checkout bundle build for a leg
+      properties:
+        includeMedia:
+          type: boolean
+          default: false
+          description: Embed the referenced originals in the zip (self-contained bundle) instead of just the interchange docs + manifest
+    VideoCheckoutExportResponse:
+      type: object
+      description: The enqueued EXPORT_BUNDLE job
+      allOf:
+        - $ref: "#/components/schemas/VideoJob"
+    VideoCheckoutBundleStatus:
+      type: object
+      description: The latest EXPORT_BUNDLE job for a leg (queue state + artifact location)
+      allOf:
+        - $ref: "#/components/schemas/VideoJob"
     VideoSubmission:
       type: object
       properties:
@@ -3494,7 +3596,7 @@ components:
       properties:
         id: { type: string }
         projectId: { type: string }
-        assetId: { type: string }
+        assetId: { type: ["string", "null"] }
         type: { type: string }
         status: { type: string }
         attempts: { type: integer }
