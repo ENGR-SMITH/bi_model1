@@ -19,9 +19,14 @@ import {
 // add the rest. Versioned like Git — raw upload is v0.
 export const tandemVideoAssetFilesTable = pgTable("tandem_video_asset_files", {
   id: text("id").primaryKey(),
-  assetId: text("asset_id").notNull(),
+  // Nullable — project-scoped artifacts (e.g. INTERCHANGE checkout bundles)
+  // are not anchored to a single asset.
+  assetId: text("asset_id"),
   kind: text("kind").notNull(),
   storageKey: text("storage_key").notNull(),
+  // Content address (SHA-256) of this physical blob — lets a re-imported pass
+  // reference an already-stored file (Git-LFS-style pointer) without a copy.
+  contentHash: text("content_hash"),
   mimeType: text("mime_type").notNull().default("application/octet-stream"),
   sizeBytes: integer("size_bytes").notNull().default(0),
   // e.g. { width, height, fps, durationMs, model, degraded }
@@ -119,8 +124,13 @@ export const tandemVideoSubmissionsTable = pgTable("tandem_video_submissions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Timecode comments ("the lighting shift at 02:14 is jarring — can we grade
-// this?"). Pinned to a leg and/or asset at a moment in time.
+// Comments + annotations ("the lighting shift at 02:14 is jarring — can we
+// grade this?"). One primitive serves both timecode notes and spatial pins:
+// `geometry` (normalized x/y/w/h) turns a comment into a Frame.io-style pin
+// or highlight drawn over the frame; `kind` distinguishes TIMECODE notes from
+// PIN / HIGHLIGHT / MARK annotations; `color` + `label` identify the reviewer
+// on a shared canvas; `submissionId` / `timelineVersionId` scope the comment
+// to a specific review (PR) or version.
 export const tandemVideoCommentsTable = pgTable("tandem_video_comments", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
@@ -130,6 +140,17 @@ export const tandemVideoCommentsTable = pgTable("tandem_video_comments", {
   body: text("body").notNull(),
   authorId: text("author_id").notNull(),
   parentId: text("parent_id"),
+  // Normalized 0..1: { x, y, w?, h? } — null = timecode-only note.
+  geometry: jsonb("geometry"),
+  // TIMECODE | PIN | HIGHLIGHT | MARK
+  kind: text("kind").notNull().default("TIMECODE"),
+  // Reviewer's unique color / swatch on the annotation canvas.
+  color: text("color"),
+  // Short identifier, e.g. "A", "1", "FIX".
+  label: text("label"),
+  // Scope the comment to a submission (PR) or timeline version.
+  submissionId: text("submission_id"),
+  timelineVersionId: text("timeline_version_id"),
   resolvedAt: timestamp("resolved_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -229,7 +250,9 @@ export const tandemVideoDownloadsTable = pgTable("tandem_video_downloads", {
 export const tandemVideoJobsTable = pgTable("tandem_video_jobs", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
-  assetId: text("asset_id").notNull(),
+  // Nullable — project/leg-scoped jobs (e.g. EXPORT_BUNDLE checkout) have no
+  // anchor asset.
+  assetId: text("asset_id"),
   type: text("type").notNull(),
   // QUEUED → RUNNING → SUCCEEDED | FAILED
   status: text("status").notNull().default("QUEUED"),
@@ -270,7 +293,7 @@ export type TandemVideoSubmission = typeof tandemVideoSubmissionsTable.$inferSel
 export type TandemVideoComment = typeof tandemVideoCommentsTable.$inferSelect;
 export type TandemVideoJob = typeof tandemVideoJobsTable.$inferSelect;
 
-export const VIDEO_LEGS = ["SELECTS", "CUT", "SOUND", "FINISH"] as const;
+export const VIDEO_LEGS = ["SELECTS", "CUT", "SOUND", "FINISH", "THUMBNAIL"] as const;
 export type VideoLeg = (typeof VIDEO_LEGS)[number];
 export const VIDEO_JOB_TYPES = [
   "PROXY",
@@ -281,5 +304,7 @@ export const VIDEO_JOB_TYPES = [
   "EXPORT",
   "THUMBNAIL",
   "REFERENCE_ANALYZE",
+  "INTERCHANGE",
+  "EXPORT_BUNDLE",
 ] as const;
 export type VideoJobType = (typeof VIDEO_JOB_TYPES)[number];

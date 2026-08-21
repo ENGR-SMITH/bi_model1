@@ -41,9 +41,12 @@ import type { VideoAssetDetail } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from './selects';
+import { ActivityFeed } from '@/components/activity-feed';
 import { Timeline, formatTimecode, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
 import { AssetPlayer, pollWhileProcessing } from '@/components/asset-preview';
+import { AnnotationCanvas } from '@/components/annotation-canvas';
+import { CheckoutPanel, ImportFlow } from '@/components/checkout-import';
 
 const LUT_PRESETS = ['NONE', 'WARM', 'COOL', 'CINEMA', 'PUNCHY'] as const;
 const CAPTION_STYLES = ['BOTTOM_CENTER', 'SPLIT', 'MINIMAL'] as const;
@@ -134,6 +137,7 @@ function FinishPreview({
   playheadMs,
   onTimeUpdate,
   onScrub,
+  headVersionId,
 }: {
   projectId: string;
   snapshot: FinishSnapshot;
@@ -142,6 +146,8 @@ function FinishPreview({
   playheadMs: number;
   onTimeUpdate: (ms: number) => void;
   onScrub: (ms: number) => void;
+  /** Scope on-frame pins to the FINISH leg's head snapshot. */
+  headVersionId?: string | null;
 }) {
   // Order clips by source in-point so scrubbing moves left → right.
   const clips = useMemo(
@@ -236,6 +242,14 @@ function FinishPreview({
             </div>
           )}
         </div>
+        <AnnotationCanvas
+          projectId={projectId}
+          leg="FINISH"
+          assetId={asset.id}
+          playheadMs={playheadMs}
+          onSeek={onScrub}
+          timelineVersionId={headVersionId}
+        />
       </AssetPlayer>
 
       {clips.length > 0 && (
@@ -393,7 +407,7 @@ function CaptionsPanel({
           </button>
         )}
       </div>
-      <p className="setting-copy">Captions are generated from the Leg 1 transcript — never re-transcribed.</p>
+      <p className="setting-copy">Captions are generated from the Stage 1 transcript — never re-transcribed.</p>
       {snapshot.captions.enabled && canEdit && (
         <div className="den-chip-list mt-3">
           {CAPTION_STYLES.map((style) => (
@@ -934,6 +948,7 @@ export default function ContentCreatorsFinishPage() {
             playheadMs={playheadMs}
             onTimeUpdate={setPlayheadMs}
             onScrub={setPlayheadMs}
+            headVersionId={finishTimeline.data?.versions.find((v) => v.version === finishTimeline.data?.version)?.id ?? null}
           />
           <GradePanel snapshot={working} onChange={(next) => { setWorking(next); setDirty(true); }} assets={p.assets} canEdit={canEdit} />
           <LowerThirdsPanel
@@ -1015,7 +1030,24 @@ export default function ContentCreatorsFinishPage() {
             versions={finishTimeline.data?.versions ?? []}
             currentVersion={finishTimeline.data?.version ?? null}
             canSubmit={canEdit}
+            wipeFilter={(snapshot, ms) => {
+              const snap = snapshot as FinishSnapshot;
+              const clips = Array.isArray(snap.clips) ? snap.clips : [];
+              const clip = clips.find((c) => ms >= c.inMs && ms < Math.max(c.inMs + 1, c.outMs));
+              return clip ? gradeFilter(clip.grade) : undefined;
+            }}
           />
+
+          <ActivityFeed projectId={p.id} leg="FINISH" className="" />
+
+          <CheckoutPanel
+            projectId={p.id}
+            projectName={p.name}
+            leg="FINISH"
+            savedVersion={finishTimeline.data?.version ?? null}
+          />
+
+          <ImportFlow projectId={p.id} leg="FINISH" canEdit={canEdit} />
         </div>
       </div>
 

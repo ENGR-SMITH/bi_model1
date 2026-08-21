@@ -38,6 +38,8 @@ import path from "node:path";
 import { logger } from "../lib/logger";
 import { emitJobProgress, emitToProject } from "../realtime";
 import { attachQueueEventBridge, bullmqEnabled, enqueueBullMqJob } from "./queues";
+import { buildCheckout } from "./checkout";
+import { buildZip, type ZipEntry } from "./zip";
 
 const JOB_BATCH_SIZE = 5;
 const POLL_INTERVAL_MS = 2000;
@@ -52,6 +54,10 @@ function proxyDir(): string {
 
 function renderDir(): string {
   return path.join(uploadDir(), "renders");
+}
+
+function bundleDir(): string {
+  return path.join(uploadDir(), "bundles");
 }
 
 // ---------------------------------------------------------------------------
@@ -188,9 +194,12 @@ export function isDemoMode(): boolean {
 // Job enqueueing
 // ---------------------------------------------------------------------------
 
-export async function enqueueAssetJobs(asset: TandemVideoAsset): Promise<void> {
+export async function enqueueAssetJobs(
+  asset: TandemVideoAsset,
+  types: ReadonlyArray<"PROXY" | "TRANSCRIBE"> = ["PROXY", "TRANSCRIBE"],
+): Promise<void> {
   const jobs: Array<{ id: string; projectId: string; assetId: string; type: string }> = [];
-  for (const type of ["PROXY", "TRANSCRIBE"] as const) {
+  for (const type of types) {
     jobs.push({ id: randomUUID(), projectId: asset.projectId, assetId: asset.id, type });
   }
   await db.insert(tandemVideoJobsTable).values(jobs);
@@ -249,6 +258,47 @@ export async function enqueueRenderJob(
     .returning();
   emitJobProgress({ projectId, jobId: job.id, type: job.type, status: "QUEUED" });
   await enqueueBullMqJob(job);
+}
+
+/**
+ * Queues a background checkout bundle build for a leg. Project-scoped (no
+ * anchor asset) so any member can trigger it; the worker materializes all
+ * four interchange documents + manifest (and media, on request) into a zip.
+ */
+export async function enqueueExportBundleJob(
+  projectId: string,
+  leg: string,
+  includeMedia = false,
+): Promise<TandemVideoJob> {
+  const [job] = await db
+    .insert(tandemVideoJobsTable)
+    .values({
+      id: randomUUID(),
+      projectId,
+      assetId: null,
+      type: "EXPORT_BUNDLE",
+      params: { leg, includeMedia },
+    })
+    .returning();
+  emitJobProgress({ projectId, jobId: job.id, type: job.type, status: "QUEUED" });
+  await enqueueBullMqJob(job);
+  return job;
+}
+
+/** True when a bundle build is already queued/running for this leg (dedupe). */
+export async function hasActiveExportBundle(projectId: string, leg: string): Promise<boolean> {
+  const active = await db
+    .select()
+    .from(tandemVideoJobsTable)
+    .where(
+      and(
+        eq(tandemVideoJobsTable.projectId, projectId),
+        eq(tandemVideoJobsTable.type, "EXPORT_BUNDLE"),
+        inArray(tandemVideoJobsTable.status, ["QUEUED", "RUNNING"]),
+      ),
+    );
+  // A bundle job is leg-scoped via its params; the dedupe is per-leg.
+  return active.some((job) => (job.params as { leg?: string } | null)?.leg === leg);
 }
 
 /** True when a render is already queued/running for this leg (dedupe). */
@@ -902,6 +952,132 @@ async function processExport(asset: TandemVideoAsset, job: TandemVideoJob): Prom
   return { format, demo: true, storageKey: null };
 }
 
+// ---------------------------------------------------------------------------
+// Checkout bundle — the background half of the external-first round-trip.
+//
+// `EXPORT_BUNDLE` materializes a leg's saved snapshot as a single downloadable
+// zip containing all four interchange documents plus the media manifest (and,
+// when the originals are on disk, the referenced media itself). Progress is
+// streamed to the project room so the CheckoutPanel can show the queue state
+// live instead of blocking the request. Anchored to the project, not an asset
+// (job.assetId is null), so any member of the project can build a bundle.
+// ---------------------------------------------------------------------------
+
+async function processExportBundle(
+  _asset: TandemVideoAsset | null,
+  job: TandemVideoJob,
+): Promise<{
+  storageKey: string;
+  mimeType: string;
+  sizeBytes: number;
+  leg: string;
+  version: number | null;
+  entries: string[];
+}> {
+  const params = (job.params ?? {}) as { leg?: string; includeMedia?: boolean };
+  const leg = params.leg ?? "CUT";
+  const checkout = await buildCheckout(job.projectId, leg);
+  if (!checkout) {
+    throw new Error("Save a snapshot before checking out");
+  }
+
+  const slug =
+    checkout.projectName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "project";
+  const base = `${slug}-${leg.toLowerCase()}-v${checkout.version ?? 0}`;
+
+  const entries: ZipEntry[] = [
+    { name: `${base}.edl`, data: Buffer.from(checkout.edl, "utf8") },
+    { name: `${base}.fcpxml`, data: Buffer.from(checkout.fcpxml, "utf8") },
+    { name: `${base}.otio`, data: Buffer.from(checkout.otio, "utf8") },
+    { name: `${base}.aaf`, data: checkout.aaf },
+    {
+      name: `${base}.manifest.json`,
+      data: Buffer.from(
+        JSON.stringify(
+          {
+            projectId: checkout.projectId,
+            projectName: checkout.projectName,
+            leg,
+            version: checkout.version,
+            generatedAt: new Date().toISOString(),
+            media: checkout.manifest,
+          },
+          null,
+          2,
+        ),
+        "utf8",
+      ),
+    },
+  ];
+
+  // Optionally embed the referenced originals so the bundle is self-contained
+  // (the design's "zip referenced media" option). Skip missing files — the
+  // manifest still lists them for the timed-grant path.
+  if (params.includeMedia) {
+    const assetIds = checkout.manifest.map((item) => item.assetId);
+    const assets = assetIds.length
+      ? await db
+          .select()
+          .from(tandemVideoAssetsTable)
+          .where(inArray(tandemVideoAssetsTable.id, assetIds))
+      : [];
+    for (const asset of assets) {
+      const sourcePath = path.join(uploadDir(), asset.storageKey);
+      if (!fs.existsSync(sourcePath)) continue;
+      entries.push({
+        name: `media/${asset.fileName}`,
+        data: fs.readFileSync(sourcePath),
+      });
+    }
+  }
+
+  emitJobProgress({
+    projectId: job.projectId,
+    jobId: job.id,
+    type: job.type,
+    status: "RUNNING",
+    progress: 60,
+  });
+
+  const zip = buildZip(entries);
+  fs.mkdirSync(bundleDir(), { recursive: true });
+  const storageKey = `bundles/${job.id}.zip`;
+  fs.writeFileSync(path.join(uploadDir(), storageKey), zip);
+
+  emitJobProgress({
+    projectId: job.projectId,
+    jobId: job.id,
+    type: job.type,
+    status: "RUNNING",
+    progress: 90,
+  });
+
+  // Record the artifact so the vault can discover it without re-probing.
+  await db.insert(tandemVideoAssetFilesTable).values({
+    id: randomUUID(),
+    // No anchor asset for a project-scoped bundle.
+    assetId: null,
+    kind: "INTERCHANGE",
+    storageKey,
+    mimeType: "application/zip",
+    sizeBytes: zip.length,
+    metadata: { leg, version: checkout.version, entries: entries.map((e) => e.name) },
+  });
+
+  return {
+    storageKey,
+    mimeType: "application/zip",
+    sizeBytes: zip.length,
+    leg,
+    version: checkout.version,
+    entries: entries.map((e) => e.name),
+  };
+}
+
 // Extracts + polishes a thumbnail frame (FFmpeg + ImageMagick when present).
 async function processThumbnail(asset: TandemVideoAsset, job: TandemVideoJob): Promise<{
   timeMs: number;
@@ -1069,7 +1245,10 @@ async function processReferenceAnalyze(asset: TandemVideoAsset, _job: TandemVide
   return { source: pacing.source, sections, totalMs, demo: !tools.ffmpeg };
 }
 
-const PROCESSORS: Record<string, (asset: TandemVideoAsset, job: TandemVideoJob) => Promise<unknown>> = {
+const PROCESSORS: Record<
+  string,
+  (asset: TandemVideoAsset | null, job: TandemVideoJob) => Promise<unknown>
+> = {
   PROXY: processProxy,
   TRANSCRIBE: processTranscribe,
   SYNC: processSync,
@@ -1078,6 +1257,7 @@ const PROCESSORS: Record<string, (asset: TandemVideoAsset, job: TandemVideoJob) 
   EXPORT: processExport,
   THUMBNAIL: processThumbnail,
   REFERENCE_ANALYZE: processReferenceAnalyze,
+  EXPORT_BUNDLE: processExportBundle,
 };
 
 // ---------------------------------------------------------------------------
@@ -1100,20 +1280,24 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
     .where(eq(tandemVideoJobsTable.id, job.id));
   emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "RUNNING" });
 
-  const [asset] = await db
-    .select()
-    .from(tandemVideoAssetsTable)
-    .where(eq(tandemVideoAssetsTable.id, job.assetId))
-    .limit(1);
+  // Project-scoped jobs (EXPORT_BUNDLE checkout) have no anchor asset.
+  let asset: TandemVideoAsset | null = null;
+  if (job.assetId) {
+    [asset] = await db
+      .select()
+      .from(tandemVideoAssetsTable)
+      .where(eq(tandemVideoAssetsTable.id, job.assetId))
+      .limit(1);
 
-  if (!asset) {
-    const message = "Asset no longer exists";
-    await db
-      .update(tandemVideoJobsTable)
-      .set({ status: "FAILED", error: message, finishedAt: new Date() })
-      .where(eq(tandemVideoJobsTable.id, job.id));
-    emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "FAILED", error: message });
-    throw new Error(message);
+    if (!asset) {
+      const message = "Asset no longer exists";
+      await db
+        .update(tandemVideoJobsTable)
+        .set({ status: "FAILED", error: message, finishedAt: new Date() })
+        .where(eq(tandemVideoJobsTable.id, job.id));
+      emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "FAILED", error: message });
+      throw new Error(message);
+    }
   }
 
   const processor = PROCESSORS[job.type];
@@ -1137,12 +1321,13 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
 
     // Record the produced artifact (proxy file) as an asset file row so the
     // vault and studio can discover it without re-probing. Renders record
-    // their own file rows inside the processor.
+    // their own file rows inside the processor; EXPORT_BUNDLE records its
+    // bundle row inside the processor too.
     if (job.type === "PROXY") {
       const proxy = result as ProxyResult;
       await db.insert(tandemVideoAssetFilesTable).values({
         id: randomUUID(),
-        assetId: asset.id,
+        assetId: asset!.id,
         kind: "PROXY",
         storageKey: proxy.storageKey,
         mimeType: proxy.mimeType,
@@ -1151,8 +1336,8 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
       });
     }
 
-    await markAssetProcessedIfDone(asset.id);
-    logger.info({ jobId: job.id, type: job.type, assetId: asset.id }, "Video job succeeded");
+    if (asset) await markAssetProcessedIfDone(asset.id);
+    logger.info({ jobId: job.id, type: job.type, assetId: asset?.id ?? null }, "Video job succeeded");
   } catch (error) {
     await db
       .update(tandemVideoJobsTable)

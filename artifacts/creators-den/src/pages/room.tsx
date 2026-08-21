@@ -5,6 +5,7 @@ import {
   Bell,
   Clapperboard,
   Film,
+  Image,
   LockKeyhole,
   Mic2,
   Palette,
@@ -29,6 +30,7 @@ const LEGS = [
   { number: '02', role: 'Visual Editor', studio: 'Precision cutting', icon: Scissors, blurb: 'Tightens every cut, layers B-roll, syncs cameras, and locks the picture.' },
   { number: '03', role: 'Sound Designer', studio: 'Restore & score', icon: Mic2, blurb: 'Cleans captured audio, ducks music under speech, and repairs bad takes.' },
   { number: '04', role: 'Motion & Color', studio: 'Finish & polish', icon: Palette, blurb: 'Grades the footage into one look, burns captions, and exports every format.' },
+  { number: '05', role: 'Thumbnail Designer', studio: 'Cover art & titles', icon: Image, blurb: 'Picks the frame, writes the title, and ships the thumbnail that earns the click.' },
 ];
 
 function NotificationsPanel() {
@@ -167,7 +169,7 @@ export default function ContentCreatorsPage() {
         <span className="guide-pin" />
         <div>
           <b>CONTENT CREATORS · THE ROOM</b>
-          <span>Four roles, one relay — selects, cut, sound, finish — working the same locked footage until the Captain releases it.</span>
+          <span>Five roles, one relay — selects, cut, sound, finish, thumbnail — working the same locked footage until the Captain releases it.</span>
         </div>
         <span className="guide-spark" />
       </div>
@@ -178,7 +180,7 @@ export default function ContentCreatorsPage() {
           <h1>Your footage<br /><em>has a room.</em></h1>
           <p>
             Drop raw files into a locked vault, hand each role its studio, and relay the picture
-            down the line — selects, cut, sound, finish — until the Captain releases the master.
+            down the line — selects, cut, sound, finish, thumbnail — until the Captain releases the master.
           </p>
           <button type="button" className="hero-new-project" onClick={() => setModalOpen(true)} data-testid="button-new-project">
             <Clapperboard size={16} />
@@ -199,9 +201,9 @@ export default function ContentCreatorsPage() {
       <div className="section-head">
         <div>
           <span className="eyebrow">The relay</span>
-          <h2>Four roles, one locked picture</h2>
+          <h2>Five roles, one locked picture</h2>
         </div>
-        <span className="mono-label">01 — 04</span>
+        <span className="mono-label">01 — 05</span>
       </div>
 
       <div className="project-grid">
@@ -211,7 +213,7 @@ export default function ContentCreatorsPage() {
             <div key={leg.number} className="project-card" data-testid={`card-leg-${leg.number}`}>
               <div className="project-card-top">
                 <span className="template-tag">{leg.studio}</span>
-                <span className="mono-label">{leg.number} / 04</span>
+                <span className="mono-label">{leg.number} / 05</span>
               </div>
               <div className="project-open">
                 <h3><Icon size={16} style={{ display: 'inline', verticalAlign: '-2px', marginRight: 7, color: 'hsl(var(--accent))' }} />{leg.role}</h3>

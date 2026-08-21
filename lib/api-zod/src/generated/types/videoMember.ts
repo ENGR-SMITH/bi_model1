@@ -10,6 +10,11 @@ export interface VideoMember {
   id: string;
   projectId: string;
   userId: string;
+  /**
+     * Resolved Clerk display name
+     * @nullable
+     */
+  name: string | null;
   role: string;
   status: string;
   createdAt: Date;

@@ -5,6 +5,7 @@ import {
   Clapperboard,
   DoorOpen,
   Film,
+  Image,
   LogOut,
   Mic2,
   Palette,
@@ -25,6 +26,7 @@ export const RELAY_LEGS = [
   { slug: 'cut', leg: 'CUT', number: '02', label: 'Cut', role: 'Visual Editor', icon: Scissors },
   { slug: 'sound', leg: 'SOUND', number: '03', label: 'Sound', role: 'Sound Designer', icon: Mic2 },
   { slug: 'finish', leg: 'FINISH', number: '04', label: 'Finish', role: 'Motion & Color', icon: Palette },
+  { slug: 'thumbnail', leg: 'THUMBNAIL', number: '05', label: 'Thumbnail', role: 'Thumbnail Designer', icon: Image },
 ] as const;
 
 function UserChip({ compact }: { compact?: boolean }) {

@@ -1618,6 +1618,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/versions/{versionId}:
+    get:
+      operationId: getVideoTimelineVersion
+      tags: [content-creators]
+      summary: Read the full snapshot of one timeline version (for diffing / review)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+        - { $ref: "#/components/parameters/VideoVersionId" }
+      responses:
+        "200":
+          description: Full version with snapshot
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoTimelineVersionDetail" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Timeline or version not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/projects/{projectId}/timelines/{leg}/rollback:
     post:
       operationId: rollbackVideoTimeline
@@ -1642,6 +1667,285 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout:
+    get:
+      operationId: checkoutVideoTimeline
+      tags: [content-creators]
+      summary: Download the leg's current snapshot as a CMX3600 EDL for an external NLE
+      description: The checkout half of the external-first round-trip — the editor opens the cut in Premiere/Resolve/Avid, finishes it there, and re-imports the result. FCPXML export lives at /checkout/fcpxml.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: CMX3600 EDL file (with a `* MEDIA MANIFEST` trailer)
+          content:
+            text/plain:
+              schema: { type: string }
+        "400":
+          description: No snapshot saved for this leg yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/fcpxml:
+    get:
+      operationId: checkoutVideoTimelineFcpxml
+      tags: [content-creators]
+      summary: Download the leg's current snapshot as an FCPXML 1.9 project for Final Cut or Premiere
+      description: The FCPXML variant of the checkout — source media round-trips through the clip `uid`/`ref` attributes, so a re-import relinks exactly.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: FCPXML 1.9 document
+          content:
+            application/xml:
+              schema: { type: string }
+        "400":
+          description: No snapshot saved for this leg yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/otio:
+    get:
+      operationId: checkoutVideoTimelineOtio
+      tags: [content-creators]
+      summary: Download the leg's current snapshot as an OpenTimelineIO (OTIO) Timeline.1 document
+      description: The OTIO variant of the checkout — the canonical interchange. Source media round-trips through `metadata.assetId`, so a re-import relinks exactly.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: OTIO Timeline.1 JSON document
+          content:
+            application/json:
+              schema: { type: string }
+        "400":
+          description: No snapshot saved for this leg yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/aaf:
+    get:
+      operationId: checkoutVideoTimelineAaf
+      tags: [content-creators]
+      summary: Download the leg's current snapshot as an AAF file (export-only)
+      description: The AAF variant of the checkout — export-only per the design (AAF is a binary Microsoft format intended for one-directional handoff to Avid/Premiere via AMA, not a round-trip interchange). Source media round-trips through the SourceMob UMIDs, matching the other formats' relink keys.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: AAF binary (OLE2/CFB container with a self-contained MetaDictionary)
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400":
+          description: No snapshot saved for this leg yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/manifest:
+    get:
+      operationId: getVideoTimelineCheckoutManifest
+      tags: [content-creators]
+      summary: List the source media referenced by a leg's checkout EDL
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: Referenced media (deduped, in first-use order)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoCheckoutManifest" }
+        "400":
+          description: No snapshot saved for this leg yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/export:
+    post:
+      operationId: exportVideoTimelineCheckout
+      tags: [content-creators]
+      summary: Enqueue a background checkout bundle build (EXPORT_BUNDLE job) for a leg
+      description: The background half of the checkout — materializes the leg's saved snapshot as a single downloadable zip (EDL + FCPXML + OTIO + AAF + media manifest, plus the referenced originals when includeMedia is set) and streams `job.progress` to the project room while it runs. Returns 409 if a bundle is already building for this leg.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoCheckoutExportInput" }
+      responses:
+        "201":
+          description: The enqueued EXPORT_BUNDLE job
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoCheckoutExportResponse" }
+        "400":
+          description: No snapshot saved for this leg yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: A bundle is already building for this leg
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/bundle:
+    get:
+      operationId: getVideoTimelineCheckoutBundle
+      tags: [content-creators]
+      summary: Get the latest EXPORT_BUNDLE job for a leg (queue state + artifact)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: The latest bundle job for this leg
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoCheckoutBundleStatus" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: No bundle has been built for this leg yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/checkout/bundle/download:
+    get:
+      operationId: getVideoTimelineCheckoutBundleDownload
+      tags: [content-creators]
+      summary: Download the built checkout bundle zip for a leg
+      description: Streams the zip produced by the latest SUCCEEDED EXPORT_BUNDLE job for this leg.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      responses:
+        "200":
+          description: The bundle zip
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: The bundle is not ready yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/timelines/{leg}/import:
+    post:
+      operationId: importVideoTimeline
+      tags: [content-creators]
+      summary: Re-import an edited interchange document (EDL, FCPXML, or OTIO) from an external NLE as a new timeline version
+      description: The push half of the round-trip — parse the CMX3600 EDL, FCPXML, or OpenTimelineIO document, relink its sources to vault assets, save a new Git-style version, and (by default) submit it for Captain review.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoLeg" }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/VideoTimelineImportInput" }
+      responses:
+        "201":
+          description: Imported timeline version
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoTimelineImportResponse" }
+        "400":
+          description: Missing/empty document, unparseable events, or sources not in the vault
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the leg role / Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/activity:
+    get:
+      operationId: listVideoActivity
+      tags: [content-creators]
+      summary: Project activity feed (saves, imports, rollbacks, submissions, decisions, uploads)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoActivityLegQuery" }
+      responses:
+        "200":
+          description: Activity events, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoActivityEvent" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/genealogy:
+    get:
+      operationId: listVideoGenealogy
+      tags: [content-creators]
+      summary: Version provenance (every version chained to its parent, with review decisions)
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Version genealogy, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoGenealogyEntry" }
         "403":
           description: Not allowed
           content:
@@ -2273,6 +2577,14 @@ components:
       in: path
       required: true
       schema: { type: string, minLength: 1 }
+    VideoActivityLegQuery:
+      name: leg
+      in: query
+      required: false
+      description: Optional leg (stage) filter — returns only that leg's events
+      schema:
+        type: string
+        enum: [SELECTS, CUT, SOUND, FINISH, THUMBNAIL]
     VideoAssetId:
       name: assetId
       in: path
@@ -2297,9 +2609,14 @@ components:
       name: leg
       in: path
       required: true
-      schema: { type: string, enum: [SELECTS, CUT, SOUND, FINISH] }
+      schema: { type: string, enum: [SELECTS, CUT, SOUND, FINISH, THUMBNAIL] }
     VideoSubmissionId:
       name: submissionId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    VideoVersionId:
+      name: versionId
       in: path
       required: true
       schema: { type: string, minLength: 1 }
@@ -3070,17 +3387,18 @@ components:
         id: { type: string }
         projectId: { type: string }
         userId: { type: string }
+        name: { type: ["string", "null"], description: Resolved Clerk display name, when available (falls back to the raw id client-side) }
         role: { type: string }
         status: { type: string }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, userId, role, status, createdAt]
+      required: [id, projectId, userId, name, role, status, createdAt]
     VideoMemberInput:
       type: object
       properties:
         email: { type: string, format: email }
         role:
           type: string
-          enum: [UPLOADER, ARCHITECT, VISUAL_EDITOR, SOUND_DESIGNER, MOTION_COLOR, VIEWER]
+          enum: [UPLOADER, ARCHITECT, VISUAL_EDITOR, SOUND_DESIGNER, MOTION_COLOR, THUMBNAIL_DESIGNER, VIEWER]
       required: [email, role]
     VideoAsset:
       type: object
@@ -3093,10 +3411,11 @@ components:
         mimeType: { type: string }
         sizeBytes: { type: integer }
         durationMs: { type: ["integer", "null"] }
+        contentHash: { type: ["string", "null"] }
         status: { type: string }
         version: { type: integer }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, status, version, createdAt]
+      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, contentHash, status, version, createdAt]
     VideoAssetUploadInput:
       type: object
       description: Multipart upload of a raw asset into the project vault
@@ -3106,7 +3425,7 @@ components:
           format: binary
         kind:
           type: string
-          enum: [RAW_VIDEO, RAW_AUDIO, SCREEN_REC, B_ROLL, REFERENCE, VO_PICKUP, GRAPHIC]
+          enum: [RAW_VIDEO, RAW_AUDIO, SCREEN_REC, B_ROLL, REFERENCE, VO_PICKUP, GRAPHIC, THUMBNAIL_DESIGN]
       required: [file, kind]
     VideoAssetFile:
       type: object
@@ -3150,6 +3469,7 @@ components:
         mimeType: { type: string }
         sizeBytes: { type: integer }
         durationMs: { type: ["integer", "null"] }
+        contentHash: { type: ["string", "null"] }
         status: { type: string }
         version: { type: integer }
         createdAt: { type: string, format: date-time }
@@ -3157,7 +3477,7 @@ components:
           type: array
           items: { $ref: "#/components/schemas/VideoAssetFile" }
         transcript: { type: ["object", "null"], allOf: [{ $ref: "#/components/schemas/VideoTranscript" }] }
-      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, status, version, createdAt, files, transcript]
+      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, contentHash, status, version, createdAt, files, transcript]
     VideoTimelineState:
       type: object
       properties:
@@ -3179,8 +3499,54 @@ components:
         version: { type: integer }
         message: { type: string }
         createdById: { type: string }
+        parentVersionId: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
-      required: [id, version, message, createdById, createdAt]
+      required: [id, version, message, createdById, parentVersionId, createdAt]
+    VideoActivityEvent:
+      type: object
+      description: One immutable line on the project activity feed
+      properties:
+        id: { type: string }
+        actorId: { type: string }
+        actorName: { type: ["string", "null"], description: Resolved Clerk display name, when available (falls back to short id client-side) }
+        eventType: { type: string }
+        summary: { type: string }
+        resourceId: { type: ["string", "null"] }
+        leg: { type: ["string", "null"], description: "The leg the event belongs to (SELECTS/CUT/SOUND/FINISH/THUMBNAIL); null for vault-wide events like uploads" }
+        createdAt: { type: string, format: date-time }
+      required: [id, actorId, actorName, eventType, summary, resourceId, leg, createdAt]
+    VideoGenealogyEntry:
+      type: object
+      description: One version's provenance — its author, its parent in the chain, and the review decision that pinned it
+      properties:
+        id: { type: string }
+        leg: { type: string }
+        version: { type: integer }
+        message: { type: string }
+        createdById: { type: string }
+        parentVersionId: { type: ["string", "null"] }
+        parentVersion: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        submission:
+          type: ["object", "null"]
+          description: The review decision (if any) that pinned this version
+          properties:
+            status: { type: string }
+            decidedById: { type: ["string", "null"] }
+            decidedAt: { type: ["string", "null"], format: date-time }
+          required: [status, decidedById, decidedAt]
+      required: [id, leg, version, message, createdById, parentVersionId, parentVersion, createdAt, submission]
+    VideoTimelineVersionDetail:
+      type: object
+      properties:
+        id: { type: string }
+        version: { type: integer }
+        message: { type: string }
+        createdById: { type: string }
+        parentVersionId: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        snapshot: { type: object, additionalProperties: true }
+      required: [id, version, message, createdById, parentVersionId, createdAt, snapshot]
     VideoTimelineSaveInput:
       type: object
       properties:
@@ -3192,6 +3558,80 @@ components:
       properties:
         versionId: { type: string, minLength: 1 }
       required: [versionId]
+    VideoCheckoutMediaItem:
+      type: object
+      properties:
+        assetId: { type: string }
+        fileName: { type: string }
+        kind: { type: string }
+        reel: { type: string }
+        clipIds:
+          type: array
+          items: { type: string }
+        firstInMs: { type: integer }
+        lastOutMs: { type: integer }
+        downloadPath: { type: string }
+      required: [assetId, fileName, kind, reel, clipIds, firstInMs, lastOutMs, downloadPath]
+    VideoCheckoutManifest:
+      type: object
+      properties:
+        projectId: { type: string }
+        leg: { type: string }
+        version: { type: ["integer", "null"] }
+        media:
+          type: array
+          items: { $ref: "#/components/schemas/VideoCheckoutMediaItem" }
+      required: [projectId, leg, version, media]
+    VideoTimelineImportInput:
+      type: object
+      description: An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1). `media` optionally carries the rendered master / stems to land in the vault with the push (content-addressed, so unchanged files dedupe).
+      properties:
+        format: { type: string, enum: [EDL, FCPXML, OTIO], default: EDL }
+        document: { type: string, minLength: 1 }
+        message: { type: string, maxLength: 500 }
+        submit: { type: boolean, default: true }
+        media:
+          type: array
+          description: Optional rendered master / stems attached to the push
+          items: { type: string, format: binary }
+      required: [document]
+    VideoTimelineImportMediaItem:
+      type: object
+      description: A media file that landed in the vault with the import
+      properties:
+        id: { type: string }
+        fileName: { type: string }
+        kind: { type: string }
+        deduplicated: { type: boolean, description: True when identical bytes already existed and the stored blob was reused (Git-LFS dedupe) }
+      required: [id, fileName, kind, deduplicated]
+    VideoTimelineImportResponse:
+      type: object
+      properties:
+        version: { type: integer }
+        clips: { type: integer }
+        submissionId: { type: ["string", "null"] }
+        media:
+          type: array
+          items: { $ref: "#/components/schemas/VideoTimelineImportMediaItem" }
+      required: [version, clips, submissionId, media]
+    VideoCheckoutExportInput:
+      type: object
+      description: Request a background checkout bundle build for a leg
+      properties:
+        includeMedia:
+          type: boolean
+          default: false
+          description: Embed the referenced originals in the zip (self-contained bundle) instead of just the interchange docs + manifest
+    VideoCheckoutExportResponse:
+      type: object
+      description: The enqueued EXPORT_BUNDLE job
+      allOf:
+        - $ref: "#/components/schemas/VideoJob"
+    VideoCheckoutBundleStatus:
+      type: object
+      description: The latest EXPORT_BUNDLE job for a leg (queue state + artifact location)
+      allOf:
+        - $ref: "#/components/schemas/VideoJob"
     VideoSubmission:
       type: object
       properties:
@@ -3210,7 +3650,7 @@ components:
     VideoSubmissionInput:
       type: object
       properties:
-        leg: { type: string, enum: [SELECTS, CUT, SOUND, FINISH] }
+        leg: { type: string, enum: [SELECTS, CUT, SOUND, FINISH, THUMBNAIL] }
         note: { type: string, maxLength: 2000 }
       required: [leg]
     VideoComment:
@@ -3224,17 +3664,30 @@ components:
         body: { type: string }
         authorId: { type: string }
         parentId: { type: ["string", "null"] }
+        geometry: { type: ["object", "null"], additionalProperties: true }
+        kind: { type: string }
+        color: { type: ["string", "null"] }
+        label: { type: ["string", "null"] }
+        submissionId: { type: ["string", "null"] }
+        timelineVersionId: { type: ["string", "null"] }
         resolvedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, leg, assetId, timecodeMs, body, authorId, parentId, resolvedAt, createdAt]
+      required: [id, projectId, leg, assetId, timecodeMs, body, authorId, parentId, geometry, kind, color, label, submissionId, timelineVersionId, resolvedAt, createdAt]
     VideoCommentInput:
       type: object
+      description: A timecode note or a spatial annotation (kind PIN/HIGHLIGHT/MARK carries a normalized geometry)
       properties:
-        leg: { type: string, enum: [SELECTS, CUT, SOUND, FINISH] }
+        leg: { type: string, enum: [SELECTS, CUT, SOUND, FINISH, THUMBNAIL] }
         assetId: { type: string }
         timecodeMs: { type: integer, minimum: 0 }
         body: { type: string, minLength: 1, maxLength: 4000 }
         parentId: { type: string }
+        kind: { type: string, enum: [TIMECODE, PIN, HIGHLIGHT, MARK], default: TIMECODE }
+        geometry: { type: object, additionalProperties: true }
+        color: { type: string }
+        label: { type: string, maxLength: 12 }
+        submissionId: { type: string }
+        timelineVersionId: { type: string }
       required: [body]
     VideoCommentResolveInput:
       type: object
@@ -3246,7 +3699,7 @@ components:
       properties:
         id: { type: string }
         projectId: { type: string }
-        assetId: { type: string }
+        assetId: { type: ["string", "null"] }
         type: { type: string }
         status: { type: string }
         attempts: { type: integer }

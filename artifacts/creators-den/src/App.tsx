@@ -7,6 +7,7 @@ import SelectsPage from '@/pages/selects';
 import CutPage from '@/pages/cut';
 import SoundPage from '@/pages/sound';
 import FinishPage from '@/pages/finish';
+import ThumbnailPage from '@/pages/thumbnail';
 
 function NotFound() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/projects/:projectId/cut" component={CutPage} />
           <Route path="/projects/:projectId/sound" component={SoundPage} />
           <Route path="/projects/:projectId/finish" component={FinishPage} />
+          <Route path="/projects/:projectId/thumbnail" component={ThumbnailPage} />
           <Route component={NotFound} />
         </Switch>
       </CreatorsShell>

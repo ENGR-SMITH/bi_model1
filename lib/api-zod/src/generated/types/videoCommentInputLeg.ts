@@ -14,4 +14,5 @@ export const VideoCommentInputLeg = {
   CUT: 'CUT',
   SOUND: 'SOUND',
   FINISH: 'FINISH',
+  THUMBNAIL: 'THUMBNAIL',
 } as const;

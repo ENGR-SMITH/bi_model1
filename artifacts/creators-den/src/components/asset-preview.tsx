@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { AudioLines, Loader2, Play, RotateCcw, Sparkles, TriangleAlert } from 'lucide-react';
+import { AudioLines, Image as ImageIcon, Loader2, Play, RotateCcw, Sparkles, TriangleAlert } from 'lucide-react';
 import type { VideoAssetDetail } from '@workspace/api-client-react';
 
 export function proxyUrlFor(projectId: string, assetId: string): string {
@@ -56,6 +56,8 @@ export function AssetPlayer({
   title,
   videoRef: externalVideoRef,
   audio = false,
+  controls = true,
+  markers,
 }: {
   projectId: string;
   assetId: string;
@@ -77,6 +79,10 @@ export function AssetPlayer({
   videoRef?: RefObject<HTMLVideoElement | null>;
   /** Render an audio element (for RAW_AUDIO / VO_PICKUP) instead of video. */
   audio?: boolean;
+  /** Show the native transport controls. Hidden for the A/B wipe's top layer. */
+  controls?: boolean;
+  /** Review markers (design §10): comments pinned at a timecode, drawn as a clickable rail under the frame. */
+  markers?: Array<{ id: string; ms: number; tone?: 'accent' | 'gold' | 'danger' | 'teal' | 'muted'; label?: string }>;
 }) {
   const internalVideoRef = useRef<HTMLVideoElement>(null);
   const internalAudioRef = useRef<HTMLAudioElement>(null);
@@ -94,6 +100,19 @@ export function AssetPlayer({
   const loading = detail === undefined;
   const proxyFile = detail?.files?.find((file) => file.kind === 'PROXY');
   const demoProxy = proxyFile?.metadata?.demo === true;
+  // Static images (designed thumbnails) are their own proxy — render an <img>.
+  const isImage = Boolean(proxyFile) && Boolean(proxyFile!.mimeType?.startsWith('image/'));
+  const durationMs = assetDurationMs(detail, 0);
+
+  // Seek the mounted media element and tell the caller the playhead moved
+  // (used by the review marker rail — design §10 "clickable pins in the player").
+  const seekTo = (ms: number) => {
+    const media = mediaRef.current;
+    if (media) {
+      media.currentTime = Math.min(durationMs, Math.max(0, ms)) / 1000;
+    }
+    onPlayheadChange?.(ms);
+  };
 
   // Turn the silent media error into an actionable explanation. The probe below
   // fetches the stream just for its status, so we can distinguish a server-side
@@ -204,7 +223,7 @@ export function AssetPlayer({
               ref={internalAudioRef}
               key={`${assetId}-${retryKey}`}
               src={proxyUrl}
-              controls
+              controls={controls}
               preload="metadata"
               onTimeUpdate={(event) => emitTime(event.currentTarget)}
               onPlay={(event) => emitTime(event.currentTarget)}
@@ -213,12 +232,22 @@ export function AssetPlayer({
               data-testid="asset-player-audio"
             />
           </div>
+        ) : isImage ? (
+          <img
+            key={`${assetId}-${retryKey}`}
+            src={proxyUrl}
+            alt="Preview"
+            style={filter ? { filter } : undefined}
+            onError={() => setMediaError(true)}
+            onLoad={() => setMediaError(false)}
+            data-testid="asset-player-image"
+          />
         ) : (
           <video
             ref={videoRef}
             key={`${assetId}-${retryKey}`}
             src={proxyUrl}
-            controls
+            controls={controls}
             preload="metadata"
             style={filter ? { filter } : undefined}
             onTimeUpdate={(event) => emitTime(event.currentTarget)}
@@ -260,6 +289,38 @@ export function AssetPlayer({
 
       {children}
 
+      {markers && markers.length > 0 && !audio && !isImage && durationMs > 0 && (
+        <div
+          className="den-marker-rail"
+          role="slider"
+          aria-label="Review markers — click to seek"
+          aria-valuemin={0}
+          aria-valuemax={durationMs}
+          aria-valuenow={Math.min(playheadMs ?? 0, durationMs)}
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+            seekTo(ratio * durationMs);
+          }}
+          data-testid="marker-rail"
+        >
+          {markers.map((marker) => (
+            <button
+              key={marker.id}
+              type="button"
+              className={`den-marker-pin ${marker.tone ?? 'accent'}`}
+              style={{ left: `${Math.min(100, Math.max(0, (marker.ms / durationMs) * 100))}%` }}
+              title={marker.label ?? formatClock(marker.ms)}
+              onClick={(event) => {
+                event.stopPropagation();
+                seekTo(marker.ms);
+              }}
+              data-testid="marker-pin"
+            />
+          ))}
+        </div>
+      )}
+
       {title && (
         <div className="den-player-bar">
           <span className="truncate">{title}</span>
@@ -287,6 +348,51 @@ export function EmptyPlayer({ children, className = '' }: { children?: ReactNode
         <Play className="mb-2" size={22} />
         {children}
       </div>
+    </div>
+  );
+}
+
+/**
+ * ImageStage — the thumbnail review surface. Renders a static image sized to
+ * its natural aspect ratio (so spatial pins on the AnnotationCanvas overlay
+ * land exactly on the pixels), with the frame chrome of the other players.
+ */
+export function ImageStage({
+  src,
+  title,
+  children,
+  className = '',
+}: {
+  src: string;
+  title?: string;
+  /** Overlays rendered on top of the image (AnnotationCanvas…). */
+  children?: ReactNode;
+  className?: string;
+}) {
+  const [aspect, setAspect] = useState('16 / 9');
+
+  return (
+    <div className={`den-player ${className}`} data-testid="image-stage">
+      <div className="thumbnail-stage" style={{ aspectRatio: aspect }}>
+        <img
+          src={src}
+          alt={title ?? 'Design preview'}
+          onLoad={(event) => {
+            const el = event.currentTarget;
+            if (el.naturalWidth > 0 && el.naturalHeight > 0) {
+              setAspect(`${el.naturalWidth} / ${el.naturalHeight}`);
+            }
+          }}
+          data-testid="image-stage-img"
+        />
+        {children}
+      </div>
+      {title && (
+        <div className="den-player-bar">
+          <span className="truncate">{title}</span>
+          <span className="mono-label"><ImageIcon size={10} /> static frame</span>
+        </div>
+      )}
     </div>
   );
 }

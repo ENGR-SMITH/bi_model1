@@ -11,5 +11,7 @@ export interface VideoTimelineVersionSummary {
   version: number;
   message: string;
   createdById: string;
+  /** @nullable */
+  parentVersionId: string | null;
   createdAt: Date;
 }

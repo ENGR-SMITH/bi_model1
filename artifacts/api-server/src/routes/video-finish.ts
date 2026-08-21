@@ -47,6 +47,7 @@ const LEG_ROLES: Record<string, string> = {
   CUT: "VISUAL_EDITOR",
   SOUND: "SOUND_DESIGNER",
   FINISH: "MOTION_COLOR",
+  THUMBNAIL: "THUMBNAIL_DESIGNER",
 } as const;
 
 async function requireMember(
@@ -304,12 +305,17 @@ router.get(
       .limit(1);
 
     let asset;
-    if (file) {
+    if (file && file.assetId) {
       [asset] = await db
         .select()
         .from(tandemVideoAssetsTable)
         .where(eq(tandemVideoAssetsTable.id, file.assetId))
         .limit(1);
+    } else if (file) {
+      // Project-scoped artifact (e.g. an INTERCHANGE bundle) — not an asset
+      // download, so reject rather than fall through to an asset lookup.
+      res.status(404).json({ error: "File not found" });
+      return;
     } else {
       [asset] = await db
         .select()

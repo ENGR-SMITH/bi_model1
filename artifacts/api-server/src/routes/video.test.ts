@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { eq } from "drizzle-orm";
+import { runWorkerCycle } from "../video/worker";
+import { backfillContentHashes } from "../video/content-address";
+import { clearUserNameCache } from "../lib/user-names";
 
 // Uploads land on disk; point multer at a throwaway temp dir for tests.
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "video-test-"));
@@ -14,14 +18,29 @@ const state = vi.hoisted(() => ({
   db: null as any,
   tables: null as any,
   clerkEmailToUser: {} as Record<string, string | null>,
+  clerkIdToName: {} as Record<string, string>,
 }));
 
 vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: state.userId }),
   clerkClient: {
     users: {
-      getUserList: async ({ emailAddress }: { emailAddress: string[] }) => {
-        const email = emailAddress[0];
+      getUserList: async (params: { emailAddress?: string[]; userId?: string[] }) => {
+        if (params.userId) {
+          return {
+            data: params.userId.map((id) => {
+              const [first, ...rest] = (state.clerkIdToName[id] ?? "").split(" ");
+              return {
+                id,
+                firstName: first || null,
+                lastName: rest.join(" ") || null,
+                username: null,
+                emailAddresses: [],
+              };
+            }),
+          };
+        }
+        const email = params.emailAddress?.[0] ?? "";
         const id = state.clerkEmailToUser[email] ?? null;
         return { data: id ? [{ id }] : [] };
       },
@@ -38,6 +57,7 @@ vi.mock("@workspace/db", async () => {
 });
 
 import videoRouter from "./video";
+import videoProductionRouter from "./video-production";
 
 function createApp(): Express {
   const app = express();
@@ -47,6 +67,7 @@ function createApp(): Express {
     next();
   });
   app.use("/api", videoRouter);
+  app.use("/api", videoProductionRouter);
   return app;
 }
 
@@ -70,10 +91,16 @@ async function resetDb() {
   await state.db.delete(t.tandemVideoMembersTable);
   await state.db.delete(t.tandemVideoProjectsTable);
   state.userId = null;
+  clearUserNameCache();
   state.clerkEmailToUser = {
     "editor@example.com": "user-2",
     "sound@example.com": "user-3",
     "creator2@example.com": "captain-2",
+  };
+  state.clerkIdToName = {
+    "captain-1": "Ada Captain",
+    "user-2": "Sam Editor",
+    "user-3": "Zoe Sound",
   };
 }
 
@@ -129,6 +156,8 @@ describe("projects", () => {
     expect(project.status).toBe("VAULT");
     expect(project.members).toHaveLength(1);
     expect(project.members[0].role).toBe("CAPTAIN");
+    // Member ids resolve to Clerk display names on the project detail.
+    expect(project.members[0].name).toBe("Ada Captain");
     expect(project.assets).toHaveLength(0);
   });
 
@@ -271,5 +300,222 @@ describe("vault assets", () => {
       .from(state.tables.tandemVideoAssetsTable)
       .where(eq(state.tables.tandemVideoAssetsTable.id, res.body.id));
     expect(row.storageKey).toBeTruthy();
+  });
+
+  it("marks THUMBNAIL_DESIGN uploads processed immediately with the image as its proxy", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "THUMBNAIL_DESIGN")
+      .attach("file", Buffer.from("fake png"), "cover.png");
+    expect(res.status).toBe(201);
+    expect(res.body.kind).toBe("THUMBNAIL_DESIGN");
+    expect(res.body.status).toBe("PROCESSED");
+
+    // No ffmpeg/whisper jobs — the image needs no proxy encode or transcript.
+    const jobs = await state.db
+      .select()
+      .from(state.tables.tandemVideoJobsTable)
+      .where(eq(state.tables.tandemVideoJobsTable.assetId, res.body.id));
+    expect(jobs).toHaveLength(0);
+
+    // A PROXY row serves the original file straight to the browser.
+    const files = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetFilesTable)
+      .where(eq(state.tables.tandemVideoAssetFilesTable.assetId, res.body.id));
+    expect(files).toHaveLength(1);
+    expect(files[0].kind).toBe("PROXY");
+    expect(files[0].mimeType).toBe("image/png");
+
+    // The proxy stream serves the image for the thumbnail studio.
+    const proxy = await request(API).get(`/api/video/projects/${project.id}/assets/${res.body.id}/proxy`);
+    expect(proxy.status).toBe(200);
+    expect(proxy.headers["content-type"]).toContain("image/png");
+  });
+});
+
+describe("content-addressed media (Git LFS)", () => {
+  it("stores the sha256 content hash on every upload", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const bytes = Buffer.from("hash me once");
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", bytes, "clip.mp4");
+    expect(res.status).toBe(201);
+    expect(res.body.contentHash).toBe(crypto.createHash("sha256").update(bytes).digest("hex"));
+  });
+
+  it("dedupes identical uploads to a single blob and reuses previews", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const bytes = Buffer.from("same footage, second pass");
+
+    const first = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", bytes, "pass-a.mp4");
+    expect(first.status).toBe(201);
+    await runWorkerCycle();
+
+    const [firstRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.id, first.body.id));
+    const [firstProxy] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetFilesTable)
+      .where(eq(state.tables.tandemVideoAssetFilesTable.assetId, first.body.id));
+
+    // Re-upload the exact same bytes — this must not write a second file.
+    const dirBefore = fs.readdirSync(process.env.VIDEO_UPLOAD_DIR!);
+    const second = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", bytes, "pass-b.mp4");
+    expect(second.status).toBe(201);
+    expect(second.body.contentHash).toBe(first.body.contentHash);
+    expect(second.body.status).toBe("PROCESSED");
+    expect(fs.readdirSync(process.env.VIDEO_UPLOAD_DIR!)).toEqual(dirBefore);
+
+    // The new asset is a pointer to the existing blob — no second copy.
+    const [secondRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.id, second.body.id));
+    expect(secondRow.storageKey).toBe(firstRow.storageKey);
+
+    // Derived previews are reused: the same proxy + transcript, no jobs, and
+    // the asset is already marked PROCESSED.
+    const [secondProxy] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetFilesTable)
+      .where(eq(state.tables.tandemVideoAssetFilesTable.assetId, second.body.id));
+    expect(secondProxy).toBeTruthy();
+    expect(secondProxy.storageKey).toBe(firstProxy.storageKey);
+
+    const [firstTranscript] = await state.db
+      .select()
+      .from(state.tables.tandemVideoTranscriptsTable)
+      .where(eq(state.tables.tandemVideoTranscriptsTable.assetId, first.body.id));
+    const [secondTranscript] = await state.db
+      .select()
+      .from(state.tables.tandemVideoTranscriptsTable)
+      .where(eq(state.tables.tandemVideoTranscriptsTable.assetId, second.body.id));
+    expect(secondTranscript).toBeTruthy();
+    const firstSegments = await state.db
+      .select()
+      .from(state.tables.tandemVideoTranscriptSegmentsTable)
+      .where(eq(state.tables.tandemVideoTranscriptSegmentsTable.transcriptId, firstTranscript.id));
+    const secondSegments = await state.db
+      .select()
+      .from(state.tables.tandemVideoTranscriptSegmentsTable)
+      .where(eq(state.tables.tandemVideoTranscriptSegmentsTable.transcriptId, secondTranscript.id));
+    expect(secondSegments).toHaveLength(firstSegments.length);
+
+    const jobs = await state.db
+      .select()
+      .from(state.tables.tandemVideoJobsTable)
+      .where(eq(state.tables.tandemVideoJobsTable.assetId, second.body.id));
+    expect(jobs).toHaveLength(0);
+  });
+
+  it("dedupes across projects — the vault is one content-addressed store", async () => {
+    const projectA = await createProject();
+    const projectB = await createProject(undefined, "Second Room");
+    state.userId = "captain-1";
+    const bytes = Buffer.from("shared master export");
+
+    await request(API)
+      .post(`/api/video/projects/${projectA.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", bytes, "master-a.mp4");
+    await request(API)
+      .post(`/api/video/projects/${projectB.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", bytes, "master-b.mp4");
+
+    const [a] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.projectId, projectA.id));
+    const [b] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.projectId, projectB.id));
+    expect(b.storageKey).toBe(a.storageKey);
+    expect(b.contentHash).toBe(a.contentHash);
+  });
+
+  it("dedupes against backfilled legacy uploads (pre-content-addressing rows)", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const bytes = Buffer.from("old footage, pre-hash era");
+
+    // Simulate a legacy asset: uploaded before hashing existed, file on disk
+    // but no contentHash column value. Backfill it, then re-upload the same
+    // bytes — the new asset must point at the legacy blob.
+    const key = "legacy-session.mp4";
+    fs.writeFileSync(path.join(process.env.VIDEO_UPLOAD_DIR!, key), bytes);
+    await state.db.insert(state.tables.tandemVideoAssetsTable).values({
+      id: "asset-legacy",
+      projectId: project.id,
+      uploaderId: "captain-1",
+      kind: "RAW_VIDEO",
+      fileName: "legacy.mp4",
+      mimeType: "video/mp4",
+      sizeBytes: bytes.length,
+      storageKey: key,
+      status: "PROCESSED",
+      version: 0,
+      createdAt: new Date(),
+    });
+    await backfillContentHashes(process.env.VIDEO_UPLOAD_DIR!);
+
+    const res = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", bytes, "re-upload.mp4");
+    expect(res.status).toBe(201);
+
+    const [legacyRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.id, "asset-legacy"));
+    const [newRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.id, res.body.id));
+    expect(newRow.storageKey).toBe(legacyRow.storageKey);
+    expect(legacyRow.contentHash).toBeTruthy();
+  });
+
+  it("dedupes before processing and still queues the missing preview jobs", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const bytes = Buffer.from("queued twice");
+
+    await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", bytes, "first.mp4");
+
+    // No worker run between uploads: nothing to reuse yet, so the second
+    // upload still enqueues its own PROXY + TRANSCRIBE jobs.
+    const second = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", bytes, "second.mp4");
+    expect(second.status).toBe(201);
+    expect(second.body.status).toBe("UPLOADED");
+
+    const jobs = await state.db
+      .select()
+      .from(state.tables.tandemVideoJobsTable)
+      .where(eq(state.tables.tandemVideoJobsTable.assetId, second.body.id));
+    expect(jobs.map((job: any) => job.type).sort()).toEqual(["PROXY", "TRANSCRIBE"]);
   });
 });

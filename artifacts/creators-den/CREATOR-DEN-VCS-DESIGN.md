@@ -1,8 +1,21 @@
 # Creator Den — External-First VCS Design ("GitHub for Video")
 
-**Status:** Decided direction (external-first), awaiting implementation.
+**Status:** Implemented. The full external-first loop is shipped — checkout
+(Phase 1), push with media/stems (Phase 2), review/diff + unified annotations
+(Phase 3), merge/history + commit log + genealogy (Phase 4), content-addressed
+media with legacy backfill + disk consolidation (Phase 0 copy reframe:
+stages/pull requests, marker rail on the player, server-side activity leg
+filter). Open decisions remain deferred by design (named branches, AAF import,
+parser library, in-browser editing as the primary path).
 **Scope:** Creator Den (`artifacts/creators-den`), the video platform behind the
 Content Creators door.
+**Deployment note:** the shipped schema additions (`tandem_video_assets.content_hash`,
+`tandem_video_asset_files.content_hash`, `collaboration_activity_events.leg`)
+need pushing to any live database:
+`pnpm --filter @workspace/db push` (no checked-in migrations by convention).
+After that, run `pnpm --filter @workspace/api-server backfill:hashes` once to
+address legacy uploads, and optionally `consolidate:hashes --apply` to reclaim
+duplicate disk.
 **Related docs:** `WORKSPACE-REFERENCE.md` (per-role reference-app tool
 catalogue), `START-APP.md`, `FEATURES.md`,
 `TADEM_COLLABORATION_IMPLEMENTATION_PLAN.md`.

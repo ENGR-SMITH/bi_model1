@@ -5,6 +5,7 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { VideoCommentGeometry } from './videoCommentGeometry';
 
 export interface VideoComment {
   id: string;
@@ -19,6 +20,17 @@ export interface VideoComment {
   authorId: string;
   /** @nullable */
   parentId: string | null;
+  /** @nullable */
+  geometry: VideoCommentGeometry;
+  kind: string;
+  /** @nullable */
+  color: string | null;
+  /** @nullable */
+  label: string | null;
+  /** @nullable */
+  submissionId: string | null;
+  /** @nullable */
+  timelineVersionId: string | null;
   /** @nullable */
   resolvedAt: Date | null;
   createdAt: Date;

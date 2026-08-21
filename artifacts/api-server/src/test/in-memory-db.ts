@@ -197,6 +197,7 @@ export const collaborationActivityEventsTable = sqliteTable("collaboration_activ
   eventType: text("event_type").notNull(),
   summary: text("summary").notNull(),
   resourceId: text("resource_id"),
+  leg: text("leg"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -247,6 +248,7 @@ export const tandemVideoAssetsTable = sqliteTable("tandem_video_assets", {
   sizeBytes: integer("size_bytes").notNull().default(0),
   durationMs: integer("duration_ms"),
   storageKey: text("storage_key").notNull(),
+  contentHash: text("content_hash"),
   status: text("status").notNull().default("UPLOADED"),
   version: integer("version").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
@@ -254,9 +256,10 @@ export const tandemVideoAssetsTable = sqliteTable("tandem_video_assets", {
 
 export const tandemVideoAssetFilesTable = sqliteTable("tandem_video_asset_files", {
   id: text("id").primaryKey(),
-  assetId: text("asset_id").notNull(),
+  assetId: text("asset_id"),
   kind: text("kind").notNull(),
   storageKey: text("storage_key").notNull(),
+  contentHash: text("content_hash"),
   mimeType: text("mime_type").notNull().default("application/octet-stream"),
   sizeBytes: integer("size_bytes").notNull().default(0),
   metadata: text("metadata", { mode: "json" }),
@@ -345,6 +348,12 @@ export const tandemVideoCommentsTable = sqliteTable("tandem_video_comments", {
   body: text("body").notNull(),
   authorId: text("author_id").notNull(),
   parentId: text("parent_id"),
+  geometry: text("geometry", { mode: "json" }),
+  kind: text("kind").notNull().default("TIMECODE"),
+  color: text("color"),
+  label: text("label"),
+  submissionId: text("submission_id"),
+  timelineVersionId: text("timeline_version_id"),
   resolvedAt: integer("resolved_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
@@ -419,7 +428,7 @@ export const tandemVideoSyncsTable = sqliteTable(
 export const tandemVideoJobsTable = sqliteTable("tandem_video_jobs", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
-  assetId: text("asset_id").notNull(),
+  assetId: text("asset_id"),
   type: text("type").notNull(),
   status: text("status").notNull().default("QUEUED"),
   attempts: integer("attempts").notNull().default(0),
@@ -551,7 +560,7 @@ export async function buildInMemoryDb() {
     CREATE TABLE collaboration_activity_events (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT, seed_id TEXT,
       actor_id TEXT NOT NULL, event_type TEXT NOT NULL, summary TEXT NOT NULL,
-      resource_id TEXT, created_at INTEGER NOT NULL
+      resource_id TEXT, leg TEXT, created_at INTEGER NOT NULL
     );
     CREATE TABLE collaboration_genealogy (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
@@ -589,12 +598,13 @@ export async function buildInMemoryDb() {
       uploader_id TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'RAW_VIDEO',
       file_name TEXT NOT NULL, mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
       size_bytes INTEGER NOT NULL DEFAULT 0, duration_ms INTEGER,
-      storage_key TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'UPLOADED',
+      storage_key TEXT NOT NULL, content_hash TEXT,
+      status TEXT NOT NULL DEFAULT 'UPLOADED',
       version INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
     );
     CREATE TABLE tandem_video_asset_files (
-      id TEXT PRIMARY KEY NOT NULL, asset_id TEXT NOT NULL,
-      kind TEXT NOT NULL, storage_key TEXT NOT NULL,
+      id TEXT PRIMARY KEY NOT NULL, asset_id TEXT,
+      kind TEXT NOT NULL, storage_key TEXT NOT NULL, content_hash TEXT,
       mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
       size_bytes INTEGER NOT NULL DEFAULT 0, metadata TEXT,
       created_at INTEGER NOT NULL
@@ -636,12 +646,14 @@ export async function buildInMemoryDb() {
     CREATE TABLE tandem_video_comments (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       leg TEXT, asset_id TEXT, timecode_ms INTEGER, body TEXT NOT NULL,
-      author_id TEXT NOT NULL, parent_id TEXT, resolved_at INTEGER,
-      created_at INTEGER NOT NULL
+      author_id TEXT NOT NULL, parent_id TEXT,
+      geometry TEXT, kind TEXT NOT NULL DEFAULT 'TIMECODE', color TEXT,
+      label TEXT, submission_id TEXT, timeline_version_id TEXT,
+      resolved_at INTEGER, created_at INTEGER NOT NULL
     );
     CREATE TABLE tandem_video_jobs (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
-      asset_id TEXT NOT NULL, type TEXT NOT NULL,
+      asset_id TEXT, type TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'QUEUED', attempts INTEGER NOT NULL DEFAULT 0,
       error TEXT, params TEXT, result TEXT,
       created_at INTEGER NOT NULL, started_at INTEGER, finished_at INTEGER

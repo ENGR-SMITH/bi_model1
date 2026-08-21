@@ -10,6 +10,8 @@ export const VIDEO_JOB_TYPES = [
   "EXPORT",
   "THUMBNAIL",
   "REFERENCE_ANALYZE",
+  "INTERCHANGE",
+  "EXPORT_BUNDLE",
 ] as const;
 
 export type VideoJobType = (typeof VIDEO_JOB_TYPES)[number];

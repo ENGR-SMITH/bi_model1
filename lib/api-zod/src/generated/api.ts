@@ -1707,6 +1707,7 @@ export const CreateVideoProjectResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "userId": zod.string(),
+  "name": zod.string().nullable().describe('Resolved Clerk display name'),
   "role": zod.string(),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -1720,6 +1721,7 @@ export const CreateVideoProjectResponse = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date()
@@ -1750,6 +1752,7 @@ export const GetVideoProjectResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "userId": zod.string(),
+  "name": zod.string().nullable().describe('Resolved Clerk display name'),
   "role": zod.string(),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -1763,6 +1766,7 @@ export const GetVideoProjectResponse = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date()
@@ -1784,13 +1788,14 @@ export const AddVideoProjectMemberParams = zod.object({
 
 export const AddVideoProjectMemberBody = zod.object({
   "email": zod.string().email(),
-  "role": zod.enum(['UPLOADER', 'ARCHITECT', 'VISUAL_EDITOR', 'SOUND_DESIGNER', 'MOTION_COLOR', 'VIEWER'])
+  "role": zod.enum(['UPLOADER', 'ARCHITECT', 'VISUAL_EDITOR', 'SOUND_DESIGNER', 'MOTION_COLOR', 'THUMBNAIL_DESIGNER', 'VIEWER'])
 })
 
 export const AddVideoProjectMemberResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "userId": zod.string(),
+  "name": zod.string().nullable().describe('Resolved Clerk display name'),
   "role": zod.string(),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -1816,6 +1821,7 @@ export const ListVideoAssetsResponseItem = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date()
@@ -1835,7 +1841,7 @@ export const UploadVideoAssetParams = zod.object({
 
 export const UploadVideoAssetBody = zod.object({
   "file": zod.instanceof(File),
-  "kind": zod.enum(['RAW_VIDEO', 'RAW_AUDIO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE', 'VO_PICKUP', 'GRAPHIC'])
+  "kind": zod.enum(['RAW_VIDEO', 'RAW_AUDIO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE', 'VO_PICKUP', 'GRAPHIC', 'THUMBNAIL_DESIGN'])
 }).describe('Multipart upload of a raw asset into the project vault')
 
 export const UploadVideoAssetResponse = zod.object({
@@ -1847,6 +1853,7 @@ export const UploadVideoAssetResponse = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date()
@@ -1874,6 +1881,7 @@ export const GetVideoAssetResponse = zod.object({
   "mimeType": zod.string(),
   "sizeBytes": zod.number().int(),
   "durationMs": zod.number().int().nullable(),
+  "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
   "createdAt": zod.coerce.date(),
@@ -1925,7 +1933,7 @@ export const GetVideoAssetProxyResponse = zod.unknown()
 
 export const GetVideoTimelineParams = zod.object({
   "projectId": zod.coerce.string().min(1),
-  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH'])
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
 })
 
 export const GetVideoTimelineResponse = zod.object({
@@ -1940,6 +1948,7 @@ export const GetVideoTimelineResponse = zod.object({
   "version": zod.number().int(),
   "message": zod.string(),
   "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })),
   "updatedAt": zod.coerce.date()
@@ -1954,7 +1963,7 @@ export const GetVideoTimelineResponse = zod.object({
 
 export const SaveVideoTimelineParams = zod.object({
   "projectId": zod.coerce.string().min(1),
-  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH'])
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
 })
 
 export const saveVideoTimelineBodyMessageMax = 500;
@@ -1978,6 +1987,7 @@ export const SaveVideoTimelineResponse = zod.object({
   "version": zod.number().int(),
   "message": zod.string(),
   "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })),
   "updatedAt": zod.coerce.date()
@@ -1992,7 +2002,7 @@ export const SaveVideoTimelineResponse = zod.object({
 
 export const ListVideoTimelineVersionsParams = zod.object({
   "projectId": zod.coerce.string().min(1),
-  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH'])
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
 })
 
 export const ListVideoTimelineVersionsResponseItem = zod.object({
@@ -2000,9 +2010,34 @@ export const ListVideoTimelineVersionsResponseItem = zod.object({
   "version": zod.number().int(),
   "message": zod.string(),
   "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })
 export const ListVideoTimelineVersionsResponse = zod.array(ListVideoTimelineVersionsResponseItem)
+
+
+/**
+ * @summary Read the full snapshot of one timeline version (for diffing / review)
+ */
+
+
+
+
+export const GetVideoTimelineVersionParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL']),
+  "versionId": zod.coerce.string().min(1)
+})
+
+export const GetVideoTimelineVersionResponse = zod.object({
+  "id": zod.string(),
+  "version": zod.number().int(),
+  "message": zod.string(),
+  "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "snapshot": zod.record(zod.string(), zod.unknown())
+})
 
 
 /**
@@ -2013,7 +2048,7 @@ export const ListVideoTimelineVersionsResponse = zod.array(ListVideoTimelineVers
 
 export const RollbackVideoTimelineParams = zod.object({
   "projectId": zod.coerce.string().min(1),
-  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH'])
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
 })
 
 
@@ -2035,10 +2070,268 @@ export const RollbackVideoTimelineResponse = zod.object({
   "version": zod.number().int(),
   "message": zod.string(),
   "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })),
   "updatedAt": zod.coerce.date()
 })
+
+
+/**
+ * The checkout half of the external-first round-trip — the editor opens the cut in Premiere/Resolve/Avid, finishes it there, and re-imports the result. FCPXML export lives at /checkout/fcpxml.
+ * @summary Download the leg's current snapshot as a CMX3600 EDL for an external NLE
+ */
+
+
+
+export const CheckoutVideoTimelineParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const CheckoutVideoTimelineResponse = zod.string()
+
+
+/**
+ * The FCPXML variant of the checkout — source media round-trips through the clip `uid`/`ref` attributes, so a re-import relinks exactly.
+ * @summary Download the leg's current snapshot as an FCPXML 1.9 project for Final Cut or Premiere
+ */
+
+
+
+export const CheckoutVideoTimelineFcpxmlParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const CheckoutVideoTimelineFcpxmlResponse = zod.unknown()
+
+
+/**
+ * The OTIO variant of the checkout — the canonical interchange. Source media round-trips through `metadata.assetId`, so a re-import relinks exactly.
+ * @summary Download the leg's current snapshot as an OpenTimelineIO (OTIO) Timeline.1 document
+ */
+
+
+
+export const CheckoutVideoTimelineOtioParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const CheckoutVideoTimelineOtioResponse = zod.string()
+
+
+/**
+ * The AAF variant of the checkout — export-only per the design (AAF is a binary Microsoft format intended for one-directional handoff to Avid/Premiere via AMA, not a round-trip interchange). Source media round-trips through the SourceMob UMIDs, matching the other formats' relink keys.
+ * @summary Download the leg's current snapshot as an AAF file (export-only)
+ */
+
+
+
+export const CheckoutVideoTimelineAafParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const CheckoutVideoTimelineAafResponse = zod.unknown()
+
+
+/**
+ * @summary List the source media referenced by a leg's checkout EDL
+ */
+
+
+
+export const GetVideoTimelineCheckoutManifestParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const GetVideoTimelineCheckoutManifestResponse = zod.object({
+  "projectId": zod.string(),
+  "leg": zod.string(),
+  "version": zod.number().int().nullable(),
+  "media": zod.array(zod.object({
+  "assetId": zod.string(),
+  "fileName": zod.string(),
+  "kind": zod.string(),
+  "reel": zod.string(),
+  "clipIds": zod.array(zod.string()),
+  "firstInMs": zod.number().int(),
+  "lastOutMs": zod.number().int(),
+  "downloadPath": zod.string()
+}))
+})
+
+
+/**
+ * The background half of the checkout — materializes the leg's saved snapshot as a single downloadable zip (EDL + FCPXML + OTIO + AAF + media manifest, plus the referenced originals when includeMedia is set) and streams `job.progress` to the project room while it runs. Returns 409 if a bundle is already building for this leg.
+ * @summary Enqueue a background checkout bundle build (EXPORT_BUNDLE job) for a leg
+ */
+
+
+
+export const ExportVideoTimelineCheckoutParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const exportVideoTimelineCheckoutBodyIncludeMediaDefault = false;
+
+export const ExportVideoTimelineCheckoutBody = zod.object({
+  "includeMedia": zod.boolean().default(exportVideoTimelineCheckoutBodyIncludeMediaDefault).describe('Embed the referenced originals in the zip (self-contained bundle) instead of just the interchange docs + manifest')
+}).describe('Request a background checkout bundle build for a leg')
+
+export const ExportVideoTimelineCheckoutResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "assetId": zod.string().nullable(),
+  "type": zod.string(),
+  "status": zod.string(),
+  "attempts": zod.number().int(),
+  "error": zod.string().nullable(),
+  "params": zod.record(zod.string(), zod.unknown()).nullable(),
+  "result": zod.record(zod.string(), zod.unknown()).nullable(),
+  "createdAt": zod.coerce.date(),
+  "startedAt": zod.coerce.date().nullable(),
+  "finishedAt": zod.coerce.date().nullable()
+}).describe('The enqueued EXPORT_BUNDLE job')
+
+
+/**
+ * @summary Get the latest EXPORT_BUNDLE job for a leg (queue state + artifact)
+ */
+
+
+
+export const GetVideoTimelineCheckoutBundleParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const GetVideoTimelineCheckoutBundleResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "assetId": zod.string().nullable(),
+  "type": zod.string(),
+  "status": zod.string(),
+  "attempts": zod.number().int(),
+  "error": zod.string().nullable(),
+  "params": zod.record(zod.string(), zod.unknown()).nullable(),
+  "result": zod.record(zod.string(), zod.unknown()).nullable(),
+  "createdAt": zod.coerce.date(),
+  "startedAt": zod.coerce.date().nullable(),
+  "finishedAt": zod.coerce.date().nullable()
+}).describe('The latest EXPORT_BUNDLE job for a leg (queue state + artifact location)')
+
+
+/**
+ * Streams the zip produced by the latest SUCCEEDED EXPORT_BUNDLE job for this leg.
+ * @summary Download the built checkout bundle zip for a leg
+ */
+
+
+
+export const GetVideoTimelineCheckoutBundleDownloadParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const GetVideoTimelineCheckoutBundleDownloadResponse = zod.unknown()
+
+
+/**
+ * The push half of the round-trip — parse the CMX3600 EDL, FCPXML, or OpenTimelineIO document, relink its sources to vault assets, save a new Git-style version, and (by default) submit it for Captain review.
+ * @summary Re-import an edited interchange document (EDL, FCPXML, or OTIO) from an external NLE as a new timeline version
+ */
+
+
+
+export const ImportVideoTimelineParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
+})
+
+export const importVideoTimelineBodyFormatDefault = `EDL`;
+export const importVideoTimelineBodyMessageMax = 500;
+
+export const importVideoTimelineBodySubmitDefault = true;
+
+export const ImportVideoTimelineBody = zod.object({
+  "format": zod.enum(['EDL', 'FCPXML', 'OTIO']).default(importVideoTimelineBodyFormatDefault),
+  "document": zod.string().min(1),
+  "message": zod.string().max(importVideoTimelineBodyMessageMax).optional(),
+  "submit": zod.boolean().default(importVideoTimelineBodySubmitDefault),
+  "media": zod.array(zod.instanceof(File)).optional().describe('Optional rendered master \/ stems attached to the push')
+}).describe('An interchange document to re-import — `format` picks the parser (CMX3600 EDL default, FCPXML 1.9, or OpenTimelineIO Timeline.1). `media` optionally carries the rendered master \/ stems to land in the vault with the push (content-addressed, so unchanged files dedupe).')
+
+export const ImportVideoTimelineResponse = zod.object({
+  "version": zod.number().int(),
+  "clips": zod.number().int(),
+  "submissionId": zod.string().nullable(),
+  "media": zod.array(zod.object({
+  "id": zod.string(),
+  "fileName": zod.string(),
+  "kind": zod.string(),
+  "deduplicated": zod.boolean().describe('True when identical bytes already existed and the stored blob was reused (Git-LFS dedupe)')
+}).describe('A media file that landed in the vault with the import'))
+})
+
+
+/**
+ * @summary Project activity feed (saves, imports, rollbacks, submissions, decisions, uploads)
+ */
+
+
+
+export const ListVideoActivityParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const ListVideoActivityQueryParams = zod.object({
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL']).optional().describe('Optional leg (stage) filter — returns only that leg\'s events')
+})
+
+export const ListVideoActivityResponseItem = zod.object({
+  "id": zod.string(),
+  "actorId": zod.string(),
+  "actorName": zod.string().nullable().describe('Resolved Clerk display name'),
+  "eventType": zod.string(),
+  "summary": zod.string(),
+  "resourceId": zod.string().nullable(),
+  "leg": zod.string().nullable().describe('The leg the event belongs to (SELECTS\/CUT\/SOUND\/FINISH\/THUMBNAIL); null for vault-wide events like uploads'),
+  "createdAt": zod.coerce.date()
+}).describe('One immutable line on the project activity feed')
+export const ListVideoActivityResponse = zod.array(ListVideoActivityResponseItem)
+
+
+/**
+ * @summary Version provenance (every version chained to its parent, with review decisions)
+ */
+
+
+
+export const ListVideoGenealogyParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const ListVideoGenealogyResponseItem = zod.object({
+  "id": zod.string(),
+  "leg": zod.string(),
+  "version": zod.number().int(),
+  "message": zod.string(),
+  "createdById": zod.string(),
+  "parentVersionId": zod.string().nullable(),
+  "parentVersion": zod.number().int().nullable(),
+  "createdAt": zod.coerce.date(),
+  "submission": zod.object({
+  "status": zod.string(),
+  "decidedById": zod.string().nullable(),
+  "decidedAt": zod.coerce.date().nullable()
+}).nullable().describe('The review decision (if any) that pinned this version')
+}).describe('One version\'s provenance — its author, its parent in the chain, and the review decision that pinned it')
+export const ListVideoGenealogyResponse = zod.array(ListVideoGenealogyResponseItem)
 
 
 /**
@@ -2082,7 +2375,7 @@ export const createVideoSubmissionBodyNoteMax = 2000;
 
 
 export const CreateVideoSubmissionBody = zod.object({
-  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH']),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL']),
   "note": zod.string().max(createVideoSubmissionBodyNoteMax).optional()
 })
 
@@ -2174,6 +2467,12 @@ export const ListVideoCommentsResponseItem = zod.object({
   "body": zod.string(),
   "authorId": zod.string(),
   "parentId": zod.string().nullable(),
+  "geometry": zod.record(zod.string(), zod.unknown()).nullable(),
+  "kind": zod.string(),
+  "color": zod.string().nullable(),
+  "label": zod.string().nullable(),
+  "submissionId": zod.string().nullable(),
+  "timelineVersionId": zod.string().nullable(),
   "resolvedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -2194,15 +2493,24 @@ export const createVideoCommentBodyTimecodeMsMin = 0;
 
 export const createVideoCommentBodyBodyMax = 4000;
 
+export const createVideoCommentBodyKindDefault = `TIMECODE`;
+export const createVideoCommentBodyLabelMax = 12;
+
 
 
 export const CreateVideoCommentBody = zod.object({
-  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH']).optional(),
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL']).optional(),
   "assetId": zod.string().optional(),
   "timecodeMs": zod.number().int().min(createVideoCommentBodyTimecodeMsMin).optional(),
   "body": zod.string().min(1).max(createVideoCommentBodyBodyMax),
-  "parentId": zod.string().optional()
-})
+  "parentId": zod.string().optional(),
+  "kind": zod.enum(['TIMECODE', 'PIN', 'HIGHLIGHT', 'MARK']).default(createVideoCommentBodyKindDefault),
+  "geometry": zod.record(zod.string(), zod.unknown()).optional(),
+  "color": zod.string().optional(),
+  "label": zod.string().max(createVideoCommentBodyLabelMax).optional(),
+  "submissionId": zod.string().optional(),
+  "timelineVersionId": zod.string().optional()
+}).describe('A timecode note or a spatial annotation (kind PIN\/HIGHLIGHT\/MARK carries a normalized geometry)')
 
 export const CreateVideoCommentResponse = zod.object({
   "id": zod.string(),
@@ -2213,6 +2521,12 @@ export const CreateVideoCommentResponse = zod.object({
   "body": zod.string(),
   "authorId": zod.string(),
   "parentId": zod.string().nullable(),
+  "geometry": zod.record(zod.string(), zod.unknown()).nullable(),
+  "kind": zod.string(),
+  "color": zod.string().nullable(),
+  "label": zod.string().nullable(),
+  "submissionId": zod.string().nullable(),
+  "timelineVersionId": zod.string().nullable(),
   "resolvedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -2243,6 +2557,12 @@ export const ResolveVideoCommentResponse = zod.object({
   "body": zod.string(),
   "authorId": zod.string(),
   "parentId": zod.string().nullable(),
+  "geometry": zod.record(zod.string(), zod.unknown()).nullable(),
+  "kind": zod.string(),
+  "color": zod.string().nullable(),
+  "label": zod.string().nullable(),
+  "submissionId": zod.string().nullable(),
+  "timelineVersionId": zod.string().nullable(),
   "resolvedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -2261,7 +2581,7 @@ export const ListVideoJobsParams = zod.object({
 export const ListVideoJobsResponseItem = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2297,7 +2617,7 @@ export const SyncVideoAssetBody = zod.object({
 export const SyncVideoAssetResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2342,7 +2662,7 @@ export const ListVideoSyncsResponse = zod.array(ListVideoSyncsResponseItem)
 
 export const RenderVideoTimelineParams = zod.object({
   "projectId": zod.coerce.string().min(1),
-  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH'])
+  "leg": zod.enum(['SELECTS', 'CUT', 'SOUND', 'FINISH', 'THUMBNAIL'])
 })
 
 export const renderVideoTimelineBodyFormatDefault = `PREVIEW`;
@@ -2354,7 +2674,7 @@ export const RenderVideoTimelineBody = zod.object({
 export const RenderVideoTimelineResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2385,7 +2705,7 @@ export const QueueAudioPassBody = zod.object({
 export const QueueAudioPassResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2418,7 +2738,7 @@ export const QueueVideoExportBody = zod.object({
 export const QueueVideoExportResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2454,7 +2774,7 @@ export const QueueVideoThumbnailBody = zod.object({
 export const QueueVideoThumbnailResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
@@ -2518,7 +2838,7 @@ export const AnalyzeVideoReferenceParams = zod.object({
 export const AnalyzeVideoReferenceResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "assetId": zod.string(),
+  "assetId": zod.string().nullable(),
   "type": zod.string(),
   "status": zod.string(),
   "attempts": zod.number().int(),
