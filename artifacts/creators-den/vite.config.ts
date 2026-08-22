@@ -27,6 +27,12 @@ if (!basePath) {
   );
 }
 
+// Dev-only, opt-in escape hatch for local visual/design QA. When launched with
+// CREATORS_DEV_NO_AUTH=1, Clerk is swapped for a local mock (src/dev/clerk-mock*)
+// so the app renders without a real sign-in. Unset (every build/deploy) this is
+// a no-op and the genuine Clerk package is used untouched.
+const devNoAuth = process.env.CREATORS_DEV_NO_AUTH === '1';
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -49,6 +55,21 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
+      // The `/internal` entry MUST precede the base package: Vite matches
+      // string aliases by prefix and uses the first hit, so `@clerk/react`
+      // listed first would also swallow `@clerk/react/internal`.
+      ...(devNoAuth
+        ? {
+            '@clerk/react/internal': path.resolve(
+              import.meta.dirname,
+              'src/dev/clerk-mock-internal.ts',
+            ),
+            '@clerk/react': path.resolve(
+              import.meta.dirname,
+              'src/dev/clerk-mock.ts',
+            ),
+          }
+        : {}),
       '@': path.resolve(import.meta.dirname, 'src'),
     },
     dedupe: ['react', 'react-dom'],

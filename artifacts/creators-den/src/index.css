@@ -74,8 +74,8 @@
   button { cursor: pointer; }
 }
 
-.app-shell { min-height: 100dvh; display: flex; background: hsl(var(--background)); }
-.sidebar { width: 244px; flex: 0 0 244px; min-height: 100dvh; padding: 27px 16px 19px; background: hsl(var(--sidebar)); color: hsl(var(--sidebar-foreground)); display: flex; flex-direction: column; position: sticky; top: 0; z-index: 20; transition: width .25s ease, flex-basis .25s ease, padding .25s ease; }
+.app-shell { --sidebar-w: 246px; min-height: 100dvh; display: flex; background: hsl(var(--background)); }
+.sidebar { width: var(--sidebar-w); flex: 0 0 var(--sidebar-w); min-height: 100dvh; padding: 27px 16px 19px; background: hsl(var(--sidebar)); color: hsl(var(--sidebar-foreground)); display: flex; flex-direction: column; position: sticky; top: 0; z-index: 20; transition: width .25s ease, flex-basis .25s ease, padding .25s ease; }
 .brand-row { display: flex; align-items: center; gap: 10px; padding: 0 10px 29px; white-space: nowrap; overflow: hidden; }
 .brand-mark { width: 27px; height: 27px; flex: 0 0 27px; border: 1px solid hsl(var(--sidebar-primary)); color: hsl(var(--sidebar-primary)); border-radius: 50%; display: grid; place-items: center; font: 700 17px var(--app-font-serif); font-style: italic; }
 .brand-name { font: 700 17px var(--app-font-serif); letter-spacing: -.04em; }
@@ -190,17 +190,11 @@
 .big-search { height: 63px; padding: 0 19px; gap: 11px; }.big-search input { font-size: 18px; font-family: var(--app-font-serif); }.big-search kbd, kbd { border: 1px solid hsl(var(--border)); border-radius: 3px; padding: 3px 6px; color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }.search-results { margin-top: 12px; }.result-row { width: 100%; border: 0; border-bottom: 1px solid hsl(var(--border)); background: transparent; display: grid; grid-template-columns: 85px 1fr 20px; gap: 15px; text-align: left; align-items: center; padding: 16px 8px; color: hsl(var(--foreground)); }.result-row:hover { background: hsl(var(--secondary)); }.result-type { color: hsl(var(--accent)); font: 9px var(--app-font-mono); text-transform: uppercase; }.result-row b { font: 700 15px var(--app-font-serif); }.result-row p { margin: 4px 0 0; color: hsl(var(--muted-foreground)); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.revision-layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; min-height: 510px; }.revision-list, .revision-preview { border: 1px solid hsl(var(--border)); background: hsl(var(--card)); }.revision-row { width: 100%; padding: 14px; display: flex; align-items: center; gap: 10px; background: transparent; border: 0; border-bottom: 1px solid hsl(var(--border)); text-align: left; color: hsl(var(--muted-foreground)); }.revision-row.selected { background: hsl(var(--secondary)); color: hsl(var(--foreground)); border-left: 2px solid hsl(var(--accent)); }.revision-row > span { display: flex; flex-direction: column; flex: 1; gap: 4px; }.revision-row b { font-size: 12px; }.revision-row small, .revision-row em { font: 9px var(--app-font-mono); color: hsl(var(--muted-foreground)); }.revision-preview { padding: 25px; }.revision-preview h2 { font: 700 23px var(--app-font-serif); margin: 21px 0 4px; }.revision-date { color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }.revision-copy { white-space: pre-wrap; font: 14px/1.75 var(--app-font-serif); color: hsl(var(--foreground)); margin-top: 26px; }.revision-copy p { margin: 0 0 18px; }.tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }.target-number { display: flex; align-items: baseline; gap: 7px; margin: 5px 0 13px; }.target-number b { font: 700 39px var(--app-font-serif); letter-spacing: -.05em; }.target-number span { color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }.progress-track { height: 5px; background: hsl(var(--border)); border-radius: 5px; overflow: hidden; margin-bottom: 22px; }.progress-track span { display: block; height: 100%; background: hsl(164 33% 45%); }.progress-track.peach span { background: hsl(var(--accent)); }.settings-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }.settings-card { min-height: 250px; }.choice-row { display: flex; gap: 9px; margin-bottom: 25px; }.choice { flex: 1; border: 1px solid hsl(var(--border)); background: transparent; color: hsl(var(--foreground)); padding: 14px 10px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 11px; }.choice.selected { border-color: hsl(var(--accent)); background: hsl(var(--accent) / .1); }.light-swatch, .dark-swatch { width: 22px; height: 22px; border-radius: 50%; background: hsl(38 34% 94%); border: 1px solid hsl(var(--border)); }.dark-swatch { background: hsl(220 20% 11%); }.setting-row { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid hsl(var(--border)); padding: 13px 0; }.setting-row b, .setting-row small { display: block; }.setting-row b { font-size: 12px; }.setting-row small { color: hsl(var(--muted-foreground)); font-size: 10px; margin-top: 3px; }.export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }.export-grid button { border: 1px solid hsl(var(--border)); background: transparent; color: hsl(var(--foreground)); padding: 10px; text-align: left; display: flex; align-items: center; gap: 7px; font-size: 11px; }.export-grid button:hover { border-color: hsl(var(--accent)); color: hsl(var(--accent)); }.danger-card { grid-column: span 2; }.empty-state { border: 1px dashed hsl(var(--border)); min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: hsl(var(--muted-foreground)); padding: 25px; }.empty-state svg { color: hsl(var(--accent)); margin-bottom: 10px; }.empty-state h3 { color: hsl(var(--foreground)); font: 700 19px var(--app-font-serif); margin: 0 0 6px; }.empty-state p { font-size: 12px; margin: 0 0 16px; }.setting-copy { font-size: 12px; line-height: 1.6; color: hsl(var(--muted-foreground)); }
 .tutorial-dock { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); width: min(700px, calc(100% - 40px)); z-index: 30; display: flex; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid hsl(var(--accent) / .45); background: hsl(var(--card) / .96); box-shadow: var(--shadow-md); backdrop-filter: blur(12px); animation: pageIn .25s ease both; }.tutorial-dock > div { flex: 1; display: flex; flex-direction: column; gap: 3px; }.tutorial-dock b { font: 700 14px var(--app-font-serif); }.tutorial-dock small { color: hsl(var(--muted-foreground)); font-size: 10px; }.dock-arrow { position: absolute; bottom: -8px; left: 50%; width: 15px; height: 15px; background: hsl(var(--card)); border-right: 1px solid hsl(var(--accent) / .45); border-bottom: 1px solid hsl(var(--accent) / .45); transform: rotate(45deg); }.tutorial-backdrop { background: hsl(0 0% 0% / .7); }.tutorial-modal { width: min(540px, 100%); padding: 42px 42px 32px; }.tutorial-mark { display: flex; align-items: center; gap: 7px; margin-bottom: 28px; }.tutorial-mark span { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); font: italic 22px var(--app-font-serif); }.tutorial-mark i { display: block; width: 40px; height: 1px; background: hsl(var(--accent)); }.tutorial-modal h2 { max-width: 390px; font: 700 34px/1.05 var(--app-font-serif); letter-spacing: -.05em; margin: 11px 0 0; }.tutorial-modal > p { max-width: 420px; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.75; margin: 12px 0 30px; }.tutorial-progress { display: flex; gap: 6px; margin-bottom: 25px; }.tutorial-progress span { width: 30px; height: 3px; border-radius: 3px; background: hsl(var(--border)); }.tutorial-progress span.active { background: hsl(var(--accent)); }.tutorial-actions { display: flex; align-items: center; gap: 16px; border-top: 1px solid hsl(var(--border)); padding-top: 18px; }.tutorial-actions .link-btn { color: hsl(var(--muted-foreground)); font-weight: 500; }.tutorial-hint { color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }.modal-backdrop { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; background: hsl(0 0% 0% / .7); backdrop-filter: blur(5px); animation: fadeIn .2s ease both; }.modal { width: min(640px, 100%); max-height: 90dvh; overflow: auto; position: relative; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); padding: 33px; box-shadow: var(--shadow-xl); }.small-modal { width: min(460px, 100%); }.modal-close { position: absolute; right: 17px; top: 17px; }.modal h2 { font: 700 29px var(--app-font-serif); letter-spacing: -.05em; margin: 10px 0 6px; }.modal > p { color: hsl(var(--muted-foreground)); font-size: 12px; margin: 0 0 24px; }.template-options { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; margin-bottom: 24px; }.template-option { min-height: 105px; border: 1px solid hsl(var(--border)); background: transparent; padding: 10px 6px; text-align: left; color: hsl(var(--foreground)); display: flex; flex-direction: column; align-items: flex-start; gap: 5px; }.template-option:hover, .template-option.selected { border-color: hsl(var(--accent)); background: hsl(var(--accent) / .1); }.template-glyph { font: italic 20px var(--app-font-serif); color: hsl(var(--accent)); }.template-option b { font-size: 10px; }.template-option small { color: hsl(var(--muted-foreground)); font-size: 8px; line-height: 1.2; }.modal-submit { width: 100%; margin-top: 5px; }.drop-zone { border: 1px dashed hsl(var(--accent)); min-height: 170px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; color: hsl(var(--accent)); cursor: pointer; }.drop-zone b { color: hsl(var(--foreground)); font-size: 13px; }.drop-zone small { color: hsl(var(--muted-foreground)); font-size: 10px; }.shortcut-list { border-top: 1px solid hsl(var(--border)); margin-top: 24px; }.shortcut-list div { display: flex; align-items: center; gap: 15px; border-bottom: 1px solid hsl(var(--border)); padding: 13px 0; color: hsl(var(--muted-foreground)); font-size: 12px; }.shortcut-list kbd { min-width: 48px; text-align: center; }.toast { position: fixed; right: 25px; bottom: 25px; z-index: 60; display: flex; align-items: center; gap: 8px; background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding: 11px 15px; border-radius: 5px; box-shadow: var(--shadow-xl); font-size: 12px; animation: pageIn .25s ease both; }.toast svg { color: hsl(var(--sidebar-primary)); } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }.mobile-only { display: none; }
 
-@media (min-width: 981px) {
-  .sidebar:not(:hover) { width: 76px; flex-basis: 76px; padding-left: 12px; padding-right: 12px; }
-  .sidebar:not(:hover) .brand-copy, .sidebar:not(:hover) .workspace-copy, .sidebar:not(:hover) .workspace-switch > svg, .sidebar:not(:hover) .nav-item span, .sidebar:not(:hover) .nav-label, .sidebar:not(:hover) .tutorial-btn span, .sidebar:not(:hover) .new-project-btn span { display: none; }
-  .sidebar:not(:hover) .brand-row { justify-content: center; padding-left: 0; padding-right: 0; }
-  .sidebar:not(:hover) .workspace-switch { justify-content: center; padding: 9px 6px; }
-  .sidebar:not(:hover) .workspace-icon { width: 29px; height: 29px; }
-  .sidebar:not(:hover) .nav-item { justify-content: center; padding: 11px 8px; }
-  .sidebar:not(:hover) .nav-item.active { box-shadow: inset 0 0 0 1px hsl(var(--sidebar-primary) / .3); }
-  .sidebar:not(:hover) .sidebar-bottom button { padding-left: 7px; padding-right: 7px; }
-}
-@media (max-width: 980px) { .sidebar { width: 215px; flex-basis: 215px; }.topbar { padding: 0 25px; }.page { padding-left: 30px; padding-right: 30px; }.hero-orbit { margin-right: 0; transform: scale(.8); }.project-grid { grid-template-columns: repeat(2, 1fr); }.project-card.featured { grid-column: span 2; }.world-categories { grid-template-columns: repeat(3, 1fr); }.editor-page { padding-left: 30px; padding-right: 30px; } }
+/* Persistent, fully-labeled sidebar on desktop (Netflix/YouTube-style left nav).
+   The former hover-to-expand icon rail was removed: it collapsed the sidebar to
+   76px while the main stage stayed offset by the full width, leaving a dead gap,
+   and it hid the role labels that make the relay stages legible. */
+@media (max-width: 980px) { .app-shell { --sidebar-w: 216px; }.topbar { padding: 0 25px; }.page { padding-left: 30px; padding-right: 30px; }.hero-orbit { margin-right: 0; transform: scale(.8); }.project-grid { grid-template-columns: repeat(2, 1fr); }.project-card.featured { grid-column: span 2; }.world-categories { grid-template-columns: repeat(3, 1fr); }.editor-page { padding-left: 30px; padding-right: 30px; } }
 @media (max-width: 700px) { .mobile-only { display: inline-grid; }.sidebar { position: fixed; left: -260px; transition: left .25s ease; box-shadow: var(--shadow-xl); }.sidebar.sidebar-open { left: 0; }.sidebar-close { display: inline-grid; margin-left: auto; }.topbar { height: 59px; padding: 0 15px; }.top-actions .save-indicator { display: none; }.top-workspace b { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.page { padding: 29px 16px 45px; }.page-header { align-items: flex-start; flex-direction: column; gap: 17px; margin-bottom: 27px; }.page-header h1 { font-size: 34px; }.home-page { padding-top: 30px; }.home-hero { min-height: auto; margin-bottom: 45px; }.home-hero h1 { font-size: 49px; }.home-hero p { font-size: 12px; }.hero-orbit { display: none; }.project-grid, .home-lower, .general-layout, .plot-split, .split-layout, .revision-layout, .tools-grid, .settings-layout { grid-template-columns: 1fr; }.project-card.featured, .frequency-card, .danger-card { grid-column: auto; }.stats-row { grid-template-columns: 1fr 1fr; }.stat { border-bottom: 1px solid hsl(var(--border)); }.two-fields, .three-fields, .world-form-grid { grid-template-columns: 1fr; gap: 0; }.paper-card { padding: 20px; }.world-categories { grid-template-columns: repeat(2, 1fr); }.outline-tools { flex-wrap: wrap; gap: 9px; }.search-field { max-width: none; flex-basis: 100%; }.outline-tools > .mono-label { margin-left: 0; }.scene-row { grid-template-columns: 30px 1fr; }.scene-actions { grid-column: 2; grid-row: 1; justify-content: flex-end; }.scene-quick-edit { grid-column: 2; flex-wrap: wrap; }.scene-relationship-wrap { grid-column: 2; }.scene-quick-edit input { flex-basis: 100%; }.edit-scene-btn { margin-left: 0; }.editor-page { min-height: calc(100dvh - 59px); padding: 24px 12px 0; }.editor-title-input { width: min(260px, 62vw); font-size: 23px; }.editor-head-actions .save-indicator { display: none; }.editor-layout { margin-top: 18px; }.draft-area { padding: 32px 20px; font-size: 16px; }.editor-settings { position: absolute; right: 12px; top: 140px; z-index: 5; width: 220px; }.editor-footer { gap: 9px; padding-bottom: 10px; }.editor-footer span:nth-child(2), .editor-footer span:nth-child(3) { display: none; }.template-options { grid-template-columns: repeat(2, 1fr); }.template-option:last-child { grid-column: span 2; }.modal { padding: 25px 18px; }.tutorial-modal { padding: 31px 22px 24px; }.tutorial-modal h2 { font-size: 29px; }.tutorial-dock { width: calc(100% - 24px); bottom: 12px; }.tutorial-dock .primary-btn { padding: 9px; }.tutorial-dock small { display: none; }.workspace-menu { width: min(260px, calc(100vw - 30px)); }.top-workspace-wrap .workspace-menu { right: 0; left: auto; }.media-canvas { min-height: 180px; } }
 @media (max-width: 700px) { .editor-head { grid-template-columns: 1fr auto; }.editor-head-center { grid-column: 1 / -1; justify-content: center; margin-top: 12px; }.editor-head-actions { justify-self: end; } }
 
@@ -587,64 +581,14 @@
   overflow: hidden;
 }
 .main-stage {
-  width: calc(100% - 244px);
-  margin-left: 244px;
+  width: calc(100% - var(--sidebar-w));
+  margin-left: var(--sidebar-w);
 }
 .sidebar-bottom {
   flex: 0 0 auto;
 }
 .desktop-only { display: inline-grid; }
 .mobile-only { display: none; }
-.sidebar-toggle { margin-left: auto; }
-.sidebar-is-collapsed .sidebar {
-  width: 72px;
-  flex-basis: 72px;
-  padding-left: 10px;
-  padding-right: 10px;
-}
-.sidebar-is-collapsed .main-stage {
-  width: calc(100% - 72px);
-  margin-left: 72px;
-}
-.sidebar.sidebar-collapsed + .main-stage {
-  width: calc(100% - 72px);
-  margin-left: 72px;
-}
-.sidebar.sidebar-collapsed .brand-row {
-  justify-content: center;
-  gap: 3px;
-  padding-left: 0;
-  padding-right: 0;
-}
-.sidebar.sidebar-collapsed .tandem-back-btn {
-  justify-content: center;
-  padding: 9px;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-.sidebar.sidebar-collapsed .tandem-back-btn span {
-  display: none;
-}
-.sidebar.sidebar-collapsed .brand-copy,
-.sidebar.sidebar-collapsed .workspace-copy,
-.sidebar.sidebar-collapsed .workspace-switch > svg,
-.sidebar.sidebar-collapsed .nav-label,
-.sidebar.sidebar-collapsed .nav-count,
-.sidebar.sidebar-collapsed .nav-lock,
-.sidebar.sidebar-collapsed .sidebar-bottom span {
-  display: none;
-}
-.sidebar.sidebar-collapsed .workspace-switch,
-.sidebar.sidebar-collapsed .nav-item,
-.sidebar.sidebar-collapsed .sidebar-bottom button {
-  justify-content: center;
-}
-.sidebar.sidebar-collapsed .workspace-switch {
-  padding: 10px;
-}
-.sidebar.sidebar-collapsed .nav-item {
-  padding: 10px;
-}
 
 .oracle-page {
   max-width: 1120px;
@@ -1083,6 +1027,8 @@
 }
 
 @media (max-width: 760px) {
+  .mobile-only { display: inline-grid; }
+  .desktop-only { display: none !important; }
   .main-stage {
     width: 100%;
     margin-left: 0;
@@ -1302,16 +1248,6 @@
 @media (max-width: 700px) {
   .desktop-only { display: none !important; }
   .mobile-only { display: inline-grid; }
-  .sidebar.sidebar-collapsed {
-    width: 244px;
-    flex-basis: 244px;
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-  .sidebar-is-collapsed .main-stage {
-    width: 100%;
-    margin-left: 0;
-  }
   .format-bar {
     flex-wrap: wrap;
     row-gap: 4px;
@@ -1379,3 +1315,194 @@
 .card-actions .submit-clone-btn { color: hsl(var(--primary-foreground)); background: hsl(var(--primary)); }.card-actions .submit-clone-btn:hover { background: hsl(var(--primary) / .85); }
 .account-card .card-heading { align-items: flex-start; }.account-avatar { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; background: hsl(var(--sidebar)); color: hsl(var(--sidebar-foreground)); font: italic 20px var(--app-font-serif); }.account-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid hsl(var(--border)); padding: 12px 0; font-size: 12px; }.account-row span { color: hsl(var(--muted-foreground)); }.account-row b { color: hsl(var(--foreground)); font-weight: 600; }
 .brief-modal, .note-modal { width: min(560px, 100%); }.brief-modal textarea, .note-modal textarea { min-height: 120px; }.brief-modal h2, .note-modal h2 { font-size: 25px; }
+
+/* ============================================================================
+   CREATOR-DEN ELEVATION LAYER
+   ----------------------------------------------------------------------------
+   Appended last so these refinements win on source order. Additive + targeted
+   overrides only — the locked dark-cinematic palette (tokens above) is
+   UNCHANGED. This layer adds depth (a light source + layered shadows), artful
+   use of the single red (glows, gradient CTAs), smoother motion, and considered
+   loading / empty states. Creator-Den only: index.css is imported solely by
+   creators-den/src/main.tsx, so nothing here can reach Tandem or Author-Den.
+   ============================================================================ */
+
+/* Deepen the elevation system for a near-black canvas + add reusable helpers. */
+:root {
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, .5);
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, .5), 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-md: 0 16px 42px rgba(0, 0, 0, .62), 0 4px 12px rgba(0, 0, 0, .45);
+  --shadow-xl: 0 34px 74px rgba(0, 0, 0, .72), 0 12px 26px rgba(0, 0, 0, .5);
+  --edge-hi: inset 0 1px 0 hsl(0 0% 100% / .05);        /* top light-source hairline */
+  --accent-ring: 0 0 0 1px hsl(var(--accent) / .55);    /* red rim-light           */
+  --accent-glow: 0 8px 24px hsl(var(--accent) / .32);   /* red key-light bloom     */
+}
+
+/* Global finish: smooth scroll, cinematic selection, refined dark scrollbars. */
+html { scroll-behavior: smooth; }
+::selection { background: hsl(var(--accent) / .3); color: #fff; }
+* { scrollbar-width: thin; scrollbar-color: hsl(0 0% 26%) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: hsl(0 0% 22%); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: hsl(0 0% 34%); }
+
+/* Surfaces gain a light source (top highlight), a soft vertical gradient body,
+   and layered depth. Cascades to every .paper-card / .accent-card in the app. */
+.paper-card {
+  background: linear-gradient(180deg, hsl(0 0% 12.5%), hsl(0 0% 10%));
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm), var(--edge-hi);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+.accent-card {
+  background: linear-gradient(180deg, hsl(0 0% 15%), hsl(0 0% 11.5%));
+  box-shadow: inset 0 2px 0 hsl(var(--accent) / .38), var(--shadow-sm), var(--edge-hi);
+}
+
+/* Buttons: a dimensional, glowing primary and a crisper, liftable secondary. */
+.primary-btn {
+  background: linear-gradient(180deg, hsl(357 92% 53%), hsl(357 92% 44%));
+  border-color: hsl(357 92% 40%);
+  box-shadow: 0 4px 14px hsl(var(--accent) / .3), var(--edge-hi);
+}
+.primary-btn:hover:not(:disabled) { box-shadow: 0 9px 24px hsl(var(--accent) / .44), var(--edge-hi); }
+.primary-btn:active:not(:disabled) { transform: translateY(0); box-shadow: 0 3px 10px hsl(var(--accent) / .32); }
+.secondary-btn {
+  background: linear-gradient(180deg, hsl(0 0% 13%), hsl(0 0% 10%));
+  box-shadow: var(--shadow-xs), var(--edge-hi);
+}
+.secondary-btn:hover:not(:disabled) { border-color: hsl(var(--accent) / .55); box-shadow: 0 4px 14px rgba(0, 0, 0, .45), var(--edge-hi); }
+
+/* Inputs: subtle inset depth + a refined accent focus glow. */
+.field input, .field textarea, .field select,
+.custom-row input, .step-row input {
+  border-radius: 6px;
+  background: hsl(0 0% 8% / .55);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .3);
+}
+.field input:focus, .field textarea:focus, .field select:focus,
+.custom-row input:focus, .step-row input:focus {
+  border-color: hsl(var(--accent));
+  box-shadow: 0 0 0 3px hsl(var(--accent) / .16), inset 0 1px 2px rgba(0, 0, 0, .25);
+}
+
+/* Headlines read best balanced; eyebrows align their icon + label cleanly. */
+.page-header h1 { text-wrap: balance; }
+.eyebrow { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Sidebar + topbar: deeper black with a hairline light separation. */
+.sidebar { background: linear-gradient(180deg, hsl(0 0% 6%), hsl(0 0% 4%)); box-shadow: 1px 0 0 hsl(0 0% 100% / .03), var(--shadow-md); }
+.brand-mark { box-shadow: 0 0 0 4px hsl(var(--sidebar-primary) / .09), 0 4px 12px hsl(var(--sidebar-primary) / .2); }
+.topbar { background: hsl(var(--background) / .72); box-shadow: 0 1px 0 hsl(0 0% 100% / .04), 0 6px 18px rgba(0, 0, 0, .28); }
+
+/* List rows: softer corners, and an accent edge on the selected/unread state. */
+.list-row { border-radius: 8px; transition: background .16s ease, box-shadow .16s ease; }
+.list-row.selected { box-shadow: inset 2px 0 0 hsl(var(--accent)); }
+
+/* Empty states: a considered gradient wash + a glowing accent glyph. */
+.empty-state {
+  border-radius: 12px;
+  border-color: hsl(0 0% 22%);
+  background: radial-gradient(130% 90% at 50% 0%, hsl(0 0% 14%), hsl(0 0% 10%));
+}
+.empty-state svg { filter: drop-shadow(0 6px 16px hsl(var(--accent) / .35)); }
+
+/* Loading: turn the bare text panel into a considered, spinner-topped surface.
+   (Every .panel-empty in Creator-Den is a loading state — verified.) */
+.panel-empty {
+  position: relative;
+  border-radius: 10px;
+  padding-top: 52px;
+  background: linear-gradient(180deg, hsl(0 0% 12%), hsl(0 0% 9.5%));
+  box-shadow: var(--edge-hi);
+}
+.panel-empty::before {
+  content: "";
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--accent) / .28);
+  border-top-color: hsl(var(--accent));
+  animation: cdSpin .8s linear infinite;
+}
+
+/* Modal: a richer backdrop blur + a lifted, rounded dialog. */
+.modal { border-radius: 14px; box-shadow: var(--shadow-xl), var(--edge-hi); }
+.modal-backdrop { background: hsl(0 0% 0% / .78); backdrop-filter: blur(8px); }
+
+/* Reusable skeleton shimmer (available for richer loading states). */
+.cd-skeleton {
+  border-radius: 8px;
+  background: linear-gradient(100deg, hsl(0 0% 13%) 30%, hsl(0 0% 17%) 50%, hsl(0 0% 13%) 70%);
+  background-size: 200% 100%;
+  animation: cdShimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes cdSpin { to { transform: rotate(360deg); } }
+@keyframes cdShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ============================================================================
+   CREATOR-DEN — STRUCTURE, RHYTHM & HIERARCHY  (final layer)
+   ----------------------------------------------------------------------------
+   The elevation layers above added *finish* (depth, glow, motion). This layer
+   fixes *organization*: one 4px-based spacing scale, a calmer type ladder, and
+   consistent page / card / list / form rhythm — so surfaces read as ordered
+   zones rather than clustered blocks. Appended last → wins on source order.
+   The locked palette + tokens are UNCHANGED. Creator-Den only (index.css is
+   imported solely by creators-den/src/main.tsx, before creators.css).
+   ============================================================================ */
+:root {
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;  --sp-4: 16px;  --sp-5: 20px;
+  --sp-6: 24px; --sp-7: 28px; --sp-8: 32px;  --sp-10: 40px; --sp-12: 48px;
+}
+
+/* ---- Page frame: a contained canvas with even, fluid side gutters.
+   Centred within the main stage so ultrawide viewports don't strand the
+   whole page against the sidebar with dead space on the right. Now the sole
+   content container — the shell no longer double-wraps children in `.page`. ---- */
+.page { max-width: 1520px; margin-inline: auto; padding: var(--sp-10) clamp(24px, 4vw, 48px) 88px; }
+
+/* ---- Page header: one clear title block, closed by a hairline baseline
+   that separates the heading zone from the content below it. ---- */
+.page-header {
+  align-items: flex-end;
+  gap: var(--sp-7);
+  margin-bottom: var(--sp-7);
+  padding-bottom: var(--sp-5);
+  border-bottom: 1px solid hsl(var(--border) / .6);
+}
+.page-header h1 { margin: var(--sp-3) 0 0; font-size: clamp(27px, 3.1vw, 37px); letter-spacing: -.03em; line-height: 1.06; }
+.page-header p { margin: var(--sp-2) 0 0; font-size: 13.5px; line-height: 1.6; max-width: 620px; }
+.page-guide { margin-bottom: var(--sp-5); }
+
+/* ---- Surfaces: a single card padding + one heading rhythm everywhere. ---- */
+.paper-card { padding: var(--sp-6); }
+.card-heading { margin-bottom: var(--sp-5); gap: var(--sp-4); }
+.card-heading h2, .detail-heading h2 { font-size: 18px; letter-spacing: -.02em; margin-top: 0; }
+.inline-heading { margin-bottom: var(--sp-4); }
+
+/* ---- Forms: even field spacing + a calmer, better-tracked label. ---- */
+.field { margin-bottom: var(--sp-4); gap: 6px; }
+.field > span:first-child { letter-spacing: .09em; }
+
+/* ---- Lists: roomier rows so stacked items group without clumping. ---- */
+.list-row { padding: var(--sp-3); gap: var(--sp-3); }
+.list-row small { margin-top: 4px; line-height: 1.5; }
+
+/* ---- States: generous, centred, and consistent between empty + loading. ---- */
+.empty-state { min-height: 200px; padding: var(--sp-10) var(--sp-7); }
+.empty-state h3 { font-size: 18px; margin-bottom: var(--sp-2); }
+.empty-state p { max-width: 380px; line-height: 1.6; }
+.panel-empty { padding: 46px var(--sp-4) var(--sp-6); }
+
+/* ---- Keep the tightened frame honest on small screens. ---- */
+@media (max-width: 700px) {
+  .page { padding: var(--sp-7) 16px 56px; }
+  .paper-card { padding: var(--sp-5); }
+  .page-header { gap: var(--sp-4); margin-bottom: var(--sp-6); padding-bottom: var(--sp-4); }
+}

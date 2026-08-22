@@ -294,3 +294,219 @@
   .cd-billboard-body { padding: 26px 24px; }
   .cd-billboard-body h1 { font-size: 28px; }
 }
+
+/* ============================================================================
+   CREATOR-DEN ELEVATION LAYER — cinematic polish for the .cd-* / .den-*
+   primitives. Appended last so refinements win on source order. The locked
+   palette is UNCHANGED; this adds depth, a single-red key-light, and motion.
+   ============================================================================ */
+
+/* Leg switcher → a segmented control with a glowing red active pill. */
+.role-tabs {
+  background: linear-gradient(180deg, hsl(0 0% 13%), hsl(0 0% 9.5%));
+  box-shadow: var(--shadow-xs), inset 0 1px 0 hsl(0 0% 100% / .05);
+}
+.role-tabs button { transition: color .18s ease, background .2s ease, box-shadow .2s ease; }
+.role-tabs button.active {
+  background: linear-gradient(180deg, hsl(357 92% 53%), hsl(357 92% 45%));
+  box-shadow: 0 4px 14px hsl(var(--primary) / .4), inset 0 1px 0 hsl(0 0% 100% / .2);
+}
+
+/* Poster cards → true cinematic hover: image push-in, gradient veil, red rim. */
+.cd-card {
+  background: linear-gradient(180deg, hsl(0 0% 13%), hsl(0 0% 9.5%));
+  box-shadow: var(--shadow-sm);
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1), box-shadow .28s ease, border-color .2s ease;
+}
+.cd-card:hover { box-shadow: 0 18px 46px rgba(0, 0, 0, .7), var(--accent-ring); }
+.cd-card-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(0deg, hsl(0 0% 0% / .5), transparent 60%);
+  opacity: .85;
+  transition: opacity .28s ease;
+}
+.cd-card:hover .cd-card-thumb::after { opacity: .4; }
+.cd-card-thumb img, .cd-card-thumb video { transition: transform .4s cubic-bezier(.22, 1, .36, 1); }
+.cd-card:hover .cd-card-thumb img, .cd-card:hover .cd-card-thumb video { transform: scale(1.08); }
+.cd-card-badge { z-index: 2; backdrop-filter: blur(6px); box-shadow: 0 2px 8px rgba(0, 0, 0, .45); }
+.cd-card-title { transition: color .18s ease; }
+.cd-card:hover .cd-card-title { color: hsl(0 0% 100%); }
+.cd-card-add { transition: background .2s ease, border-color .2s ease, box-shadow .2s ease, color .2s ease; }
+.cd-card-add:hover { background: hsl(var(--accent) / .06); box-shadow: inset 0 0 0 1px hsl(var(--accent) / .4); }
+
+/* Billboard → a red key-light glow (shows through when there's no cover art)
+   over the base gradient, plus a sharper, shadowed headline. */
+.cd-billboard {
+  background:
+    radial-gradient(90% 130% at 84% -20%, hsl(357 62% 24% / .5), transparent 55%),
+    linear-gradient(120deg, hsl(0 0% 16%), hsl(0 0% 7%));
+  box-shadow: var(--shadow-md), var(--edge-hi);
+}
+.cd-billboard-body h1 { text-shadow: 0 2px 22px hsl(0 0% 0% / .5); text-wrap: balance; }
+
+/* Action-bar pills → glass; the primary carries the single red glow. */
+.cd-actionbtn {
+  background: linear-gradient(180deg, hsl(0 0% 17%), hsl(0 0% 13%));
+  box-shadow: var(--shadow-xs), var(--edge-hi);
+}
+.cd-actionbtn:hover { background: linear-gradient(180deg, hsl(0 0% 22%), hsl(0 0% 17%)); }
+.cd-actionbtn.is-primary {
+  background: linear-gradient(180deg, hsl(357 92% 53%), hsl(357 92% 45%));
+  box-shadow: 0 4px 14px hsl(var(--accent) / .34), var(--edge-hi);
+}
+.cd-actionbtn.is-primary:hover {
+  background: linear-gradient(180deg, hsl(357 92% 56%), hsl(357 92% 47%));
+  box-shadow: 0 9px 24px hsl(var(--accent) / .46), var(--edge-hi);
+}
+
+/* Section tabs → an accent underline that grows from the centre on activate. */
+.cd-tab::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  right: 50%;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: hsl(var(--accent));
+  transition: left .22s ease, right .22s ease;
+}
+.cd-tab.is-active { box-shadow: none; }
+.cd-tab.is-active::after { left: 0; right: 0; }
+
+/* Player → a true-black cinema frame with a soft rim + refined chrome bar. */
+.den-player { border-radius: 10px; box-shadow: var(--shadow-md), inset 0 1px 0 hsl(0 0% 100% / .05); }
+.den-player-bar { background: linear-gradient(transparent, hsl(0 0% 0% / .92)); }
+
+/* Oracle → a considered advisory panel: accent-lit header, glassy messages. */
+.den-oracle {
+  background: linear-gradient(180deg, hsl(0 0% 12.5%), hsl(0 0% 10%));
+  border-color: hsl(var(--accent) / .3);
+  box-shadow: var(--shadow-sm), inset 0 2px 0 hsl(var(--accent) / .3);
+}
+.den-oracle-head { background: linear-gradient(180deg, hsl(var(--accent) / .08), transparent); }
+.den-oracle-msg.oracle { background: linear-gradient(180deg, hsl(0 0% 17%), hsl(0 0% 14%)); box-shadow: var(--edge-hi); }
+.den-oracle-msg.user { box-shadow: 0 4px 12px hsl(var(--accent) / .28); }
+
+/* Status pills → crisper on black with a hairline ring. */
+.den-tag { box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .07); }
+.den-tag.accent { box-shadow: inset 0 0 0 1px hsl(var(--accent) / .3); }
+
+/* Chips → a subtle accent hover for the style / beat selectors. */
+.den-chip { transition: border-color .15s ease, color .15s ease, background .15s ease; }
+.den-chip:hover { border-color: hsl(var(--accent) / .5); }
+
+/* Stat strip → a unified rounded panel with a light source. */
+.den-stat-row {
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, hsl(0 0% 12.5%), hsl(0 0% 10%));
+  box-shadow: var(--shadow-sm), var(--edge-hi);
+}
+
+/* Read-only filmstrip → a softer frame. */
+.timeline-shell { border-radius: 10px; box-shadow: var(--shadow-sm); }
+
+/* Review pins → a deeper lift off the frame. */
+.annotation-pin-dot { box-shadow: 0 2px 8px hsl(0 0% 0% / .75), 0 0 0 2px hsl(0 0% 100% / .9); }
+
+/* ============================================================================
+   CREATOR-DEN — STRUCTURE, RHYTHM & HIERARCHY  (final layer · .cd-* / .den-*)
+   ----------------------------------------------------------------------------
+   Pairs with the same-named block in index.css. Puts the watch grid, rails,
+   poster cards, tabs and oracle on the shared 4px scale (--sp-*) and one type
+   ladder, so dense pages — the vault and the five stages — read as separated
+   zones instead of clusters. Appended last in the last-loaded stylesheet →
+   wins on source order. Locked palette + tokens UNCHANGED.
+   ============================================================================ */
+
+/* ---- Watch grid: a wider seam between the main column and the rail, and
+   even separation between the cards stacked inside each. ---- */
+.cd-watch { gap: var(--sp-7); }
+.cd-watch-main { gap: var(--sp-5); }
+.cd-watch-rail { gap: var(--sp-5); }
+
+/* ---- Rails: even head → track → card rhythm; a balanced wrap grid so a
+   short row (e.g. the five stages) fills its width instead of leaving a
+   lonely empty cell. ---- */
+.cd-rail { gap: var(--sp-4); }
+.cd-rail-head h3 { font-size: 18px; letter-spacing: -.015em; }
+.cd-rail-track { gap: var(--sp-4); padding: 2px 2px var(--sp-4); }
+.cd-rail-grid { grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: var(--sp-4); }
+
+/* ---- Poster cards: a touch more internal air + a steadier title line. ---- */
+.cd-card-body { padding: 14px 14px 15px; gap: 5px; }
+.cd-card-title { letter-spacing: -.01em; }
+
+/* ---- Billboard: a contained height and a clean display headline that sits
+   a clear step above the section headings (18px) below it. ---- */
+.cd-billboard { min-height: 288px; }
+.cd-billboard-body { max-width: 640px; padding: var(--sp-10) 44px; gap: var(--sp-4); }
+.cd-billboard-body h1 { font-size: 38px; letter-spacing: -.025em; }
+.cd-billboard-body p { font-size: 14px; line-height: 1.62; }
+.cd-billboard-actions { margin-top: var(--sp-2); gap: 10px; }
+
+/* ---- Meta row: align the avatar + text on one comfortable baseline. ---- */
+.cd-metarow { gap: var(--sp-4); }
+
+/* ---- Section tabs: a YouTube-style bar with a real click target. ---- */
+.cd-tabs { gap: 2px; margin-bottom: var(--sp-1); }
+.cd-tab { padding: var(--sp-3) var(--sp-4); font-size: 13px; }
+
+/* ---- Stacked lists inside cards: grouped, evenly spaced. ---- */
+.den-stack { gap: var(--sp-2); }
+
+/* ---- Oracle: a calmer, consistent internal rhythm on the 4px scale. ---- */
+.den-oracle-head { padding: 14px var(--sp-4); }
+.den-oracle-messages { padding: var(--sp-4); gap: 10px; }
+.den-oracle-compose { padding: var(--sp-3) var(--sp-4); gap: 10px; }
+.den-oracle-actions { padding: 0 var(--sp-4) 14px; gap: 6px; }
+
+/* ---- Leg switcher: a slightly larger, easier-to-hit segmented control. ---- */
+.role-tabs { gap: var(--sp-1); padding: var(--sp-1); }
+.role-tabs button { padding: var(--sp-2) 14px; }
+
+/* ---- Responsive: hold the rhythm together on small screens. ---- */
+@media (max-width: 720px) {
+  .cd-watch { gap: var(--sp-5); }
+  .cd-billboard-body { padding: var(--sp-6) var(--sp-5); gap: var(--sp-3); }
+  .cd-billboard-body h1 { font-size: 27px; }
+}
+
+/* ============================================================================
+   CREATOR-DEN — PANEL HEADER HIERARCHY  (final layer · index.css primitives)
+   ----------------------------------------------------------------------------
+   Root cause of the "clustered / not organized" read: every stacked panel
+   titled itself with the same 10px mono accent `.eyebrow` — SMALLER than its
+   own 12px body — so no header sat above its content and a column of panels
+   looked like one undifferentiated pile. This crowns each panel with a real
+   title (foreground sans, stepped clearly above the body) and reserves the red
+   for the icon, and closes the header zone with a hairline so header + body
+   read as distinct bands. Scoped to `.inline-heading` and the oracle head, so
+   the standalone billboard/page kicker eyebrows stay small accent labels — a
+   clean two-tier system: crowns (panel titles) vs kickers (labels over a
+   headline). Locked palette UNCHANGED.
+   ============================================================================ */
+.inline-heading {
+  align-items: center;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid hsl(var(--border) / .55);
+}
+.inline-heading .eyebrow,
+.den-oracle-head .eyebrow {
+  font: 700 13px var(--app-font-sans);
+  letter-spacing: -.01em;
+  text-transform: none;
+  color: hsl(var(--foreground));
+  gap: var(--sp-2);
+}
+.inline-heading .eyebrow svg,
+.den-oracle-head .eyebrow svg { color: hsl(var(--accent)); flex: 0 0 auto; }
+/* Trailing count / status chip in a heading reads as quiet right-aligned meta. */
+.inline-heading > .mono-label { margin-left: auto; color: hsl(var(--muted-foreground)); }

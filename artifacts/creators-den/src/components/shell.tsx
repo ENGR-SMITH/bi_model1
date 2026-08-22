@@ -252,7 +252,9 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           </div>
         </header>
         {projectId && <PresenceStrip projectId={projectId} />}
-        <div className="page">{children}</div>
+        {/* Each page component supplies its own `.page` container; the shell
+            must not add a second one or the content gets doubled padding. */}
+        {children}
       </main>
     </div>
   );
