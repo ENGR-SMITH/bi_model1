@@ -41,10 +41,10 @@ import {
   useRejectVideoSubmission,
   useRevokeVideoGrant,
 } from '@workspace/api-client-react';
-import type { VideoAssetUploadInputKind } from '@workspace/api-client-react';
+import type { VideoAssetDetail, VideoAssetUploadInputKind } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
-import { AssetPlayer, isAudioKind, pollWhileProcessing } from '@/components/asset-preview';
+import { AssetPlayer, isAudioKind, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
 import { CommitLog } from '@/components/commit-log';
 import { ActivityFeed } from '@/components/activity-feed';
 
@@ -67,6 +67,10 @@ const KIND_LABELS: Record<string, string> = {
   THUMBNAIL_DESIGN: 'Thumbnail design',
 };
 
+// The order rails appear in on the vault (repo file browser, grouped by kind).
+const KIND_ORDER = ['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'RAW_AUDIO', 'VO_PICKUP', 'REFERENCE', 'GRAPHIC', 'THUMBNAIL_DESIGN'] as const;
+const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
+
 const ROLE_LABELS: Record<string, string> = {
   CAPTAIN: 'Captain',
   UPLOADER: 'Uploader',
@@ -80,6 +84,8 @@ const ROLE_LABELS: Record<string, string> = {
 
 const INVITE_ROLES = ['UPLOADER', 'ARCHITECT', 'VISUAL_EDITOR', 'SOUND_DESIGNER', 'MOTION_COLOR', 'THUMBNAIL_DESIGNER', 'VIEWER'] as const;
 
+type AssetSummary = { id: string; fileName: string; kind: string; status: string; sizeBytes: number; version: number; durationMs: number | null; contentHash?: string | null };
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -87,8 +93,13 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
+function formatDurationShort(ms: number | null): string {
+  if (!ms) return '';
+  return ` · ${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
+}
+
 /** True when an earlier vault asset holds the exact same bytes (Git-LFS dedupe). */
-function isDuplicateContent(assets: Array<{ contentHash: string | null }>, index: number): boolean {
+function isDuplicateContent(assets: Array<{ contentHash?: string | null }>, index: number): boolean {
   const hash = assets[index].contentHash;
   if (!hash) return false;
   for (let i = 0; i < index; i++) {
@@ -97,64 +108,111 @@ function isDuplicateContent(assets: Array<{ contentHash: string | null }>, index
   return false;
 }
 
-function AssetCard({ projectId, asset, released, deduplicated }: { projectId: string; asset: { id: string; fileName: string; kind: string; status: string; sizeBytes: number; version: number; durationMs: number | null }; released: boolean; deduplicated?: boolean }) {
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const detail = useGetVideoAsset(projectId, asset.id, {
-    query: {
-      queryKey: getGetVideoAssetQueryKey(projectId, asset.id),
-      enabled: previewOpen,
-      refetchInterval: (query) => pollWhileProcessing(query.state.data),
-    },
-  });
-  const processing = asset.status !== 'PROCESSED';
+// ---------------------------------------------------------------------------
+// PosterCard — a Netflix-style poster tile for one vault asset. Clicking it
+// features the asset in the player above. The proxy stream doubles as the
+// poster (first frame for video, the image itself for designs); an icon shows
+// through while processing or if the frame can't be decoded.
+// ---------------------------------------------------------------------------
+
+function PosterCard({ projectId, asset, active, deduplicated, onSelect }: { projectId: string; asset: AssetSummary; active: boolean; deduplicated: boolean; onSelect: (id: string) => void }) {
+  const [broken, setBroken] = useState(false);
+  const processed = asset.status === 'PROCESSED';
+  const audio = isAudioKind(asset.kind);
+  const image = IMAGE_KINDS.has(asset.kind);
+  const proxy = proxyUrlFor(projectId, asset.id);
 
   return (
-    <div className="paper-card den-asset-card" data-testid={`card-asset-${asset.id}`}>
-      <div className="flex items-start gap-3">
-        <span className="world-symbol"><FileVideo2 size={14} /></span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <b className="truncate text-sm">{asset.fileName}</b>
-            <span className="den-tag gold">{KIND_LABELS[asset.kind] ?? asset.kind}</span>
-            {deduplicated && <span className="den-tag teal" title="Identical bytes are already in the vault — this entry points at the stored file, no second copy">Already in vault</span>}
-            {processing && <span className="den-tag accent">processing…</span>}
-          </div>
-          <p className="mono-label mt-1">
-            {formatBytes(asset.sizeBytes)} · v{asset.version} · {asset.status.replaceAll('_', ' ')}
-            {asset.durationMs ? ` · ${Math.floor(asset.durationMs / 60000)}m ${Math.floor((asset.durationMs % 60000) / 1000)}s` : ''}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {asset.status === 'PROCESSED' && (
-            <button type="button" onClick={() => setPreviewOpen((open) => !open)} className="secondary-btn" data-testid={`button-preview-${asset.id}`}>
-              <Play size={13} />
-              {previewOpen ? 'Close' : 'Preview'}
-            </button>
-          )}
-          {released ? (
-            <a href={getDownloadVideoFileUrl(projectId, asset.id)} download className="secondary-btn" data-testid={`link-download-${asset.id}`}>
-              <Download size={13} />
-            </a>
-          ) : (
-            <span className="den-tag teal">Locked</span>
-          )}
-        </div>
+    <button
+      type="button"
+      onClick={() => onSelect(asset.id)}
+      className="cd-card"
+      style={active ? { borderColor: 'hsl(var(--accent))' } : undefined}
+      data-testid={`card-asset-${asset.id}`}
+    >
+      <div className="cd-card-thumb">
+        {audio ? <Mic2 size={26} /> : <FileVideo2 size={26} />}
+        {processed && !broken && (image ? (
+          <img src={proxy} alt="" onError={() => setBroken(true)} />
+        ) : !audio ? (
+          <video src={`${proxy}#t=0.5`} muted playsInline preload="metadata" onError={() => setBroken(true)} />
+        ) : null)}
+        <span className="cd-card-badge">{KIND_LABELS[asset.kind] ?? asset.kind}</span>
+        {active ? (
+          <span className="cd-card-badge is-accent right">viewing</span>
+        ) : !processed ? (
+          <span className="cd-card-badge right">processing…</span>
+        ) : null}
+      </div>
+      <div className="cd-card-body">
+        <span className="cd-card-title">{asset.fileName}</span>
+        <span className="cd-card-meta">
+          {formatBytes(asset.sizeBytes)} · v{asset.version}
+          {deduplicated && ' · deduped'}
+        </span>
+      </div>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FeaturedAsset — the "now viewing" player at the top of the vault. Streams the
+// selected asset's proxy and carries its download / studio affordances.
+// ---------------------------------------------------------------------------
+
+function FeaturedAsset({ projectId, asset, detail, released, deduplicated }: { projectId: string; asset: AssetSummary; detail: VideoAssetDetail | undefined; released: boolean; deduplicated: boolean }) {
+  return (
+    <div className="paper-card" data-testid="featured-asset">
+      <div className="inline-heading">
+        <span className="eyebrow"><Play size={13} /> Now viewing</span>
+        <span className="flex items-center gap-2">
+          {deduplicated && <span className="den-tag teal" title="Identical bytes are already in the vault — this entry points at the stored file">Already in vault</span>}
+          <span className="den-tag gold">{KIND_LABELS[asset.kind] ?? asset.kind}</span>
+        </span>
       </div>
 
-      {previewOpen && (
-        <div className="mt-4" data-testid={`preview-${asset.id}`}>
-          <AssetPlayer projectId={projectId} assetId={asset.id} detail={detail.data} title={asset.fileName} audio={isAudioKind(asset.kind)} />
-        </div>
-      )}
+      <AssetPlayer
+        className="mt-3"
+        projectId={projectId}
+        assetId={asset.id}
+        detail={detail}
+        title={asset.fileName}
+        audio={isAudioKind(asset.kind)}
+      />
+
+      <div className="cd-metarow mt-3" style={{ justifyContent: 'space-between' }}>
+        <span className="cd-metatext min-w-0">
+          <b className="truncate">{asset.fileName}</b>
+          <small>
+            {formatBytes(asset.sizeBytes)} · v{asset.version} · {asset.status.replaceAll('_', ' ')}
+            {formatDurationShort(asset.durationMs)}
+          </small>
+        </span>
+        <span className="flex items-center gap-2">
+          {released ? (
+            <a href={getDownloadVideoFileUrl(projectId, asset.id)} download className="secondary-btn" data-testid={`link-download-${asset.id}`}>
+              <Download size={13} /> Download
+            </a>
+          ) : (
+            <span className="den-tag teal"><LockKeyhole size={10} /> Locked</span>
+          )}
+          {asset.status === 'PROCESSED' && (
+            <Link href={`/projects/${projectId}/selects`} className="secondary-btn" data-testid={`link-studio-${asset.id}`}>
+              <Film size={13} /> Open studio
+            </Link>
+          )}
+        </span>
+      </div>
 
       {asset.status === 'PROCESSED' ? (
-        <Link href={`/projects/${projectId}/selects`} className="link-btn mt-3" data-testid={`link-studio-${asset.id}`}>
-          <Film size={13} /> Open the selects studio <ArrowLeft size={12} className="rotate-180" />
-        </Link>
+        <p className="den-footnote mt-3">
+          <LockKeyhole size={13} />
+          Streaming the degraded proxy — the locked original never leaves the vault.
+        </p>
       ) : (
         <p className="den-footnote mt-3">
-          <Sparkles size={12} />
-          Proxying and transcribing in the background — preview appears here automatically.
+          <Sparkles size={13} />
+          Proxying and transcribing in the background — the preview appears here automatically.
         </p>
       )}
     </div>
@@ -387,7 +445,7 @@ function JobProgressStrip({ projectId }: { projectId: string }) {
   if (!jobs.data || jobs.data.length === 0) return null;
 
   return (
-    <div className="paper-card mt-4" data-testid="panel-job-progress">
+    <div className="paper-card" data-testid="panel-job-progress">
       <div className="inline-heading">
         <span className="eyebrow"><Sparkles size={13} /> Processing</span>
         {active.length > 0 ? (
@@ -526,7 +584,7 @@ function DownloadAuditPanel({ projectId, myRole }: { projectId: string; myRole: 
   if (myRole !== 'CAPTAIN' || !downloads.data || downloads.data.length === 0) return null;
 
   return (
-    <div className="paper-card mt-4" data-testid="panel-download-audit">
+    <div className="paper-card" data-testid="panel-download-audit">
       <div className="inline-heading">
         <span className="eyebrow"><History size={13} /> Download audit trail</span>
       </div>
@@ -569,9 +627,10 @@ function SubmissionsPanel({ projectId, myRole }: { projectId: string; myRole: st
   if (rows.length === 0) return null;
 
   return (
-    <div className="paper-card mt-4" data-testid="panel-submissions">
+    <div className="paper-card" data-testid="panel-submissions">
       <div className="inline-heading">
-        <span className="eyebrow"><Film size={13} /> The relay — pull requests</span>
+        <span className="eyebrow"><Film size={13} /> Pull requests</span>
+        {pending.length > 0 && <span className="den-tag gold">{pending.length} open</span>}
       </div>
       <div className="den-stack">
         {rows.map((submission) => {
@@ -630,6 +689,24 @@ export default function ContentCreatorsProjectPage() {
     },
   });
 
+  const [featuredId, setFeaturedId] = useState<string | null>(null);
+  const assets = (project.data?.assets ?? []) as AssetSummary[];
+
+  // Default the featured player to the first ready asset (or the first asset).
+  useEffect(() => {
+    if (featuredId) return;
+    const first = assets.find((a) => a.status === 'PROCESSED') ?? assets[0];
+    if (first) setFeaturedId(first.id);
+  }, [assets, featuredId]);
+
+  const featured = useGetVideoAsset(projectId, featuredId ?? '', {
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, featuredId ?? ''),
+      enabled: Boolean(featuredId),
+      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+    },
+  });
+
   if (project.isLoading) {
     return (
       <div className="page">
@@ -643,60 +720,73 @@ export default function ContentCreatorsProjectPage() {
       <div className="page">
         <div className="page-guide"><span className="guide-pin" /><div><b>VAULT CLOSED</b><span>This room is out of reach.</span></div></div>
         <h1 style={{ font: '700 43px var(--app-font-serif)', letterSpacing: '-.045em', margin: '9px 0 20px' }}>This room is out of reach.</h1>
-        <Link href="/" className="secondary-btn"><ArrowLeft size={14} /> Back to the room</Link>
+        <Link href="/" className="secondary-btn"><ArrowLeft size={14} /> Back home</Link>
       </div>
     );
   }
 
   const p = project.data;
   const myRole = p.myRole ?? 'VIEWER';
+  const released = p.status === 'RELEASED';
+  const featuredAsset = assets.find((a) => a.id === featuredId) ?? null;
+  const featuredIndex = featuredAsset ? assets.findIndex((a) => a.id === featuredAsset.id) : -1;
+
+  // Group assets into rails by kind, in a stable display order.
+  const seen = new Set<string>();
+  const orderedKinds = [...KIND_ORDER, ...assets.map((a) => a.kind).filter((k) => !KIND_ORDER.includes(k as (typeof KIND_ORDER)[number]))];
+  const groups = orderedKinds
+    .filter((kind) => (seen.has(kind) ? false : (seen.add(kind), true)))
+    .map((kind) => ({ kind, items: assets.filter((a) => a.kind === kind) }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <div className="page">
-      <div className="page-guide">
-        <span className="guide-pin" />
-        <div>
-          <b>CONTENT CREATORS · THE VAULT</b>
-          <span>Raw footage is viewable by the team, downloadable by no one. The lock releases when the Captain approves the final master.</span>
-        </div>
-        <span className="guide-spark" />
-      </div>
-
-      <div className="page-header">
-        <div>
-          <SectionEyebrow>The vault</SectionEyebrow>
+      <div className="cd-billboard mb-6" data-testid="vault-billboard">
+        <div className="cd-billboard-scrim" />
+        <div className="cd-billboard-body">
+          <SectionEyebrow>The vault · repository</SectionEyebrow>
           <h1>{p.name}</h1>
           {p.description && <p>{p.description}</p>}
-        </div>
-        <Link href="/" className="secondary-btn" data-testid="link-project-back-room">
-          <ArrowLeft size={14} />
-          Back to the room
-        </Link>
-      </div>
-
-      <div className="den-stat-row">
-        <div className="den-stat"><small>Assets</small><b>{p.assets.length}</b></div>
-        <div className="den-stat"><small>Team</small><b>{p.members.length}</b></div>
-        <div className="den-stat"><small>Status</small><b>{p.status.replaceAll('_', ' ')}</b></div>
-        <div className="den-stat"><small>Your role</small><b>{ROLE_LABELS[myRole] ?? myRole}</b></div>
-      </div>
-
-      <div className="den-two-col-wide mt-5">
-        <section className="space-y-4">
-          <div className="card-heading">
-            <div>
-              <span className="eyebrow">The vault</span>
-              <h2>Raw footage</h2>
-            </div>
-            <span className="den-tag accent"><LockKeyhole size={10} /> locked</span>
-          </div>
-
-          {p.assets.length > 0 ? (
-            <div className="den-stack">
-              {p.assets.map((asset, index) => (
-                <AssetCard key={asset.id} projectId={p.id} asset={asset} released={p.status === 'RELEASED'} deduplicated={isDuplicateContent(p.assets, index)} />
+          <div className="cd-metarow">
+            <span className="den-tag accent"><LockKeyhole size={10} /> {p.status.replaceAll('_', ' ')}</span>
+            <span className="flex items-center">
+              {p.members.slice(0, 5).map((member, index) => (
+                <span
+                  key={member.id}
+                  className={`cd-avatar ${index > 0 ? 'stack' : ''}`}
+                  title={`${member.name ?? member.userId} · ${ROLE_LABELS[member.role] ?? member.role}`}
+                  style={member.role === 'CAPTAIN' ? { background: 'hsl(var(--accent) / .28)' } : undefined}
+                >
+                  {(member.name ?? member.userId).slice(0, 2).toUpperCase()}
+                </span>
               ))}
-            </div>
+            </span>
+            <span className="cd-metatext">
+              <b>{p.assets.length} asset{p.assets.length === 1 ? '' : 's'} · {p.members.length} member{p.members.length === 1 ? '' : 's'}</b>
+              <small>you are the {ROLE_LABELS[myRole] ?? myRole}</small>
+            </span>
+          </div>
+          <div className="cd-billboard-actions">
+            <Link href="/" className="cd-actionbtn" data-testid="link-project-back-room">
+              <ArrowLeft size={14} /> Home
+            </Link>
+            <a href="#vault-upload" className="cd-actionbtn is-primary">
+              <Upload size={14} /> Add footage
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div className="cd-watch">
+        <div className="cd-watch-main">
+          {featuredAsset ? (
+            <FeaturedAsset
+              projectId={p.id}
+              asset={featuredAsset}
+              detail={featured.data}
+              released={released}
+              deduplicated={featuredIndex >= 0 && isDuplicateContent(assets, featuredIndex)}
+            />
           ) : (
             <div className="empty-state" data-testid="empty-vault">
               <Clapperboard size={22} />
@@ -705,64 +795,85 @@ export default function ContentCreatorsProjectPage() {
             </div>
           )}
 
-          <div className="paper-card accent-card" data-testid="card-upload">
+          {groups.map((group) => (
+            <div className="cd-rail" key={group.kind}>
+              <div className="cd-rail-head">
+                <h3>{KIND_LABELS[group.kind] ?? group.kind}</h3>
+                <span className="mono-label">{group.items.length}</span>
+              </div>
+              <div className="cd-rail-track">
+                {group.items.map((asset) => (
+                  <PosterCard
+                    key={asset.id}
+                    projectId={p.id}
+                    asset={asset}
+                    active={asset.id === featuredId}
+                    deduplicated={isDuplicateContent(assets, assets.findIndex((a) => a.id === asset.id))}
+                    onSelect={setFeaturedId}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          <div className="paper-card accent-card" id="vault-upload" data-testid="card-upload">
             <div className="inline-heading">
               <span className="eyebrow"><Upload size={13} /> Add raw footage</span>
             </div>
+            <p className="setting-copy">Camera files, separate audio, screen recordings, B-roll, references. Identical bytes are deduped automatically — the vault keeps one copy.</p>
             <UploadForm projectId={p.id} />
           </div>
 
-          <JobProgressStrip projectId={p.id} />
-        </section>
+          <div className="paper-card">
+            <div className="inline-heading">
+              <span className="eyebrow"><UserPlus size={13} /> Members &amp; roles</span>
+              <span className="mono-label">{p.members.length}</span>
+            </div>
+            <div className="den-stack">
+              {p.members.map((member) => (
+                <div key={member.id} className="list-row" data-testid={`card-member-${member.userId}`}>
+                  <span className="person-dot" style={{ background: member.role === 'CAPTAIN' ? 'hsl(var(--accent))' : 'hsl(164 33% 45%)' }}>
+                    {(member.name ?? member.userId).slice(0, 2).toUpperCase()}
+                  </span>
+                  <span>
+                    <b>{member.name ?? member.userId}</b>
+                    <small>
+                      {ROLE_LABELS[member.role] ?? member.role}
+                      {member.name ? ` · ${member.userId}` : ''}
+                    </small>
+                  </span>
+                  {member.role === 'CAPTAIN' && <span className="den-tag danger">Captain</span>}
+                </div>
+              ))}
+            </div>
 
-        <section className="space-y-4">
-          <GrantsPanel projectId={p.id} myRole={myRole} members={p.members} assets={p.assets} />
+            {myRole === 'CAPTAIN' ? (
+              <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
+                <span className="eyebrow"><UserPlus size={12} /> Invite a teammate</span>
+                <p className="setting-copy mt-1">Assign the five stages — Architect, Visual Editor, Sound Designer, Motion &amp; Color, Thumbnail — or add an uploader.</p>
+                <InviteForm projectId={p.id} />
+              </div>
+            ) : (
+              <p className="den-footnote mt-3">
+                <Sparkles size={13} />
+                Only the Captain can invite teammates. When a stage is assigned to you, its studio opens from the tabs above.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="cd-watch-rail">
           <SubmissionsPanel projectId={p.id} myRole={myRole} />
-          <ActivityFeed projectId={p.id} />
+          <JobProgressStrip projectId={p.id} />
+          <GrantsPanel projectId={p.id} myRole={myRole} members={p.members} assets={p.assets} />
           <DownloadAuditPanel projectId={p.id} myRole={myRole} />
-
-          <div className="card-heading mt-5">
-            <div>
-              <span className="eyebrow">The team</span>
-              <h2>Members & roles</h2>
-            </div>
-          </div>
-          <div className="den-stack">
-            {p.members.map((member) => (
-              <div key={member.id} className="list-row" data-testid={`card-member-${member.userId}`}>
-                <span className="person-dot" style={{ background: member.role === 'CAPTAIN' ? 'hsl(var(--accent))' : 'hsl(164 33% 45%)' }}>
-                  {(member.name ?? member.userId).slice(0, 2).toUpperCase()}
-                </span>
-                <span>
-                  <b>{member.name ?? member.userId}</b>
-                  <small>
-                    {ROLE_LABELS[member.role] ?? member.role}
-                    {member.name ? ` · ${member.userId}` : ''}
-                  </small>
-                </span>
-                {member.role === 'CAPTAIN' && <span className="den-tag danger">Captain</span>}
-              </div>
-            ))}
-          </div>
-
-          {myRole === 'CAPTAIN' ? (
-            <div className="paper-card accent-card mt-5" data-testid="card-invite">
-              <div className="inline-heading">
-                <span className="eyebrow"><UserPlus size={13} /> Invite a teammate</span>
-              </div>
-              <p className="setting-copy">Assign the four stages — Architect, Visual Editor, Sound Designer, Motion &amp; Color — or add an uploader.</p>
-              <InviteForm projectId={p.id} />
-            </div>
-          ) : (
-            <p className="den-footnote mt-5">
-              <Sparkles size={13} />
-              Only the Captain can invite teammates. When a stage is assigned to you, its studio appears here.
-            </p>
-          )}
-        </section>
+          <ActivityFeed projectId={p.id} />
+        </div>
       </div>
 
-      <CommitLog projectId={p.id} members={p.members} />
+      <div className="mt-6">
+        <CommitLog projectId={p.id} members={p.members} />
+      </div>
 
       <p className="den-footnote mt-8">
         <LockKeyhole size={13} />

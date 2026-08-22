@@ -58,7 +58,7 @@ function PresenceStrip({ projectId }: { projectId: string }) {
     <div className="den-presence" data-testid="presence-strip">
       <span className="den-presence-dot" />
       <span>
-        <b>{others.length}</b> {others.length === 1 ? 'teammate' : 'teammates'} in the room
+        <b>{others.length}</b> {others.length === 1 ? 'teammate' : 'teammates'} on this project
       </span>
       {others.map((entry) => (
         <span key={entry.userId} className="inline-flex items-center gap-1.5" data-testid={`presence-${entry.userId}`}>
@@ -81,7 +81,7 @@ function WorkspaceMenu({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="workspace-menu" data-testid="workspace-menu">
-      <span className="menu-caption">Your rooms</span>
+      <span className="menu-caption">Your projects</span>
       {(projects.data ?? []).map((project) => {
         const selected = project.id === currentId;
         return (
@@ -114,8 +114,8 @@ function WorkspaceMenu({ onClose }: { onClose: () => void }) {
       >
         <Clapperboard size={15} />
         <span>
-          <b>The room — new project</b>
-          <small>Start a locked room</small>
+          <b>New project</b>
+          <small>Start a new locked project</small>
         </span>
       </button>
     </div>
@@ -150,7 +150,7 @@ function Sidebar({ projectId, onClose, open }: { projectId: string | null; onClo
         <span className="brand-mark">C</span>
         <span className="brand-copy">
           <span className="block brand-name">Creators Den</span>
-          <span className="block brand-sub">the video room</span>
+          <span className="block brand-sub">video version control</span>
         </span>
         <button type="button" className="icon-btn sidebar-close mobile-only" aria-label="Close navigation" onClick={onClose}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
@@ -167,7 +167,7 @@ function Sidebar({ projectId, onClose, open }: { projectId: string | null; onClo
           <span className="workspace-icon"><Clapperboard size={14} /></span>
           <span className="workspace-copy">
             <small>Workspace</small>
-            <strong className="truncate">{current?.name ?? 'The room'}</strong>
+            <strong className="truncate">{current?.name ?? 'Home'}</strong>
           </span>
           <ChevronDown size={14} />
         </button>
@@ -176,11 +176,11 @@ function Sidebar({ projectId, onClose, open }: { projectId: string | null; onClo
 
       <nav aria-label="Creators Den">
         <span className="nav-label">Studio</span>
-        {navItem('/', 'The room', <DoorOpen size={16} />, location === '/')}
-        {projectId && navItem(`/projects/${projectId}`, 'The vault', <Film size={16} />, location === `/projects/${projectId}`)}
+        {navItem('/', 'Home', <DoorOpen size={16} />, location === '/')}
+        {projectId && navItem(`/projects/${projectId}`, 'Project', <Film size={16} />, location === `/projects/${projectId}`)}
         {projectId && (
           <>
-            <span className="nav-label nav-label-spaced">The relay</span>
+            <span className="nav-label nav-label-spaced">Stages</span>
             {RELAY_LEGS.map((leg) => {
               const Icon = leg.icon;
               const href = `/projects/${projectId}/${leg.slug}`;
@@ -208,7 +208,7 @@ function Sidebar({ projectId, onClose, open }: { projectId: string | null; onClo
       <div className="sidebar-bottom">
         <button type="button" className="tutorial-btn" onClick={logout} data-testid="button-creators-logout">
           <LogOut size={14} />
-          <span>Leave the room</span>
+          <span>Sign out</span>
         </button>
         <UserChip compact />
       </div>
@@ -239,7 +239,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             <button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)} data-testid="top-workspace">
               <span>Workspace</span>
               <ChevronDown size={13} />
-              <b className="truncate">{current?.name ?? 'The room'}</b>
+              <b className="truncate">{current?.name ?? 'Home'}</b>
             </button>
             {topWorkspaceOpen && <WorkspaceMenu onClose={() => setTopWorkspaceOpen(false)} />}
           </div>

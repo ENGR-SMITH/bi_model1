@@ -26,13 +26,13 @@ function ClerkGate({ children }: { children: React.ReactNode }) {
           minHeight: '100vh',
           display: 'grid',
           placeItems: 'center',
-          background: 'var(--paper, #f2e7d8)',
-          color: '#625f6d',
-          fontFamily: 'Manrope, sans-serif',
+          background: '#0f0f0f',
+          color: '#a1a1a1',
+          fontFamily: "'DM Sans', system-ui, sans-serif",
           fontSize: 14,
         }}
       >
-        Opening the room…
+        Loading Creator Den…
       </div>
     );
   }
@@ -44,27 +44,28 @@ function ClerkGate({ children }: { children: React.ReactNode }) {
           display: 'grid',
           placeItems: 'center',
           padding: 24,
-          background: 'var(--paper, #f2e7d8)',
-          color: '#625f6d',
-          fontFamily: 'Manrope, sans-serif',
+          background: '#0f0f0f',
+          color: '#e5e5e5',
+          fontFamily: "'DM Sans', system-ui, sans-serif",
         }}
       >
         <div style={{ maxWidth: 420, textAlign: 'center' }}>
           <h1
             style={{
-              fontFamily: 'Newsreader, serif',
-              fontStyle: 'italic',
+              fontFamily: "'DM Sans', system-ui, sans-serif",
+              fontWeight: 700,
               fontSize: 32,
-              color: '#292b45',
+              letterSpacing: '-0.02em',
+              color: '#f1f1f1',
               marginBottom: 12,
             }}
           >
-            Your room is signed in on Tandem.
+            Sign in on Tandem to open your projects.
           </h1>
-          <p style={{ lineHeight: 1.7 }}>
-            Creators Den lives inside the same Tandem account — sign in on the
-            Tandem app, then come back here. The rooms you open are tied to
-            your identity.
+          <p style={{ lineHeight: 1.7, color: '#a1a1a1' }}>
+            Creator Den shares your Tandem account. Sign in on the Tandem app,
+            then come back here — your projects, versions, and reviews are tied
+            to your identity.
           </p>
           <a
             href="/sign-in"
@@ -73,8 +74,8 @@ function ClerkGate({ children }: { children: React.ReactNode }) {
               marginTop: 16,
               padding: '12px 22px',
               borderRadius: 999,
-              background: '#292b45',
-              color: '#fff4e6',
+              background: '#E50914',
+              color: '#fff',
               textDecoration: 'none',
               fontWeight: 700,
               fontSize: 14,

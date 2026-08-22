@@ -44,12 +44,14 @@ import {
 /** Per-version live filter (e.g. a FINISH grade of the clip under the playhead). */
 export type WipeFilter = (snapshot: unknown, playheadMs: number) => string | undefined;
 
+// GitHub-dark diff palette — semantic change colors tuned to read on the
+// near-black canvas (kept distinct per kind, not collapsed to the red accent).
 const KIND_COLOR: Record<string, string> = {
-  added: '#286254',
-  removed: '#a33d31',
-  trimmed: '#f0c85c',
-  moved: 'hsl(var(--accent))',
-  slipped: 'hsl(var(--sidebar-primary))',
+  added: '#3fb950',
+  removed: '#f85149',
+  trimmed: '#e3b341',
+  moved: '#58a6ff',
+  slipped: '#bc8cff',
 };
 
 const KIND_ICON: Record<string, string> = {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ArrowUpRight,
+  Check,
   Image as ImageIcon,
   LockKeyhole,
   Save,
@@ -23,7 +24,7 @@ import { useProjectRealtime } from '@/lib/realtime';
 import { ImageStage, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { RoleOracle } from '@/components/role-oracle';
-import { CommentsPanel, HistoryPanel } from '@/pages/selects';
+import { CommentsPanel, HistoryPanel } from '@/components/review-shared';
 import { ActivityFeed } from '@/components/activity-feed';
 
 // ---------------------------------------------------------------------------
@@ -200,7 +201,10 @@ export default function ThumbnailStudioPage() {
             <ArrowLeft size={14} />
             The vault
           </Link>
-          <span className={`den-tag ${canEdit ? 'teal' : 'muted'}`}>{canEdit ? 'Editing' : 'Viewing'}</span>
+          <span className={`den-tag ${canEdit ? 'teal' : 'muted'}`}>
+            <Check size={10} />
+            {canEdit ? 'Thumbnail Designer' : 'Viewing'}
+          </span>
         </div>
       </div>
 
@@ -208,41 +212,18 @@ export default function ThumbnailStudioPage() {
         {RELAY_LEGS.map((item) => {
           const Icon = item.icon;
           const active = item.leg === 'THUMBNAIL';
-          const status = submissions.data?.find((s) => s.leg === item.leg);
-          const href =
-            item.leg === 'SELECTS'
-              ? `/projects/${p.id}/selects`
-              : item.leg === 'CUT'
-                ? `/projects/${p.id}/cut`
-                : item.leg === 'SOUND'
-                  ? `/projects/${p.id}/sound`
-                  : item.leg === 'FINISH'
-                    ? `/projects/${p.id}/finish`
-                    : null;
-          const inner = (
-            <>
+          const href = `/projects/${p.id}/${item.slug}`;
+          return (
+            <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`tab-leg-${item.leg}`}>
               <Icon size={13} />
               {item.role}
-              {status && <span className={`leg-badge ${status.status === 'APPROVED' ? 'text-[#286254]' : status.status === 'REJECTED' ? 'text-[#a33d31]' : ''}`}>{status.status}</span>}
-            </>
-          );
-          if (href) {
-            return (
-              <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`tab-leg-${item.leg}`}>
-                {inner}
-              </Link>
-            );
-          }
-          return (
-            <button key={item.leg} type="button" className={active ? 'active' : ''} data-testid={`tab-leg-${item.leg}`}>
-              {inner}
-            </button>
+            </Link>
           );
         })}
       </div>
 
-      <div className="den-two-col">
-        <div className="space-y-4">
+      <div className="cd-watch">
+        <div className="cd-watch-main">
           <div className="paper-card">
             <div className="inline-heading">
               <span className="eyebrow"><ImageIcon size={13} /> Design canvas</span>
@@ -294,7 +275,7 @@ export default function ThumbnailStudioPage() {
           <CommentsPanel projectId={p.id} leg="THUMBNAIL" />
         </div>
 
-        <div className="space-y-4">
+        <div className="cd-watch-rail">
           <div className="paper-card accent-card">
             <div className="inline-heading">
               <span className="eyebrow"><ImageIcon size={13} /> The thumbnail document</span>

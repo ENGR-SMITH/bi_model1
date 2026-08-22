@@ -16,7 +16,7 @@ to run them from. Paths are relative to the repo root (the folder that contains
 |-----|-----------|------|-----------|---------|
 | **Tandem** (main hub) | `artifacts/tandem` | `5173` | `/` | The main web app. Proxies `/api`, `/authors-den`, `/creators-den`, and `/socket.io` to the other services. **Open this one in your browser.** |
 | **Author Den** | `artifacts/authors-den` | `5174` | `/authors-den/` | Writing studio (books/projects, oracle AI, collaboration). |
-| **Creator Den** | `artifacts/creators-den` | `5175` | `/creators-den/` | Video platform (Selects / Cut / Sound / Finish workspaces, timeline & canvas editing). |
+| **Creator Den** | `artifacts/creators-den` | `5175` | `/creators-den/` | Video version-control platform — Selects / Cut / Sound / Finish / Thumbnail review stages; external-editor checkout & import, commits, pull requests, A/B compare (no in-browser editing). |
 | **API server** | `artifacts/api-server` | `3000` | — | Express REST API + Socket.IO realtime + Clerk auth + AI (Story Oracle) + video job queue. |
 | **PostgreSQL** | — | `5432` | — | The database. Schema lives in `lib/db`. |
 | Oracle Admin *(optional)* | `artifacts/oracle-admin` | `5176` | `/oracle-admin/` | Private control room for AI model providers (login code `ADMIN_ACCESS_CODE`). |

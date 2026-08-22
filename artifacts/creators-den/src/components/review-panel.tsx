@@ -31,7 +31,7 @@ import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/c
 import { AssetPlayer, ImageStage, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { DiffView } from '@/components/diff-view';
-import { CommentsPanel } from '@/pages/selects';
+import { CommentsPanel } from '@/components/review-shared';
 import type { StudioLeg } from '@/components/role-oracle';
 import type { TimelineSnapshotLike } from '@/lib/diff';
 
