@@ -30,7 +30,7 @@ import type {
   VideoAssetDetail,
   VideoTranscriptSegment,
 } from '@workspace/api-client-react';
-import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
+import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { Timeline, formatTimecode, activeBlockId, type TimelineBlock } from '@/components/timeline';
 import { RoleOracle, AiResult } from '@/components/role-oracle';
@@ -466,15 +466,6 @@ export default function ContentCreatorsStudioPage() {
 
   return (
     <div className="page">
-      <div className="page-guide">
-        <span className="guide-pin" />
-        <div>
-          <b>CONTENT CREATORS · THE STUDIO</b>
-          <span>Review the marked selects and the narrative spine — Hook → Setup → Core → Payoff → CTA — compare versions, and open a pull request. The paper edit happens in your NLE.</span>
-        </div>
-        <span className="guide-spark" />
-      </div>
-
       <div className="page-header">
         <div>
           <SectionEyebrow>Story Architect · selects</SectionEyebrow>
@@ -491,20 +482,6 @@ export default function ContentCreatorsStudioPage() {
             {canEdit ? 'Story Architect' : 'Viewing'}
           </span>
         </div>
-      </div>
-
-      <div className="role-tabs mb-5">
-        {RELAY_LEGS.map((item) => {
-          const Icon = item.icon;
-          const active = item.leg === 'SELECTS';
-          const href = `/projects/${p.id}/${item.slug}`;
-          return (
-            <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`tab-leg-${item.leg}`}>
-              <Icon size={13} />
-              {item.role}
-            </Link>
-          );
-        })}
       </div>
 
       <div className="cd-watch">

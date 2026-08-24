@@ -150,15 +150,6 @@ export default function ActivityPage() {
 
   return (
     <div className="page">
-      <div className="page-guide">
-        <span className="guide-pin" />
-        <div>
-          <b>CONTENT CREATORS · THE LEDGER</b>
-          <span>Every move on the picture, in the order it happened.</span>
-        </div>
-        <span className="guide-spark" />
-      </div>
-
       <div className="page-header">
         <div>
           <SectionEyebrow>Project · activity</SectionEyebrow>

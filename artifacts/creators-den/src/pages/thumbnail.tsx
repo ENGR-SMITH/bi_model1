@@ -19,7 +19,7 @@ import {
   useListVideoSubmissions,
   useSaveVideoTimeline,
 } from '@workspace/api-client-react';
-import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
+import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { ImageStage, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
@@ -181,15 +181,6 @@ export default function ThumbnailStudioPage() {
 
   return (
     <div className="page">
-      <div className="page-guide">
-        <span className="guide-pin" />
-        <div>
-          <b>CONTENT CREATORS · THE STUDIO</b>
-          <span>Designs the click: pick the frame, write the title, and ship the thumbnail that earns the play.</span>
-        </div>
-        <span className="guide-spark" />
-      </div>
-
       <div className="page-header">
         <div>
           <SectionEyebrow>Thumbnail Designer · cover art</SectionEyebrow>
@@ -206,20 +197,6 @@ export default function ThumbnailStudioPage() {
             {canEdit ? 'Thumbnail Designer' : 'Viewing'}
           </span>
         </div>
-      </div>
-
-      <div className="role-tabs mb-5">
-        {RELAY_LEGS.map((item) => {
-          const Icon = item.icon;
-          const active = item.leg === 'THUMBNAIL';
-          const href = `/projects/${p.id}/${item.slug}`;
-          return (
-            <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`tab-leg-${item.leg}`}>
-              <Icon size={13} />
-              {item.role}
-            </Link>
-          );
-        })}
       </div>
 
       <div className="cd-watch">

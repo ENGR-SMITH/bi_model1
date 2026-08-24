@@ -2,7 +2,6 @@ import { useState, type ReactNode } from 'react';
 import { useClerk, useUser } from '@clerk/react';
 import {
   Activity,
-  ArrowUpRight,
   Clapperboard,
   DoorOpen,
   Film,
@@ -204,8 +203,6 @@ function Sidebar({ projectId, onClose, open }: { projectId: string | null; onClo
             })}
           </>
         )}
-        <span className="nav-label nav-label-spaced">Tandem</span>
-        {navItem('/dashboard', 'Back to the atrium', <ArrowUpRight size={16} />, false)}
       </nav>
 
       <div className="sidebar-bottom">
@@ -265,11 +262,6 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             )}
           </div>
           <div className="top-actions">
-            <Link href="/dashboard" className="link-btn" data-testid="link-back-atrium">
-              <ArrowUpRight size={14} />
-              Back to the atrium
-            </Link>
-            <span className="top-divider" aria-hidden />
             <UserChip />
           </div>
         </header>

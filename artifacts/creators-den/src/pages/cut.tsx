@@ -27,7 +27,7 @@ import {
   useRenderVideoTimeline,
   useSyncVideoAsset,
 } from '@workspace/api-client-react';
-import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
+import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from '@/components/review-shared';
 import { ActivityFeed } from '@/components/activity-feed';
@@ -507,15 +507,6 @@ export default function ContentCreatorsCutPage() {
 
   return (
     <div className="page">
-      <div className="page-guide">
-        <span className="guide-pin" />
-        <div>
-          <b>CONTENT CREATORS · THE CUTTING ROOM</b>
-          <span>Review the assembled cut against the beats, sync the cameras, render a preview, and open a pull request — the edit itself happens in your NLE.</span>
-        </div>
-        <span className="guide-spark" />
-      </div>
-
       <div className="page-header">
         <div>
           <SectionEyebrow>Visual Editor · precision cutting</SectionEyebrow>
@@ -532,20 +523,6 @@ export default function ContentCreatorsCutPage() {
             {canEdit ? 'Visual Editor' : 'Viewing'}
           </span>
         </div>
-      </div>
-
-      <div className="role-tabs mb-5">
-        {RELAY_LEGS.map((item) => {
-          const Icon = item.icon;
-          const active = item.leg === 'CUT';
-          const href = `/projects/${p.id}/${item.slug}`;
-          return (
-            <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`cut-tab-leg-${item.leg}`}>
-              <Icon size={13} />
-              {item.role}
-            </Link>
-          );
-        })}
       </div>
 
       <div className="cd-watch">

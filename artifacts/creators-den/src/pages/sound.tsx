@@ -20,7 +20,7 @@ import {
   useListVideoJobs,
   useQueueAudioPass,
 } from '@workspace/api-client-react';
-import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
+import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from '@/components/review-shared';
 import { ActivityFeed } from '@/components/activity-feed';
@@ -436,15 +436,6 @@ export default function ContentCreatorsSoundPage() {
 
   return (
     <div className="page">
-      <div className="page-guide">
-        <span className="guide-pin" />
-        <div>
-          <b>CONTENT CREATORS · THE MIX ROOM</b>
-          <span>Review the mix, run restoration passes on the server, compare versions, and open a pull request — the mix itself happens in your DAW.</span>
-        </div>
-        <span className="guide-spark" />
-      </div>
-
       <div className="page-header">
         <div>
           <SectionEyebrow>Sound Designer · restore &amp; score</SectionEyebrow>
@@ -461,20 +452,6 @@ export default function ContentCreatorsSoundPage() {
             {canEdit ? 'Sound Designer' : 'Viewing'}
           </span>
         </div>
-      </div>
-
-      <div className="role-tabs mb-5">
-        {RELAY_LEGS.map((item) => {
-          const Icon = item.icon;
-          const active = item.leg === 'SOUND';
-          const href = `/projects/${p.id}/${item.slug}`;
-          return (
-            <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`sound-tab-leg-${item.leg}`}>
-              <Icon size={13} />
-              {item.role}
-            </Link>
-          );
-        })}
       </div>
 
       <div className="cd-watch">

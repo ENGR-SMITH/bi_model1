@@ -23,7 +23,7 @@ import {
   useQueueVideoThumbnail,
 } from '@workspace/api-client-react';
 import type { VideoAssetDetail } from '@workspace/api-client-react';
-import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
+import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { CommentsPanel, HistoryPanel } from '@/components/review-shared';
 import { ActivityFeed } from '@/components/activity-feed';
@@ -512,15 +512,6 @@ export default function ContentCreatorsFinishPage() {
 
   return (
     <div className="page">
-      <div className="page-guide">
-        <span className="guide-pin" />
-        <div>
-          <b>CONTENT CREATORS · THE FINISHING SUITE</b>
-          <span>Review the finished look, compare grades version-to-version, extract the cover frame, and export every format.</span>
-        </div>
-        <span className="guide-spark" />
-      </div>
-
       <div className="page-header">
         <div>
           <SectionEyebrow>Motion &amp; Color · finish &amp; polish</SectionEyebrow>
@@ -545,20 +536,6 @@ export default function ContentCreatorsFinishPage() {
           The Lock is released — the team can download the finals from the vault.
         </div>
       )}
-
-      <div className="role-tabs mb-5">
-        {RELAY_LEGS.map((item) => {
-          const Icon = item.icon;
-          const active = item.leg === 'FINISH';
-          const href = `/projects/${p.id}/${item.slug}`;
-          return (
-            <Link key={item.leg} href={href} className={active ? 'active' : ''} data-testid={`finish-tab-leg-${item.leg}`}>
-              <Icon size={13} />
-              {item.role}
-            </Link>
-          );
-        })}
-      </div>
 
       <div className="cd-watch">
         <div className="cd-watch-main">
