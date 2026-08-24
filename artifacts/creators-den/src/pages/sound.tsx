@@ -211,34 +211,34 @@ function MixLayers({
         <span className="eyebrow"><Music4 size={13} /> Mix layers · from the head version</span>
         <span className="mono-label">{formatTimecode(playheadMs)}</span>
       </div>
-      {musicBlocks.length > 0 && (
-        <div className="mt-3">
-          <Timeline
-            title={`Score & music — ${musicBlocks.length} track${musicBlocks.length === 1 ? '' : 's'}`}
-            hint="Read-only · scrub to review where the score plays"
-            blocks={musicBlocks}
-            durationMs={durationMs}
-            playheadMs={playheadMs}
-            canEdit={false}
-            scrubOnly
-            onScrub={onScrub}
-            activeId={activeBlockId(musicBlocks, playheadMs)}
-          />
-        </div>
-      )}
-      {pickupBlocks.length > 0 && (
-        <div className="mt-3">
-          <Timeline
-            title={`Pickup VO — ${pickupBlocks.length} pin${pickupBlocks.length === 1 ? '' : 's'}`}
-            hint="Read-only · scrub to hear where re-records land"
-            blocks={pickupBlocks}
-            durationMs={durationMs}
-            playheadMs={playheadMs}
-            canEdit={false}
-            scrubOnly
-            onScrub={onScrub}
-            activeId={activeBlockId(pickupBlocks, playheadMs)}
-          />
+      {(musicBlocks.length > 0 || pickupBlocks.length > 0) && (
+        <div className="cd-sequence mt-3" data-testid="sound-sequence">
+          {musicBlocks.length > 0 && (
+            <Timeline
+              title={`Score & music — ${musicBlocks.length} track${musicBlocks.length === 1 ? '' : 's'}`}
+              hint="Read-only · scrub to review where the score plays"
+              blocks={musicBlocks}
+              durationMs={durationMs}
+              playheadMs={playheadMs}
+              canEdit={false}
+              scrubOnly
+              onScrub={onScrub}
+              activeId={activeBlockId(musicBlocks, playheadMs)}
+            />
+          )}
+          {pickupBlocks.length > 0 && (
+            <Timeline
+              title={`Pickup VO — ${pickupBlocks.length} pin${pickupBlocks.length === 1 ? '' : 's'}`}
+              hint="Read-only · scrub to hear where re-records land"
+              blocks={pickupBlocks}
+              durationMs={durationMs}
+              playheadMs={playheadMs}
+              canEdit={false}
+              scrubOnly
+              onScrub={onScrub}
+              activeId={activeBlockId(pickupBlocks, playheadMs)}
+            />
+          )}
         </div>
       )}
     </div>

@@ -3,6 +3,7 @@ import { Link, Route, Router, Switch } from 'wouter';
 import { CreatorsShell, SectionEyebrow } from '@/components/shell';
 import RoomPage from '@/pages/room';
 import VaultPage from '@/pages/vault';
+import ActivityPage from '@/pages/activity';
 import SelectsPage from '@/pages/selects';
 import CutPage from '@/pages/cut';
 import SoundPage from '@/pages/sound';
@@ -28,6 +29,7 @@ export default function App() {
         <Switch>
           <Route path="/" component={RoomPage} />
           <Route path="/projects/:projectId" component={VaultPage} />
+          <Route path="/projects/:projectId/activity" component={ActivityPage} />
           <Route path="/projects/:projectId/selects" component={SelectsPage} />
           <Route path="/projects/:projectId/cut" component={CutPage} />
           <Route path="/projects/:projectId/sound" component={SoundPage} />

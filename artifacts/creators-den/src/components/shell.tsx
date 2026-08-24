@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useClerk, useUser } from '@clerk/react';
 import {
+  Activity,
   ArrowUpRight,
   Clapperboard,
   DoorOpen,
@@ -11,6 +12,7 @@ import {
   Palette,
   Scissors,
   ChevronDown,
+  ChevronRight,
   Check,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
@@ -178,6 +180,7 @@ function Sidebar({ projectId, onClose, open }: { projectId: string | null; onClo
         <span className="nav-label">Studio</span>
         {navItem('/', 'Home', <DoorOpen size={16} />, location === '/')}
         {projectId && navItem(`/projects/${projectId}`, 'Project', <Film size={16} />, location === `/projects/${projectId}`)}
+        {projectId && navItem(`/projects/${projectId}/activity`, 'Activity', <Activity size={16} />, location === `/projects/${projectId}/activity`)}
         {projectId && (
           <>
             <span className="nav-label nav-label-spaced">Stages</span>
@@ -226,6 +229,16 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   const projectId = projectMatch?.[1];
   const current = projects.data?.find((p) => p.id === projectId);
 
+  // Contextual breadcrumb shown in the top bar, chevroned off the workspace name.
+  const stageLeg = projectId ? RELAY_LEGS.find((l) => location === `/projects/${projectId}/${l.slug}`) : undefined;
+  const sectionLabel = !projectId
+    ? null
+    : location === `/projects/${projectId}`
+      ? 'The vault'
+      : location === `/projects/${projectId}/activity`
+        ? 'Activity'
+        : stageLeg?.role ?? null;
+
   return (
     <div className="app-shell">
       <Sidebar projectId={projectId ?? null} onClose={() => setMobileNav(false)} open={mobileNav} />
@@ -235,19 +248,28 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           <button className="icon-btn mobile-only" aria-label="Open navigation" onClick={() => setMobileNav(true)}>
             <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
           </button>
-          <div className="top-workspace-wrap" onPointerLeave={() => setTopWorkspaceOpen(false)}>
-            <button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)} data-testid="top-workspace">
-              <span>Workspace</span>
-              <ChevronDown size={13} />
-              <b className="truncate">{current?.name ?? 'Home'}</b>
-            </button>
-            {topWorkspaceOpen && <WorkspaceMenu onClose={() => setTopWorkspaceOpen(false)} />}
+          <div className="topbar-lead">
+            <div className="top-workspace-wrap" onPointerLeave={() => setTopWorkspaceOpen(false)}>
+              <button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)} data-testid="top-workspace">
+                <span>Workspace</span>
+                <ChevronDown size={13} />
+                <b className="truncate">{current?.name ?? 'Home'}</b>
+              </button>
+              {topWorkspaceOpen && <WorkspaceMenu onClose={() => setTopWorkspaceOpen(false)} />}
+            </div>
+            {sectionLabel && (
+              <div className="top-crumb" data-testid="top-crumb">
+                <ChevronRight size={15} />
+                <span>{sectionLabel}</span>
+              </div>
+            )}
           </div>
           <div className="top-actions">
             <Link href="/dashboard" className="link-btn" data-testid="link-back-atrium">
               <ArrowUpRight size={14} />
               Back to the atrium
             </Link>
+            <span className="top-divider" aria-hidden />
             <UserChip />
           </div>
         </header>

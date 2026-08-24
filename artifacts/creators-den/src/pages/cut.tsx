@@ -199,35 +199,34 @@ function CutPreview({
           </EmptyPlayer>
         )}
 
-        {clipBlocks.length > 0 && (
-          <div className="mt-4">
-            <Timeline
-              title={`Main track — ${clips.length} clips`}
-              hint="Click or drag the ruler to scrub the assembled cut"
-              blocks={clipBlocks}
-              durationMs={durationMs}
-              playheadMs={playheadMs}
-              canEdit={false}
-              scrubOnly
-              onScrub={onSeek}
-              activeId={activeClip?.id ?? activeBlockId(clipBlocks, playheadMs)}
-            />
-          </div>
-        )}
-
-        {overlayBlocks.length > 0 && (
-          <div className="mt-3">
-            <Timeline
-              title="Overlay layer — b-roll & screens"
-              hint="Read-only · scrub to see where overlays land"
-              blocks={overlayBlocks}
-              durationMs={durationMs}
-              playheadMs={playheadMs}
-              canEdit={false}
-              scrubOnly
-              onScrub={onSeek}
-              activeId={activeBlockId(overlayBlocks, playheadMs)}
-            />
+        {(clipBlocks.length > 0 || overlayBlocks.length > 0) && (
+          <div className="cd-sequence mt-4" data-testid="cut-sequence">
+            {clipBlocks.length > 0 && (
+              <Timeline
+                title={`Main track — ${clips.length} clips`}
+                hint="Click or drag the ruler to scrub the assembled cut"
+                blocks={clipBlocks}
+                durationMs={durationMs}
+                playheadMs={playheadMs}
+                canEdit={false}
+                scrubOnly
+                onScrub={onSeek}
+                activeId={activeClip?.id ?? activeBlockId(clipBlocks, playheadMs)}
+              />
+            )}
+            {overlayBlocks.length > 0 && (
+              <Timeline
+                title="Overlay layer — b-roll & screens"
+                hint="Read-only · scrub to see where overlays land"
+                blocks={overlayBlocks}
+                durationMs={durationMs}
+                playheadMs={playheadMs}
+                canEdit={false}
+                scrubOnly
+                onScrub={onSeek}
+                activeId={activeBlockId(overlayBlocks, playheadMs)}
+              />
+            )}
           </div>
         )}
 

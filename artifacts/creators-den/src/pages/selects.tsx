@@ -288,38 +288,37 @@ function SelectsView({
         <span className="eyebrow"><Film size={13} /> Selects & spine · from the head version</span>
         <span className="mono-label">{clipBlocks.length} marked</span>
       </div>
-      {clipBlocks.length > 0 ? (
-        <div className="mt-3">
-          <Timeline
-            title={`Selects — ${clipBlocks.length} marked`}
-            hint="Read-only · click or drag the ruler to scrub"
-            blocks={clipBlocks}
-            durationMs={durationMs}
-            playheadMs={playheadMs}
-            canEdit={false}
-            scrubOnly
-            onScrub={onScrub}
-            activeId={activeBlockId(clipBlocks, playheadMs)}
-          />
+      {clipBlocks.length > 0 || sceneBlocks.length > 0 ? (
+        <div className="cd-sequence mt-3" data-testid="selects-sequence">
+          {clipBlocks.length > 0 && (
+            <Timeline
+              title={`Selects — ${clipBlocks.length} marked`}
+              hint="Read-only · click or drag the ruler to scrub"
+              blocks={clipBlocks}
+              durationMs={durationMs}
+              playheadMs={playheadMs}
+              canEdit={false}
+              scrubOnly
+              onScrub={onScrub}
+              activeId={activeBlockId(clipBlocks, playheadMs)}
+            />
+          )}
+          {sceneBlocks.length > 0 && (
+            <Timeline
+              title="Narrative spine — Hook → Setup → Core → Payoff → CTA"
+              hint="Read-only · the spine that drives the cut"
+              blocks={sceneBlocks}
+              durationMs={durationMs}
+              playheadMs={playheadMs}
+              canEdit={false}
+              scrubOnly
+              onScrub={onScrub}
+              activeId={activeBlockId(sceneBlocks, playheadMs)}
+            />
+          )}
         </div>
       ) : (
         <p className="setting-copy mt-2">No selects marked yet — mark them in your editor and import the pass as a version.</p>
-      )}
-
-      {sceneBlocks.length > 0 && (
-        <div className="mt-3">
-          <Timeline
-            title="Narrative spine — Hook → Setup → Core → Payoff → CTA"
-            hint="Read-only · the spine that drives the cut"
-            blocks={sceneBlocks}
-            durationMs={durationMs}
-            playheadMs={playheadMs}
-            canEdit={false}
-            scrubOnly
-            onScrub={onScrub}
-            activeId={activeBlockId(sceneBlocks, playheadMs)}
-          />
-        </div>
       )}
 
       <p className="den-footnote mt-3">

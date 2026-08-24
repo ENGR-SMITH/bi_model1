@@ -242,7 +242,7 @@ function FinishPreview({
       </AssetPlayer>
 
       {clips.length > 0 && (
-        <div className="mt-4">
+        <div className="cd-sequence mt-4" data-testid="finish-sequence">
           <Timeline
             title="Grade clips — scrub to compare"
             hint="Click or drag the ruler to move across clips · each clip shows its own grade"
