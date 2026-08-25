@@ -3,6 +3,7 @@ import { useClerk, useUser } from '@clerk/react';
 import {
   Activity,
   Clapperboard,
+  Compass,
   Film,
   Image,
   LogOut,
@@ -11,6 +12,7 @@ import {
   Scissors,
   ChevronDown,
   Check,
+  UserRound,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useListVideoProjects } from '@workspace/api-client-react';
@@ -172,7 +174,16 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
           </div>
 
+          <Link href="/explore" className="cd-explore-link" data-testid="nav-explore">
+            <Compass size={14} />
+            <span>Explore</span>
+          </Link>
+
           <div className="cd-topnav-account">
+            <Link href="/profile" className="cd-profile" data-testid="nav-profile">
+              <UserRound size={14} />
+              <span>Profile</span>
+            </Link>
             <button type="button" className="cd-signout" onClick={logout} data-testid="button-creators-logout">
               <LogOut size={14} />
               <span>Sign out</span>

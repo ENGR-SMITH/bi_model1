@@ -21,6 +21,9 @@ export const tandemVideoProjectsTable = pgTable("tandem_video_projects", {
   description: text("description").notNull().default(""),
   // VAULT → IN_PRODUCTION → LOCK_RELEASED → COMPLETE
   status: text("status").notNull().default("VAULT"),
+  // PUBLIC projects appear on the owner's public profile track history;
+  // PRIVATE projects stay visible to members only. Set by the Captain.
+  visibility: text("visibility").notNull().default("PRIVATE"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -70,13 +73,34 @@ export const tandemVideoAssetsTable = pgTable("tandem_video_assets", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// A directed follow edge between Creator Den users — the GitHub-style follow
+// model behind profiles and discovery. Uniqueness on (follower, following)
+// keeps the graph simple; no self-follows (enforced in the API layer).
+export const tandemVideoFollowsTable = pgTable(
+  "tandem_video_follows",
+  {
+    id: text("id").primaryKey(),
+    followerId: text("follower_id").notNull(),
+    followingId: text("following_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    followerFollowingUnique: unique("tandem_video_follow_follower_following").on(
+      table.followerId,
+      table.followingId,
+    ),
+  }),
+);
+
 export const insertTandemVideoProjectSchema = createInsertSchema(tandemVideoProjectsTable);
 export const insertTandemVideoMemberSchema = createInsertSchema(tandemVideoMembersTable);
 export const insertTandemVideoAssetSchema = createInsertSchema(tandemVideoAssetsTable);
+export const insertTandemVideoFollowSchema = createInsertSchema(tandemVideoFollowsTable);
 
 export type TandemVideoProject = typeof tandemVideoProjectsTable.$inferSelect;
 export type TandemVideoMember = typeof tandemVideoMembersTable.$inferSelect;
 export type TandemVideoAsset = typeof tandemVideoAssetsTable.$inferSelect;
+export type TandemVideoFollow = typeof tandemVideoFollowsTable.$inferSelect;
 export type TandemVideoRole = "CAPTAIN" | "UPLOADER" | "ARCHITECT" | "VISUAL_EDITOR" | "SOUND_DESIGNER" | "MOTION_COLOR" | "THUMBNAIL_DESIGNER" | "VIEWER";
 export const tandemVideoRoleSchema = z.enum([
   "CAPTAIN",

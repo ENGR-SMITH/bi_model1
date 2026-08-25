@@ -9,6 +9,8 @@ import CutPage from '@/pages/cut';
 import SoundPage from '@/pages/sound';
 import FinishPage from '@/pages/finish';
 import ThumbnailPage from '@/pages/thumbnail';
+import ProfilePage from '@/pages/profile';
+import ExplorePage from '@/pages/explore';
 
 function NotFound() {
   return (
@@ -28,6 +30,9 @@ export default function App() {
       <CreatorsShell>
         <Switch>
           <Route path="/" component={RoomPage} />
+          <Route path="/profile" component={ProfilePage} />
+          <Route path="/profile/:userId" component={ProfilePage} />
+          <Route path="/explore" component={ExplorePage} />
           <Route path="/projects/:projectId" component={VaultPage} />
           <Route path="/projects/:projectId/activity" component={ActivityPage} />
           <Route path="/projects/:projectId/selects" component={SelectsPage} />

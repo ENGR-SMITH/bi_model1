@@ -8,7 +8,7 @@ import { clerkClient } from "@clerk/express";
 // short ids so the feed never breaks because name resolution is down.
 // ---------------------------------------------------------------------------
 
-const cache = new Map<string, { name: string | null; at: number }>();
+const cache = new Map<string, { name: string | null; imageUrl: string | null; at: number }>();
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
 interface ClerkUserLike {
@@ -40,14 +40,28 @@ export function clearUserNameCache(): void {
 export async function resolveUserNames(
   userIds: string[],
 ): Promise<Record<string, string | null>> {
+  const profiles = await resolveUserProfiles(userIds);
   const result: Record<string, string | null> = {};
+  for (const id of userIds) result[id] = profiles[id]?.name ?? null;
+  return result;
+}
+
+/**
+ * Resolves Clerk user ids to display names + avatar urls, cached. Used by
+ * explore, follow lists, and the public profile. Unresolvable ids (or a
+ * Clerk outage) yield no entry — callers fall back to the raw short id.
+ */
+export async function resolveUserProfiles(
+  userIds: string[],
+): Promise<Record<string, { name: string | null; imageUrl: string | null }>> {
+  const result: Record<string, { name: string | null; imageUrl: string | null }> = {};
   const missing: string[] = [];
   const now = Date.now();
 
   for (const id of userIds) {
     const hit = cache.get(id);
     if (hit && now - hit.at < CACHE_TTL_MS) {
-      result[id] = hit.name;
+      result[id] = { name: hit.name, imageUrl: hit.imageUrl };
     } else {
       missing.push(id);
     }
@@ -58,11 +72,12 @@ export async function resolveUserNames(
       const list = await clerkClient.users.getUserList({ userId: missing });
       for (const user of list.data) {
         const name = displayName(user as ClerkUserLike);
-        result[user.id] = name;
-        cache.set(user.id, { name, at: now });
+        const imageUrl = (user as ClerkUserLike & { imageUrl?: string | null }).imageUrl ?? null;
+        result[user.id] = { name, imageUrl };
+        cache.set(user.id, { name, imageUrl, at: now });
       }
     } catch {
-      // Name resolution is best-effort — the feed still works on short ids.
+      // Profile resolution is best-effort — the feed still works on short ids.
     }
   }
 

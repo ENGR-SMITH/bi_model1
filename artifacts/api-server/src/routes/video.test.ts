@@ -185,6 +185,84 @@ describe("projects", () => {
   });
 });
 
+describe("project visibility (public profile track history)", () => {
+  it("creates projects PRIVATE by default", async () => {
+    const project = await createProject();
+    expect(project.visibility).toBe("PRIVATE");
+  });
+
+  it("lets the Captain flip visibility to PUBLIC and back", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const publicRes = await request(API)
+      .patch(`/api/video/projects/${project.id}/visibility`)
+      .send({ visibility: "PUBLIC" });
+    expect(publicRes.status).toBe(200);
+    expect(publicRes.body.visibility).toBe("PUBLIC");
+
+    const privateRes = await request(API)
+      .patch(`/api/video/projects/${project.id}/visibility`)
+      .send({ visibility: "PRIVATE" });
+    expect(privateRes.status).toBe(200);
+    expect(privateRes.body.visibility).toBe("PRIVATE");
+  });
+
+  it("rejects visibility changes from non-Captains and bad bodies", async () => {
+    const project = await createProject();
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ email: "editor@example.com", role: "VISUAL_EDITOR" });
+
+    state.userId = "user-2";
+    const memberRes = await request(API)
+      .patch(`/api/video/projects/${project.id}/visibility`)
+      .send({ visibility: "PUBLIC" });
+    expect(memberRes.status).toBe(403);
+
+    state.userId = "captain-1";
+    const badBody = await request(API)
+      .patch(`/api/video/projects/${project.id}/visibility`)
+      .send({ visibility: "EVERYONE" });
+    expect(badBody.status).toBe(400);
+
+    state.userId = null;
+    expect(
+      (await request(API).patch(`/api/video/projects/${project.id}/visibility`).send({ visibility: "PUBLIC" })).status,
+    ).toBe(401);
+  });
+
+  it("lists only PUBLIC projects on the profile track history (owned or participated)", async () => {
+    const owned = await createProject();
+    const other = await createProject("captain-2", "Other Vlog");
+
+    // captain-1 makes their own project public, captain-2's stays private.
+    state.userId = "captain-1";
+    await request(API)
+      .patch(`/api/video/projects/${owned.id}/visibility`)
+      .send({ visibility: "PUBLIC" });
+
+    // captain-2 joins captain-1's project — captain-2's profile should list it
+    // (participated) even though captain-2 doesn't own it.
+    await request(API)
+      .post(`/api/video/projects/${owned.id}/members`)
+      .send({ email: "creator2@example.com", role: "ARCHITECT" });
+
+    state.userId = "captain-1";
+    const captain1Profile = await request(API).get("/api/video/users/captain-1/projects");
+    expect(captain1Profile.status).toBe(200);
+    expect(captain1Profile.body.map((p: any) => p.id)).toEqual([owned.id]);
+
+    const captain2Profile = await request(API).get("/api/video/users/captain-2/projects");
+    expect(captain2Profile.status).toBe(200);
+    // captain-2 participated in the public project; their own stays hidden.
+    expect(captain2Profile.body.map((p: any) => p.id)).toEqual([owned.id]);
+    expect(captain2Profile.body[0].visibility).toBe("PUBLIC");
+
+    state.userId = null;
+    expect((await request(API).get("/api/video/users/captain-1/projects")).status).toBe(401);
+  });
+});
+
 describe("members", () => {
   it("adds a member by email with a leg role", async () => {
     const project = await createProject();

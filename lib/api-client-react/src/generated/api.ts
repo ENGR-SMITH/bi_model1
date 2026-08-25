@@ -73,8 +73,12 @@ import type {
   VideoComment,
   VideoCommentInput,
   VideoCommentResolveInput,
+  VideoContributions,
+  VideoCreatorSummary,
   VideoDownload,
   VideoExportInput,
+  VideoFollowListEntry,
+  VideoFollowState,
   VideoGenealogyEntry,
   VideoGrant,
   VideoGrantInput,
@@ -85,6 +89,8 @@ import type {
   VideoProject,
   VideoProjectDetail,
   VideoProjectInput,
+  VideoProjectVisibilityInput,
+  VideoPublicProject,
   VideoReference,
   VideoRenderInput,
   VideoSubmission,
@@ -4962,6 +4968,691 @@ export const useCreateVideoProject = <TError = ErrorType<ErrorResponse>,
       return useMutation(getCreateVideoProjectMutationOptions(options));
     }
 
+export const getListPublicVideoProjectsUrl = (userId: string,) => {
+
+
+
+
+  return `/api/video/users/${userId}/projects`
+}
+
+/**
+ * Public profile track history — only projects the user owns or participates in that are marked PUBLIC. Private projects never appear.
+ * @summary List a user's public content-creation projects
+ */
+export const listPublicVideoProjects = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoProject[]> => {
+
+  return customFetch<VideoProject[]>(getListPublicVideoProjectsUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPublicVideoProjectsQueryKey = (userId: string,) => {
+    return [
+    `/api/video/users/${userId}/projects`
+    ] as const;
+    }
+
+
+export const getListPublicVideoProjectsQueryOptions = <TData = Awaited<ReturnType<typeof listPublicVideoProjects>>, TError = ErrorType<ErrorResponse>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublicVideoProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPublicVideoProjectsQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPublicVideoProjects>>> = ({ signal }) => listPublicVideoProjects(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPublicVideoProjects>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPublicVideoProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof listPublicVideoProjects>>>
+export type ListPublicVideoProjectsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List a user's public content-creation projects
+ */
+
+export function useListPublicVideoProjects<TData = Awaited<ReturnType<typeof listPublicVideoProjects>>, TError = ErrorType<ErrorResponse>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPublicVideoProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPublicVideoProjectsQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListExploreCreatorsUrl = () => {
+
+
+
+
+  return `/api/video/explore/creators`
+}
+
+/**
+ * Every user with at least one PUBLIC project (owned or participated), with follower counts. Powers the explore browse page; name search is applied client-side.
+ * @summary List discoverable Creator Den users
+ */
+export const listExploreCreators = async ( options?: Parameters<typeof customFetch>[1]): Promise<VideoCreatorSummary[]> => {
+
+  return customFetch<VideoCreatorSummary[]>(getListExploreCreatorsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListExploreCreatorsQueryKey = () => {
+    return [
+    `/api/video/explore/creators`
+    ] as const;
+    }
+
+
+export const getListExploreCreatorsQueryOptions = <TData = Awaited<ReturnType<typeof listExploreCreators>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listExploreCreators>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListExploreCreatorsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listExploreCreators>>> = ({ signal }) => listExploreCreators({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listExploreCreators>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListExploreCreatorsQueryResult = NonNullable<Awaited<ReturnType<typeof listExploreCreators>>>
+export type ListExploreCreatorsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List discoverable Creator Den users
+ */
+
+export function useListExploreCreators<TData = Awaited<ReturnType<typeof listExploreCreators>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listExploreCreators>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListExploreCreatorsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListExploreProjectsUrl = () => {
+
+
+
+
+  return `/api/video/explore/projects`
+}
+
+/**
+ * Every project marked PUBLIC, newest first, with the owner's display identity. Powers the explore browse page; name search is applied client-side.
+ * @summary List public projects for discovery
+ */
+export const listExploreProjects = async ( options?: Parameters<typeof customFetch>[1]): Promise<VideoPublicProject[]> => {
+
+  return customFetch<VideoPublicProject[]>(getListExploreProjectsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListExploreProjectsQueryKey = () => {
+    return [
+    `/api/video/explore/projects`
+    ] as const;
+    }
+
+
+export const getListExploreProjectsQueryOptions = <TData = Awaited<ReturnType<typeof listExploreProjects>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listExploreProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListExploreProjectsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listExploreProjects>>> = ({ signal }) => listExploreProjects({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listExploreProjects>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListExploreProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof listExploreProjects>>>
+export type ListExploreProjectsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List public projects for discovery
+ */
+
+export function useListExploreProjects<TData = Awaited<ReturnType<typeof listExploreProjects>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listExploreProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListExploreProjectsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetVideoUserSocialUrl = (userId: string,) => {
+
+
+
+
+  return `/api/video/users/${userId}/social`
+}
+
+/**
+ * @summary Read follow counts and the viewer's follow state for a user
+ */
+export const getVideoUserSocial = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoFollowState> => {
+
+  return customFetch<VideoFollowState>(getGetVideoUserSocialUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoUserSocialQueryKey = (userId: string,) => {
+    return [
+    `/api/video/users/${userId}/social`
+    ] as const;
+    }
+
+
+export const getGetVideoUserSocialQueryOptions = <TData = Awaited<ReturnType<typeof getVideoUserSocial>>, TError = ErrorType<ErrorResponse>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoUserSocial>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoUserSocialQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoUserSocial>>> = ({ signal }) => getVideoUserSocial(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoUserSocial>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVideoUserSocialQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoUserSocial>>>
+export type GetVideoUserSocialQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read follow counts and the viewer's follow state for a user
+ */
+
+export function useGetVideoUserSocial<TData = Awaited<ReturnType<typeof getVideoUserSocial>>, TError = ErrorType<ErrorResponse>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoUserSocial>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVideoUserSocialQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getFollowVideoUserUrl = (userId: string,) => {
+
+
+
+
+  return `/api/video/users/${userId}/follow`
+}
+
+/**
+ * @summary Follow a user
+ */
+export const followVideoUser = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoFollowState> => {
+
+  return customFetch<VideoFollowState>(getFollowVideoUserUrl(userId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getFollowVideoUserMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof followVideoUser>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof followVideoUser>>, TError,{userId: string}, TContext> => {
+
+const mutationKey = ['followVideoUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof followVideoUser>>, {userId: string}> = (props) => {
+          const {userId} = props ?? {};
+
+          return  followVideoUser(userId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type FollowVideoUserMutationResult = NonNullable<Awaited<ReturnType<typeof followVideoUser>>>
+
+    export type FollowVideoUserMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Follow a user
+ */
+export const useFollowVideoUser = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof followVideoUser>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof followVideoUser>>,
+        TError,
+        {userId: string},
+        TContext
+      > => {
+      return useMutation(getFollowVideoUserMutationOptions(options));
+    }
+
+export const getUnfollowVideoUserUrl = (userId: string,) => {
+
+
+
+
+  return `/api/video/users/${userId}/follow`
+}
+
+/**
+ * @summary Unfollow a user
+ */
+export const unfollowVideoUser = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoFollowState> => {
+
+  return customFetch<VideoFollowState>(getUnfollowVideoUserUrl(userId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getUnfollowVideoUserMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unfollowVideoUser>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unfollowVideoUser>>, TError,{userId: string}, TContext> => {
+
+const mutationKey = ['unfollowVideoUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unfollowVideoUser>>, {userId: string}> = (props) => {
+          const {userId} = props ?? {};
+
+          return  unfollowVideoUser(userId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnfollowVideoUserMutationResult = NonNullable<Awaited<ReturnType<typeof unfollowVideoUser>>>
+
+    export type UnfollowVideoUserMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Unfollow a user
+ */
+export const useUnfollowVideoUser = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unfollowVideoUser>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unfollowVideoUser>>,
+        TError,
+        {userId: string},
+        TContext
+      > => {
+      return useMutation(getUnfollowVideoUserMutationOptions(options));
+    }
+
+export const getListVideoUserFollowersUrl = (userId: string,) => {
+
+
+
+
+  return `/api/video/users/${userId}/followers`
+}
+
+/**
+ * @summary List a user's followers
+ */
+export const listVideoUserFollowers = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoFollowListEntry[]> => {
+
+  return customFetch<VideoFollowListEntry[]>(getListVideoUserFollowersUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVideoUserFollowersQueryKey = (userId: string,) => {
+    return [
+    `/api/video/users/${userId}/followers`
+    ] as const;
+    }
+
+
+export const getListVideoUserFollowersQueryOptions = <TData = Awaited<ReturnType<typeof listVideoUserFollowers>>, TError = ErrorType<ErrorResponse>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoUserFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVideoUserFollowersQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoUserFollowers>>> = ({ signal }) => listVideoUserFollowers(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVideoUserFollowers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVideoUserFollowersQueryResult = NonNullable<Awaited<ReturnType<typeof listVideoUserFollowers>>>
+export type ListVideoUserFollowersQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List a user's followers
+ */
+
+export function useListVideoUserFollowers<TData = Awaited<ReturnType<typeof listVideoUserFollowers>>, TError = ErrorType<ErrorResponse>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoUserFollowers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVideoUserFollowersQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListVideoUserFollowingUrl = (userId: string,) => {
+
+
+
+
+  return `/api/video/users/${userId}/following`
+}
+
+/**
+ * @summary List the users a user follows
+ */
+export const listVideoUserFollowing = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoFollowListEntry[]> => {
+
+  return customFetch<VideoFollowListEntry[]>(getListVideoUserFollowingUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVideoUserFollowingQueryKey = (userId: string,) => {
+    return [
+    `/api/video/users/${userId}/following`
+    ] as const;
+    }
+
+
+export const getListVideoUserFollowingQueryOptions = <TData = Awaited<ReturnType<typeof listVideoUserFollowing>>, TError = ErrorType<ErrorResponse>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoUserFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVideoUserFollowingQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoUserFollowing>>> = ({ signal }) => listVideoUserFollowing(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVideoUserFollowing>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVideoUserFollowingQueryResult = NonNullable<Awaited<ReturnType<typeof listVideoUserFollowing>>>
+export type ListVideoUserFollowingQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the users a user follows
+ */
+
+export function useListVideoUserFollowing<TData = Awaited<ReturnType<typeof listVideoUserFollowing>>, TError = ErrorType<ErrorResponse>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoUserFollowing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVideoUserFollowingQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetVideoUserContributionsUrl = (userId: string,) => {
+
+
+
+
+  return `/api/video/users/${userId}/contributions`
+}
+
+/**
+ * Daily activity counts across PUBLIC projects the user acted in, zero-filled over the trailing ~26 weeks for the GitHub-style contribution grid.
+ * @summary Read a user's public-project contribution graph
+ */
+export const getVideoUserContributions = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoContributions> => {
+
+  return customFetch<VideoContributions>(getGetVideoUserContributionsUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoUserContributionsQueryKey = (userId: string,) => {
+    return [
+    `/api/video/users/${userId}/contributions`
+    ] as const;
+    }
+
+
+export const getGetVideoUserContributionsQueryOptions = <TData = Awaited<ReturnType<typeof getVideoUserContributions>>, TError = ErrorType<ErrorResponse>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoUserContributions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoUserContributionsQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoUserContributions>>> = ({ signal }) => getVideoUserContributions(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoUserContributions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVideoUserContributionsQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoUserContributions>>>
+export type GetVideoUserContributionsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read a user's public-project contribution graph
+ */
+
+export function useGetVideoUserContributions<TData = Awaited<ReturnType<typeof getVideoUserContributions>>, TError = ErrorType<ErrorResponse>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoUserContributions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVideoUserContributionsQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetVideoProjectUrl = (projectId: string,) => {
 
 
@@ -5038,6 +5729,79 @@ export function useGetVideoProject<TData = Awaited<ReturnType<typeof getVideoPro
 
 
 
+
+export const getUpdateVideoProjectVisibilityUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/visibility`
+}
+
+/**
+ * PUBLIC projects appear on the Captain's public profile track history; PRIVATE projects stay visible to members only. Only the project Captain (its creator) can change this.
+ * @summary Set a project's profile visibility (Captain only)
+ */
+export const updateVideoProjectVisibility = async (projectId: string,
+    videoProjectVisibilityInput: VideoProjectVisibilityInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoProject> => {
+
+  return customFetch<VideoProject>(getUpdateVideoProjectVisibilityUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(videoProjectVisibilityInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateVideoProjectVisibilityMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVideoProjectVisibility>>, TError,{projectId: string;data: BodyType<VideoProjectVisibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateVideoProjectVisibility>>, TError,{projectId: string;data: BodyType<VideoProjectVisibilityInput>}, TContext> => {
+
+const mutationKey = ['updateVideoProjectVisibility'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateVideoProjectVisibility>>, {projectId: string;data: BodyType<VideoProjectVisibilityInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  updateVideoProjectVisibility(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateVideoProjectVisibilityMutationResult = NonNullable<Awaited<ReturnType<typeof updateVideoProjectVisibility>>>
+    export type UpdateVideoProjectVisibilityMutationBody = BodyType<VideoProjectVisibilityInput>
+    export type UpdateVideoProjectVisibilityMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Set a project's profile visibility (Captain only)
+ */
+export const useUpdateVideoProjectVisibility = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVideoProjectVisibility>>, TError,{projectId: string;data: BodyType<VideoProjectVisibilityInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateVideoProjectVisibility>>,
+        TError,
+        {projectId: string;data: BodyType<VideoProjectVisibilityInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateVideoProjectVisibilityMutationOptions(options));
+    }
 
 export const getAddVideoProjectMemberUrl = (projectId: string,) => {
 

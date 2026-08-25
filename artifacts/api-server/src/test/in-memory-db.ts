@@ -219,9 +219,23 @@ export const tandemVideoProjectsTable = sqliteTable("tandem_video_projects", {
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
   status: text("status").notNull().default("VAULT"),
+  visibility: text("visibility").notNull().default("PRIVATE"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
+
+export const tandemVideoFollowsTable = sqliteTable(
+  "tandem_video_follows",
+  {
+    id: text("id").primaryKey(),
+    followerId: text("follower_id").notNull(),
+    followingId: text("following_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    followerFollowingUnique: unique("tandem_video_follow_follower_following").on(table.followerId, table.followingId),
+  }),
+);
 
 export const tandemVideoMembersTable = sqliteTable(
   "tandem_video_members",
@@ -585,7 +599,13 @@ export async function buildInMemoryDb() {
       id TEXT PRIMARY KEY NOT NULL, owner_id TEXT NOT NULL,
       name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'VAULT',
+      visibility TEXT NOT NULL DEFAULT 'PRIVATE',
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_video_follows (
+      id TEXT PRIMARY KEY NOT NULL, follower_id TEXT NOT NULL,
+      following_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+      UNIQUE (follower_id, following_id)
     );
     CREATE TABLE tandem_video_members (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
@@ -730,6 +750,7 @@ export async function buildInMemoryDb() {
     oracleProvidersTable,
     oracleHealthEventsTable,
     tandemVideoProjectsTable,
+    tandemVideoFollowsTable,
     tandemVideoMembersTable,
     tandemVideoAssetsTable,
     tandemVideoAssetFilesTable,

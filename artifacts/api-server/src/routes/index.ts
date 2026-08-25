@@ -9,6 +9,7 @@ import videoRouter from "./video";
 import videoProductionRouter from "./video-production";
 import videoFinishRouter from "./video-finish";
 import videoPlatformRouter from "./video-platform";
+import videoSocialRouter from "./video-social";
 
 const router: IRouter = Router();
 
@@ -20,6 +21,7 @@ router.use(videoRouter);
 router.use(videoProductionRouter);
 router.use(videoFinishRouter);
 router.use(videoPlatformRouter);
+router.use(videoSocialRouter);
 router.use(adminRouter);
 router.use(oracleRouter);
 

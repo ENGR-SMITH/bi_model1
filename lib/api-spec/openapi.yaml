@@ -1409,6 +1409,182 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/users/{userId}/projects:
+    get:
+      operationId: listPublicVideoProjects
+      tags: [content-creators]
+      summary: List a user's public content-creation projects
+      description: Public profile track history — only projects the user owns or participates in that are marked PUBLIC. Private projects never appear.
+      parameters:
+        - { $ref: "#/components/parameters/VideoUserId" }
+      responses:
+        "200":
+          description: Public projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoProject" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/explore/creators:
+    get:
+      operationId: listExploreCreators
+      tags: [content-creators]
+      summary: List discoverable Creator Den users
+      description: Every user with at least one PUBLIC project (owned or participated), with follower counts. Powers the explore browse page; name search is applied client-side.
+      responses:
+        "200":
+          description: Discoverable creators, most active first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoCreatorSummary" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/explore/projects:
+    get:
+      operationId: listExploreProjects
+      tags: [content-creators]
+      summary: List public projects for discovery
+      description: Every project marked PUBLIC, newest first, with the owner's display identity. Powers the explore browse page; name search is applied client-side.
+      responses:
+        "200":
+          description: Public projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoPublicProject" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/users/{userId}/social:
+    get:
+      operationId: getVideoUserSocial
+      tags: [content-creators]
+      summary: Read follow counts and the viewer's follow state for a user
+      parameters:
+        - { $ref: "#/components/parameters/VideoUserId" }
+      responses:
+        "200":
+          description: Follow state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoFollowState" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/users/{userId}/follow:
+    post:
+      operationId: followVideoUser
+      tags: [content-creators]
+      summary: Follow a user
+      parameters:
+        - { $ref: "#/components/parameters/VideoUserId" }
+      responses:
+        "200":
+          description: Updated follow state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoFollowState" }
+        "400":
+          description: Cannot follow yourself
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: unfollowVideoUser
+      tags: [content-creators]
+      summary: Unfollow a user
+      parameters:
+        - { $ref: "#/components/parameters/VideoUserId" }
+      responses:
+        "200":
+          description: Updated follow state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoFollowState" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/users/{userId}/followers:
+    get:
+      operationId: listVideoUserFollowers
+      tags: [content-creators]
+      summary: List a user's followers
+      parameters:
+        - { $ref: "#/components/parameters/VideoUserId" }
+      responses:
+        "200":
+          description: Follower list with the viewer's follow state per entry
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoFollowListEntry" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/users/{userId}/following:
+    get:
+      operationId: listVideoUserFollowing
+      tags: [content-creators]
+      summary: List the users a user follows
+      parameters:
+        - { $ref: "#/components/parameters/VideoUserId" }
+      responses:
+        "200":
+          description: Following list with the viewer's follow state per entry
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoFollowListEntry" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/users/{userId}/contributions:
+    get:
+      operationId: getVideoUserContributions
+      tags: [content-creators]
+      summary: Read a user's public-project contribution graph
+      description: Daily activity counts across PUBLIC projects the user acted in, zero-filled over the trailing ~26 weeks for the GitHub-style contribution grid.
+      parameters:
+        - { $ref: "#/components/parameters/VideoUserId" }
+      responses:
+        "200":
+          description: Contribution days
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoContributions" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/projects/{projectId}:
     get:
       operationId: getVideoProject
@@ -1424,6 +1600,40 @@ paths:
               schema: { $ref: "#/components/schemas/VideoProjectDetail" }
         "403":
           description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/visibility:
+    patch:
+      operationId: updateVideoProjectVisibility
+      tags: [content-creators]
+      summary: Set a project's profile visibility (Captain only)
+      description: PUBLIC projects appear on the Captain's public profile track history; PRIVATE projects stay visible to members only. Only the project Captain (its creator) can change this.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoProjectVisibilityInput" }
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoProject" }
+        "400":
+          description: Invalid visibility
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Project not found
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -2577,6 +2787,12 @@ components:
       in: path
       required: true
       schema: { type: string, minLength: 1 }
+    VideoUserId:
+      name: userId
+      in: path
+      required: true
+      description: Clerk user id whose public track history to read
+      schema: { type: string, minLength: 1 }
     VideoActivityLegQuery:
       name: leg
       in: query
@@ -3354,15 +3570,85 @@ components:
         name: { type: string }
         description: { type: string }
         status: { type: string }
+        visibility:
+          type: string
+          enum: [PUBLIC, PRIVATE]
+          description: Whether the project appears on the owner's public profile
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, ownerId, name, description, status, createdAt, updatedAt]
+      required: [id, ownerId, name, description, status, visibility, createdAt, updatedAt]
     VideoProjectInput:
       type: object
       properties:
         name: { type: string, minLength: 1, maxLength: 120 }
         description: { type: string, maxLength: 2000 }
       required: [name]
+    VideoProjectVisibilityInput:
+      type: object
+      properties:
+        visibility:
+          type: string
+          enum: [PUBLIC, PRIVATE]
+      required: [visibility]
+    VideoCreatorSummary:
+      type: object
+      description: A discoverable Creator Den user (has public track history), with social counts for the viewer
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        imageUrl: { type: ["string", "null"] }
+        publicProjectCount: { type: integer }
+        followerCount: { type: integer }
+        isFollowing: { type: ["boolean", "null"], description: Whether the viewer follows this creator (null when viewing yourself) }
+      required: [userId, displayName, imageUrl, publicProjectCount, followerCount, isFollowing]
+    VideoPublicProject:
+      type: object
+      description: A public project as shown on explore — the owner's display identity rides along for attribution
+      properties:
+        id: { type: string }
+        ownerId: { type: string }
+        ownerName: { type: string }
+        ownerImageUrl: { type: ["string", "null"] }
+        name: { type: string }
+        description: { type: string }
+        status: { type: string }
+        visibility: { type: string, enum: [PUBLIC, PRIVATE] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, ownerId, ownerName, ownerImageUrl, name, description, status, visibility, createdAt, updatedAt]
+    VideoFollowState:
+      type: object
+      description: Follow counts for a user plus whether the viewer follows them
+      properties:
+        userId: { type: string }
+        followerCount: { type: integer }
+        followingCount: { type: integer }
+        isFollowing: { type: ["boolean", "null"], description: Whether the viewer follows this user (null when viewing yourself) }
+      required: [userId, followerCount, followingCount, isFollowing]
+    VideoFollowListEntry:
+      type: object
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        imageUrl: { type: ["string", "null"] }
+        isFollowing: { type: ["boolean", "null"] }
+      required: [userId, displayName, imageUrl, isFollowing]
+    VideoContributionDay:
+      type: object
+      description: One day cell in the contribution graph. Date is a plain "YYYY-MM-DD" key, not a timestamp — it must not be coerced to a Date.
+      properties:
+        date: { type: string, pattern: "^\\d{4}-\\d{2}-\\d{2}$" }
+        count: { type: integer }
+      required: [date, count]
+    VideoContributions:
+      type: object
+      description: Public-project activity aggregated into the GitHub-style contribution graph (contiguous recent days, zero-filled)
+      properties:
+        total: { type: integer }
+        days:
+          type: array
+          items: { $ref: "#/components/schemas/VideoContributionDay" }
+      required: [total, days]
     VideoProjectDetail:
       type: object
       properties:
@@ -3371,6 +3657,10 @@ components:
         name: { type: string }
         description: { type: string }
         status: { type: string }
+        visibility:
+          type: string
+          enum: [PUBLIC, PRIVATE]
+          description: Whether the project appears on the owner's public profile
         myRole: { type: ["string", "null"] }
         members:
           type: array
@@ -3380,7 +3670,7 @@ components:
           items: { $ref: "#/components/schemas/VideoAsset" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, ownerId, name, description, status, myRole, members, assets, createdAt, updatedAt]
+      required: [id, ownerId, name, description, status, visibility, myRole, members, assets, createdAt, updatedAt]
     VideoMember:
       type: object
       properties:

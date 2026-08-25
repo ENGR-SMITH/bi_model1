@@ -5,6 +5,7 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { VideoProjectVisibility } from './videoProjectVisibility';
 
 export interface VideoProject {
   id: string;
@@ -12,6 +13,8 @@ export interface VideoProject {
   name: string;
   description: string;
   status: string;
+  /** Whether the project appears on the owner's public profile */
+  visibility: VideoProjectVisibility;
   createdAt: Date;
   updatedAt: Date;
 }

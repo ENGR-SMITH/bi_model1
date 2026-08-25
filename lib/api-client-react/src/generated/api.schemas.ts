@@ -811,12 +811,25 @@ export interface WorldBibleExtractResult {
   attempted: string[];
 }
 
+/**
+ * Whether the project appears on the owner's public profile
+ */
+export type VideoProjectVisibility = typeof VideoProjectVisibility[keyof typeof VideoProjectVisibility];
+
+
+export const VideoProjectVisibility = {
+  PUBLIC: 'PUBLIC',
+  PRIVATE: 'PRIVATE',
+} as const;
+
 export interface VideoProject {
   id: string;
   ownerId: string;
   name: string;
   description: string;
   status: string;
+  /** Whether the project appears on the owner's public profile */
+  visibility: VideoProjectVisibility;
   createdAt: string;
   updatedAt: string;
 }
@@ -830,6 +843,111 @@ export interface VideoProjectInput {
   /** @maxLength 2000 */
   description?: string;
 }
+
+export type VideoProjectVisibilityInputVisibility = typeof VideoProjectVisibilityInputVisibility[keyof typeof VideoProjectVisibilityInputVisibility];
+
+
+export const VideoProjectVisibilityInputVisibility = {
+  PUBLIC: 'PUBLIC',
+  PRIVATE: 'PRIVATE',
+} as const;
+
+export interface VideoProjectVisibilityInput {
+  visibility: VideoProjectVisibilityInputVisibility;
+}
+
+/**
+ * A discoverable Creator Den user (has public track history), with social counts for the viewer
+ */
+export interface VideoCreatorSummary {
+  userId: string;
+  displayName: string;
+  /** @nullable */
+  imageUrl: string | null;
+  publicProjectCount: number;
+  followerCount: number;
+  /**
+     * Whether the viewer follows this creator (null when viewing yourself)
+     * @nullable
+     */
+  isFollowing: boolean | null;
+}
+
+export type VideoPublicProjectVisibility = typeof VideoPublicProjectVisibility[keyof typeof VideoPublicProjectVisibility];
+
+
+export const VideoPublicProjectVisibility = {
+  PUBLIC: 'PUBLIC',
+  PRIVATE: 'PRIVATE',
+} as const;
+
+/**
+ * A public project as shown on explore — the owner's display identity rides along for attribution
+ */
+export interface VideoPublicProject {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  /** @nullable */
+  ownerImageUrl: string | null;
+  name: string;
+  description: string;
+  status: string;
+  visibility: VideoPublicProjectVisibility;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Follow counts for a user plus whether the viewer follows them
+ */
+export interface VideoFollowState {
+  userId: string;
+  followerCount: number;
+  followingCount: number;
+  /**
+     * Whether the viewer follows this user (null when viewing yourself)
+     * @nullable
+     */
+  isFollowing: boolean | null;
+}
+
+export interface VideoFollowListEntry {
+  userId: string;
+  displayName: string;
+  /** @nullable */
+  imageUrl: string | null;
+  /** @nullable */
+  isFollowing: boolean | null;
+}
+
+/**
+ * One day cell in the contribution graph. Date is a plain "YYYY-MM-DD" key, not a timestamp — it must not be coerced to a Date.
+ */
+export interface VideoContributionDay {
+  /** @pattern ^\d{4}-\d{2}-\d{2}$ */
+  date: string;
+  count: number;
+}
+
+/**
+ * Public-project activity aggregated into the GitHub-style contribution graph (contiguous recent days, zero-filled)
+ */
+export interface VideoContributions {
+  total: number;
+  days: VideoContributionDay[];
+}
+
+/**
+ * Whether the project appears on the owner's public profile
+ */
+export type VideoProjectDetailVisibility = typeof VideoProjectDetailVisibility[keyof typeof VideoProjectDetailVisibility];
+
+
+export const VideoProjectDetailVisibility = {
+  PUBLIC: 'PUBLIC',
+  PRIVATE: 'PRIVATE',
+} as const;
 
 export interface VideoMember {
   id: string;
@@ -868,6 +986,8 @@ export interface VideoProjectDetail {
   name: string;
   description: string;
   status: string;
+  /** Whether the project appears on the owner's public profile */
+  visibility: VideoProjectDetailVisibility;
   /** @nullable */
   myRole: string | null;
   members: VideoMember[];

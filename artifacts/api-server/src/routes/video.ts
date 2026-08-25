@@ -14,9 +14,14 @@ import {
   CreateVideoProjectResponse,
   GetVideoProjectParams,
   GetVideoProjectResponse,
+  ListPublicVideoProjectsParams,
+  ListPublicVideoProjectsResponse,
   ListVideoAssetsParams,
   ListVideoAssetsResponse,
   ListVideoProjectsResponse,
+  UpdateVideoProjectVisibilityBody,
+  UpdateVideoProjectVisibilityParams,
+  UpdateVideoProjectVisibilityResponse,
   UploadVideoAssetParams,
   UploadVideoAssetResponse,
 } from "@workspace/api-zod";
@@ -221,6 +226,112 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
     }),
   );
 });
+
+// PATCH /video/projects/:projectId/visibility — set profile visibility (Captain only).
+router.patch(
+  "/video/projects/:projectId/visibility",
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = UpdateVideoProjectVisibilityParams.safeParse(req.params);
+    const body = UpdateVideoProjectVisibilityBody.safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({ error: "Invalid visibility request" });
+      return;
+    }
+
+    const [project] = await db
+      .select()
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (project.ownerId !== userId) {
+      res.status(403).json({ error: "Only the Captain can change visibility" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(tandemVideoProjectsTable)
+      .set({
+        visibility: body.data.visibility,
+        updatedAt: new Date(),
+      })
+      .where(eq(tandemVideoProjectsTable.id, project.id))
+      .returning();
+
+    res.json(UpdateVideoProjectVisibilityResponse.parse(updated));
+  },
+);
+
+// GET /video/users/:userId/projects — public track history (PUBLIC projects only).
+router.get(
+  "/video/users/:userId/projects",
+  async (req: Request, res): Promise<void> => {
+    const viewerId = getAuth(req).userId;
+    if (!viewerId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = ListPublicVideoProjectsParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid user id" });
+      return;
+    }
+
+    const profileUserId = params.data.userId;
+
+    const owned = await db
+      .select()
+      .from(tandemVideoProjectsTable)
+      .where(
+        and(
+          eq(tandemVideoProjectsTable.ownerId, profileUserId),
+          eq(tandemVideoProjectsTable.visibility, "PUBLIC"),
+        ),
+      );
+
+    const memberships = await db
+      .select({ projectId: tandemVideoMembersTable.projectId })
+      .from(tandemVideoMembersTable)
+      .where(
+        and(
+          eq(tandemVideoMembersTable.userId, profileUserId),
+          eq(tandemVideoMembersTable.status, "ACTIVE"),
+        ),
+      );
+
+    const memberProjectIds = memberships.map((m) => m.projectId);
+    const viaMembership =
+      memberProjectIds.length > 0
+        ? await db
+            .select()
+            .from(tandemVideoProjectsTable)
+            .where(
+              and(
+                inArray(tandemVideoProjectsTable.id, memberProjectIds),
+                eq(tandemVideoProjectsTable.visibility, "PUBLIC"),
+              ),
+            )
+        : [];
+
+    const byId = new Map<string, (typeof owned)[number]>();
+    for (const project of [...owned, ...viaMembership]) byId.set(project.id, project);
+    const projects = [...byId.values()].sort(
+      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+    );
+
+    res.json(ListPublicVideoProjectsResponse.parse(projects));
+  },
+);
 
 // POST /video/projects/:projectId/members — invite by email, Captain only.
 router.post(

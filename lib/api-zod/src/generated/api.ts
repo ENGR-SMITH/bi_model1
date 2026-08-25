@@ -1676,6 +1676,7 @@ export const ListVideoProjectsResponseItem = zod.object({
   "name": zod.string(),
   "description": zod.string(),
   "status": zod.string(),
+  "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -1702,6 +1703,7 @@ export const CreateVideoProjectResponse = zod.object({
   "name": zod.string(),
   "description": zod.string(),
   "status": zod.string(),
+  "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
   "myRole": zod.string().nullable(),
   "members": zod.array(zod.object({
   "id": zod.string(),
@@ -1732,6 +1734,179 @@ export const CreateVideoProjectResponse = zod.object({
 
 
 /**
+ * Public profile track history — only projects the user owns or participates in that are marked PUBLIC. Private projects never appear.
+ * @summary List a user's public content-creation projects
+ */
+
+
+
+export const ListPublicVideoProjectsParams = zod.object({
+  "userId": zod.coerce.string().min(1).describe('Clerk user id whose public track history to read')
+})
+
+export const ListPublicVideoProjectsResponseItem = zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.string(),
+  "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListPublicVideoProjectsResponse = zod.array(ListPublicVideoProjectsResponseItem)
+
+
+/**
+ * Every user with at least one PUBLIC project (owned or participated), with follower counts. Powers the explore browse page; name search is applied client-side.
+ * @summary List discoverable Creator Den users
+ */
+export const ListExploreCreatorsResponseItem = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string(),
+  "imageUrl": zod.string().nullable(),
+  "publicProjectCount": zod.number().int(),
+  "followerCount": zod.number().int(),
+  "isFollowing": zod.boolean().nullable().describe('Whether the viewer follows this creator (null when viewing yourself)')
+}).describe('A discoverable Creator Den user (has public track history), with social counts for the viewer')
+export const ListExploreCreatorsResponse = zod.array(ListExploreCreatorsResponseItem)
+
+
+/**
+ * Every project marked PUBLIC, newest first, with the owner's display identity. Powers the explore browse page; name search is applied client-side.
+ * @summary List public projects for discovery
+ */
+export const ListExploreProjectsResponseItem = zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string(),
+  "ownerName": zod.string(),
+  "ownerImageUrl": zod.string().nullable(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.string(),
+  "visibility": zod.enum(['PUBLIC', 'PRIVATE']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('A public project as shown on explore — the owner\'s display identity rides along for attribution')
+export const ListExploreProjectsResponse = zod.array(ListExploreProjectsResponseItem)
+
+
+/**
+ * @summary Read follow counts and the viewer's follow state for a user
+ */
+
+
+
+export const GetVideoUserSocialParams = zod.object({
+  "userId": zod.coerce.string().min(1).describe('Clerk user id whose public track history to read')
+})
+
+export const GetVideoUserSocialResponse = zod.object({
+  "userId": zod.string(),
+  "followerCount": zod.number().int(),
+  "followingCount": zod.number().int(),
+  "isFollowing": zod.boolean().nullable().describe('Whether the viewer follows this user (null when viewing yourself)')
+}).describe('Follow counts for a user plus whether the viewer follows them')
+
+
+/**
+ * @summary Follow a user
+ */
+
+
+
+export const FollowVideoUserParams = zod.object({
+  "userId": zod.coerce.string().min(1).describe('Clerk user id whose public track history to read')
+})
+
+export const FollowVideoUserResponse = zod.object({
+  "userId": zod.string(),
+  "followerCount": zod.number().int(),
+  "followingCount": zod.number().int(),
+  "isFollowing": zod.boolean().nullable().describe('Whether the viewer follows this user (null when viewing yourself)')
+}).describe('Follow counts for a user plus whether the viewer follows them')
+
+
+/**
+ * @summary Unfollow a user
+ */
+
+
+
+export const UnfollowVideoUserParams = zod.object({
+  "userId": zod.coerce.string().min(1).describe('Clerk user id whose public track history to read')
+})
+
+export const UnfollowVideoUserResponse = zod.object({
+  "userId": zod.string(),
+  "followerCount": zod.number().int(),
+  "followingCount": zod.number().int(),
+  "isFollowing": zod.boolean().nullable().describe('Whether the viewer follows this user (null when viewing yourself)')
+}).describe('Follow counts for a user plus whether the viewer follows them')
+
+
+/**
+ * @summary List a user's followers
+ */
+
+
+
+export const ListVideoUserFollowersParams = zod.object({
+  "userId": zod.coerce.string().min(1).describe('Clerk user id whose public track history to read')
+})
+
+export const ListVideoUserFollowersResponseItem = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string(),
+  "imageUrl": zod.string().nullable(),
+  "isFollowing": zod.boolean().nullable()
+})
+export const ListVideoUserFollowersResponse = zod.array(ListVideoUserFollowersResponseItem)
+
+
+/**
+ * @summary List the users a user follows
+ */
+
+
+
+export const ListVideoUserFollowingParams = zod.object({
+  "userId": zod.coerce.string().min(1).describe('Clerk user id whose public track history to read')
+})
+
+export const ListVideoUserFollowingResponseItem = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string(),
+  "imageUrl": zod.string().nullable(),
+  "isFollowing": zod.boolean().nullable()
+})
+export const ListVideoUserFollowingResponse = zod.array(ListVideoUserFollowingResponseItem)
+
+
+/**
+ * Daily activity counts across PUBLIC projects the user acted in, zero-filled over the trailing ~26 weeks for the GitHub-style contribution grid.
+ * @summary Read a user's public-project contribution graph
+ */
+
+
+
+export const GetVideoUserContributionsParams = zod.object({
+  "userId": zod.coerce.string().min(1).describe('Clerk user id whose public track history to read')
+})
+
+export const getVideoUserContributionsResponseDaysItemDateRegExp = new RegExp('^\\d{4}-\\d{2}-\\d{2}$');
+
+
+export const GetVideoUserContributionsResponse = zod.object({
+  "total": zod.number().int(),
+  "days": zod.array(zod.object({
+  "date": zod.string().regex(getVideoUserContributionsResponseDaysItemDateRegExp),
+  "count": zod.number().int()
+}).describe('One day cell in the contribution graph. Date is a plain \"YYYY-MM-DD\" key, not a timestamp — it must not be coerced to a Date.'))
+}).describe('Public-project activity aggregated into the GitHub-style contribution graph (contiguous recent days, zero-filled)')
+
+
+/**
  * @summary Read a permitted video project with members and assets
  */
 
@@ -1747,6 +1922,7 @@ export const GetVideoProjectResponse = zod.object({
   "name": zod.string(),
   "description": zod.string(),
   "status": zod.string(),
+  "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
   "myRole": zod.string().nullable(),
   "members": zod.array(zod.object({
   "id": zod.string(),
@@ -1771,6 +1947,33 @@ export const GetVideoProjectResponse = zod.object({
   "version": zod.number().int(),
   "createdAt": zod.coerce.date()
 })),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * PUBLIC projects appear on the Captain's public profile track history; PRIVATE projects stay visible to members only. Only the project Captain (its creator) can change this.
+ * @summary Set a project's profile visibility (Captain only)
+ */
+
+
+
+export const UpdateVideoProjectVisibilityParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const UpdateVideoProjectVisibilityBody = zod.object({
+  "visibility": zod.enum(['PUBLIC', 'PRIVATE'])
+})
+
+export const UpdateVideoProjectVisibilityResponse = zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.string(),
+  "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })

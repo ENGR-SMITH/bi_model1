@@ -1234,7 +1234,20 @@
 /* ---- Keyboard focus on the rest of the chrome (quality floor) ------------- */
 .cd-brand:focus-visible,
 .cd-topnav .top-workspace:focus-visible,
-.cd-signout:focus-visible { outline: none; box-shadow: var(--accent-ring); }
+.cd-signout:focus-visible,
+.cd-profile:focus-visible { outline: none; box-shadow: var(--accent-ring); }
+
+/* Profile link — a ghost action beside sign-out; hover lights the accent. */
+.cd-profile {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); border-radius: 10px;
+  border: 1px solid hsl(var(--border));
+  background: transparent; color: hsl(var(--muted-foreground));
+  font: 600 12px var(--app-font-sans); text-decoration: none;
+  transition: color .18s ease, background .18s ease, border-color .18s ease;
+}
+.cd-profile:hover { color: hsl(var(--accent)); border-color: hsl(var(--accent) / .5); background: hsl(var(--accent) / .08); }
+.cd-profile svg { color: hsl(var(--accent)); }
 
 /* ---- Narrow screens: the tabs row scrolls, the chrome compacts ------------ */
 @media (max-width: 760px) {
@@ -1244,9 +1257,270 @@
   .cd-topnav .top-workspace b { max-width: 96px; }
   .cd-signout { padding: var(--sp-2); }
   .cd-signout span { display: none; }
+  .cd-profile { padding: var(--sp-2); }
+  .cd-profile span { display: none; }
+  .cd-explore-link { padding: var(--sp-2); }
+  .cd-explore-link span { display: none; }
   .cd-topnav-account [data-testid="user-chip"] > span.leading-tight { display: none; }
   .cd-topnav-tabs { padding-inline: 16px; -webkit-overflow-scrolling: touch; }
 }
+
+/* ============================================================================
+   CREATOR-DEN — PROJECT VISIBILITY (eye toggle on home cards + profile page)
+
+   Each project card carries an eye: OPEN for PUBLIC (shown on the Captain's
+   profile track history), CLOSED for PRIVATE (members only). Only the Captain
+   can flip it; the state swap replays a lid-opening / lid-closing animation.
+   ============================================================================ */
+
+.cd-card-project { position: relative; }
+
+/* Stretched link: the whole card opens the project; the eye sits above it. */
+.cd-card-hit {
+  position: absolute; inset: 0; z-index: 3;
+  border-radius: 8px;
+}
+.cd-card-hit:focus-visible { outline: 2px solid hsl(var(--accent)); outline-offset: 2px; }
+
+/* The eye itself — a glass pill over the poster, top-right. */
+.eye-toggle {
+  position: absolute; top: 10px; right: 10px; z-index: 4;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 9px; border-radius: 999px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(0 0% 0% / .72);
+  color: hsl(var(--muted-foreground));
+  backdrop-filter: blur(6px);
+  font: 700 8px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase;
+  cursor: pointer;
+  transition: color .18s ease, border-color .18s ease, background .18s ease, transform .12s ease;
+}
+.eye-toggle:hover:not(:disabled) { transform: translateY(-1px); background: hsl(0 0% 0% / .85); }
+.eye-toggle:disabled { cursor: default; opacity: .6; }
+.eye-toggle:focus-visible { outline: none; box-shadow: var(--accent-ring); }
+.eye-toggle.is-open { color: hsl(var(--accent)); border-color: hsl(var(--accent) / .55); background: hsl(357 92% 45% / .18); }
+.eye-toggle.is-closed { color: hsl(var(--muted-foreground)); }
+
+/* The icon itself: re-mounts on every toggle (keyed), so the lid animation
+   replays — iris blooms open for PUBLIC, lid snaps shut for PRIVATE. */
+.eye-toggle-icon { display: inline-flex; }
+.eye-toggle.is-open .eye-toggle-icon {
+  animation:
+    eyeOpenIn .5s cubic-bezier(.22, 1, .36, 1),
+    eyeGlowPulse 2.6s ease-in-out .6s infinite;
+}
+.eye-toggle.is-closed .eye-toggle-icon { animation: eyeCloseIn .32s ease; }
+
+@keyframes eyeOpenIn {
+  0% { opacity: 0; transform: scale(.3) rotate(-14deg); }
+  60% { opacity: 1; transform: scale(1.18) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+@keyframes eyeCloseIn {
+  0% { opacity: 0; transform: scale(1.3); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes eyeGlowPulse {
+  0%, 100% { filter: drop-shadow(0 0 0 hsl(var(--accent) / 0)); }
+  50% { filter: drop-shadow(0 0 7px hsl(var(--accent) / .85)); }
+}
+
+/* ---- Profile page: hero header + track-history rows ----------------------- */
+.profile-hero { display: flex; align-items: center; gap: 18px; }
+.profile-hero h1 { margin: 0; font: 800 clamp(26px, 4vw, 34px)/1.08 var(--app-font-sans); letter-spacing: -.03em; color: #fff; }
+.profile-sub { margin: 7px 0 0; color: hsl(0 0% 74%); font-size: 13px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.profile-avatar {
+  width: 66px; height: 66px; border-radius: 18px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: linear-gradient(150deg, hsl(var(--secondary)), hsl(var(--card)));
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground)); font: 700 24px var(--app-font-sans);
+  object-fit: cover;
+  box-shadow: var(--shadow-sm), var(--edge-hi);
+}
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+
+/* Track-history rows stay inert when browsing someone else's profile — the
+   vault is members-only, so there is nowhere to link them to. */
+.list-row.is-static { cursor: default; }
+.list-row.is-static:hover { background: transparent; }
+
+/* ---- Explore nav link (topnav chrome) ------------------------------------- */
+.cd-explore-link {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); border-radius: 10px;
+  color: hsl(var(--muted-foreground)); text-decoration: none;
+  font: 600 12px var(--app-font-sans);
+  transition: color .18s ease, background .18s ease;
+}
+.cd-explore-link:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / .05); }
+.cd-explore-link svg { color: hsl(var(--accent)); }
+.cd-explore-link:focus-visible { outline: none; box-shadow: var(--accent-ring); }
+
+/* ============================================================================
+   CREATOR-DEN — EXPLORE (discovery) + FOLLOW MODEL + CONTRIBUTION GRAPH
+   ============================================================================ */
+
+/* Explore hero: a compact search billboard with the creator/project tabs. */
+.explore-hero {
+  position: relative;
+  padding: 30px 32px 22px;
+  border-radius: 12px;
+  border: 1px solid hsl(var(--border));
+  background:
+    radial-gradient(90% 130% at 84% -20%, hsl(357 62% 24% / .5), transparent 55%),
+    linear-gradient(120deg, hsl(0 0% 16%), hsl(0 0% 7%));
+  box-shadow: var(--shadow-md), var(--edge-hi);
+  margin-bottom: 22px;
+}
+.explore-hero h1 { margin: 0; font: 800 clamp(26px, 4vw, 34px)/1.08 var(--app-font-sans); letter-spacing: -.03em; color: #fff; }
+.explore-hero p { margin: 8px 0 0; color: hsl(0 0% 78%); font-size: 13.5px; line-height: 1.55; max-width: 560px; }
+
+.explore-search {
+  display: flex; align-items: center; gap: 9px;
+  margin-top: 18px;
+  max-width: 480px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / .85);
+  box-shadow: var(--shadow-xs), var(--edge-hi);
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+.explore-search:focus-within { border-color: hsl(var(--accent) / .55); box-shadow: 0 0 0 3px hsl(var(--accent) / .14), var(--edge-hi); }
+.explore-search svg { flex: 0 0 auto; color: hsl(var(--muted-foreground)); }
+.explore-search input {
+  flex: 1; min-width: 0;
+  border: 0; background: transparent; outline: none;
+  color: hsl(var(--foreground)); font: 500 13.5px var(--app-font-sans);
+}
+.explore-search input::placeholder { color: hsl(var(--muted-foreground) / .8); }
+
+.explore-tabs { margin-top: 18px; align-self: flex-start; }
+
+.explore-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.explore-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px;
+  border: 1px solid hsl(var(--border)); border-radius: 10px;
+  background: linear-gradient(180deg, hsl(0 0% 13%), hsl(0 0% 9.5%));
+  box-shadow: var(--shadow-sm), var(--edge-hi);
+  transition: transform .2s cubic-bezier(.22, 1, .36, 1), border-color .2s ease, box-shadow .2s ease;
+}
+.explore-card:hover { transform: translateY(-2px); border-color: hsl(var(--accent) / .45); box-shadow: 0 14px 34px rgba(0, 0, 0, .55), var(--edge-hi); }
+
+.explore-card-main {
+  display: flex; align-items: center; gap: 12px;
+  flex: 1; min-width: 0;
+  color: inherit; text-decoration: none;
+}
+.explore-card-main b { display: block; font: 700 14px var(--app-font-sans); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.explore-card-main small { display: block; margin-top: 3px; color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }
+.explore-card-main:hover b { color: hsl(0 0% 100%); }
+
+.explore-avatar {
+  width: 42px; height: 42px; flex: 0 0 auto;
+  border-radius: 11px;
+  display: grid; place-items: center;
+  background: linear-gradient(150deg, hsl(var(--secondary)), hsl(var(--card)));
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+  font: 700 13px var(--app-font-sans);
+  object-fit: cover;
+}
+.explore-avatar.is-tiny { width: 22px; height: 22px; border-radius: 6px; font-size: 9px; }
+
+/* Follow button — ghost pill; filled when already following. */
+.follow-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex: 0 0 auto;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid hsl(var(--accent) / .5);
+  background: hsl(var(--accent) / .12);
+  color: hsl(var(--accent));
+  font: 600 11px var(--app-font-sans);
+  cursor: pointer;
+  transition: background .16s ease, border-color .16s ease, color .16s ease, transform .12s ease;
+}
+.follow-btn:hover:not(:disabled) { background: hsl(var(--accent) / .22); transform: translateY(-1px); }
+.follow-btn:disabled { opacity: .5; cursor: default; }
+.follow-btn.is-md { padding: 8px 15px; font-size: 12px; }
+.follow-btn.is-following {
+  border-color: hsl(var(--border));
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+}
+.follow-btn.is-following:hover:not(:disabled) { border-color: hsl(var(--destructive) / .5); color: hsl(var(--destructive)); background: hsl(var(--destructive) / .08); }
+
+/* Explore project cards: owner row, body, visibility tag. */
+.explore-project { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+.explore-project-owner {
+  display: inline-flex; align-items: center; gap: 7px;
+  align-self: flex-start;
+  color: hsl(var(--muted-foreground)); text-decoration: none;
+  font: 600 11px var(--app-font-sans);
+  transition: color .16s ease;
+}
+.explore-project-owner:hover { color: hsl(var(--accent)); }
+.explore-project-body { display: flex; gap: 12px; min-width: 0; }
+.explore-project-icon {
+  width: 38px; height: 38px; flex: 0 0 auto;
+  border-radius: 9px;
+  display: grid; place-items: center;
+  color: hsl(var(--accent)); background: hsl(var(--accent) / .12);
+}
+.explore-project-title { display: block; font: 700 14px var(--app-font-sans); color: hsl(var(--foreground)); }
+.explore-project-body small { display: block; margin-top: 3px; color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }
+.explore-project-desc {
+  margin: 8px 0 0;
+  color: hsl(0 0% 76%);
+  font-size: 12px; line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.explore-project .den-tag { align-self: flex-start; }
+
+/* ---- Contribution graph (GitHub-style heat grid) -------------------------- */
+.contrib-wrap { overflow-x: auto; padding-bottom: 4px; }
+.contrib-months {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 6px;
+  height: 12px;
+}
+.contrib-month { font: 9px var(--app-font-mono); color: hsl(var(--muted-foreground)); text-align: left; }
+
+.contrib-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 11px;
+  grid-template-rows: repeat(7, 11px);
+  gap: 3px;
+}
+.contrib-week { display: contents; }
+.contrib-cell {
+  width: 11px; height: 11px;
+  border-radius: 2px;
+  background: hsl(var(--muted) / .55);
+  border: 1px solid hsl(var(--border) / .6);
+  transition: transform .12s ease, filter .12s ease;
+}
+.contrib-cell:hover { transform: scale(1.35); filter: brightness(1.35); }
+.contrib-cell.level-1 { background: hsl(164 33% 45% / .22); border-color: hsl(164 33% 45% / .3); }
+.contrib-cell.level-2 { background: hsl(164 33% 45% / .45); border-color: hsl(164 33% 45% / .55); }
+.contrib-cell.level-3 { background: hsl(164 33% 45% / .7); border-color: hsl(164 33% 45% / .8); }
+.contrib-cell.level-4 { background: hsl(164 33% 45%); border-color: hsl(164 33% 45%); }
+
+.contrib-legend {
+  display: flex; align-items: center; justify-content: flex-end; gap: 4px;
+  margin-top: 8px;
+  font: 9px var(--app-font-mono); color: hsl(var(--muted-foreground));
+}
+.contrib-legend .contrib-cell { width: 10px; height: 10px; }
 
 /* ---- Respect reduced motion ---------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
@@ -1254,4 +1528,8 @@
   .cd-brand .brand-mark { transition: none; }
   .cd-brand:hover .brand-mark { transform: none; }
   .cd-topnav .top-workspace:hover > svg { transform: none; }
+  .eye-toggle, .eye-toggle-icon { animation: none !important; transition: none !important; }
+  .eye-toggle:hover:not(:disabled) { transform: none; }
+  .explore-card, .follow-btn, .contrib-cell { transition: none; }
+  .explore-card:hover, .follow-btn:hover:not(:disabled), .contrib-cell:hover { transform: none; filter: none; }
 }

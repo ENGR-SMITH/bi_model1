@@ -7,6 +7,7 @@
  */
 import type { VideoAsset } from './videoAsset';
 import type { VideoMember } from './videoMember';
+import type { VideoProjectDetailVisibility } from './videoProjectDetailVisibility';
 
 export interface VideoProjectDetail {
   id: string;
@@ -14,6 +15,8 @@ export interface VideoProjectDetail {
   name: string;
   description: string;
   status: string;
+  /** Whether the project appears on the owner's public profile */
+  visibility: VideoProjectDetailVisibility;
   /** @nullable */
   myRole: string | null;
   members: VideoMember[];

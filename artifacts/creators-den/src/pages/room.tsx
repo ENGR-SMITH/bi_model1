@@ -4,6 +4,8 @@ import {
   ArrowUpRight,
   Bell,
   Clapperboard,
+  Eye,
+  EyeOff,
   Film,
   Image,
   LockKeyhole,
@@ -18,11 +20,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import {
   getListVideoNotificationsQueryKey,
+  getListVideoProjectsQueryKey,
   useCreateVideoProject,
   useListVideoNotifications,
   useListVideoProjects,
   useMarkVideoNotificationRead,
+  useUpdateVideoProjectVisibility,
 } from '@workspace/api-client-react';
+import type { VideoProject } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
 import { useRealtimeNotifications } from '@/lib/realtime';
 
@@ -160,21 +165,61 @@ function NewProjectModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ProjectCard({ project }: { project: { id: string; name: string; status: string; createdAt: string; description?: string | null } }) {
+function ProjectCard({ project, isCaptain }: { project: VideoProject; isCaptain: boolean }) {
+  const queryClient = useQueryClient();
+  const update = useUpdateVideoProjectVisibility();
+  const isPublic = project.visibility === 'PUBLIC';
+
+  const toggle = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isCaptain || update.isPending) return;
+    update.mutate(
+      { projectId: project.id, data: { visibility: isPublic ? 'PRIVATE' : 'PUBLIC' } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListVideoProjectsQueryKey() });
+        },
+      },
+    );
+  };
+
+  const toggleTitle = isCaptain
+    ? isPublic
+      ? 'Public — visible on your profile. Click to make private.'
+      : 'Private — hidden from your profile. Click to make public.'
+    : 'Only the Captain can change visibility';
+
   return (
-    <Link href={`/projects/${project.id}`} className="cd-card" data-testid={`card-video-project-${project.id}`}>
-      <div className="cd-card-thumb">
+    <div className={`cd-card cd-card-project ${isPublic ? 'is-public' : 'is-private'}`} data-testid={`card-video-project-${project.id}`}>
+      {/* Stretched link — the whole card opens the project; the eye toggle sits above it. */}
+      <Link href={`/projects/${project.id}`} className="cd-card-hit" aria-label={`Open ${project.name}`} data-testid={`link-open-project-${project.id}`} />
+      <div className="cd-card-thumb" aria-hidden>
         <Film size={26} />
         <span className="cd-card-badge">{project.status.replaceAll('_', ' ')}</span>
       </div>
-      <div className="cd-card-body">
+      <button
+        type="button"
+        className={`eye-toggle ${isPublic ? 'is-open' : 'is-closed'}`}
+        onClick={toggle}
+        disabled={!isCaptain || update.isPending}
+        title={toggleTitle}
+        aria-pressed={isPublic}
+        data-testid={`eye-toggle-${project.id}`}
+      >
+        <span className="eye-toggle-icon" key={isPublic ? 'open' : 'closed'}>
+          {isPublic ? <Eye size={14} /> : <EyeOff size={14} />}
+        </span>
+        <span className="eye-toggle-label">{isPublic ? 'Public' : 'Private'}</span>
+      </button>
+      <div className="cd-card-body" aria-hidden>
         <span className="cd-card-title">{project.name}</span>
         <span className="cd-card-meta">
           {new Date(project.createdAt).toLocaleDateString()}
           {project.description ? ` · ${project.description}` : ''}
         </span>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -224,7 +269,7 @@ export default function ContentCreatorsPage() {
         ) : recent.length > 0 ? (
           <div className="cd-rail-track">
             {recent.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard key={project.id} project={project} isCaptain={project.ownerId === user?.id} />
             ))}
             <button type="button" className="cd-card cd-card-add" onClick={() => setModalOpen(true)} data-testid="card-new-project">
               <Clapperboard size={22} />
