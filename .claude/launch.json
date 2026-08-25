@@ -35,6 +35,23 @@
       },
       "port": 5181,
       "autoPort": false
+    },
+    {
+      "name": "tandem-signin",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "artifacts/tandem/node_modules/vite/bin/vite.js",
+        "--config",
+        "artifacts/tandem/vite.config.ts",
+        "--host",
+        "0.0.0.0"
+      ],
+      "env": {
+        "PORT": "5176",
+        "BASE_PATH": "/"
+      },
+      "port": 5176,
+      "autoPort": false
     }
   ]
 }

@@ -3,7 +3,6 @@ import { useClerk, useUser } from '@clerk/react';
 import {
   Activity,
   Clapperboard,
-  DoorOpen,
   Film,
   Image,
   LogOut,
@@ -11,7 +10,6 @@ import {
   Palette,
   Scissors,
   ChevronDown,
-  ChevronRight,
   Check,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
@@ -123,148 +121,96 @@ function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   );
 }
 
-function Sidebar({ projectId, onClose, open }: { projectId: string | null; onClose: () => void; open?: boolean }) {
+export function CreatorsShell({ children }: { children: ReactNode }) {
   const { signOut } = useClerk();
   const [location] = useLocation();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const projects = useListVideoProjects();
-  const current = projects.data?.find((p) => p.id === projectId);
-
-  const logout = () => signOut({ redirectUrl: '/' });
-
-  const navItem = (href: string, label: string, icon: ReactNode, active: boolean, extra?: ReactNode) => (
-    <Link
-      href={href}
-      className={`nav-item ${active ? 'active' : ''}`}
-      onClick={onClose}
-      data-testid={`nav-${label.toLowerCase().replace(/\s+/g, '-')}`}
-    >
-      {icon}
-      <span>{label}</span>
-      {extra}
-    </Link>
-  );
-
-  return (
-    <aside className={`sidebar ${open ? 'sidebar-open' : ''}`} data-testid="den-sidebar">
-      <div className="brand-row">
-        <span className="brand-mark">C</span>
-        <span className="brand-copy">
-          <span className="block brand-name">Creators Den</span>
-          <span className="block brand-sub">video version control</span>
-        </span>
-        <button type="button" className="icon-btn sidebar-close mobile-only" aria-label="Close navigation" onClick={onClose}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
-        </button>
-      </div>
-
-      <div className="workspace-switch-wrap">
-        <button
-          type="button"
-          className={`workspace-switch ${workspaceOpen ? 'open' : ''}`}
-          onClick={() => setWorkspaceOpen((open) => !open)}
-          data-testid="workspace-switch"
-        >
-          <span className="workspace-icon"><Clapperboard size={14} /></span>
-          <span className="workspace-copy">
-            <small>Workspace</small>
-            <strong className="truncate">{current?.name ?? 'Home'}</strong>
-          </span>
-          <ChevronDown size={14} />
-        </button>
-        {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
-      </div>
-
-      <nav aria-label="Creators Den">
-        <span className="nav-label">Studio</span>
-        {navItem('/', 'Home', <DoorOpen size={16} />, location === '/')}
-        {projectId && navItem(`/projects/${projectId}`, 'Project', <Film size={16} />, location === `/projects/${projectId}`)}
-        {projectId && navItem(`/projects/${projectId}/activity`, 'Activity', <Activity size={16} />, location === `/projects/${projectId}/activity`)}
-        {projectId && (
-          <>
-            <span className="nav-label nav-label-spaced">Stages</span>
-            {RELAY_LEGS.map((leg) => {
-              const Icon = leg.icon;
-              const href = `/projects/${projectId}/${leg.slug}`;
-              const active = location === href;
-              return (
-                <Link
-                  key={leg.leg}
-                  href={href}
-                  className={`nav-item ${active ? 'active' : ''}`}
-                  onClick={onClose}
-                  data-testid={`nav-leg-${leg.slug}`}
-                >
-                  <Icon size={16} />
-                  <span>{leg.role}</span>
-                  <span className="nav-count">{leg.number}</span>
-                </Link>
-              );
-            })}
-          </>
-        )}
-      </nav>
-
-      <div className="sidebar-bottom">
-        <button type="button" className="tutorial-btn" onClick={logout} data-testid="button-creators-logout">
-          <LogOut size={14} />
-          <span>Sign out</span>
-        </button>
-        <UserChip compact />
-      </div>
-    </aside>
-  );
-}
-
-export function CreatorsShell({ children }: { children: ReactNode }) {
-  const [location] = useLocation();
-  const [mobileNav, setMobileNav] = useState(false);
-  const [topWorkspaceOpen, setTopWorkspaceOpen] = useState(false);
   const projects = useListVideoProjects();
 
   const projectMatch = location.match(/^\/projects\/([^/]+)/);
   const projectId = projectMatch?.[1];
   const current = projects.data?.find((p) => p.id === projectId);
 
-  // Contextual breadcrumb shown in the top bar, chevroned off the workspace name.
-  const stageLeg = projectId ? RELAY_LEGS.find((l) => location === `/projects/${projectId}/${l.slug}`) : undefined;
-  const sectionLabel = !projectId
-    ? null
-    : location === `/projects/${projectId}`
-      ? 'The vault'
-      : location === `/projects/${projectId}/activity`
-        ? 'Activity'
-        : stageLeg?.role ?? null;
+  const logout = () => signOut({ redirectUrl: '/' });
+
+  // A primary section tab. The active tab (not a breadcrumb) conveys location.
+  const tab = (href: string, label: string, icon: ReactNode, testId: string) => (
+    <Link
+      href={href}
+      className={`cd-tab ${location === href ? 'active' : ''}`}
+      data-testid={testId}
+    >
+      {icon}
+      <span>{label}</span>
+    </Link>
+  );
 
   return (
     <div className="app-shell">
-      <Sidebar projectId={projectId ?? null} onClose={() => setMobileNav(false)} open={mobileNav} />
-      {mobileNav && <div className="modal-backdrop mobile-only" style={{ zIndex: 15 }} onClick={() => setMobileNav(false)} />}
-      <main className="main-stage">
-        <header className="topbar">
-          <button className="icon-btn mobile-only" aria-label="Open navigation" onClick={() => setMobileNav(true)}>
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
-          </button>
-          <div className="topbar-lead">
-            <div className="top-workspace-wrap" onPointerLeave={() => setTopWorkspaceOpen(false)}>
-              <button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)} data-testid="top-workspace">
-                <span>Workspace</span>
-                <ChevronDown size={13} />
-                <b className="truncate">{current?.name ?? 'Home'}</b>
-              </button>
-              {topWorkspaceOpen && <WorkspaceMenu onClose={() => setTopWorkspaceOpen(false)} />}
-            </div>
-            {sectionLabel && (
-              <div className="top-crumb" data-testid="top-crumb">
-                <ChevronRight size={15} />
-                <span>{sectionLabel}</span>
-              </div>
-            )}
+      <header className="cd-topnav" data-testid="den-topnav">
+        {/* Tier 1 — chrome: brand · workspace · account */}
+        <div className="cd-topnav-chrome">
+          <Link href="/" className="cd-brand" data-testid="nav-home">
+            <span className="brand-mark">C</span>
+            <span className="brand-copy">
+              <span className="block brand-name">Creators Den</span>
+              <span className="block brand-sub">video version control</span>
+            </span>
+          </Link>
+
+          <div className="top-workspace-wrap" onPointerLeave={() => setWorkspaceOpen(false)}>
+            <button
+              type="button"
+              className="top-workspace"
+              onClick={() => setWorkspaceOpen((open) => !open)}
+              data-testid="top-workspace"
+            >
+              <span>Workspace</span>
+              <b className="truncate">{current?.name ?? 'Home'}</b>
+              <ChevronDown size={13} />
+            </button>
+            {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
           </div>
-          <div className="top-actions">
+
+          <div className="cd-topnav-account">
+            <button type="button" className="cd-signout" onClick={logout} data-testid="button-creators-logout">
+              <LogOut size={14} />
+              <span>Sign out</span>
+            </button>
             <UserChip />
           </div>
-        </header>
+        </div>
+
+        {/* Tier 2 — tabs: sections + the five-stage relay (only inside a project) */}
+        {projectId && (
+          <nav className="cd-topnav-tabs" aria-label="Project sections" data-testid="den-tabs">
+            <div className="cd-tab-group">
+              {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
+              {tab(`/projects/${projectId}/activity`, 'Activity', <Activity size={15} />, 'nav-activity')}
+            </div>
+            <span className="cd-tab-divider" aria-hidden />
+            <div className="cd-tab-group cd-tab-stages">
+              {RELAY_LEGS.map((leg) => {
+                const href = `/projects/${projectId}/${leg.slug}`;
+                return (
+                  <Link
+                    key={leg.leg}
+                    href={href}
+                    title={leg.role}
+                    className={`cd-tab ${location === href ? 'active' : ''}`}
+                    data-testid={`nav-leg-${leg.slug}`}
+                  >
+                    <span className="cd-tab-num">{leg.number}</span>
+                    <span>{leg.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        )}
+      </header>
+
+      <main className="main-stage">
         {projectId && <PresenceStrip projectId={projectId} />}
         {/* Each page component supplies its own `.page` container; the shell
             must not add a second one or the content gets doubled padding. */}
