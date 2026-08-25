@@ -758,7 +758,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(240px, 300px);
   gap: var(--sp-7);
-  align-items: start;
+  margin-top: var(--sp-8); /* breathable gap below the full-span header & filter */
 }
 .cd-split-left,
 .cd-split-mid,

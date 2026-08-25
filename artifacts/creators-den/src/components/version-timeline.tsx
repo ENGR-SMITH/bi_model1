@@ -31,7 +31,7 @@
 // ---------------------------------------------------------------------------
 
 import { useMemo, type CSSProperties } from 'react';
-import { Film, GitBranch, History, Image as ImageIcon, Music, Paperclip } from 'lucide-react';
+import { Film, History, Image as ImageIcon, Music, Paperclip } from 'lucide-react';
 import {
   useGetVideoProject,
   useListVideoTimelineVersions,
@@ -383,23 +383,6 @@ export function VersionTimeline({ projectId, leg, onLegChange }: { projectId: st
 
   return (
     <div className="cd-timeline" data-testid="version-timeline">
-      <div className="cd-timeline-sub">
-        <p className="den-footnote cd-timeline-caption">
-          <GitBranch size={13} />
-          Every saved version and vault upload, newest on top — the arrows trace the work back in time.
-        </p>
-        <div className="snake-legend">
-          <span className="snake-legend-item">
-            <span className="snake-legend-dot is-version" aria-hidden />
-            Role version
-          </span>
-          <span className="snake-legend-item">
-            <span className="snake-legend-dot is-upload" aria-hidden />
-            Vault upload
-          </span>
-        </div>
-      </div>
-
       {loading ? (
         <div className="panel-empty" data-testid="timeline-loading">Tracing the version graph…</div>
       ) : chron.length === 0 ? (
