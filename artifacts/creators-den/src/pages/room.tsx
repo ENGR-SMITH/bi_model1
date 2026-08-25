@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -200,14 +201,52 @@ function DeleteProjectModal({ project, deleting, onCancel, onConfirm }: { projec
 }
 
 // The three-dot menu on each project card — the single place to change
-// visibility (public ↔ private) or delete the project. Captain only.
+// visibility (public ↔ private) or delete the project. Captain only. The
+// dropdown and the delete modal render through a portal so the card's
+// overflow:hidden and hover transform can't clip or trap them (which caused
+// the page glitch).
 function CardMenu({ project }: { project: VideoProject }) {
   const queryClient = useQueryClient();
   const update = useUpdateVideoProjectVisibility();
   const remove = useDeleteVideoProject();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const isPublic = project.visibility === 'PUBLIC';
+
+  const openMenu = () => {
+    const rect = anchorRef.current?.getBoundingClientRect();
+    setMenuPos(rect ? { top: rect.bottom + 6, left: rect.right } : null);
+    setOpen(true);
+  };
+  const closeMenu = () => setOpen(false);
+
+  // Dismiss on outside click, Escape, or any scroll/resize (the cards sit in a
+  // scrollable rail, so the menu just closes instead of trying to follow it).
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (anchorRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      closeMenu();
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeMenu();
+    };
+    const onViewportChange = () => closeMenu();
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onViewportChange);
+    window.addEventListener('scroll', onViewportChange, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onViewportChange);
+      window.removeEventListener('scroll', onViewportChange, true);
+    };
+  }, [open]);
 
   const toggleVisibility = () => {
     update.mutate(
@@ -215,7 +254,7 @@ function CardMenu({ project }: { project: VideoProject }) {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVideoProjectsQueryKey() });
-          setOpen(false);
+          closeMenu();
         },
       },
     );
@@ -227,7 +266,7 @@ function CardMenu({ project }: { project: VideoProject }) {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVideoProjectsQueryKey() });
-          setOpen(false);
+          closeMenu();
           setConfirming(false);
         },
       },
@@ -235,42 +274,48 @@ function CardMenu({ project }: { project: VideoProject }) {
   };
 
   return (
-    <div className="card-menu-wrap">
+    <>
       <button
+        ref={anchorRef}
         type="button"
         className="card-menu-btn"
-        onClick={() => setOpen((value) => !value)}
+        onClick={openMenu}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Project menu for ${project.name}`}
         data-testid={`card-menu-${project.id}`}
       >
-        <MoreHorizontal size={16} />
+        <MoreHorizontal size={15} />
       </button>
-      {open && (
-        <>
-          <div className="card-menu-backdrop" onClick={() => setOpen(false)} />
-          <div className="card-menu" role="menu" data-testid={`card-menu-popup-${project.id}`}>
-            <button type="button" role="menuitem" onClick={toggleVisibility} disabled={update.isPending} data-testid={`menu-visibility-${project.id}`}>
-              {isPublic ? <EyeOff size={14} /> : <Eye size={14} />}
-              {isPublic ? 'Make private' : 'Make public'}
-            </button>
-            <button type="button" role="menuitem" className="is-danger" onClick={() => setConfirming(true)} data-testid={`menu-delete-${project.id}`}>
-              <Trash2 size={14} />
-              Delete project
-            </button>
-          </div>
-        </>
+      {open && menuPos && createPortal(
+        <div
+          ref={menuRef}
+          className="card-menu"
+          role="menu"
+          style={{ top: menuPos.top, left: menuPos.left }}
+          data-testid={`card-menu-popup-${project.id}`}
+        >
+          <button type="button" role="menuitem" onClick={toggleVisibility} disabled={update.isPending} data-testid={`menu-visibility-${project.id}`}>
+            {isPublic ? <EyeOff size={14} /> : <Eye size={14} />}
+            {isPublic ? 'Make private' : 'Make public'}
+          </button>
+          <button type="button" role="menuitem" className="is-danger" onClick={() => { closeMenu(); setConfirming(true); }} data-testid={`menu-delete-${project.id}`}>
+            <Trash2 size={14} />
+            Delete project
+          </button>
+        </div>,
+        document.body,
       )}
-      {confirming && (
+      {confirming && createPortal(
         <DeleteProjectModal
           project={project}
           deleting={remove.isPending}
           onCancel={() => setConfirming(false)}
           onConfirm={confirmDelete}
-        />
+        />,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
 
@@ -279,7 +324,7 @@ function ProjectCard({ project, isCaptain }: { project: VideoProject; isCaptain:
 
   return (
     <div className={`cd-card cd-card-project ${isPublic ? 'is-public' : 'is-private'}`} data-testid={`card-video-project-${project.id}`}>
-      {/* Stretched link — the whole card opens the project; the menu sits above it. */}
+      {/* Stretched link — the whole card opens the project; controls sit above it. */}
       <Link href={`/projects/${project.id}`} className="cd-card-hit" aria-label={`Open ${project.name}`} data-testid={`link-open-project-${project.id}`} />
       <div className="cd-card-thumb" aria-hidden>
         <Film size={26} />
@@ -291,9 +336,11 @@ function ProjectCard({ project, isCaptain }: { project: VideoProject; isCaptain:
           {isPublic ? 'Public' : 'Private'}
         </span>
       </div>
-      {isCaptain && <CardMenu project={project} />}
-      <div className="cd-card-body" aria-hidden>
-        <span className="cd-card-title">{project.name}</span>
+      <div className="cd-card-body">
+        <div className="cd-card-title-row">
+          <span className="cd-card-title">{project.name}</span>
+          {isCaptain && <CardMenu project={project} />}
+        </div>
         <span className="cd-card-meta">
           {new Date(project.createdAt).toLocaleDateString()}
           {project.description ? ` · ${project.description}` : ''}

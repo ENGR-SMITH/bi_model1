@@ -1,18 +1,18 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useClerk, useUser } from '@clerk/react';
 import {
   Activity,
   Clapperboard,
-  Compass,
   Film,
+  Home,
   Image,
   LogOut,
   Mic2,
   Palette,
   Scissors,
+  Search,
   ChevronDown,
   Check,
-  UserRound,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useListVideoProjects } from '@workspace/api-client-react';
@@ -30,20 +30,22 @@ export const RELAY_LEGS = [
   { slug: 'thumbnail', leg: 'THUMBNAIL', number: '05', label: 'Thumbnail', role: 'Thumbnail Designer', icon: Image },
 ] as const;
 
-function UserChip({ compact }: { compact?: boolean }) {
+// The account tile IS the profile link: the user's real account image (or
+// initials fallback), full name, and email. No separate "Profile" button.
+function UserChip() {
   const { user } = useUser();
-  const name = user?.firstName || user?.username || 'Maker';
+  const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim() || user?.username || 'Maker';
   const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}` || name.slice(0, 2);
   return (
-    <div className="flex items-center gap-2.5" data-testid="user-chip">
-      <span className="avatar" aria-hidden>{initials}</span>
-      {!compact && (
-        <span className="min-w-0 leading-tight">
-          <span className="block max-w-40 truncate text-xs font-bold text-[hsl(var(--foreground))]" data-testid="text-user-name">{name}</span>
-          <span className="block max-w-40 truncate text-[10px] text-[hsl(var(--muted-foreground))]">{user?.primaryEmailAddress?.emailAddress || 'Tandem member'}</span>
-        </span>
-      )}
-    </div>
+    <Link href="/profile" className="cd-account" data-testid="user-chip" aria-label={`Open ${name}'s profile`}>
+      <span className="avatar" aria-hidden>
+        {user?.imageUrl ? <img src={user.imageUrl} alt="" /> : initials}
+      </span>
+      <span className="cd-account-meta">
+        <span className="cd-account-name" data-testid="text-user-name">{name}</span>
+        <span className="cd-account-email">{user?.primaryEmailAddress?.emailAddress || 'Tandem member'}</span>
+      </span>
+    </Link>
   );
 }
 
@@ -82,6 +84,21 @@ function WorkspaceMenu({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="workspace-menu" data-testid="workspace-menu">
+      <button
+        type="button"
+        className="menu-home"
+        onClick={() => {
+          setLocation('/');
+          onClose();
+        }}
+        data-testid="workspace-home"
+      >
+        <Home size={15} />
+        <span>
+          <b>Home</b>
+          <small>Back to the room</small>
+        </span>
+      </button>
       <span className="menu-caption">Your projects</span>
       {(projects.data ?? []).map((project) => {
         const selected = project.id === currentId;
@@ -123,6 +140,48 @@ function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   );
 }
 
+// The expanding search telescope in the centre of the top bar — collapses to a
+// magnifier and grows into a query field; submitting jumps to /explore?q=…
+function ExploreSearch() {
+  const [, setLocation] = useLocation();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const q = query.trim();
+    setLocation(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
+    setQuery('');
+    setExpanded(false);
+  };
+
+  const expand = () => {
+    setExpanded(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  return (
+    <div className="cd-explore-search">
+      <form className={`cd-explore-search-box ${expanded ? 'is-expanded' : ''}`} role="search" onSubmit={submit} data-testid="nav-explore">
+        <button type="button" className="cd-explore-search-icon" onClick={expand} aria-label="Search the den" data-testid="nav-explore-toggle">
+          <Search size={15} />
+        </button>
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          onFocus={() => setExpanded(true)}
+          onBlur={() => !query.trim() && setExpanded(false)}
+          placeholder="Search creators and projects…"
+          aria-label="Search creators and projects"
+          data-testid="nav-explore-input"
+        />
+      </form>
+    </div>
+  );
+}
+
 export function CreatorsShell({ children }: { children: ReactNode }) {
   const { signOut } = useClerk();
   const [location] = useLocation();
@@ -150,7 +209,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <header className="cd-topnav" data-testid="den-topnav">
-        {/* Tier 1 — chrome: brand · workspace · account */}
+        {/* Tier 1 — chrome: brand · search · account (the account tile is the profile). */}
         <div className="cd-topnav-chrome">
           <Link href="/" className="cd-brand" data-testid="nav-home">
             <span className="brand-mark">C</span>
@@ -160,6 +219,15 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             </span>
           </Link>
 
+          <ExploreSearch />
+
+          <div className="cd-topnav-account">
+            <UserChip />
+          </div>
+        </div>
+
+        {/* Tier 2 — always-visible workspace/sign-out row + collapsing project tabs. */}
+        <div className="cd-topnav-sub">
           <div className="top-workspace-wrap" onPointerLeave={() => setWorkspaceOpen(false)}>
             <button
               type="button"
@@ -174,51 +242,38 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
           </div>
 
-          <Link href="/explore" className="cd-explore-link" data-testid="nav-explore">
-            <Compass size={14} />
-            <span>Explore</span>
-          </Link>
+          {projectId && (
+            <div className="cd-tab-scroll">
+              <div className="cd-tab-group">
+                {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
+                {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
+              </div>
+              <span className="cd-tab-divider" aria-hidden />
+              <div className="cd-tab-group cd-tab-stages">
+                {RELAY_LEGS.map((leg) => {
+                  const href = `/projects/${projectId}/${leg.slug}`;
+                  return (
+                    <Link
+                      key={leg.leg}
+                      href={href}
+                      title={leg.role}
+                      className={`cd-tab ${location === href ? 'active' : ''}`}
+                      data-testid={`nav-leg-${leg.slug}`}
+                    >
+                      <span className="cd-tab-num">{leg.number}</span>
+                      <span>{leg.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-          <div className="cd-topnav-account">
-            <Link href="/profile" className="cd-profile" data-testid="nav-profile">
-              <UserRound size={14} />
-              <span>Profile</span>
-            </Link>
-            <button type="button" className="cd-signout" onClick={logout} data-testid="button-creators-logout">
-              <LogOut size={14} />
-              <span>Sign out</span>
-            </button>
-            <UserChip />
-          </div>
+          <button type="button" className="cd-signout" onClick={logout} data-testid="button-creators-logout">
+            <LogOut size={14} />
+            <span>Sign out</span>
+          </button>
         </div>
-
-        {/* Tier 2 — tabs: sections + the five-stage relay (only inside a project) */}
-        {projectId && (
-          <nav className="cd-topnav-tabs" aria-label="Project sections" data-testid="den-tabs">
-            <div className="cd-tab-group">
-              {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
-              {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
-            </div>
-            <span className="cd-tab-divider" aria-hidden />
-            <div className="cd-tab-group cd-tab-stages">
-              {RELAY_LEGS.map((leg) => {
-                const href = `/projects/${projectId}/${leg.slug}`;
-                return (
-                  <Link
-                    key={leg.leg}
-                    href={href}
-                    title={leg.role}
-                    className={`cd-tab ${location === href ? 'active' : ''}`}
-                    data-testid={`nav-leg-${leg.slug}`}
-                  >
-                    <span className="cd-tab-num">{leg.number}</span>
-                    <span>{leg.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
-        )}
       </header>
 
       <main className="main-stage">

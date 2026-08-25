@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'wouter';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearch } from 'wouter';
 import { useUser } from '@clerk/react';
 import { Check, Compass, Eye, Film, Search, UserPlus, UserRound } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -109,7 +109,14 @@ function ProjectCard({ project }: { project: VideoPublicProject }) {
 
 export default function ExplorePage() {
   const [tab, setTab] = useState<'creators' | 'projects'>('creators');
-  const [query, setQuery] = useState('');
+  // Seed from the top-nav search telescope (/explore?q=…), then filter locally.
+  const searchString = useSearch();
+  const urlQuery = useMemo(() => new URLSearchParams(searchString).get('q') ?? '', [searchString]);
+  const [query, setQuery] = useState(urlQuery);
+
+  useEffect(() => {
+    setQuery(urlQuery);
+  }, [urlQuery]);
 
   const creators = useListExploreCreators({ query: { queryKey: getListExploreCreatorsQueryKey() } });
   const projects = useListExploreProjects({ query: { queryKey: getListExploreProjectsQueryKey() } });

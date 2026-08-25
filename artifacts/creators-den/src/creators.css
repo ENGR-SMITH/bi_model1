@@ -1108,13 +1108,53 @@
 .cd-brand .brand-sub { transition: color .18s ease; }
 .cd-brand:hover .brand-sub { color: hsl(var(--muted-foreground)); }
 
-/* Workspace switcher sits just after the brand, split off by a soft hairline. */
-.cd-topnav-chrome .top-workspace-wrap { position: relative; padding-left: var(--sp-4); }
-.cd-topnav-chrome .top-workspace-wrap::before {
-  content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
-  width: 1px; height: 26px;
-  background: linear-gradient(hsl(var(--border) / 0), hsl(var(--border)), hsl(var(--border) / 0));
+/* ---- Expanding search telescope (centre of the chrome row) ----------------- */
+.cd-explore-search {
+  flex: 1;
+  display: flex; justify-content: center; align-items: center;
+  min-width: 0;
+  margin: 0 var(--sp-3);
 }
+.cd-explore-search-box {
+  display: flex; align-items: center;
+  width: 36px; height: 36px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--secondary) / .5);
+  overflow: hidden;
+  transition: width .28s cubic-bezier(.22, 1, .36, 1), border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+.cd-explore-search-box.is-expanded {
+  width: clamp(220px, 30vw, 340px);
+  border-color: hsl(var(--accent) / .55);
+  background: hsl(var(--card));
+  box-shadow: 0 0 0 3px hsl(var(--accent) / .12), var(--edge-hi);
+}
+.cd-explore-search-icon {
+  flex: 0 0 36px; width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border: 0; background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: color .16s ease;
+}
+.cd-explore-search-icon:hover { color: hsl(var(--foreground)); }
+.cd-explore-search-box input {
+  flex: 1; min-width: 0; height: 100%;
+  border: 0; background: transparent; outline: none;
+  color: hsl(var(--foreground)); font: 500 13px var(--app-font-sans);
+  padding: 0 14px 0 2px;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.cd-explore-search-box.is-expanded input { opacity: 1; }
+.cd-explore-search-box input::placeholder { color: hsl(var(--muted-foreground) / .8); }
+
+/* Workspace switcher lives on the secondary row now (always visible). */
+.cd-topnav-sub .top-workspace-wrap { position: relative; flex: 0 0 auto; }
+/* Home entry at the top of the workspace dropdown — its icon stays lit. */
+.workspace-menu button.menu-home { border-bottom: 1px solid hsl(var(--border)); border-radius: 5px; margin-bottom: 2px; }
+.workspace-menu button.menu-home > svg { opacity: 1; color: hsl(var(--accent)); }
 .cd-topnav .top-workspace {
   gap: var(--sp-2); padding: var(--sp-2) var(--sp-3);
   border: 1px solid transparent; border-radius: 10px;
@@ -1132,8 +1172,21 @@
 .cd-topnav .top-workspace > svg { color: hsl(var(--muted-foreground) / .7); transition: transform .18s ease; }
 .cd-topnav .top-workspace:hover > svg { transform: translateY(1px); }
 
-/* Account cluster pinned to the right: ghost sign-out + neutral user tile. */
+/* Account tile pinned right in the chrome — the avatar IS the profile link. */
 .cd-topnav-account { margin-left: auto; display: flex; align-items: center; gap: var(--sp-3); }
+
+.cd-account {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 10px; border-radius: 11px;
+  color: inherit; text-decoration: none; white-space: nowrap;
+  transition: background .16s ease;
+}
+.cd-account:hover { background: hsl(var(--foreground) / .05); }
+.cd-account .avatar { width: 32px; height: 32px; border-radius: 10px; overflow: hidden; }
+.cd-account .avatar img { width: 100%; height: 100%; object-fit: cover; }
+.cd-account-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.cd-account-name { max-width: 150px; font: 700 12px var(--app-font-sans); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-account-email { max-width: 150px; font: 10px var(--app-font-mono); color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cd-signout {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3); border-radius: 10px;
@@ -1144,8 +1197,26 @@
 }
 .cd-signout:hover { color: hsl(var(--destructive)); border-color: hsl(var(--destructive) / .5); background: hsl(var(--destructive) / .08); }
 .cd-signout svg { color: hsl(var(--destructive)); }
+/* In the secondary row the sign-out sits at the far right. */
+.cd-topnav-sub .cd-signout { margin-left: auto; flex: 0 0 auto; }
 
-/* ---- Tier 2: the relay deck (tabs) --------------------------------------- */
+/* ---- Tier 2: the relay deck (workspace + tabs + sign-out) ----------------- */
+.cd-topnav-sub {
+  display: flex; align-items: center; gap: var(--sp-2);
+  height: 46px;
+  padding: 0 clamp(16px, 3vw, 40px);
+  border-top: 1px solid hsl(var(--border) / .5);
+  background: hsl(var(--card) / .35);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, .22);   /* recess the deck under the chrome */
+}
+/* Only the project tabs scroll — the workspace dropdown must not be clipped. */
+.cd-tab-scroll {
+  display: flex; align-items: center; gap: var(--sp-2);
+  flex: 1; min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.cd-tab-scroll::-webkit-scrollbar { display: none; }
 .cd-topnav-tabs {
   display: flex; align-items: stretch; gap: var(--sp-2);
   height: 46px;
@@ -1235,34 +1306,19 @@
 .cd-brand:focus-visible,
 .cd-topnav .top-workspace:focus-visible,
 .cd-signout:focus-visible,
-.cd-profile:focus-visible { outline: none; box-shadow: var(--accent-ring); }
-
-/* Profile link — a ghost action beside sign-out; hover lights the accent. */
-.cd-profile {
-  display: inline-flex; align-items: center; gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3); border-radius: 10px;
-  border: 1px solid hsl(var(--border));
-  background: transparent; color: hsl(var(--muted-foreground));
-  font: 600 12px var(--app-font-sans); text-decoration: none;
-  transition: color .18s ease, background .18s ease, border-color .18s ease;
-}
-.cd-profile:hover { color: hsl(var(--accent)); border-color: hsl(var(--accent) / .5); background: hsl(var(--accent) / .08); }
-.cd-profile svg { color: hsl(var(--accent)); }
+.cd-account:focus-visible { outline: none; box-shadow: var(--accent-ring); }
 
 /* ---- Narrow screens: the tabs row scrolls, the chrome compacts ------------ */
 @media (max-width: 760px) {
   .cd-topnav-chrome { height: 56px; gap: var(--sp-3); padding-inline: 16px; }
   .cd-brand .brand-sub { display: none; }
-  .cd-topnav-chrome .top-workspace-wrap { padding-left: var(--sp-3); }
   .cd-topnav .top-workspace b { max-width: 96px; }
   .cd-signout { padding: var(--sp-2); }
   .cd-signout span { display: none; }
-  .cd-profile { padding: var(--sp-2); }
-  .cd-profile span { display: none; }
-  .cd-explore-link { padding: var(--sp-2); }
-  .cd-explore-link span { display: none; }
-  .cd-topnav-account [data-testid="user-chip"] > span.leading-tight { display: none; }
-  .cd-topnav-tabs { padding-inline: 16px; -webkit-overflow-scrolling: touch; }
+  .cd-account { padding: var(--sp-2); }
+  .cd-account-meta { display: none; }
+  .cd-topnav-sub { padding-inline: 16px; }
+  .cd-tab-scroll { -webkit-overflow-scrolling: touch; }
 }
 
 /* ============================================================================
@@ -1282,10 +1338,11 @@
 }
 .cd-card-hit:focus-visible { outline: 2px solid hsl(var(--accent)); outline-offset: 2px; }
 
-/* The eye status indicator — a glass pill bottom-right of the thumb, showing
-   the current visibility (open eye = public, closed = private). Non-interactive */
+/* The eye status indicator — a glass pill in the top-right corner of the
+   thumb, showing the current visibility (open eye = public, closed = private).
+   Non-interactive: the control lives in the three-dot menu. */
 .eye-indicator {
-  position: absolute; bottom: 8px; right: 8px; z-index: 2;
+  position: absolute; top: 8px; right: 8px; z-index: 2;
   display: inline-flex; align-items: center; gap: 5px;
   padding: 4px 8px; border-radius: 999px;
   border: 1px solid hsl(var(--border) / .7);
@@ -1307,23 +1364,30 @@
 }
 .eye-indicator.is-closed .eye-toggle-icon { animation: eyeCloseIn .32s ease; }
 
-/* ---- Three-dot card menu (Captain only, top-right of thumb) ---------------- */
-.card-menu-wrap { position: absolute; top: 8px; right: 8px; z-index: 5; }
+/* ---- Three-dot card menu (Captain only, next to the project name) ---------- */
 .card-menu-btn {
-  width: 28px; height: 28px;
+  position: relative; z-index: 5;
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
   display: grid; place-items: center;
-  border: 1px solid hsl(var(--border) / .7); border-radius: 8px;
-  background: hsl(0 0% 0% / .72);
-  backdrop-filter: blur(6px);
+  border: 1px solid hsl(var(--border)); border-radius: 7px;
+  background: hsl(var(--secondary) / .6);
   color: hsl(var(--muted-foreground));
   cursor: pointer;
   transition: color .15s ease, background .15s ease, border-color .15s ease, transform .12s ease;
 }
-.card-menu-btn:hover { color: hsl(var(--foreground)); background: hsl(0 0% 0% / .88); transform: translateY(-1px); }
+.card-menu-btn:hover { color: hsl(var(--foreground)); background: hsl(var(--secondary)); border-color: hsl(var(--border)); transform: translateY(-1px); }
 .card-menu-btn:focus-visible { outline: none; box-shadow: var(--accent-ring); }
-.card-menu-backdrop { position: fixed; inset: 0; z-index: 50; }
+
+/* Title row: name on the left, the ⋮ button on the right. */
+.cd-card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; }
+.cd-card-title-row .cd-card-title { flex: 1; min-width: 0; }
+
+/* The dropdown renders through a portal (position: fixed at the button),
+   so the card's overflow:hidden and hover transform can't clip or trap it. */
 .card-menu {
-  position: absolute; top: calc(100% + 5px); right: 0; z-index: 51;
+  position: fixed; z-index: 60;
+  transform: translateX(-100%);   /* right-align to the ⋮ button */
   min-width: 180px;
   padding: 4px;
   border-radius: 10px;
@@ -1382,18 +1446,6 @@
    vault is members-only, so there is nowhere to link them to. */
 .list-row.is-static { cursor: default; }
 .list-row.is-static:hover { background: transparent; }
-
-/* ---- Explore nav link (topnav chrome) ------------------------------------- */
-.cd-explore-link {
-  display: inline-flex; align-items: center; gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3); border-radius: 10px;
-  color: hsl(var(--muted-foreground)); text-decoration: none;
-  font: 600 12px var(--app-font-sans);
-  transition: color .18s ease, background .18s ease;
-}
-.cd-explore-link:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / .05); }
-.cd-explore-link svg { color: hsl(var(--accent)); }
-.cd-explore-link:focus-visible { outline: none; box-shadow: var(--accent-ring); }
 
 /* ============================================================================
    CREATOR-DEN — EXPLORE (discovery) + FOLLOW MODEL + CONTRIBUTION GRAPH
