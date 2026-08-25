@@ -40,6 +40,7 @@ interface LedgerEvent {
   actorId: string;
   createdAt: string;
   leg?: string | null;
+  resourceId?: string | null;
 }
 
 const EVENT_META: Record<string, { icon: typeof History; tone: string; label: string }> = {
@@ -64,6 +65,24 @@ const TYPE_ORDER = [
 ];
 
 const FALLBACK_META = { icon: History, tone: 'muted', label: 'Other' } as const;
+
+// Map a ledger event to the timeline node it corresponds to (the snake card's
+// `keyOf` format), so hovering/clicking one column can highlight the other.
+// Version events carry a version id; upload events carry an asset id; the rest
+// (submissions, reviews…) have no timeline node and return null.
+function eventToNodeKey(ev: LedgerEvent): string | null {
+  if (!ev.resourceId) return null;
+  switch (ev.eventType) {
+    case 'version_saved':
+    case 'version_imported':
+    case 'version_rolled_back':
+      return `version:${ev.resourceId}`;
+    case 'asset_uploaded':
+      return `upload:${ev.resourceId}`;
+    default:
+      return null;
+  }
+}
 
 function timeAgo(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -102,6 +121,15 @@ function dayLabel(iso: string): string {
 export default function ActivityPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [leg, setLeg] = useState<string>('all');
+  // Cross-column highlight: hovering shows a transient match, clicking pins it
+  // until another card is clicked (or the same one again to unpin).
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  const [pinnedKey, setPinnedKey] = useState<string | null>(null);
+  const activeKey = hoverKey ?? pinnedKey;
+  // Clicking a card pins it (click again to unpin); hovering shows a transient match.
+  const togglePin = (key: string | null) => {
+    setPinnedKey((prev) => (key !== null && prev === key ? null : key));
+  };
   useProjectRealtime(projectId);
   const activity = useListVideoActivity(projectId, undefined);
   const events = (activity.data ?? []) as LedgerEvent[];
@@ -150,7 +178,7 @@ export default function ActivityPage() {
   const filteredCount = groups.reduce((n, g) => n + g.events.length, 0);
 
   return (
-    <div className="page">
+    <div className="page activity-page">
       <div className="page-header">
         <div>
           <SectionEyebrow>Project timeline</SectionEyebrow>
@@ -211,7 +239,14 @@ export default function ActivityPage() {
       <div className="cd-split">
         {/* ---- LEFT: Version timeline (snake-and-ladder graph) ---- */}
         <div className="cd-split-left">
-          <VersionTimeline projectId={projectId} leg={leg} onLegChange={setLeg} />
+          <VersionTimeline
+            projectId={projectId}
+            leg={leg}
+            onLegChange={setLeg}
+            activeKey={activeKey}
+            onHover={setHoverKey}
+            onPin={togglePin}
+          />
         </div>
 
         {/* ---- MID: Activity ledger (day-grouped event feed) ---- */}
@@ -241,8 +276,17 @@ export default function ActivityPage() {
                       const meta = EVENT_META[ev.eventType] ?? FALLBACK_META;
                       const Icon = meta.icon;
                       const legMeta = ev.leg ? RELAY_LEGS.find((l) => l.leg === ev.leg) : undefined;
+                      const nodeKey = eventToNodeKey(ev);
+                      const synced = nodeKey !== null && nodeKey === activeKey;
                       return (
-                        <li className="cd-ledger-row" key={ev.id} data-testid={`ledger-${ev.eventType}`}>
+                        <li
+                          key={ev.id}
+                          className={`cd-ledger-row ${synced ? 'is-synced' : ''}`}
+                          data-testid={`ledger-${ev.eventType}`}
+                          onMouseEnter={() => setHoverKey(nodeKey)}
+                          onMouseLeave={() => setHoverKey(null)}
+                          onClick={() => nodeKey && togglePin(nodeKey)}
+                        >
                           <span className={`cd-ledger-dot ${meta.tone}`} aria-hidden>
                             <Icon size={13} />
                           </span>

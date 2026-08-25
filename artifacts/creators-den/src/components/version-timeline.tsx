@@ -180,7 +180,21 @@ function buildSnake(chron: TLNode[]): SnakeRow[] {
   return rows.reverse();
 }
 
-export function VersionTimeline({ projectId, leg, onLegChange }: { projectId: string; leg: string; onLegChange: (leg: string) => void }) {
+export function VersionTimeline({
+  projectId,
+  leg,
+  onLegChange,
+  activeKey,
+  onHover,
+  onPin,
+}: {
+  projectId: string;
+  leg: string;
+  onLegChange: (leg: string) => void;
+  activeKey: string | null;
+  onHover: (key: string | null) => void;
+  onPin: (key: string | null) => void;
+}) {
   const selects = useListVideoTimelineVersions(projectId, 'SELECTS');
   const cut = useListVideoTimelineVersions(projectId, 'CUT');
   const sound = useListVideoTimelineVersions(projectId, 'SOUND');
@@ -280,6 +294,7 @@ export function VersionTimeline({ projectId, leg, onLegChange }: { projectId: st
 
   const renderCard = (node: TLNode, opts: { lone?: boolean; col?: number } = {}) => {
     const isHead = keyOf(node) === headKey;
+    const isSynced = keyOf(node) === activeKey;
     const author = memberNameById.get(node.authorId) ?? node.authorId.slice(0, 8);
     const spine =
       node.kind === 'upload'
@@ -290,9 +305,18 @@ export function VersionTimeline({ projectId, leg, onLegChange }: { projectId: st
     if (opts.lone && opts.col == null) style.gridColumn = '1 / -1';
     else if (opts.col) style.gridColumn = String(opts.col);
 
+    // Cross-column sync: hovering or clicking a card highlights the matching
+    // ledger row (and vice versa). Clicking again unpins.
+    const syncHandlers = {
+      onMouseEnter: () => onHover(keyOf(node)),
+      onMouseLeave: () => onHover(null),
+      onClick: () => onPin(keyOf(node)),
+    };
+
     const className = [
       'snake-card',
       isHead && 'is-head',
+      isSynced && 'is-synced',
       opts.lone && opts.col == null && 'is-lone',
       node.kind === 'upload' && 'is-upload',
     ]
@@ -318,6 +342,7 @@ export function VersionTimeline({ projectId, leg, onLegChange }: { projectId: st
           className={className}
           style={style as CSSProperties}
           data-testid={`snake-card-upload-${node.id.slice(0, 8)}`}
+          {...syncHandlers}
         >
           <div className="snake-card-head">
             <span className="snake-tag-upload">
@@ -355,6 +380,7 @@ export function VersionTimeline({ projectId, leg, onLegChange }: { projectId: st
         className={className}
         style={style as CSSProperties}
         data-testid={`snake-card-${node.leg}-${node.versionNo}`}
+        {...syncHandlers}
       >
         <div className="snake-card-head">
           <span className={`den-tag ${LEG_TONES[node.leg ?? ''] ?? 'muted'}`}>
