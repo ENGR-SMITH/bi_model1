@@ -18,6 +18,23 @@
       },
       "port": 5180,
       "autoPort": false
+    },
+    {
+      "name": "creators-den-auth",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "artifacts/creators-den/node_modules/vite/bin/vite.js",
+        "--config",
+        "artifacts/creators-den/vite.config.ts",
+        "--host",
+        "0.0.0.0"
+      ],
+      "env": {
+        "PORT": "5181",
+        "BASE_PATH": "/creators-den/"
+      },
+      "port": 5181,
+      "autoPort": false
     }
   ]
 }

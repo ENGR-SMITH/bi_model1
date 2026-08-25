@@ -789,3 +789,166 @@
 
 /* Track well: let the darker sequence bg read behind the clips. */
 .cd-sequence .timeline-track { background: transparent; }
+
+/* ============================================================================
+   CREATOR-DEN — ACTIVITY ▸ TIMELINE: the snake-and-ladder version graph.
+
+   Every role's saved versions, newest on top, zig-zagging across two columns.
+   Horizontal arrows trace a pair left→right (even row) or right→left (odd row);
+   a vertical "ladder" arrow climbs from one row up to the next in the shared
+   column. An odd count leaves the newest version alone on a full-width top row.
+   Arrowheads model the accent chevron used by .guide-arrow (index.css).
+   See version-timeline.tsx for the layout math.
+   ============================================================================ */
+.cd-timeline { display: flex; flex-direction: column; gap: var(--sp-5); }
+.cd-timeline .role-tabs { align-self: flex-start; }
+
+/* Caption + legend share a row; the legend spells out the version-vs-upload
+   colour split so the two node kinds are unmistakable at a glance. */
+.cd-timeline-sub { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); }
+.cd-timeline-caption { margin: 0; }
+.snake-legend { display: inline-flex; align-items: center; gap: var(--sp-4); font: 500 10px var(--app-font-mono); letter-spacing: .04em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.snake-legend-item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.snake-legend-dot { width: 9px; height: 9px; border-radius: 3px; box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .12); }
+.snake-legend-dot.is-version { background: hsl(var(--accent)); box-shadow: inset 0 0 0 1px hsl(var(--accent) / .5), 0 0 8px hsl(var(--accent) / .5); }
+.snake-legend-dot.is-upload { background: hsl(212 90% 62%); box-shadow: inset 0 0 0 1px hsl(212 90% 62% / .5), 0 0 8px hsl(212 90% 62% / .5); }
+
+/* The board: a stack of rows, newest first. --snake-vgap is the runway the
+   vertical ladder arrows climb, so .snake and .snake-arrow-v share it; each row
+   sets --snake-gap for its column gutter (and the horizontal arrow that spans it). */
+.snake { --snake-vgap: 62px; display: flex; flex-direction: column; gap: var(--snake-vgap); margin-top: var(--sp-1); }
+.snake-row { --snake-gap: clamp(40px, 4.5vw, 72px); position: relative; display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--snake-gap); align-items: stretch; }
+
+/* Node card — a paper tile with a role-coloured spine (`--spine`, set inline).
+   The newest version wears the accent "head" ring; vault uploads switch to the
+   cool dashed .is-upload treatment so they never read as role versions. */
+.snake-card {
+  position: relative; z-index: 1;
+  /* Pin to the single logical row: a right-to-left pair renders its cards in
+     col-2-then-col-1 DOM order, and sparse grid auto-placement would wrap the
+     second card to a new row. Explicit row + explicit column fixes placement.
+     (Ignored under the <=720px flex collapse.) */
+  grid-row: 1;
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: 14px;
+  border: 1px solid hsl(var(--border) / .7);
+  background: linear-gradient(180deg, hsl(0 0% 13%), hsl(0 0% 9.5%));
+  box-shadow: var(--shadow-sm), var(--edge-hi);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+/* Role-coloured spine down the leading edge. */
+.snake-card::before {
+  content: ""; position: absolute; left: 0; top: 13px; bottom: 13px;
+  width: 3px; border-radius: 0 4px 4px 0;
+  background: hsl(var(--spine, var(--muted-foreground)));
+  box-shadow: 0 0 14px hsl(var(--spine, var(--muted-foreground)) / .45);
+}
+.snake-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md), var(--edge-hi); border-color: hsl(var(--border)); }
+.snake-card.is-head {
+  border-color: hsl(var(--accent) / .5);
+  background: linear-gradient(180deg, hsl(0 0% 15.5%), hsl(0 0% 11%));
+  box-shadow: inset 0 1px 0 hsl(var(--accent) / .32), 0 0 0 1px hsl(var(--accent) / .16), var(--shadow-md), var(--edge-hi);
+}
+.snake-card.is-lone { max-width: 540px; justify-self: center; }
+
+/* Vault upload — cool blue with a dashed border: clearly "not a role version". */
+.snake-card.is-upload {
+  border-style: dashed;
+  border-color: hsl(212 80% 60% / .42);
+  background: linear-gradient(180deg, hsl(212 42% 12.5%), hsl(213 34% 9%));
+}
+.snake-card.is-upload:hover { border-color: hsl(212 80% 62% / .6); }
+
+.snake-card-head { display: flex; align-items: center; gap: var(--sp-2); }
+.snake-card-ver { font: 700 16px var(--app-font-serif); letter-spacing: -.02em; color: hsl(var(--foreground)); }
+.snake-card-file { min-width: 0; flex: 1; font: 600 13px var(--app-font-sans); color: hsl(var(--foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.snake-card-kind { margin: 0; font: 500 11px var(--app-font-mono); letter-spacing: .03em; color: hsl(212 62% 74%); }
+.snake-tag-upload {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  padding: 3px 8px; border-radius: 999px;
+  font: 8px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase;
+  color: hsl(212 92% 74%); background: hsl(212 90% 60% / .16);
+  box-shadow: inset 0 0 0 1px hsl(212 90% 62% / .34);
+}
+.snake-card-latest {
+  margin-left: auto; padding: 3px 9px; border-radius: 999px;
+  font: 700 8px var(--app-font-mono); letter-spacing: .1em; text-transform: uppercase;
+  color: hsl(var(--accent)); background: hsl(var(--accent) / .13);
+  box-shadow: inset 0 0 0 1px hsl(var(--accent) / .3);
+}
+.snake-card-msg { margin: 0; font: 500 13px var(--app-font-sans); line-height: 1.5; color: hsl(var(--foreground) / .9); overflow-wrap: anywhere; }
+
+.snake-card-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--sp-3);
+  margin-top: auto; padding-top: var(--sp-2); border-top: 1px solid hsl(var(--border) / .5);
+  font: 500 11px var(--app-font-mono); color: hsl(var(--muted-foreground));
+}
+.snake-card.is-upload .snake-card-meta { border-top-color: hsl(212 40% 42% / .32); }
+.snake-card-id { border: 0; background: transparent; padding: 0; cursor: pointer; color: hsl(var(--muted-foreground)); transition: color .15s; }
+.snake-card-id:hover { color: hsl(var(--accent)); }
+.snake-card.is-upload .snake-card-id:hover { color: hsl(212 90% 70%); }
+.snake-card-person { color: hsl(var(--foreground) / .74); }
+.snake-card-sep { width: 3px; height: 3px; border-radius: 50%; background: hsl(var(--muted-foreground) / .55); }
+.snake-card-time { color: hsl(var(--muted-foreground)); }
+.snake-card-size { color: hsl(var(--muted-foreground) / .85); }
+.snake-card-from { color: hsl(var(--muted-foreground) / .85); }
+.snake-card-from::before { content: "↳ "; color: hsl(var(--accent) / .8); }
+
+/* ---- Connectors --------------------------------------------------------- */
+/* The snake's spine is the accent-red flow of time (kind is signalled by the
+   cards, not the arrows). Gradient lines fade in from the source card and land
+   on a glowing chevron at the target. */
+/* Horizontal arrow, centred in the column gap, pointing along the row's flow.
+   z-index sits ABOVE the cards (z-index:1) so the chevron head is never buried,
+   and the line is short enough that the head stops a few px shy of the target
+   card — a small breathing gap, so it points AT the card without touching it. */
+.snake-arrow-h {
+  position: absolute; top: 50%; left: 50%; z-index: 3;
+  width: calc(var(--snake-gap) - 18px); height: 2px;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(90deg, hsl(var(--accent) / 0), hsl(var(--accent) / .85) 62%, hsl(var(--accent)));
+  border-radius: 2px;
+  pointer-events: none;
+}
+.snake-arrow-h::after {
+  content: ""; position: absolute; right: -1px; top: 50%;
+  width: 10px; height: 10px;
+  border-top: 2px solid hsl(var(--accent)); border-right: 2px solid hsl(var(--accent));
+  border-radius: 0 2px 0 0;
+  transform: translateY(-50%) rotate(45deg);
+  filter: drop-shadow(0 0 5px hsl(var(--accent) / .5));
+}
+.snake-arrow-h.to-left { transform: translate(-50%, -50%) scaleX(-1); }
+
+/* Vertical "ladder" arrow, in the row gap above, on the shared column, ↑.
+   Above the cards (z-index) and short enough that its head stops a few px below
+   the upper card's edge, leaving the same small breathing gap as the h-arrow. */
+.snake-arrow-v {
+  position: absolute; top: 0; z-index: 3;
+  width: 2px; height: calc(var(--snake-vgap) - 9px);
+  transform: translateY(-100%);
+  background: linear-gradient(180deg, hsl(var(--accent)), hsl(var(--accent) / .3) 82%, hsl(var(--accent) / 0));
+  border-radius: 2px;
+  pointer-events: none;
+}
+.snake-arrow-v.on-left { left: calc((100% - var(--snake-gap)) / 4); }
+.snake-arrow-v.on-right { left: calc(100% - (100% - var(--snake-gap)) / 4); }
+.snake-arrow-v::after {
+  content: ""; position: absolute; top: -1px; left: 50%;
+  width: 10px; height: 10px;
+  border-top: 2px solid hsl(var(--accent)); border-right: 2px solid hsl(var(--accent));
+  border-radius: 0 2px 0 0;
+  transform: translateX(-50%) rotate(-45deg);
+  filter: drop-shadow(0 0 5px hsl(var(--accent) / .5));
+}
+
+/* ---- Narrow screens: collapse to one newest-first column ---------------- */
+/* Cards render in chronological DOM order (older first); column-reverse puts
+   the newer card on top within each row, and rows are already newest-first. */
+@media (max-width: 720px) {
+  .snake { --snake-vgap: var(--sp-4); }
+  .snake-row, .snake-row.is-lone { display: flex; flex-direction: column-reverse; gap: var(--sp-4); }
+  .snake-card.is-lone { max-width: none; justify-self: stretch; }
+  .snake-arrow-h, .snake-arrow-v { display: none; }
+}

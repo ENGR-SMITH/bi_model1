@@ -29,6 +29,7 @@ import {
 import { Link, useParams } from 'wouter';
 import { useListVideoActivity } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
+import { VersionTimeline } from '@/components/version-timeline';
 import { useProjectRealtime } from '@/lib/realtime';
 
 interface LedgerEvent {
@@ -101,6 +102,7 @@ function dayLabel(iso: string): string {
 export default function ActivityPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [leg, setLeg] = useState<string>('all');
+  const [view, setView] = useState<'ledger' | 'timeline'>('ledger');
   useProjectRealtime(projectId);
   const activity = useListVideoActivity(projectId, undefined);
   const events = (activity.data ?? []) as LedgerEvent[];
@@ -152,11 +154,12 @@ export default function ActivityPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <SectionEyebrow>Project · activity</SectionEyebrow>
-          <h1>The activity ledger.</h1>
+          <SectionEyebrow>{view === 'timeline' ? 'Project · timeline' : 'Project · activity'}</SectionEyebrow>
+          <h1>{view === 'timeline' ? 'The version timeline.' : 'The activity ledger.'}</h1>
           <p>
-            Every save, import, rollback, pull request, review decision, and vault upload across all
-            five stages — one immutable timeline of how this picture came together.
+            {view === 'timeline'
+              ? 'Every uploaded version from every role, newest first — a snake-and-ladder of the work, arrows tracing each snapshot back to the one before it.'
+              : 'Every save, import, rollback, pull request, review decision, and vault upload across all five stages — one immutable timeline of how this picture came together.'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -171,6 +174,30 @@ export default function ActivityPage() {
         </div>
       </div>
 
+      <div className="cd-tabs" role="tablist" aria-label="Activity views">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'ledger'}
+          className={`cd-tab ${view === 'ledger' ? 'is-active' : ''}`}
+          onClick={() => setView('ledger')}
+          data-testid="tab-ledger"
+        >
+          Ledger<span className="cd-tab-count">{events.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === 'timeline'}
+          className={`cd-tab ${view === 'timeline' ? 'is-active' : ''}`}
+          onClick={() => setView('timeline')}
+          data-testid="tab-timeline"
+        >
+          Timeline
+        </button>
+      </div>
+
+      {view === 'ledger' ? (
       <div className="cd-watch">
         <div className="cd-watch-main">
           <div className="role-tabs" role="tablist" aria-label="Filter activity by stage">
@@ -303,6 +330,9 @@ export default function ActivityPage() {
           </div>
         </aside>
       </div>
+      ) : (
+        <VersionTimeline projectId={projectId} />
+      )}
     </div>
   );
 }
