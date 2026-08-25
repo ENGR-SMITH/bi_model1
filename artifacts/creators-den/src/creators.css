@@ -772,52 +772,67 @@
    the sticky topbar + presence strip, mirroring the old .cd-watch-rail). */
 .cd-split-right .cd-summary { position: sticky; top: 86px; }
 
-/* ---- Cross-column sync highlight ----------------------------------------- */
+/* ---- Cross-column sync highlight (blue accent) --------------------------- */
 /* Hovering or clicking a timeline card highlights its ledger row (and vice
-   versa). A pinned (clicked) match keeps the accent wash until unpinned. */
+   versa). A pinned (clicked) match keeps the blue wash until unpinned. */
 .snake-card { cursor: pointer; }
 .snake-card.is-synced {
-  border-color: hsl(var(--accent) / .75);
-  box-shadow: 0 0 0 2px hsl(var(--accent) / .3), var(--shadow-md), var(--edge-hi);
+  border-color: hsl(212 90% 62% / .75);
+  box-shadow: 0 0 0 2px hsl(212 90% 62% / .35),
+              0 0 18px hsl(212 90% 62% / .22),
+              var(--shadow-md), var(--edge-hi);
 }
 .cd-ledger-row { cursor: pointer; }
 .cd-ledger-row.is-synced {
-  background: hsl(var(--accent) / .12);
-  box-shadow: inset 0 0 0 1px hsl(var(--accent) / .4);
+  background: hsl(212 90% 62% / .12);
+  box-shadow: inset 0 0 0 1px hsl(212 90% 62% / .4);
 }
 
-/* ---- Activity page: pinned header/filter + independently scrollable columns
-   The shell is locked to the viewport so the page header and shared filter
-   never leave the screen; only the timeline (col 1) and ledger (col 2) scroll,
-   each with its own scrollbar. The summary rail (col 3) stays put. ---------- */
-.app-shell:has(.activity-page) { height: 100dvh; overflow: hidden; }
-.main-stage:has(.activity-page) { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+/* ---- Activity page: scroll-away header + sticky filter + intra-column scroll
+   The page itself is a full-height scroll container below the topnav + presence
+   strip, so the header exits the viewport as the user scrolls down. The role
+   filter pins to the top of that container, and the three-column grid locks to
+   the remaining height so only col 1 & 2 get their own scrollbars. ---------- */
+.main-stage:has(.activity-page) {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 107px);  /* topnav: chrome (60) + tabs (46) + border */
+  overflow: hidden;
+}
 .main-stage:has(.activity-page) > .den-presence { flex: 0 0 auto; }
 
 .activity-page {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto;           /* ← the page-level scroll container */
   padding-bottom: var(--sp-10);
 }
-.activity-page .page-header { flex: 0 0 auto; }
-.activity-page > .role-tabs { flex: 0 0 auto; }
-.activity-page .cd-split { flex: 1; min-height: 0; }
+.activity-page > .role-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.activity-page .cd-split {
+  /* Fill the viewport below the pinned filter (~40px) + its 32px top gap,
+     so the columns region is exactly as tall as the space it occupies. */
+  min-height: calc(100dvh - 107px - 30px - 72px);
+}
 .activity-page .cd-split-left,
 .activity-page .cd-split-mid {
   overflow-y: auto;
+  max-height: calc(100dvh - 107px - 30px - 72px); /* topnav + presence +
+    filter+gap — columns scroll inside this cap */
   min-height: 0;
 }
 
 /* Narrow screens fall back to a normal window-scrolled, stacked layout. */
 @media (max-width: 1240px) {
-  .app-shell:has(.activity-page),
-  .main-stage:has(.activity-page) { height: auto; overflow: visible; }
-  .main-stage:has(.activity-page) { display: block; }
-  .activity-page { display: block; min-height: auto; padding-bottom: 88px; }
+  .main-stage:has(.activity-page) { height: auto; overflow: visible; display: block; }
+  .activity-page { overflow: visible; min-height: auto; padding-bottom: 88px; }
+  .activity-page > .role-tabs { position: static; }
+  .activity-page .cd-split { min-height: auto; }
   .activity-page .cd-split-left,
-  .activity-page .cd-split-mid { overflow: visible; }
+  .activity-page .cd-split-mid { overflow: visible; max-height: none; }
 }
 
 /* Narrow: timeline spans the full width, ledger + summary sit below it. */
