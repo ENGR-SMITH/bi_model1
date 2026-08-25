@@ -809,9 +809,22 @@
 }
 .activity-page > .role-tabs {
   position: sticky;
-  top: 0;
+  top: var(--sp-3);   /* little breathing gap below the top nav when pinned */
   z-index: 5;
+  /* Full-span segmented control: equal-width cells in one row that fill the
+     container completely (horizontal scroll only as a last resort). */
+  width: 100%;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.activity-page > .role-tabs::-webkit-scrollbar { display: none; }
+.activity-page > .role-tabs button {
+  flex: 1 1 0;
+  justify-content: center;
+  white-space: nowrap;
+}
+.activity-page > .role-tabs .leg-badge { flex: 0 0 auto; }
 .activity-page .cd-split {
   /* Fill the viewport below the pinned filter (~40px) + its 32px top gap,
      so the columns region is exactly as tall as the space it occupies. */
