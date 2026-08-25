@@ -10,9 +10,11 @@ import {
   Image,
   LockKeyhole,
   Mic2,
+  MoreHorizontal,
   Palette,
   Scissors,
   Sparkles,
+  Trash2,
   X,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
@@ -22,6 +24,7 @@ import {
   getListVideoNotificationsQueryKey,
   getListVideoProjectsQueryKey,
   useCreateVideoProject,
+  useDeleteVideoProject,
   useListVideoNotifications,
   useListVideoProjects,
   useMarkVideoNotificationRead,
@@ -165,53 +168,130 @@ function NewProjectModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function ProjectCard({ project, isCaptain }: { project: VideoProject; isCaptain: boolean }) {
+function DeleteProjectModal({ project, deleting, onCancel, onConfirm }: { project: VideoProject; deleting: boolean; onCancel: () => void; onConfirm: () => void }) {
+  return (
+    <div className="modal-backdrop" onClick={deleting ? undefined : onCancel} data-testid="modal-delete-project">
+      <div className="modal project-modal" onClick={(event) => event.stopPropagation()}>
+        <button type="button" className="modal-close" onClick={onCancel} aria-label="Close" disabled={deleting}><X size={16} /></button>
+        <div className="project-modal-heading">
+          <span className="eyebrow">Delete project</span>
+          <h2>Delete “{project.name}” <em>for good?</em></h2>
+          <p>This removes the project, its members, vault assets, versions, and activity — it will disappear from your profile and explore. The files on disk stay put in case another project shares them. This cannot be undone.</p>
+        </div>
+        <div className="project-modal-fields" style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+          <button type="button" className="secondary-btn" onClick={onCancel} disabled={deleting} data-testid="button-cancel-delete">
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={onConfirm}
+            disabled={deleting}
+            style={{ background: 'hsl(var(--destructive))', borderColor: 'hsl(var(--destructive))' }}
+            data-testid="button-confirm-delete-project"
+          >
+            <Trash2 size={14} />
+            {deleting ? 'Deleting…' : 'Delete project'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// The three-dot menu on each project card — the single place to change
+// visibility (public ↔ private) or delete the project. Captain only.
+function CardMenu({ project }: { project: VideoProject }) {
   const queryClient = useQueryClient();
   const update = useUpdateVideoProjectVisibility();
+  const remove = useDeleteVideoProject();
+  const [open, setOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const isPublic = project.visibility === 'PUBLIC';
 
-  const toggle = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!isCaptain || update.isPending) return;
+  const toggleVisibility = () => {
     update.mutate(
       { projectId: project.id, data: { visibility: isPublic ? 'PRIVATE' : 'PUBLIC' } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVideoProjectsQueryKey() });
+          setOpen(false);
         },
       },
     );
   };
 
-  const toggleTitle = isCaptain
-    ? isPublic
-      ? 'Public — visible on your profile. Click to make private.'
-      : 'Private — hidden from your profile. Click to make public.'
-    : 'Only the Captain can change visibility';
+  const confirmDelete = () => {
+    remove.mutate(
+      { projectId: project.id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getListVideoProjectsQueryKey() });
+          setOpen(false);
+          setConfirming(false);
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="card-menu-wrap">
+      <button
+        type="button"
+        className="card-menu-btn"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`Project menu for ${project.name}`}
+        data-testid={`card-menu-${project.id}`}
+      >
+        <MoreHorizontal size={16} />
+      </button>
+      {open && (
+        <>
+          <div className="card-menu-backdrop" onClick={() => setOpen(false)} />
+          <div className="card-menu" role="menu" data-testid={`card-menu-popup-${project.id}`}>
+            <button type="button" role="menuitem" onClick={toggleVisibility} disabled={update.isPending} data-testid={`menu-visibility-${project.id}`}>
+              {isPublic ? <EyeOff size={14} /> : <Eye size={14} />}
+              {isPublic ? 'Make private' : 'Make public'}
+            </button>
+            <button type="button" role="menuitem" className="is-danger" onClick={() => setConfirming(true)} data-testid={`menu-delete-${project.id}`}>
+              <Trash2 size={14} />
+              Delete project
+            </button>
+          </div>
+        </>
+      )}
+      {confirming && (
+        <DeleteProjectModal
+          project={project}
+          deleting={remove.isPending}
+          onCancel={() => setConfirming(false)}
+          onConfirm={confirmDelete}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProjectCard({ project, isCaptain }: { project: VideoProject; isCaptain: boolean }) {
+  const isPublic = project.visibility === 'PUBLIC';
 
   return (
     <div className={`cd-card cd-card-project ${isPublic ? 'is-public' : 'is-private'}`} data-testid={`card-video-project-${project.id}`}>
-      {/* Stretched link — the whole card opens the project; the eye toggle sits above it. */}
+      {/* Stretched link — the whole card opens the project; the menu sits above it. */}
       <Link href={`/projects/${project.id}`} className="cd-card-hit" aria-label={`Open ${project.name}`} data-testid={`link-open-project-${project.id}`} />
       <div className="cd-card-thumb" aria-hidden>
         <Film size={26} />
         <span className="cd-card-badge">{project.status.replaceAll('_', ' ')}</span>
-      </div>
-      <button
-        type="button"
-        className={`eye-toggle ${isPublic ? 'is-open' : 'is-closed'}`}
-        onClick={toggle}
-        disabled={!isCaptain || update.isPending}
-        title={toggleTitle}
-        aria-pressed={isPublic}
-        data-testid={`eye-toggle-${project.id}`}
-      >
-        <span className="eye-toggle-icon" key={isPublic ? 'open' : 'closed'}>
-          {isPublic ? <Eye size={14} /> : <EyeOff size={14} />}
+        <span className={`eye-indicator ${isPublic ? 'is-open' : 'is-closed'}`} title={isPublic ? 'Public — visible on your profile' : 'Private — hidden from your profile'}>
+          <span className="eye-toggle-icon" key={isPublic ? 'open' : 'closed'}>
+            {isPublic ? <Eye size={13} /> : <EyeOff size={13} />}
+          </span>
+          {isPublic ? 'Public' : 'Private'}
         </span>
-        <span className="eye-toggle-label">{isPublic ? 'Public' : 'Private'}</span>
-      </button>
+      </div>
+      {isCaptain && <CardMenu project={project} />}
       <div className="cd-card-body" aria-hidden>
         <span className="cd-card-title">{project.name}</span>
         <span className="cd-card-meta">

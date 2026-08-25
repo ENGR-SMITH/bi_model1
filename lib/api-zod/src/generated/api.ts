@@ -1953,6 +1953,20 @@ export const GetVideoProjectResponse = zod.object({
 
 
 /**
+ * Removes the project, its members, vault assets, timelines, versions, submissions, comments, and activity. The Captain (owner) only. Files already written to disk are left in place so content-addressed blobs shared with other projects stay intact.
+ * @summary Delete a project and everything inside it (Captain only)
+ */
+
+
+
+export const DeleteVideoProjectParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const DeleteVideoProjectResponse = zod.void()
+
+
+/**
  * PUBLIC projects appear on the Captain's public profile track history; PRIVATE projects stay visible to members only. Only the project Captain (its creator) can change this.
  * @summary Set a project's profile visibility (Captain only)
  */

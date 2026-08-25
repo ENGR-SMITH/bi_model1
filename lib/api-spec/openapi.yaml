@@ -1603,6 +1603,31 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: deleteVideoProject
+      tags: [content-creators]
+      summary: Delete a project and everything inside it (Captain only)
+      description: Removes the project, its members, vault assets, timelines, versions, submissions, comments, and activity. The Captain (owner) only. Files already written to disk are left in place so content-addressed blobs shared with other projects stay intact.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "204":
+          description: Project deleted
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/projects/{projectId}/visibility:
     patch:
       operationId: updateVideoProjectVisibility

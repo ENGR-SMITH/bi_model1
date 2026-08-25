@@ -5,6 +5,19 @@ import {
   tandemVideoProjectsTable,
   tandemVideoMembersTable,
   tandemVideoAssetsTable,
+  tandemVideoAssetFilesTable,
+  tandemVideoTranscriptsTable,
+  tandemVideoTranscriptSegmentsTable,
+  tandemVideoReferencesTable,
+  tandemVideoGrantsTable,
+  tandemVideoDownloadsTable,
+  tandemVideoCommentsTable,
+  tandemVideoSubmissionsTable,
+  tandemVideoTimelinesTable,
+  tandemVideoTimelineVersionsTable,
+  tandemVideoJobsTable,
+  tandemVideoSyncsTable,
+  collaborationActivityEventsTable,
 } from "@workspace/db";
 import {
   AddVideoProjectMemberBody,
@@ -12,6 +25,7 @@ import {
   AddVideoProjectMemberResponse,
   CreateVideoProjectBody,
   CreateVideoProjectResponse,
+  DeleteVideoProjectParams,
   GetVideoProjectParams,
   GetVideoProjectResponse,
   ListPublicVideoProjectsParams,
@@ -268,6 +282,128 @@ router.patch(
       .returning();
 
     res.json(UpdateVideoProjectVisibilityResponse.parse(updated));
+  },
+);
+
+// DELETE /video/projects/:projectId — remove the project and everything in it
+// (Captain only). Files already on disk are intentionally left in place: the
+// vault is content-addressed, so a blob may be shared with another project.
+router.delete(
+  "/video/projects/:projectId",
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = DeleteVideoProjectParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid project id" });
+      return;
+    }
+
+    const projectId = params.data.projectId;
+    const [project] = await db
+      .select()
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, projectId))
+      .limit(1);
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (project.ownerId !== userId) {
+      res.status(403).json({ error: "Only the Captain can delete the project" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      const assets = await tx
+        .select({ id: tandemVideoAssetsTable.id })
+        .from(tandemVideoAssetsTable)
+        .where(eq(tandemVideoAssetsTable.projectId, projectId));
+      const assetIds = assets.map((a) => a.id);
+
+      const timelines = await tx
+        .select({ id: tandemVideoTimelinesTable.id })
+        .from(tandemVideoTimelinesTable)
+        .where(eq(tandemVideoTimelinesTable.projectId, projectId));
+      const timelineIds = timelines.map((t) => t.id);
+
+      const transcripts =
+        assetIds.length > 0
+          ? await tx
+              .select({ id: tandemVideoTranscriptsTable.id })
+              .from(tandemVideoTranscriptsTable)
+              .where(inArray(tandemVideoTranscriptsTable.assetId, assetIds))
+          : [];
+      const transcriptIds = transcripts.map((t) => t.id);
+
+      // Asset-scoped rows (children first).
+      if (assetIds.length > 0) {
+        await tx
+          .delete(tandemVideoAssetFilesTable)
+          .where(inArray(tandemVideoAssetFilesTable.assetId, assetIds));
+        await tx
+          .delete(tandemVideoReferencesTable)
+          .where(inArray(tandemVideoReferencesTable.assetId, assetIds));
+      }
+      if (transcriptIds.length > 0) {
+        await tx
+          .delete(tandemVideoTranscriptSegmentsTable)
+          .where(inArray(tandemVideoTranscriptSegmentsTable.transcriptId, transcriptIds));
+      }
+      if (assetIds.length > 0) {
+        await tx
+          .delete(tandemVideoTranscriptsTable)
+          .where(inArray(tandemVideoTranscriptsTable.assetId, assetIds));
+        await tx
+          .delete(tandemVideoAssetsTable)
+          .where(inArray(tandemVideoAssetsTable.id, assetIds));
+      }
+
+      // Timeline-scoped rows.
+      if (timelineIds.length > 0) {
+        await tx
+          .delete(tandemVideoTimelineVersionsTable)
+          .where(inArray(tandemVideoTimelineVersionsTable.timelineId, timelineIds));
+        await tx
+          .delete(tandemVideoTimelinesTable)
+          .where(inArray(tandemVideoTimelinesTable.id, timelineIds));
+      }
+
+      // Project-scoped rows.
+      await tx
+        .delete(tandemVideoSubmissionsTable)
+        .where(eq(tandemVideoSubmissionsTable.projectId, projectId));
+      await tx
+        .delete(tandemVideoCommentsTable)
+        .where(eq(tandemVideoCommentsTable.projectId, projectId));
+      await tx
+        .delete(tandemVideoJobsTable)
+        .where(eq(tandemVideoJobsTable.projectId, projectId));
+      await tx
+        .delete(tandemVideoSyncsTable)
+        .where(eq(tandemVideoSyncsTable.projectId, projectId));
+      await tx
+        .delete(tandemVideoDownloadsTable)
+        .where(eq(tandemVideoDownloadsTable.projectId, projectId));
+      await tx
+        .delete(tandemVideoGrantsTable)
+        .where(eq(tandemVideoGrantsTable.projectId, projectId));
+      await tx
+        .delete(collaborationActivityEventsTable)
+        .where(eq(collaborationActivityEventsTable.projectId, projectId));
+      await tx
+        .delete(tandemVideoMembersTable)
+        .where(eq(tandemVideoMembersTable.projectId, projectId));
+      await tx
+        .delete(tandemVideoProjectsTable)
+        .where(eq(tandemVideoProjectsTable.id, projectId));
+    });
+
+    res.status(204).end();
   },
 );
 

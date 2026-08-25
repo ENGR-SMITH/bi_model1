@@ -5730,6 +5730,78 @@ export function useGetVideoProject<TData = Awaited<ReturnType<typeof getVideoPro
 
 
 
+export const getDeleteVideoProjectUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}`
+}
+
+/**
+ * Removes the project, its members, vault assets, timelines, versions, submissions, comments, and activity. The Captain (owner) only. Files already written to disk are left in place so content-addressed blobs shared with other projects stay intact.
+ * @summary Delete a project and everything inside it (Captain only)
+ */
+export const deleteVideoProject = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteVideoProjectUrl(projectId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteVideoProjectMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVideoProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteVideoProject>>, TError,{projectId: string}, TContext> => {
+
+const mutationKey = ['deleteVideoProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteVideoProject>>, {projectId: string}> = (props) => {
+          const {projectId} = props ?? {};
+
+          return  deleteVideoProject(projectId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteVideoProjectMutationResult = NonNullable<Awaited<ReturnType<typeof deleteVideoProject>>>
+
+    export type DeleteVideoProjectMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete a project and everything inside it (Captain only)
+ */
+export const useDeleteVideoProject = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVideoProject>>, TError,{projectId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteVideoProject>>,
+        TError,
+        {projectId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteVideoProjectMutationOptions(options));
+    }
+
 export const getUpdateVideoProjectVisibilityUrl = (projectId: string,) => {
 
 

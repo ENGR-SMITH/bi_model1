@@ -185,6 +185,56 @@ describe("projects", () => {
   });
 });
 
+describe("project deletion", () => {
+  it("lets the Captain delete their project and everything inside it", async () => {
+    const project = await createProject();
+    // Add a member + upload an asset so there's real data to cascade.
+    state.userId = "captain-1";
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ email: "editor@example.com", role: "VISUAL_EDITOR" });
+    await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", Buffer.from("delete me"), "clip.mp4");
+
+    state.userId = "captain-1";
+    const del = await request(API).delete(`/api/video/projects/${project.id}`);
+    expect(del.status).toBe(204);
+
+    // Project + members + assets vanished.
+    const [projectRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoProjectsTable)
+      .where(eq(state.tables.tandemVideoProjectsTable.id, project.id));
+    expect(projectRow).toBeUndefined();
+    const members = await state.db
+      .select()
+      .from(state.tables.tandemVideoMembersTable)
+      .where(eq(state.tables.tandemVideoMembersTable.projectId, project.id));
+    expect(members).toHaveLength(0);
+    const assets = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+    expect(assets).toHaveLength(0);
+  });
+
+  it("rejects deletion from non-Captains, unauthenticated, and missing projects", async () => {
+    const project = await createProject();
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ email: "editor@example.com", role: "VISUAL_EDITOR" });
+
+    state.userId = "user-2";
+    expect((await request(API).delete(`/api/video/projects/${project.id}`)).status).toBe(403);
+    state.userId = null;
+    expect((await request(API).delete(`/api/video/projects/${project.id}`)).status).toBe(401);
+    state.userId = "captain-1";
+    expect((await request(API).delete("/api/video/projects/does-not-exist")).status).toBe(404);
+  });
+});
+
 describe("project visibility (public profile track history)", () => {
   it("creates projects PRIVATE by default", async () => {
     const project = await createProject();
