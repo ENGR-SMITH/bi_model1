@@ -753,6 +753,30 @@
 .cd-summary-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, hsl(var(--sidebar-primary)), hsl(var(--sidebar-primary) / .5)); transition: width .45s cubic-bezier(.22, 1, .36, 1); }
 .cd-summary-stage-count { font: 600 11px var(--app-font-mono); color: hsl(var(--muted-foreground)); text-align: right; }
 
+/* ---- Split view: version timeline (left) + activity ledger (right) ------- */
+.cd-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: var(--sp-7);
+  align-items: start;
+}
+.cd-split-left,
+.cd-split-right {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+/* The ledger column keeps its filter + feed + summary in one vertical rhythm. */
+.cd-split-right > .role-tabs { align-self: flex-start; }
+/* Ledger summary stays pinned while the feed scrolls past (offset matches the
+   sticky topbar + presence strip, mirroring the old .cd-watch-rail). */
+.cd-split-right .cd-summary { position: sticky; top: 86px; }
+
+@media (max-width: 1180px) {
+  .cd-split { grid-template-columns: 1fr; }
+}
+
 /* ============================================================================
    CREATOR-DEN — SEQUENCE: unify stacked review timelines into one NLE panel.
 

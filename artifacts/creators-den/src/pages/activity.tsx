@@ -1,17 +1,15 @@
 // ---------------------------------------------------------------------------
-// ActivityPage — the Creator Den's dedicated project-wide ledger.
+// ActivityPage — the Creator Den's split project history view.
 //
-// Where <ActivityFeed> is a compact panel embedded in the vault / studios,
-// this is the full-width home for "the whole project's activities": one
-// immutable, day-grouped timeline of every save, import, rollback, pull
-// request, review decision, and vault upload across all five stages, with a
-// stage filter and a live summary rail.
+// Displays the version timeline (snake-and-ladder graph of every saved role
+// version and vault upload) on the LEFT, and the activity ledger (day-grouped
+// feed of every save, import, rollback, pull request, review, and upload event)
+// on the RIGHT — both side by side so the full project history reads at a
+// glance without a tab switch.
 //
-// Data: a single useListVideoActivity(projectId) fetch (all legs). Counts and
-// the per-stage breakdown are derived client-side so the filter never costs a
-// round-trip, and useProjectRealtime keeps the query live as the relay moves.
-// EVENT_META mirrors the small map in activity-feed.tsx — kept local so this
-// page stays self-contained and can carry its own friendly labels.
+// Data: VersionTimeline calls its own five-leg version + vault queries
+// internally. The ledger uses a single useListVideoActivity(projectId) fetch.
+// useProjectRealtime keeps both live. EVENT_META mirrors activity-feed.tsx.
 // ---------------------------------------------------------------------------
 
 import { useMemo, useState } from 'react';
@@ -102,7 +100,6 @@ function dayLabel(iso: string): string {
 export default function ActivityPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const [leg, setLeg] = useState<string>('all');
-  const [view, setView] = useState<'ledger' | 'timeline'>('ledger');
   useProjectRealtime(projectId);
   const activity = useListVideoActivity(projectId, undefined);
   const events = (activity.data ?? []) as LedgerEvent[];
@@ -154,12 +151,12 @@ export default function ActivityPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <SectionEyebrow>{view === 'timeline' ? 'Project · timeline' : 'Project · activity'}</SectionEyebrow>
-          <h1>{view === 'timeline' ? 'The version timeline.' : 'The activity ledger.'}</h1>
+          <SectionEyebrow>Project timeline</SectionEyebrow>
+          <h1>Version history &amp; activity ledger.</h1>
           <p>
-            {view === 'timeline'
-              ? 'Every uploaded version from every role, newest first — a snake-and-ladder of the work, arrows tracing each snapshot back to the one before it.'
-              : 'Every save, import, rollback, pull request, review decision, and vault upload across all five stages — one immutable timeline of how this picture came together.'}
+            Every saved version and vault upload on the left, every event — saves,
+            imports, rollbacks, pull requests, reviews — on the right. One page,
+            the whole picture.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -174,32 +171,14 @@ export default function ActivityPage() {
         </div>
       </div>
 
-      <div className="cd-tabs" role="tablist" aria-label="Activity views">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'ledger'}
-          className={`cd-tab ${view === 'ledger' ? 'is-active' : ''}`}
-          onClick={() => setView('ledger')}
-          data-testid="tab-ledger"
-        >
-          Ledger<span className="cd-tab-count">{events.length}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={view === 'timeline'}
-          className={`cd-tab ${view === 'timeline' ? 'is-active' : ''}`}
-          onClick={() => setView('timeline')}
-          data-testid="tab-timeline"
-        >
-          Timeline
-        </button>
-      </div>
+      <div className="cd-split">
+        {/* ---- LEFT: Version timeline (snake-and-ladder graph) ---- */}
+        <div className="cd-split-left">
+          <VersionTimeline projectId={projectId} />
+        </div>
 
-      {view === 'ledger' ? (
-      <div className="cd-watch">
-        <div className="cd-watch-main">
+        {/* ---- RIGHT: Activity ledger (day-grouped event feed + filter + summary) ---- */}
+        <div className="cd-split-right">
           <div className="role-tabs" role="tablist" aria-label="Filter activity by stage">
             <button
               type="button"
@@ -246,93 +225,91 @@ export default function ActivityPage() {
               </p>
             </div>
           ) : (
-            <div className="cd-ledger" data-testid="activity-ledger">
-              {groups.map((group) => (
-                <section className="cd-ledger-day" key={group.key}>
-                  <header className="cd-ledger-daymark">
-                    <span className="cd-ledger-daylabel">{group.label}</span>
-                    <span className="cd-ledger-dayrule" aria-hidden />
-                    <span className="cd-ledger-daycount">{group.events.length}</span>
-                  </header>
-                  <ol className="cd-ledger-list">
-                    {group.events.map((ev) => {
-                      const meta = EVENT_META[ev.eventType] ?? FALLBACK_META;
+            <>
+              <div className="cd-ledger" data-testid="activity-ledger">
+                {groups.map((group) => (
+                  <section className="cd-ledger-day" key={group.key}>
+                    <header className="cd-ledger-daymark">
+                      <span className="cd-ledger-daylabel">{group.label}</span>
+                      <span className="cd-ledger-dayrule" aria-hidden />
+                      <span className="cd-ledger-daycount">{group.events.length}</span>
+                    </header>
+                    <ol className="cd-ledger-list">
+                      {group.events.map((ev) => {
+                        const meta = EVENT_META[ev.eventType] ?? FALLBACK_META;
+                        const Icon = meta.icon;
+                        const legMeta = ev.leg ? RELAY_LEGS.find((l) => l.leg === ev.leg) : undefined;
+                        return (
+                          <li className="cd-ledger-row" key={ev.id} data-testid={`ledger-${ev.eventType}`}>
+                            <span className={`cd-ledger-dot ${meta.tone}`} aria-hidden>
+                              <Icon size={13} />
+                            </span>
+                            <div className="cd-ledger-content">
+                              <p className="cd-ledger-summary">{ev.summary}</p>
+                              <p className="cd-ledger-meta">
+                                <span className="cd-ledger-actor">
+                                  {ev.actorName ?? ev.actorId.slice(0, 8)}
+                                </span>
+                                <span className="cd-ledger-dotsep" aria-hidden />
+                                <span className="cd-ledger-time">{timeAgo(ev.createdAt)}</span>
+                              </p>
+                            </div>
+                            {legMeta && <span className="cd-ledger-leg">{legMeta.label}</span>}
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </section>
+                ))}
+              </div>
+
+              {/* ---- Compact summary below the ledger ---- */}
+              <div className="paper-card cd-summary">
+                <div className="inline-heading">
+                  <span className="eyebrow"><History size={13} /> Ledger summary</span>
+                </div>
+                <div className="cd-summary-total">
+                  <b>{events.length}</b>
+                  <span>events on record</span>
+                </div>
+
+                {typeRows.length > 0 && (
+                  <div className="cd-summary-breakdown">
+                    {typeRows.map(([type, count]) => {
+                      const meta = EVENT_META[type] ?? FALLBACK_META;
                       const Icon = meta.icon;
-                      const legMeta = ev.leg ? RELAY_LEGS.find((l) => l.leg === ev.leg) : undefined;
                       return (
-                        <li className="cd-ledger-row" key={ev.id} data-testid={`ledger-${ev.eventType}`}>
-                          <span className={`cd-ledger-dot ${meta.tone}`} aria-hidden>
-                            <Icon size={13} />
-                          </span>
-                          <div className="cd-ledger-content">
-                            <p className="cd-ledger-summary">{ev.summary}</p>
-                            <p className="cd-ledger-meta">
-                              <span className="cd-ledger-actor">
-                                {ev.actorName ?? ev.actorId.slice(0, 8)}
-                              </span>
-                              <span className="cd-ledger-dotsep" aria-hidden />
-                              <span className="cd-ledger-time">{timeAgo(ev.createdAt)}</span>
-                            </p>
-                          </div>
-                          {legMeta && <span className="cd-ledger-leg">{legMeta.label}</span>}
-                        </li>
+                        <div className="cd-summary-row" key={type}>
+                          <span className={`den-tag ${meta.tone}`}><Icon size={12} /></span>
+                          <span className="cd-summary-label">{meta.label}</span>
+                          <span className="cd-summary-count">{count}</span>
+                        </div>
                       );
                     })}
-                  </ol>
-                </section>
-              ))}
-            </div>
+                  </div>
+                )}
+
+                <div className="cd-summary-stages">
+                  <span className="mono-label">By stage</span>
+                  {RELAY_LEGS.map((item) => {
+                    const count = legCounts[item.leg] ?? 0;
+                    const pct = maxLeg ? Math.round((count / maxLeg) * 100) : 0;
+                    return (
+                      <div className="cd-summary-stage" key={item.leg} data-testid={`summary-stage-${item.slug}`}>
+                        <span className="cd-summary-stage-name">{item.label}</span>
+                        <span className="cd-summary-bar" aria-hidden>
+                          <span style={{ width: `${pct}%` }} />
+                        </span>
+                        <span className="cd-summary-stage-count">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
           )}
         </div>
-
-        <aside className="cd-watch-rail">
-          <div className="paper-card cd-summary">
-            <div className="inline-heading">
-              <span className="eyebrow"><History size={13} /> Ledger summary</span>
-            </div>
-            <div className="cd-summary-total">
-              <b>{events.length}</b>
-              <span>events on record</span>
-            </div>
-
-            {typeRows.length > 0 && (
-              <div className="cd-summary-breakdown">
-                {typeRows.map(([type, count]) => {
-                  const meta = EVENT_META[type] ?? FALLBACK_META;
-                  const Icon = meta.icon;
-                  return (
-                    <div className="cd-summary-row" key={type}>
-                      <span className={`den-tag ${meta.tone}`}><Icon size={12} /></span>
-                      <span className="cd-summary-label">{meta.label}</span>
-                      <span className="cd-summary-count">{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="cd-summary-stages">
-              <span className="mono-label">By stage</span>
-              {RELAY_LEGS.map((item) => {
-                const count = legCounts[item.leg] ?? 0;
-                const pct = maxLeg ? Math.round((count / maxLeg) * 100) : 0;
-                return (
-                  <div className="cd-summary-stage" key={item.leg} data-testid={`summary-stage-${item.slug}`}>
-                    <span className="cd-summary-stage-name">{item.label}</span>
-                    <span className="cd-summary-bar" aria-hidden>
-                      <span style={{ width: `${pct}%` }} />
-                    </span>
-                    <span className="cd-summary-stage-count">{count}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </aside>
       </div>
-      ) : (
-        <VersionTimeline projectId={projectId} />
-      )}
     </div>
   );
 }

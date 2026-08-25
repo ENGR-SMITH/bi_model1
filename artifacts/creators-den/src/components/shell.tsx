@@ -186,7 +186,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           <nav className="cd-topnav-tabs" aria-label="Project sections" data-testid="den-tabs">
             <div className="cd-tab-group">
               {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
-              {tab(`/projects/${projectId}/activity`, 'Activity', <Activity size={15} />, 'nav-activity')}
+              {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
             </div>
             <span className="cd-tab-divider" aria-hidden />
             <div className="cd-tab-group cd-tab-stages">
