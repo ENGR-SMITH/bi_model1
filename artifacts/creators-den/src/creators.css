@@ -753,28 +753,34 @@
 .cd-summary-bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, hsl(var(--sidebar-primary)), hsl(var(--sidebar-primary) / .5)); transition: width .45s cubic-bezier(.22, 1, .36, 1); }
 .cd-summary-stage-count { font: 600 11px var(--app-font-mono); color: hsl(var(--muted-foreground)); text-align: right; }
 
-/* ---- Split view: version timeline (left) + activity ledger (right) ------- */
+/* ---- Split view: timeline (left) + ledger (mid) + summary rail (right) --- */
 .cd-split {
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) minmax(240px, 300px);
   gap: var(--sp-7);
   align-items: start;
 }
 .cd-split-left,
+.cd-split-mid,
 .cd-split-right {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
 }
-/* The ledger column keeps its filter + feed + summary in one vertical rhythm. */
-.cd-split-right > .role-tabs { align-self: flex-start; }
-/* Ledger summary stays pinned while the feed scrolls past (offset matches the
-   sticky topbar + presence strip, mirroring the old .cd-watch-rail). */
+/* Ledger summary stays pinned while the columns scroll past (offset matches
+   the sticky topbar + presence strip, mirroring the old .cd-watch-rail). */
 .cd-split-right .cd-summary { position: sticky; top: 86px; }
 
-@media (max-width: 1180px) {
+/* Narrow: timeline spans the full width, ledger + summary sit below it. */
+@media (max-width: 1240px) {
+  .cd-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .cd-split-left { grid-column: 1 / -1; }
+}
+/* Mobile: everything stacks into one column. */
+@media (max-width: 820px) {
   .cd-split { grid-template-columns: 1fr; }
+  .cd-split-left { grid-column: auto; }
 }
 
 /* ============================================================================

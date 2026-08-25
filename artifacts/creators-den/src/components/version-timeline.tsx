@@ -1,14 +1,14 @@
 // ---------------------------------------------------------------------------
-// VersionTimeline — the Activity page's "Timeline" sub-view.
+// VersionTimeline — the Timeline column of the activity page.
 //
 // Where the ledger (activity.tsx) is a day-grouped feed of *events*, this is a
 // graph of *nodes*: every saved role version AND every raw vault upload, laid
 // out as a boustrophedon "snake-and-ladder" — cards zig-zag across two columns,
 // newest on top, with arrows tracing the chronological chain from one node to
 // the next. Versions read warm (role-toned spine); vault uploads read in a cool
-// blue with a dashed border, so the two kinds are unmistakable. A role filter
-// narrows the snake to a single stage (its versions + the uploads that feed it);
-// the default merges everything.
+// blue with a dashed border, so the two kinds are unmistakable. The role filter
+// is shared with the ledger and lives in the parent (activity.tsx); `leg ===
+// 'all'` merges everything.
 //
 // The snake (bottom = oldest, index 0):
 //   pair p = floor(i / 2); p=0 is the bottom row, rows grow upward.
@@ -30,8 +30,8 @@
 // without re-subscribing.
 // ---------------------------------------------------------------------------
 
-import { useMemo, useState, type CSSProperties } from 'react';
-import { Film, GitBranch, History, Image as ImageIcon, Layers, Music, Paperclip } from 'lucide-react';
+import { useMemo, type CSSProperties } from 'react';
+import { Film, GitBranch, History, Image as ImageIcon, Music, Paperclip } from 'lucide-react';
 import {
   useGetVideoProject,
   useListVideoTimelineVersions,
@@ -180,15 +180,13 @@ function buildSnake(chron: TLNode[]): SnakeRow[] {
   return rows.reverse();
 }
 
-export function VersionTimeline({ projectId }: { projectId: string }) {
+export function VersionTimeline({ projectId, leg, onLegChange }: { projectId: string; leg: string; onLegChange: (leg: string) => void }) {
   const selects = useListVideoTimelineVersions(projectId, 'SELECTS');
   const cut = useListVideoTimelineVersions(projectId, 'CUT');
   const sound = useListVideoTimelineVersions(projectId, 'SOUND');
   const finish = useListVideoTimelineVersions(projectId, 'FINISH');
   const thumbnail = useListVideoTimelineVersions(projectId, 'THUMBNAIL');
   const project = useGetVideoProject(projectId);
-
-  const [leg, setLeg] = useState<string>('all');
 
   const legQueries = [
     ['SELECTS', selects],
@@ -237,13 +235,6 @@ export function VersionTimeline({ projectId }: { projectId: string }) {
   );
 
   const merged = useMemo<TLNode[]>(() => [...versions, ...uploads], [versions, uploads]);
-
-  // Per-leg node counts (versions + uploads mapped to that leg) for the chips.
-  const legCounts = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const node of merged) if (node.leg) m[node.leg] = (m[node.leg] ?? 0) + 1;
-    return m;
-  }, [merged]);
 
   // version id → version number, so each card can show `from v<parent>` — the
   // genealogy resolves across legs even in the merged view (CommitLog §4).
@@ -392,39 +383,6 @@ export function VersionTimeline({ projectId }: { projectId: string }) {
 
   return (
     <div className="cd-timeline" data-testid="version-timeline">
-      <div className="role-tabs" role="tablist" aria-label="Filter timeline by role">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={leg === 'all'}
-          className={leg === 'all' ? 'active' : ''}
-          onClick={() => setLeg('all')}
-          data-testid="timeline-filter-all"
-        >
-          <Layers size={13} />
-          All roles
-          <span className="leg-badge">{merged.length}</span>
-        </button>
-        {RELAY_LEGS.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.leg}
-              type="button"
-              role="tab"
-              aria-selected={leg === item.leg}
-              className={leg === item.leg ? 'active' : ''}
-              onClick={() => setLeg(item.leg)}
-              data-testid={`timeline-filter-${item.slug}`}
-            >
-              <Icon size={13} />
-              {item.role}
-              <span className="leg-badge">{legCounts[item.leg] ?? 0}</span>
-            </button>
-          );
-        })}
-      </div>
-
       <div className="cd-timeline-sub">
         <p className="den-footnote cd-timeline-caption">
           <GitBranch size={13} />
