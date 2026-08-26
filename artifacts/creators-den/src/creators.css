@@ -231,25 +231,19 @@ select optgroup {
 .annotation-close-annotate { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 1px solid hsl(var(--destructive) / .5); border-radius: 999px; background: hsl(var(--card) / .92); color: hsl(var(--destructive)); font: 700 9px var(--app-font-mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; pointer-events: auto; z-index: 5; box-shadow: var(--shadow-sm); }
 .annotation-canvas.annotating .annotation-pin { cursor: pointer; }
 
-/* ---- Annotation dock (preview pages: controls below the player) ---------- */
-/* When the annotation controls live outside the media, they sit in a slim
-   dock under the player; the pinned dots stay on the media. */
-.annotation-dock {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 10px;
-}
-.annotation-dock .annotation-toggle,
-.annotation-dock .annotation-close-annotate {
-  position: static;
-}
-.annotation-dock .annotation-composer,
-.annotation-dock .annotation-thread {
-  position: static;
-  width: 100%;
-  max-height: none;
+/* The red vertical selector line drawn on the audio wave at the point the
+   reviewer picked (while annotating) — the selected point stays red even
+   though the playhead itself reads light blue. */
+.annotation-drop-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: hsl(var(--destructive));
+  box-shadow: 0 0 8px hsl(var(--destructive) / .8);
+  pointer-events: none;
+  z-index: 4;
 }
 
 /* The header edit (pencil) button — the annotation toggle pinned to the card

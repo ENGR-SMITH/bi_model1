@@ -58,7 +58,6 @@ function AudioCanvas({
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
-  const annotationDockRef = useRef<HTMLDivElement>(null);
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
 
@@ -136,8 +135,8 @@ function AudioCanvas({
               playheadMs={playheadMs}
               onSeek={onSeek}
               timelineVersionId={version?.id}
-              dockRef={annotationDockRef}
               headerRef={annotationHeaderRef}
+              dropLine
             />
             <FullscreenButton targetRef={stageRef} />
           </WaveformPlayer>
@@ -148,8 +147,6 @@ function AudioCanvas({
           </EmptyPlayer>
         )}
       </div>
-      {/* Annotation controls live below the player, not over the wave. */}
-      <div ref={annotationDockRef} className="annotation-dock" />
     </div>
   );
 }

@@ -51,7 +51,6 @@ function ThumbnailCanvas({
   vaultAssetId?: string | null;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
-  const annotationDockRef = useRef<HTMLDivElement>(null);
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
 
   const snap = version ? ((version.snapshot ?? null) as {
@@ -92,7 +91,6 @@ function ThumbnailCanvas({
               assetId={assetId}
               playheadMs={null}
               timelineVersionId={version?.id}
-              dockRef={annotationDockRef}
               headerRef={annotationHeaderRef}
             />
             <FullscreenButton targetRef={stageRef} />
@@ -104,8 +102,6 @@ function ThumbnailCanvas({
           </EmptyPlayer>
         )}
       </div>
-      {/* Annotation controls live below the player, not over the image. */}
-      <div ref={annotationDockRef} className="annotation-dock" />
     </div>
   );
 }
