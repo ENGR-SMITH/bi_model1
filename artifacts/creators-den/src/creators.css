@@ -1081,7 +1081,8 @@
   background: linear-gradient(180deg, hsl(var(--background) / .86), hsl(var(--background) / .70));
   backdrop-filter: blur(16px) saturate(1.3);
   -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  border-bottom: 1px solid hsl(var(--border) / .8);
+  /* No bottom border here — the baseline lives on the Tier-2 chips so it
+     doesn't get drawn across the empty gaps between them. */
   box-shadow: var(--edge-hi), 0 10px 30px rgba(0, 0, 0, .34);
 }
 
@@ -1228,10 +1229,12 @@
 
 /* A chip is the column's fill shrink-wrapped to its content. The fill lives
    on a ::before so the workspace dropdown (and the tabs) are never clipped
-   by the cut. */
+   by the cut. The bottom border is the row's baseline, drawn only under the
+   chips so the gaps stay clean. */
 .cd-topnav-chip {
   position: relative; isolation: isolate;
   display: flex; align-items: center;
+  border-bottom: 1px solid hsl(var(--border) / .8);
 }
 .cd-topnav-chip::before {
   content: "";
@@ -1247,12 +1250,14 @@
 
 /* The relay deck — the middle chip with cut ends on both sides. The fill and
    clip live on the nav itself: background-attachment: scroll keeps the fill
-   put while the tabs scroll, and the clip is on the nav's box. */
+   put while the tabs scroll, and the clip is on the nav's box. Its bottom
+   border is the row's baseline, drawn only under the chips. */
 .cd-topnav-tabs {
   grid-column: 2;
   display: flex; align-items: stretch; gap: var(--sp-2);
   min-width: 0; max-width: 100%;
   background: hsl(var(--card) / .35);
+  border-bottom: 1px solid hsl(var(--border) / .8);
   clip-path: polygon(0 0, calc(100% - var(--sp-3)) 0, 100% 100%, var(--sp-3) 100%);
   overflow-x: auto;               /* horizontal scroll when tabs outrun the width */
   scrollbar-width: none;
