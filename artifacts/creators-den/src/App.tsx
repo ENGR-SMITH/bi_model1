@@ -11,6 +11,11 @@ import FinishPage from '@/pages/finish';
 import ThumbnailPage from '@/pages/thumbnail';
 import ProfilePage from '@/pages/profile';
 import ExplorePage from '@/pages/explore';
+import PreviewPage from '@/pages/preview';
+import VideoPreviewPage from '@/pages/preview-video';
+import AudioPreviewPage from '@/pages/preview-audio';
+import ThumbnailPreviewPage from '@/pages/preview-thumbnail';
+import ScriptPreviewPage from '@/pages/preview-script';
 
 function NotFound() {
   return (
@@ -40,6 +45,11 @@ export default function App() {
           <Route path="/projects/:projectId/sound" component={SoundPage} />
           <Route path="/projects/:projectId/finish" component={FinishPage} />
           <Route path="/projects/:projectId/thumbnail" component={ThumbnailPage} />
+          <Route path="/projects/:projectId/preview" component={PreviewPage} />
+          <Route path="/projects/:projectId/preview/video" component={VideoPreviewPage} />
+          <Route path="/projects/:projectId/preview/audio" component={AudioPreviewPage} />
+          <Route path="/projects/:projectId/preview/thumbnail" component={ThumbnailPreviewPage} />
+          <Route path="/projects/:projectId/preview/script" component={ScriptPreviewPage} />
           <Route component={NotFound} />
         </Switch>
       </CreatorsShell>
