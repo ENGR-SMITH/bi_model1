@@ -26,7 +26,6 @@ import {
   Maximize,
   MessageSquare,
   Minimize,
-  Pin,
   Play,
   Upload,
 } from 'lucide-react';
@@ -150,10 +149,10 @@ export function VersionCarousel({
 
 // ---------------------------------------------------------------------------
 // RoleLayout — the three role pages (Video / Audio / Thumbnail).
-// Three columns at 14 : 46 : 40, with the second and third columns split into
+// Three columns at 10 : 50 : 40, with the second and third columns split into
 // two rows at 68 : 32. Column one (the version & vault shelf) spans the full
-// height; the bottom rows of columns two and three hold the upload card and
-// the oracle.
+// height; the bottom row of column two holds the upload card, and column
+// three stacks the oracle on top of the pin / comment wall.
 // ---------------------------------------------------------------------------
 
 export function RoleLayout({
@@ -167,9 +166,9 @@ export function RoleLayout({
   versions: ReactNode;
   /** Column two, row one — the big canvas. */
   canvas: ReactNode;
-  /** Column three, row one — the pin / comment wall. */
+  /** Column three, row two — the pin / comment wall. */
   notes: ReactNode;
-  /** Column three, row two — the role oracle. */
+  /** Column three, row one — the role oracle. */
   oracle: ReactNode;
   /** Column two, row two — the upload card. */
   upload: ReactNode;
@@ -180,8 +179,8 @@ export function RoleLayout({
         <div className="role-versions-col">{versions}</div>
         <div className="role-canvas-main">{canvas}</div>
         <div className="role-canvas-bar">{upload}</div>
-        <div className="role-notes-main">{notes}</div>
-        <div className="role-notes-bar">{oracle}</div>
+        <div className="role-notes-main">{oracle}</div>
+        <div className="role-notes-bar">{notes}</div>
       </div>
     </div>
   );
@@ -328,7 +327,6 @@ export function RoleUploadCard({
 
   return (
     <div className="paper-card role-upload-card" data-testid="role-upload">
-      <span className="eyebrow"><Upload size={13} /> Upload {label}</span>
       <div className="role-upload-row">
         <select
           value={kind}
@@ -515,11 +513,6 @@ export function PreviewNotesPanel({
 
   return (
     <div className="paper-card pv-notes" data-testid="preview-notes">
-      <div className="inline-heading">
-        <span className="eyebrow"><Pin size={13} /> Pins · comments · notes</span>
-        <span className="mono-label">{rows.length}</span>
-      </div>
-
       {pins.length > 0 && (
         <div className="den-stack mt-3">
           {pins.map((pin) => {
@@ -623,7 +616,7 @@ export function PreviewNotesPanel({
       )}
 
       {pins.length === 0 && timelineNotes.length === 0 && (
-        <p className="setting-copy mt-3">No pins or notes yet — drop pins on the canvas with <b>Annotate</b> and they'll appear here.</p>
+        <p className="setting-copy mt-3">No pins or notes yet — review comments from the studios will appear here.</p>
       )}
     </div>
   );

@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Play } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
   getGetVideoAssetQueryKey,
@@ -122,14 +122,7 @@ function VideoCanvas({
 
   return (
     <div className="paper-card pv-stage" data-testid="video-canvas">
-      <div className="inline-heading">
-        <span className="eyebrow"><Play size={13} /> Big canvas{version ? ` · ${version.leg} v${version.version}` : ''}</span>
-        <span className="flex items-center gap-2">
-          {!version && <span className="den-tag teal">vault preview</span>}
-          <span className="mono-label">{formatTimecode(playheadMs)}</span>
-        </span>
-      </div>
-      <div className="pv-stage-player mt-3">
+      <div className="pv-stage-player">
         {assetId ? (
           <AssetPlayer
             projectId={projectId}

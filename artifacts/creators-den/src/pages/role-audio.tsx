@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, AudioLines } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
   getGetVideoAssetQueryKey,
@@ -121,13 +121,7 @@ function AudioCanvas({
 
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="audio-canvas">
-      <div className="inline-heading">
-        <span className="eyebrow"><AudioLines size={13} /> Big canvas{version ? ` · SOUND v${version.version}` : ''}</span>
-        <span className="flex items-center gap-2">
-          {!version && <span className="den-tag teal">vault preview</span>}
-        </span>
-      </div>
-      <div className="pv-stage-player mt-3">
+      <div className="pv-stage-player">
         {assetId ? (
           <WaveformPlayer
             projectId={projectId}
