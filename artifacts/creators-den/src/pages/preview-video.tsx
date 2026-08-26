@@ -52,18 +52,29 @@ function VideoCanvas({
   version,
   assets,
   vaultAssetId,
+  seekRequest,
 }: {
   projectId: string;
   version: { id: string; leg: StudioLeg; version: number; snapshot: unknown } | null;
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
   /** Explicit vault asset to preview (picked from the timeline row). */
   vaultAssetId?: string | null;
+  /** A note-click seek from the comments rail — jumps the player to it. */
+  seekRequest?: { ms: number; n: number } | null;
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
+
+  // The comments rail and this canvas are siblings, so the page lifts a
+  // note-click seek up and passes it back down — jump straight to it.
+  useEffect(() => {
+    if (!seekRequest) return;
+    setPlayheadMs(seekRequest.ms);
+    if (videoRef.current) videoRef.current.currentTime = seekRequest.ms / 1000;
+  }, [seekRequest]);
 
   const snap = version ? ((version.snapshot ?? null) as TimelineSnapshotLike | null) : null;
   const clips = Array.isArray(snap?.clips) ? snap!.clips! : [];
@@ -164,6 +175,10 @@ export default function VideoPreviewPage() {
   const { projectId } = useParams<{ projectId: string }>();
   useProjectRealtime(projectId, null);
   const project = useGetVideoProject(projectId);
+  // Last note-click seek from the comments rail, with a counter so repeat
+  // clicks on the same timecode still re-trigger the canvas effect.
+  const [seekRequest, setSeekRequest] = useState<{ ms: number; n: number } | null>(null);
+  const onNoteSeek = (ms: number) => setSeekRequest((prev) => ({ ms, n: (prev?.n ?? 0) + 1 }));
 
   const selectsVersions = useListVideoTimelineVersions(projectId, 'SELECTS');
   const cutVersions = useListVideoTimelineVersions(projectId, 'CUT');
@@ -281,12 +296,14 @@ export default function VideoPreviewPage() {
           version={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
           assets={p.assets}
           vaultAssetId={vaultAssetId ?? undefined}
+          seekRequest={seekRequest}
         />
       }
       rail={
         <PreviewNotesPanel
           projectId={p.id}
           legs={VIDEO_LEGS}
+          onSeek={onNoteSeek}
         />
       }
       versions={

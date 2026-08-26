@@ -260,6 +260,7 @@ export default function RoleThumbnailPage() {
           projectId={p.id}
           legs={['THUMBNAIL']}
           assetId={notesAssetId}
+          allowResolve
         />
       }
       oracle={
