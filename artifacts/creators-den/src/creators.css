@@ -1893,9 +1893,11 @@
 
 /* ---- Role pages: 10 / 50 / 40 columns, 68 / 32 rows ---- */
 /* The role pages keep a slim margin gap around the grid (the full-bleed
-   edge-to-edge look was dropped in favour of a little breathing room). In
-   the third column the oracle is the short panel (32%, on top) and the
-   pin / comment wall is the tall one (68%, on the bottom). */
+   edge-to-edge look was dropped in favour of a little breathing room). The
+   second column keeps its original 68 : 32 split (big canvas on top, upload
+   card below) — untouched. Only the third column is 32 : 68: the oracle is
+   the short panel (32%, on top) and the pin / comment wall the tall one
+   (68%, on the bottom). */
 .role-page {
   max-width: none;
   padding: 20px clamp(18px, 2.5vw, 34px);
@@ -1906,37 +1908,49 @@
   min-height: 0;
   display: grid;
   grid-template-columns: 10fr 50fr 40fr;
-  grid-template-rows: minmax(0, 32fr) minmax(0, 68fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 16px;
 }
 .role-versions-col {
   grid-column: 1;
-  grid-row: 1 / 3;
+  grid-row: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
-.role-canvas-main {
+.role-col-2,
+.role-col-3 {
+  min-height: 0;
+  display: grid;
+  gap: 16px;
+}
+.role-col-2 {
   grid-column: 2;
+  grid-row: 1;
+  grid-template-rows: minmax(0, 68fr) minmax(0, 32fr);
+}
+.role-col-3 {
+  grid-column: 3;
+  grid-row: 1;
+  grid-template-rows: minmax(0, 32fr) minmax(0, 68fr);
+}
+.role-canvas-main {
   grid-row: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 .role-canvas-bar {
-  grid-column: 2;
   grid-row: 2;
   min-height: 0;
 }
 .role-notes-main {
-  grid-column: 3;
   grid-row: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 .role-notes-bar {
-  grid-column: 3;
   grid-row: 2;
   min-height: 0;
   display: flex;
@@ -2204,7 +2218,10 @@
   overflow-x: hidden;
   scroll-snap-type: y proximity;
   scrollbar-width: thin;
-  padding: 50% 4px;
+  /* Vertical padding is driven from JS (half the track height) so the list
+     is always scrollable — even with just one or two cards — and the first
+     / last cards can still be brought into the focus frame. */
+  padding: 0 4px;
   perspective: 700px;
 }
 .vs-item {
@@ -2676,11 +2693,9 @@
   .pv-canvas-col .pv-script-area { min-height: 520px; overflow: visible; }
   .pv-notes-col > .pv-notes { flex: none; overflow: visible; }
   .role-grid { grid-template-columns: 1fr; grid-template-rows: none; gap: 16px; }
-  .role-versions-col { grid-column: 1; grid-row: auto; }
-  .role-canvas-main { grid-column: 1; grid-row: auto; }
-  .role-canvas-bar { grid-column: 1; grid-row: auto; }
-  .role-notes-main { grid-column: 1; grid-row: auto; }
-  .role-notes-bar { grid-column: 1; grid-row: auto; }
+  .role-versions-col, .role-col-2, .role-col-3 { grid-column: 1; grid-row: auto; }
+  .role-col-2, .role-col-3 { grid-template-rows: none; }
+  .role-canvas-main, .role-canvas-bar, .role-notes-main, .role-notes-bar { grid-row: auto; }
   .role-canvas-main > .pv-stage { flex: none; }
   .role-canvas-main .pv-stage-player { flex: none; }
   .role-canvas-main .pv-stage-player .den-player { flex: none; }
@@ -2694,7 +2709,7 @@
   /* The version shelf, upload card, oracle and notes get explicit heights
      when the grid stacks into one column. */
   .vs-wrap { flex: none; }
-  .vs-track { max-height: 340px; padding: 12px 4px; }
+  .vs-track { max-height: 340px; }
   .role-upload-card { min-height: 210px; }
   .role-notes-main .den-oracle { height: 480px; }
   .role-notes-bar > .pv-notes { height: 340px; }

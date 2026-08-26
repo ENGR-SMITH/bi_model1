@@ -9,7 +9,7 @@
 // bring any item into the frame, which then becomes the active selection.
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { ChevronDown, ChevronUp, FileVideo2, Image as ImageIcon, Mic2 } from 'lucide-react';
 
 export type ShelfItem =
@@ -51,6 +51,23 @@ export function VersionShelf({
   const settleRef = useRef<number | null>(null);
   const activeKeyRef = useRef(activeKey);
   activeKeyRef.current = activeKey;
+
+  // Give the track half-a-viewport of padding above and below the cards, so
+  // the list is ALWAYS scrollable — even with just one or two cards — and
+  // the first / last cards can still be brought up into the fixed focus
+  // frame at the column centre. (CSS percentage padding would resolve
+  // against the column's width, which is too small to matter.)
+  const syncPadding = useCallback(() => {
+    const container = trackRef.current;
+    if (!container) return;
+    const half = container.clientHeight / 2;
+    container.style.paddingTop = `${half}px`;
+    container.style.paddingBottom = `${half}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    syncPadding();
+  }, [syncPadding, items.length]);
 
   // The item whose centre is closest to the track's vertical centre.
   const findNearestKey = useCallback((container: HTMLDivElement): string | null => {
@@ -120,8 +137,12 @@ export function VersionShelf({
       }, 180);
     };
     container.addEventListener('scroll', onScroll, { passive: true });
+    syncPadding();
     applyTransforms();
-    const observer = new ResizeObserver(() => applyTransforms());
+    const observer = new ResizeObserver(() => {
+      syncPadding();
+      applyTransforms();
+    });
     observer.observe(container);
     return () => {
       container.removeEventListener('scroll', onScroll);
@@ -129,7 +150,7 @@ export function VersionShelf({
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       if (settleRef.current != null) window.clearTimeout(settleRef.current);
     };
-  }, [applyTransforms, findNearestKey, onSelect, items.length]);
+  }, [applyTransforms, findNearestKey, onSelect, items.length, syncPadding]);
 
   const scrollToKey = (key: string) => {
     const container = trackRef.current;
