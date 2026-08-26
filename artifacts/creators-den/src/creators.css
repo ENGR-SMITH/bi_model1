@@ -231,6 +231,27 @@ select optgroup {
 .annotation-close-annotate { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 1px solid hsl(var(--destructive) / .5); border-radius: 999px; background: hsl(var(--card) / .92); color: hsl(var(--destructive)); font: 700 9px var(--app-font-mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; pointer-events: auto; z-index: 5; box-shadow: var(--shadow-sm); }
 .annotation-canvas.annotating .annotation-pin { cursor: pointer; }
 
+/* ---- Annotation dock (preview pages: controls below the player) ---------- */
+/* When the annotation controls live outside the media, they sit in a slim
+   dock under the player; the pinned dots stay on the media. */
+.annotation-dock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+}
+.annotation-dock .annotation-toggle,
+.annotation-dock .annotation-close-annotate {
+  position: static;
+}
+.annotation-dock .annotation-composer,
+.annotation-dock .annotation-thread {
+  position: static;
+  width: 100%;
+  max-height: none;
+}
+
 /* ============================================================================
    Netflix + YouTube layout primitives — dark-cinematic redesign
    Additive: existing .den-* classes stay and reskin via tokens.
@@ -1820,12 +1841,14 @@ select optgroup {
   min-width: 0;
 }
 
-/* Canvas card flexes to fill its column; the media fills the box. */
+/* Canvas card flexes to fill its column; the media fills the box. The card
+   keeps a slim padding so the player sits close to the card edge. */
 .pv-canvas-col > .pv-stage {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 10px 12px 12px;
 }
 .pv-canvas-col > .pv-script {
   flex: 1;
@@ -2451,7 +2474,7 @@ select optgroup {
   border-radius: 1px;
   background: hsl(var(--muted-foreground) / .22);
 }
-.pv-wave-bars span.played { background: hsl(var(--accent) / .75); }
+.pv-wave-bars span.played { background: hsl(212 90% 62% / .75); }
 .pv-wave-marker {
   position: absolute;
   top: 4px;
@@ -2470,8 +2493,9 @@ select optgroup {
   top: 0;
   bottom: 0;
   width: 2px;
-  background: hsl(var(--destructive));
-  box-shadow: 0 0 8px hsl(var(--destructive) / .9);
+  /* The playhead reads light blue; annotation points stay red (danger). */
+  background: hsl(212 90% 62%);
+  box-shadow: 0 0 8px hsl(212 90% 62% / .9);
   pointer-events: none;
 }
 .pv-wave-tick::before {
@@ -2481,7 +2505,7 @@ select optgroup {
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-top: 7px solid hsl(var(--destructive));
+  border-top: 7px solid hsl(212 90% 62%);
 }
 .pv-wave-tick-label {
   position: absolute;

@@ -57,6 +57,7 @@ function VideoCanvas({
   const [playheadMs, setPlayheadMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const annotationDockRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
 
   const snap = version ? ((version.snapshot ?? null) as TimelineSnapshotLike | null) : null;
@@ -113,7 +114,7 @@ function VideoCanvas({
           <span className="mono-label">{formatTimecode(playheadMs)}</span>
         </span>
       </div>
-      <div className="pv-stage-player mt-3">
+      <div className="pv-stage-player mt-2">
         {assetId ? (
           <AssetPlayer
             projectId={projectId}
@@ -131,6 +132,7 @@ function VideoCanvas({
               playheadMs={playheadMs}
               onSeek={onSeek}
               timelineVersionId={version?.id}
+              dockRef={annotationDockRef}
             />
             <FullscreenButton targetRef={stageRef} />
           </AssetPlayer>
@@ -141,6 +143,8 @@ function VideoCanvas({
           </EmptyPlayer>
         )}
       </div>
+      {/* Annotation controls live below the player, not over the frame. */}
+      <div ref={annotationDockRef} className="annotation-dock" />
     </div>
   );
 }
