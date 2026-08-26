@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Film, LockKeyhole, Play } from 'lucide-react';
+import { ArrowLeft, LockKeyhole, Play } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
   getGetVideoAssetQueryKey,
@@ -225,12 +225,6 @@ export default function VideoPreviewPage() {
 
   return (
     <PreviewLayout
-      eyebrow="Preview · video"
-      title="The picture."
-      description="Every selects pass and cut version, on one big canvas. Annotate the frame, seek with the red ticks, and flip versions from the carousel."
-      backHref={`/projects/${p.id}/preview`}
-      backLabel="Preview room"
-      status={<span className="den-tag teal"><Film size={10} /> {versions.length} version{versions.length === 1 ? '' : 's'}</span>}
       main={
         <>
           <VideoCanvas
@@ -242,7 +236,6 @@ export default function VideoPreviewPage() {
             versions={versions}
             selectedId={selected?.id ?? null}
             onSelect={setSelectedId}
-            hint="Click a version to review it on the canvas — red ticks show where notes are pinned."
             emptyText="No selects or cut versions saved yet — save a snapshot in the Selects or Cut studio first."
           />
         </>

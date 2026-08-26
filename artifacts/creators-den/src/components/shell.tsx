@@ -184,16 +184,20 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   const logout = () => signOut({ redirectUrl: '/' });
 
   // A primary section tab. The active tab (not a breadcrumb) conveys location.
-  const tab = (href: string, label: string, icon: ReactNode, testId: string) => (
-    <Link
-      href={href}
-      className={`cd-tab ${location === href ? 'active' : ''}`}
-      data-testid={testId}
-    >
-      {icon}
-      <span>{label}</span>
-    </Link>
-  );
+  // `matchPrefix` keeps the tab lit on its sub-pages (e.g. Preview → /preview/video).
+  const tab = (href: string, label: string, icon: ReactNode, testId: string, matchPrefix = false) => {
+    const active = matchPrefix ? location === href || location.startsWith(`${href}/`) : location === href;
+    return (
+      <Link
+        href={href}
+        className={`cd-tab ${active ? 'active' : ''}`}
+        data-testid={testId}
+      >
+        {icon}
+        <span>{label}</span>
+      </Link>
+    );
+  };
 
   return (
     <div className="app-shell">
@@ -240,6 +244,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
               <div className="cd-tab-group">
                 {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
                 {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
+                {tab(`/projects/${projectId}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview', true)}
               </div>
               <span className="cd-tab-divider" aria-hidden />
               <div className="cd-tab-group cd-tab-stages">

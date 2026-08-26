@@ -770,9 +770,6 @@ export default function ContentCreatorsProjectPage() {
             <Link href="/" className="cd-actionbtn" data-testid="link-project-back-room">
               <ArrowLeft size={14} /> Home
             </Link>
-            <Link href={`/projects/${p.id}/preview`} className="cd-actionbtn" data-testid="link-project-preview">
-              <Clapperboard size={14} /> Preview
-            </Link>
             <a href="#vault-upload" className="cd-actionbtn is-primary">
               <Upload size={14} /> Add footage
             </a>

@@ -42,7 +42,6 @@ import {
 } from '@workspace/api-client-react';
 import type { VideoTranscriptSegment } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
-import { SectionEyebrow } from '@/components/shell';
 import { pollWhileProcessing } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
 
@@ -377,21 +376,6 @@ export default function ScriptPreviewPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <SectionEyebrow>Preview · script</SectionEyebrow>
-          <h1>The words.</h1>
-          <p>Every take, typed. Import audio or video and the transcription lands here as editable words — correct, reorder, and rewrite freely.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href={`/projects/${p.id}/preview`} className="secondary-btn" data-testid="script-back-preview">
-            <ArrowLeft size={13} />
-            Preview room
-          </Link>
-          <span className="den-tag teal"><Sparkles size={10} /> autosaved</span>
-        </div>
-      </div>
-
       <div className="cd-watch">
         <div className="cd-watch-main">
           <div className="paper-card pv-script" data-testid="script-editor">
@@ -454,11 +438,6 @@ export default function ScriptPreviewPage() {
           )}
         </div>
       </div>
-
-      <p className="den-footnote mt-8">
-        <Sparkles size={13} />
-        The script is your words alone — raw files stay locked in the vault, and every line transcribed keeps its timecode so you can find it in the footage.
-      </p>
     </div>
   );
 }

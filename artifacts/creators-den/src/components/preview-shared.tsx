@@ -18,7 +18,6 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import {
-  ArrowLeft,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -29,7 +28,6 @@ import {
   Pin,
   Play,
 } from 'lucide-react';
-import { Link } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getListVideoCommentsQueryKey,
@@ -47,55 +45,14 @@ import { geometryKey, parseGeometry, reviewerColor, reviewerLabel } from '@/lib/
 // PreviewLayout
 // ---------------------------------------------------------------------------
 
-export function PreviewLayout({
-  eyebrow,
-  title,
-  description,
-  backHref,
-  backLabel = 'Back',
-  status,
-  actions,
-  main,
-  rail,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-  backHref: string;
-  backLabel?: string;
-  /** A status tag rendered in the header (e.g. "4 versions"). */
-  status?: ReactNode;
-  /** Extra header actions rendered next to the back link. */
-  actions?: ReactNode;
-  /** Left column — the canvas rows (big canvas + version carousel). */
-  main: ReactNode;
-  /** Right column — the pin / comment wall. */
-  rail: ReactNode;
-}) {
+export function PreviewLayout({ main, rail }: { main: ReactNode; rail: ReactNode }) {
   return (
-    <div className="page">
-      <div className="page-header">
-        <div>
-          <span className="eyebrow">{eyebrow}</span>
-          <h1>{title}</h1>
-          <p>{description}</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href={backHref} className="secondary-btn" data-testid="preview-back">
-            <ArrowLeft size={13} />
-            {backLabel}
-          </Link>
-          {actions}
-          {status}
-        </div>
+    <div className="pv-split" data-testid="preview-split">
+      <div className="pv-left">
+        {main}
       </div>
-      <div className="pv-split" data-testid="preview-split">
-        <div className="pv-left">
-          {main}
-        </div>
-        <div className="pv-right">
-          {rail}
-        </div>
+      <div className="pv-right">
+        {rail}
       </div>
     </div>
   );
@@ -120,13 +77,11 @@ export function VersionCarousel({
   selectedId,
   onSelect,
   emptyText,
-  hint,
 }: {
   versions: PreviewVersion[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   emptyText: string;
-  hint?: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
 
@@ -142,7 +97,6 @@ export function VersionCarousel({
         <span className="eyebrow"><Clock3 size={13} /> Timeline versions</span>
         <span className="mono-label">{versions.length} saved</span>
       </div>
-      {hint && <p className="setting-copy">{hint}</p>}
       {versions.length === 0 ? (
         <p className="setting-copy mt-2" data-testid="version-carousel-empty">{emptyText}</p>
       ) : (
