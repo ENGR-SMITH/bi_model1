@@ -48,12 +48,12 @@ import type { VideoComment, VideoTranscriptSegment } from '@workspace/api-client
 import { useProjectRealtime } from '@/lib/realtime';
 import { pollWhileProcessing } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
-import { reviewerColor } from '@/lib/annotations';
 import {
   applyScriptHighlights,
   findScriptMark,
   isScriptComment,
   parseScriptRange,
+  scriptColor,
   wrapScriptRange,
 } from '@/lib/script-comments';
 import { ScriptCommentsPanel } from '@/components/script-comments';
@@ -297,7 +297,7 @@ export default function RoleScriptPage() {
   const jumpToComment = (comment: VideoComment) => {
     const el = editorRef.current;
     if (!el) return;
-    const color = comment.color ?? reviewerColor(comment.authorId);
+    const color = comment.color ?? scriptColor(comment.id);
     let mark = findScriptMark(el, comment.id);
     if (!mark) {
       const range = parseScriptRange(comment.geometry);

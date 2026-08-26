@@ -6,9 +6,42 @@
 // selected passage as { start, length, text } — character offsets into the
 // script's plain text plus the quoted words. The highlighted passage is drawn
 // in the editor as a colored <mark class="pv-script-hl"> that keeps the same
-// color as the reviewer's tag, so clicking a tag in the rail can jump to the
+// color as the comment's tag, so clicking a tag in the rail can jump to the
 // matching highlight.
+//
+// Tags draw from a wide palette so the script rail reads as a rainbow of
+// distinct comment colors rather than one color per reviewer.
 // ---------------------------------------------------------------------------
+
+import { hashString } from "@/lib/annotations";
+
+/** A broad palette of distinct, readable tag colors for script comments. */
+export const SCRIPT_TAG_COLORS = [
+  "#e05555", // red
+  "#e8803c", // orange
+  "#d9a93f", // gold
+  "#5cb276", // green
+  "#2f9e8f", // teal
+  "#3f8fd6", // blue
+  "#6f7ae0", // indigo
+  "#9a6fe0", // violet
+  "#c95fc9", // magenta
+  "#df7f8f", // rose
+  "#8a9b4f", // olive
+  "#4f9bb0", // cyan
+] as const;
+
+export type ScriptTagColor = (typeof SCRIPT_TAG_COLORS)[number];
+
+/** Deterministic tag color from any seed (e.g. the comment id). */
+export function scriptColor(seed: string): ScriptTagColor {
+  return SCRIPT_TAG_COLORS[hashString(seed) % SCRIPT_TAG_COLORS.length];
+}
+
+/** A fresh random tag color, used when a new comment is pinned. */
+export function randomScriptColor(): ScriptTagColor {
+  return SCRIPT_TAG_COLORS[Math.floor(Math.random() * SCRIPT_TAG_COLORS.length)];
+}
 
 export interface ScriptRange {
   /** Character offset of the selection start into the script's plain text. */

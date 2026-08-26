@@ -19,8 +19,8 @@ import {
   useResolveVideoComment,
 } from '@workspace/api-client-react';
 import type { VideoComment } from '@workspace/api-client-react';
-import { reviewerColor, reviewerLabel } from '@/lib/annotations';
-import { isScriptComment, parseScriptRange } from '@/lib/script-comments';
+import { reviewerLabel } from '@/lib/annotations';
+import { isScriptComment, parseScriptRange, scriptColor } from '@/lib/script-comments';
 import { RESOLVED_GREEN } from '@/components/preview-shared';
 
 export function ScriptCommentsPanel({
@@ -78,7 +78,9 @@ export function ScriptCommentsPanel({
         )}
         {rows.map((comment) => {
           const range = parseScriptRange(comment.geometry);
-          const color = comment.color ?? reviewerColor(comment.authorId);
+          // The stored color wins; anything without one (older notes) still
+          // gets a varied color derived from its id rather than one per reviewer.
+          const color = comment.color ?? scriptColor(comment.id);
           const label = comment.label ?? reviewerLabel(comment.authorId);
           return (
             <div
