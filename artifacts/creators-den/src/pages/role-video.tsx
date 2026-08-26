@@ -1,12 +1,13 @@
 // ---------------------------------------------------------------------------
-// Video preview — the picture studio.
+// Video role page — the picture studio.
 //
-// Left column, row 1: the big canvas — the selected version's clip streams as
-// a proxy, with the spatial AnnotationCanvas on top (pins carry the reviewer
-// colour + the exact timecode), red ticks marking annotation times on the
-// player's timeline, and a full-screen expand button.
-// Left column, row 2: the carousel of the project's SELECTS + CUT versions.
-// Right column: the pin / comment wall, scoped to the selected version.
+// Column one: a 3D coverflow shelf mixing the project's SELECTS + CUT versions
+// with the vault's video uploads — the active (latest) item sits centred at
+// full scale and full opacity. Column two, row 1: the big canvas — the
+// selected version's clip (or the picked vault file) streams as a proxy, with
+// the spatial AnnotationCanvas on top and a full-screen expand button. Column
+// two, row 2: the upload card. Column three, row 1: the pin / comment wall;
+// row 2: the Visual Editor's oracle.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -23,23 +24,25 @@ import {
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
-import { AssetPlayer, EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
+import { AssetPlayer, EmptyPlayer, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
+import { CoverflowCarousel, type CoverflowItem } from '@/components/coverflow';
 import { formatTimecode } from '@/components/timeline';
 import {
   FullscreenButton,
   PreviewNotesPanel,
-  RoleDownloadBar,
   RoleLayout,
-  RoleUploadBar,
-  VersionList,
+  RoleUploadCard,
+  VAULT_KIND_LABELS,
   type PreviewVersion,
 } from '@/components/preview-shared';
+import { RoleOracle } from '@/components/role-oracle';
 import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
 import type { StudioLeg } from '@/components/role-oracle';
 
 const VIDEO_LEGS: StudioLeg[] = ['SELECTS', 'CUT'];
 const VIDEO_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE']);
+const VIDEO_UPLOAD_KINDS = ['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE'].map((value) => ({ value, label: VAULT_KIND_LABELS[value] }));
 
 // This role page accepts video files only — the accept list and the client
 // check below reject anything else (no audio / image / script files here).
@@ -60,10 +63,13 @@ function VideoCanvas({
   projectId,
   version,
   assets,
+  vaultAssetId,
 }: {
   projectId: string;
   version: { id: string; leg: StudioLeg; version: number; snapshot: unknown } | null;
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
+  /** Explicit vault asset to preview (picked from the coverflow shelf). */
+  vaultAssetId?: string;
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -83,9 +89,11 @@ function VideoCanvas({
   );
   // A snapshot clip may reference an asset that is no longer in the vault
   // (or still processing) — validate against the project's assets so the
-  // canvas always falls back to real, playable media.
+  // canvas always falls back to real, playable media. An explicitly picked
+  // vault file (from the coverflow) wins over everything.
+  const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : '';
   const clipAssetId = activeClip?.assetId && assets.some((a) => a.id === activeClip.assetId) ? activeClip.assetId : '';
-  const assetId = clipAssetId || fallback?.id || '';
+  const assetId = explicitAsset || clipAssetId || fallback?.id || '';
   const detail = useGetVideoAsset(projectId, assetId, {
     query: {
       queryKey: getGetVideoAssetQueryKey(projectId, assetId),
@@ -193,19 +201,102 @@ export default function RoleVideoPage() {
   }, [selectsVersions.data, cutVersions.data, selectsTimeline.data?.version, cutTimeline.data?.version]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
 
-  // Default to the newest version once the list arrives.
+  // Default to the newest version once the list arrives (unless a vault file
+  // has been picked from the coverflow shelf).
   useEffect(() => {
-    if (!selectedId && versions.length > 0) setSelectedId(versions[0].id);
-  }, [versions, selectedId]);
+    if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
+  }, [versions, selectedId, vaultAssetId]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
   const selectedDetail = useGetVideoTimelineVersion(projectId, selected?.leg ?? '', selected?.id ?? '', {
     query: {
       queryKey: getGetVideoTimelineVersionQueryKey(projectId, selected?.leg ?? '', selected?.id ?? ''),
-      enabled: Boolean(selected),
+      enabled: Boolean(selected) && !vaultAssetId,
     },
   });
+
+  // While a vault file is being previewed there is no active version — the
+  // canvas shows the picked file instead of the newest version's clip.
+  const activeVersion = vaultAssetId ? null : selected;
+
+  // Coverflow shelf: timeline versions (newest first) + the vault's video
+  // uploads, each tagged with its leg / kind.
+  const coverflowItems = useMemo<CoverflowItem[]>(() => {
+    const proj = project.data;
+    const versionItems: CoverflowItem[] = versions.map((v) => ({
+      key: `version-${v.id}`,
+      kind: 'version' as const,
+      version: v.version,
+      leg: v.leg,
+      message: v.message,
+      createdAt: v.createdAt,
+      isHead: v.isHead,
+    }));
+    const vaultItems: CoverflowItem[] = (proj?.assets ?? [])
+      .filter((a) => VIDEO_KINDS.has(a.kind))
+      .map((a) => ({
+        key: `asset-${a.id}`,
+        kind: 'asset' as const,
+        fileName: a.fileName,
+        kindLabel: VAULT_KIND_LABELS[a.kind] ?? a.kind,
+        status: a.status,
+        media: 'video' as const,
+        thumbUrl: a.status === 'PROCESSED' ? proxyUrlFor(projectId, a.id) : undefined,
+      }));
+    return [...versionItems, ...vaultItems];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions, project.data?.assets, projectId]);
+
+  const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : coverflowItems[0]?.key ?? null;
+
+  const onCoverflowSelect = (key: string) => {
+    if (key.startsWith('asset-')) {
+      setVaultAssetId(key.slice('asset-'.length));
+      setSelectedId(null);
+    } else {
+      setSelectedId(key.slice('version-'.length));
+      setVaultAssetId(null);
+    }
+  };
+
+  // The asset actually shown in the player — feeds the oracle's context
+  // (transcript + vault). Same query key the canvas uses, so no duplicate fetch.
+  const canvasAssetId = useMemo(() => {
+    const proj = project.data;
+    if (!proj) return '';
+    const snap = (selectedDetail.data?.snapshot ?? null) as TimelineSnapshotLike | null;
+    const clips = Array.isArray(snap?.clips) ? snap!.clips! : [];
+    const firstClipAsset = clips[0]?.assetId;
+    const vaultVideo = proj.assets.find((a) => VIDEO_KINDS.has(a.kind) && a.status === 'PROCESSED') ?? proj.assets.find((a) => VIDEO_KINDS.has(a.kind)) ?? null;
+    return (vaultAssetId && proj.assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : '') ||
+      (firstClipAsset && proj.assets.some((a) => a.id === firstClipAsset) ? firstClipAsset : '') ||
+      vaultVideo?.id || '';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.data, vaultAssetId, selectedDetail.data?.snapshot]);
+
+  const oracleAsset = useGetVideoAsset(projectId, canvasAssetId, {
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, canvasAssetId),
+      enabled: Boolean(canvasAssetId),
+    },
+  });
+
+  const oracleContext = useMemo(() => {
+    const proj = project.data;
+    if (!proj) return '';
+    const lines = (oracleAsset.data?.transcript?.segments ?? [])
+      .map((s) => `${formatTimecode(s.startMs)}–${formatTimecode(s.endMs)}: ${s.text}`)
+      .join('\n');
+    return [
+      `Project: ${proj.name}`,
+      `Active: ${activeVersion ? `${activeVersion.leg} v${activeVersion.version}${activeVersion.message ? ` — ${activeVersion.message}` : ''}` : vaultAssetId ? 'a vault file' : 'nothing yet'}`,
+      `Vault (${proj.assets.length} file${proj.assets.length === 1 ? '' : 's'}): ${proj.assets.map((a) => `${a.fileName} [${a.kind}]`).join(', ') || 'empty'}`,
+      `Transcript:\n${lines.slice(0, 6000) || '(no transcript yet)'}`,
+    ].join('\n\n').slice(0, 12000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.data, activeVersion, vaultAssetId, oracleAsset.data]);
 
   if (project.isLoading) {
     return (
@@ -227,33 +318,23 @@ export default function RoleVideoPage() {
 
   const p = project.data;
 
-  // The file shown in the player — the selected version's first clip when it
-  // still exists in the vault, otherwise the first playable video asset.
-  const versionSnap = (selectedDetail.data?.snapshot ?? null) as TimelineSnapshotLike | null;
-  const versionClips = Array.isArray(versionSnap?.clips) ? versionSnap!.clips! : [];
-  const firstClipAsset = versionClips[0]?.assetId;
-  const vaultVideo = p.assets.find((a) => VIDEO_KINDS.has(a.kind) && a.status === 'PROCESSED') ?? p.assets.find((a) => VIDEO_KINDS.has(a.kind)) ?? null;
-  const downloadAssetId = (firstClipAsset && p.assets.some((a) => a.id === firstClipAsset) ? firstClipAsset : '') || vaultVideo?.id || '';
-
   return (
     <RoleLayout
       versions={
-        <VersionList
-          versions={versions}
-          selectedId={selected?.id ?? null}
-          onSelect={setSelectedId}
-          emptyText="No selects or cut versions saved yet — save a snapshot in the Selects or Cut studio first."
+        <CoverflowCarousel
+          items={coverflowItems}
+          activeKey={activeKey}
+          onSelect={onCoverflowSelect}
+          emptyText="No versions or vault files yet — save a snapshot in the Selects or Cut studio, or upload footage above."
         />
       }
       canvas={
         <VideoCanvas
           projectId={p.id}
-          version={selected ? { id: selected.id, leg: selected.leg, version: selected.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+          version={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
           assets={p.assets}
+          vaultAssetId={vaultAssetId ?? undefined}
         />
-      }
-      download={
-        <RoleDownloadBar projectId={p.id} assetId={downloadAssetId} label="video file" released={p.status === 'RELEASED'} />
       }
       notes={
         <PreviewNotesPanel
@@ -261,8 +342,23 @@ export default function RoleVideoPage() {
           legs={VIDEO_LEGS}
         />
       }
+      oracle={
+        <RoleOracle
+          leg="CUT"
+          roleName="Visual Editor"
+          context={oracleContext}
+          placeholder="e.g. Where should the next cut land, and which take is strongest?"
+        />
+      }
       upload={
-        <RoleUploadBar projectId={p.id} label="video file" accept={VIDEO_ACCEPT} kind="RAW_VIDEO" checkFormat={checkVideoFile} />
+        <RoleUploadCard
+          projectId={p.id}
+          label="video file"
+          kinds={VIDEO_UPLOAD_KINDS}
+          defaultKind="RAW_VIDEO"
+          accept={VIDEO_ACCEPT}
+          checkFormat={checkVideoFile}
+        />
       }
     />
   );
