@@ -60,7 +60,10 @@ function ThumbnailCanvas({
       null,
     [assets],
   );
-  const assetId = design?.assetId || fallback?.id || '';
+  // A version's chosen design may reference an asset that is no longer in the
+  // vault — validate it so the stage always shows a real image.
+  const designAssetId = design?.assetId && assets.some((a) => a.id === design.assetId) ? design.assetId : '';
+  const assetId = designAssetId || fallback?.id || '';
 
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="thumbnail-canvas">
