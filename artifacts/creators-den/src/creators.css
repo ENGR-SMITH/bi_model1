@@ -833,10 +833,15 @@
 .activity-page .cd-split-left,
 .activity-page .cd-split-mid {
   overflow-y: auto;
+  /* The scrollbar rail is hidden — the columns stay scrollable (wheel /
+     drag) but no scrollbar line shows. */
+  scrollbar-width: none;
   max-height: calc(100dvh - 107px - 30px - 72px); /* topnav + presence +
     filter+gap — columns scroll inside this cap */
   min-height: 0;
 }
+.activity-page .cd-split-left::-webkit-scrollbar,
+.activity-page .cd-split-mid::-webkit-scrollbar { display: none; }
 
 /* Narrow screens fall back to a normal window-scrolled, stacked layout. */
 @media (max-width: 1240px) {
@@ -923,7 +928,7 @@
    vertical ladder arrows climb, so .snake and .snake-arrow-v share it; each row
    sets --snake-gap for its column gutter (and the horizontal arrow that spans it). */
 .snake { --snake-vgap: 62px; display: flex; flex-direction: column; gap: var(--snake-vgap); margin-top: var(--sp-1); }
-.snake-row { --snake-gap: clamp(40px, 4.5vw, 72px); position: relative; display: grid; grid-template-columns: 1fr 1fr; column-gap: var(--snake-gap); align-items: stretch; }
+.snake-row { --snake-gap: clamp(40px, 4.5vw, 72px); position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: var(--snake-gap); align-items: stretch; }
 
 /* Node card — a paper tile with a role-coloured spine (`--spine`, set inline).
    The newest version wears the accent "head" ring; vault uploads switch to the
