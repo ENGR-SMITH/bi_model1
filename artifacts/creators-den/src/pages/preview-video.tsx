@@ -23,14 +23,16 @@ import {
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
-import { AssetPlayer, EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
+import { AssetPlayer, EmptyPlayer, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { formatTimecode } from '@/components/timeline';
 import {
   FullscreenButton,
   PreviewLayout,
   PreviewNotesPanel,
+  VAULT_KIND_LABELS,
   VersionCarousel,
+  type CarouselItem,
   type PreviewVersion,
 } from '@/components/preview-shared';
 import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
@@ -49,15 +51,19 @@ function VideoCanvas({
   projectId,
   version,
   assets,
+  vaultAssetId,
 }: {
   projectId: string;
   version: { id: string; leg: StudioLeg; version: number; snapshot: unknown } | null;
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
+  /** Explicit vault asset to preview (picked from the timeline row). */
+  vaultAssetId?: string | null;
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const annotationDockRef = useRef<HTMLDivElement>(null);
+  const annotationHeaderRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
 
   const snap = version ? ((version.snapshot ?? null) as TimelineSnapshotLike | null) : null;
@@ -73,9 +79,11 @@ function VideoCanvas({
   );
   // A snapshot clip may reference an asset that is no longer in the vault
   // (or still processing) — validate against the project's assets so the
-  // canvas always falls back to real, playable media.
+  // canvas always falls back to real, playable media. An explicitly picked
+  // vault file (from the timeline row) wins over everything.
+  const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : '';
   const clipAssetId = activeClip?.assetId && assets.some((a) => a.id === activeClip.assetId) ? activeClip.assetId : '';
-  const assetId = clipAssetId || fallback?.id || '';
+  const assetId = explicitAsset || clipAssetId || fallback?.id || '';
   const detail = useGetVideoAsset(projectId, assetId, {
     query: {
       queryKey: getGetVideoAssetQueryKey(projectId, assetId),
@@ -112,6 +120,7 @@ function VideoCanvas({
         <span className="flex items-center gap-2">
           {!version && <span className="den-tag teal">vault preview</span>}
           <span className="mono-label">{formatTimecode(playheadMs)}</span>
+          <div ref={annotationHeaderRef} className="annotation-header-slot" />
         </span>
       </div>
       <div className="pv-stage-player mt-2">
@@ -133,6 +142,7 @@ function VideoCanvas({
               onSeek={onSeek}
               timelineVersionId={version?.id}
               dockRef={annotationDockRef}
+              headerRef={annotationHeaderRef}
             />
             <FullscreenButton targetRef={stageRef} />
           </AssetPlayer>
@@ -186,19 +196,65 @@ export default function VideoPreviewPage() {
   }, [selectsVersions.data, cutVersions.data, selectsTimeline.data?.version, cutTimeline.data?.version]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
 
-  // Default to the newest version once the list arrives.
+  // Default to the newest version once the list arrives (unless a vault file
+  // has been picked from the timeline row).
   useEffect(() => {
-    if (!selectedId && versions.length > 0) setSelectedId(versions[0].id);
-  }, [versions, selectedId]);
+    if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
+  }, [versions, selectedId, vaultAssetId]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
   const selectedDetail = useGetVideoTimelineVersion(projectId, selected?.leg ?? '', selected?.id ?? '', {
     query: {
       queryKey: getGetVideoTimelineVersionQueryKey(projectId, selected?.leg ?? '', selected?.id ?? ''),
-      enabled: Boolean(selected),
+      enabled: Boolean(selected) && !vaultAssetId,
     },
   });
+
+  // While a vault file is being previewed there is no active version — the
+  // canvas shows the picked file instead of the newest version's clip.
+  const activeVersion = vaultAssetId ? null : selected;
+
+  // Timeline row: versions (newest first) + the vault's video uploads.
+  const carouselItems = useMemo<CarouselItem[]>(() => {
+    const versionItems: CarouselItem[] = versions.map((v) => ({
+      key: `version-${v.id}`,
+      kind: 'version',
+      id: v.id,
+      leg: v.leg,
+      version: v.version,
+      message: v.message,
+      createdAt: v.createdAt,
+      isHead: v.isHead,
+    }));
+    const vaultItems: CarouselItem[] = (project.data?.assets ?? [])
+      .filter((a) => VIDEO_KINDS.has(a.kind))
+      .map((a) => ({
+        key: `asset-${a.id}`,
+        kind: 'asset',
+        id: a.id,
+        fileName: a.fileName,
+        kindLabel: VAULT_KIND_LABELS[a.kind] ?? a.kind,
+        status: a.status,
+        media: 'video',
+        thumbUrl: a.status === 'PROCESSED' ? proxyUrlFor(projectId, a.id) : undefined,
+      }));
+    return [...versionItems, ...vaultItems];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions, project.data?.assets, projectId]);
+
+  const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : carouselItems[0]?.key ?? null;
+
+  const onCarouselSelect = (key: string) => {
+    if (key.startsWith('asset-')) {
+      setVaultAssetId(key.slice('asset-'.length));
+      setSelectedId(null);
+    } else {
+      setSelectedId(key.slice('version-'.length));
+      setVaultAssetId(null);
+    }
+  };
 
   if (project.isLoading) {
     return (
@@ -225,8 +281,9 @@ export default function VideoPreviewPage() {
       canvas={
         <VideoCanvas
           projectId={p.id}
-          version={selected ? { id: selected.id, leg: selected.leg, version: selected.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+          version={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
           assets={p.assets}
+          vaultAssetId={vaultAssetId ?? undefined}
         />
       }
       rail={
@@ -237,9 +294,9 @@ export default function VideoPreviewPage() {
       }
       versions={
         <VersionCarousel
-          versions={versions}
-          selectedId={selected?.id ?? null}
-          onSelect={setSelectedId}
+          items={carouselItems}
+          activeKey={activeKey}
+          onSelect={onCarouselSelect}
           emptyText="No selects or cut versions saved yet — save a snapshot in the Selects or Cut studio first."
         />
       }

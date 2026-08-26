@@ -25,7 +25,9 @@ import {
   FullscreenButton,
   PreviewLayout,
   PreviewNotesPanel,
+  VAULT_KIND_LABELS,
   VersionCarousel,
+  type CarouselItem,
   type PreviewVersion,
 } from '@/components/preview-shared';
 
@@ -40,13 +42,17 @@ function ThumbnailCanvas({
   projectId,
   version,
   assets,
+  vaultAssetId,
 }: {
   projectId: string;
   version: { id: string; version: number; snapshot: unknown } | null;
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
+  /** Explicit vault asset to preview (picked from the timeline row). */
+  vaultAssetId?: string | null;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const annotationDockRef = useRef<HTMLDivElement>(null);
+  const annotationHeaderRef = useRef<HTMLDivElement>(null);
 
   const snap = version ? ((version.snapshot ?? null) as {
     designs?: Array<{ id?: string; assetId: string; title?: string; style?: string }>;
@@ -62,9 +68,11 @@ function ThumbnailCanvas({
     [assets],
   );
   // A version's chosen design may reference an asset that is no longer in the
-  // vault — validate it so the stage always shows a real image.
+  // vault — validate it so the stage always shows a real image. An explicitly
+  // picked vault file (from the timeline row) wins over everything.
+  const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : '';
   const designAssetId = design?.assetId && assets.some((a) => a.id === design.assetId) ? design.assetId : '';
-  const assetId = designAssetId || fallback?.id || '';
+  const assetId = explicitAsset || designAssetId || fallback?.id || '';
 
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="thumbnail-canvas">
@@ -72,6 +80,7 @@ function ThumbnailCanvas({
         <span className="eyebrow"><ImageIcon size={13} /> Big canvas{version ? ` · THUMBNAIL v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
           {!version && <span className="den-tag teal">vault preview</span>}
+          <div ref={annotationHeaderRef} className="annotation-header-slot" />
         </span>
       </div>
       <div className="pv-stage-player mt-2">
@@ -84,6 +93,7 @@ function ThumbnailCanvas({
               playheadMs={null}
               timelineVersionId={version?.id}
               dockRef={annotationDockRef}
+              headerRef={annotationHeaderRef}
             />
             <FullscreenButton targetRef={stageRef} />
           </ImageStage>
@@ -128,18 +138,62 @@ export default function ThumbnailPreviewPage() {
   );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!selectedId && versions.length > 0) setSelectedId(versions[0].id);
-  }, [versions, selectedId]);
+    if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
+  }, [versions, selectedId, vaultAssetId]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
   const selectedDetail = useGetVideoTimelineVersion(projectId, selected?.leg ?? '', selected?.id ?? '', {
     query: {
       queryKey: getGetVideoTimelineVersionQueryKey(projectId, selected?.leg ?? '', selected?.id ?? ''),
-      enabled: Boolean(selected),
+      enabled: Boolean(selected) && !vaultAssetId,
     },
   });
+
+  // While a vault file is being previewed there is no active version.
+  const activeVersion = vaultAssetId ? null : selected;
+
+  // Timeline row: versions (newest first) + the vault's image uploads.
+  const carouselItems = useMemo<CarouselItem[]>(() => {
+    const versionItems: CarouselItem[] = versions.map((v) => ({
+      key: `version-${v.id}`,
+      kind: 'version',
+      id: v.id,
+      leg: v.leg,
+      version: v.version,
+      message: v.message,
+      createdAt: v.createdAt,
+      isHead: v.isHead,
+    }));
+    const vaultItems: CarouselItem[] = (project.data?.assets ?? [])
+      .filter((a) => IMAGE_KINDS.has(a.kind))
+      .map((a) => ({
+        key: `asset-${a.id}`,
+        kind: 'asset',
+        id: a.id,
+        fileName: a.fileName,
+        kindLabel: VAULT_KIND_LABELS[a.kind] ?? a.kind,
+        status: a.status,
+        media: 'image',
+        thumbUrl: a.status === 'PROCESSED' ? proxyUrlFor(projectId, a.id) : undefined,
+      }));
+    return [...versionItems, ...vaultItems];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions, project.data?.assets, projectId]);
+
+  const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : carouselItems[0]?.key ?? null;
+
+  const onCarouselSelect = (key: string) => {
+    if (key.startsWith('asset-')) {
+      setVaultAssetId(key.slice('asset-'.length));
+      setSelectedId(null);
+    } else {
+      setSelectedId(key.slice('version-'.length));
+      setVaultAssetId(null);
+    }
+  };
 
   if (project.isLoading) {
     return (
@@ -169,8 +223,9 @@ export default function ThumbnailPreviewPage() {
       canvas={
         <ThumbnailCanvas
           projectId={p.id}
-          version={selected ? { id: selected.id, version: selected.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+          version={activeVersion ? { id: activeVersion.id, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
           assets={p.assets}
+          vaultAssetId={vaultAssetId ?? undefined}
         />
       }
       rail={
@@ -182,9 +237,9 @@ export default function ThumbnailPreviewPage() {
       }
       versions={
         <VersionCarousel
-          versions={versions}
-          selectedId={selected?.id ?? null}
-          onSelect={setSelectedId}
+          items={carouselItems}
+          activeKey={activeKey}
+          onSelect={onCarouselSelect}
           emptyText="No thumbnail versions saved yet — save a snapshot in the Thumbnail studio first."
         />
       }

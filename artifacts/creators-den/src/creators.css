@@ -252,6 +252,30 @@ select optgroup {
   max-height: none;
 }
 
+/* The header edit (pencil) button — the annotation toggle pinned to the card
+   header's top-right corner, styled like the familiar editing-tools affordance. */
+.annotation-header-slot {
+  display: inline-flex;
+  align-items: center;
+}
+.annotation-edit-btn {
+  position: static;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+}
+.annotation-edit-btn:hover { background: hsl(var(--accent) / .16); }
+.annotation-edit-btn.active {
+  background: hsl(var(--accent));
+  border-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  box-shadow: 0 0 0 3px hsl(var(--accent) / .2);
+}
+
 /* ============================================================================
    Netflix + YouTube layout primitives — dark-cinematic redesign
    Additive: existing .den-* classes stay and reskin via tokens.

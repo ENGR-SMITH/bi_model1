@@ -22,9 +22,12 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  FileVideo2,
   FolderOpen,
+  Image as ImageIcon,
   Maximize,
   MessageSquare,
+  Mic2,
   Minimize,
   Play,
   Upload,
@@ -84,15 +87,41 @@ export interface PreviewVersion {
   isHead: boolean;
 }
 
+/** One card in the preview timeline row — a saved version OR a vault file. */
+export type CarouselItem =
+  | {
+      key: string;
+      kind: 'version';
+      id: string;
+      leg: StudioLeg;
+      version: number;
+      message: string;
+      createdAt: string;
+      isHead: boolean;
+    }
+  | {
+      key: string;
+      kind: 'asset';
+      id: string;
+      fileName: string;
+      kindLabel: string;
+      status: string;
+      media: 'video' | 'audio' | 'image';
+      /** Proxy stream for the thumbnail — present once the asset is PROCESSED. */
+      thumbUrl?: string;
+    };
+
 export function VersionCarousel({
-  versions,
-  selectedId,
+  items,
+  activeKey,
   onSelect,
   emptyText,
 }: {
-  versions: PreviewVersion[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
+  /** Timeline versions (newest first) + the vault's uploads for this page. */
+  items: CarouselItem[];
+  /** The currently-active item's key (`version-…` or `asset-…`). */
+  activeKey: string | null;
+  onSelect: (key: string) => void;
   emptyText: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -107,38 +136,69 @@ export function VersionCarousel({
     <div className="paper-card pv-carousel" data-testid="version-carousel">
       <div className="inline-heading">
         <span className="eyebrow"><Clock3 size={13} /> Timeline versions</span>
-        <span className="mono-label">{versions.length} saved</span>
+        <span className="mono-label">{items.length} on record</span>
       </div>
-      {versions.length === 0 ? (
+      {items.length === 0 ? (
         <p className="setting-copy mt-2" data-testid="version-carousel-empty">{emptyText}</p>
       ) : (
         <div className="pv-carousel-wrap">
-          <button type="button" className="pv-carousel-arrow" onClick={() => scrollByCards(-1)} aria-label="Earlier versions" data-testid="carousel-prev">
+          <button type="button" className="pv-carousel-arrow" onClick={() => scrollByCards(-1)} aria-label="Earlier items" data-testid="carousel-prev">
             <ChevronLeft size={16} />
           </button>
           <div className="pv-carousel-track" ref={trackRef} data-testid="carousel-track">
-            {versions.map((version) => {
-              const active = version.id === selectedId;
+            {items.map((item) => {
+              const active = item.key === activeKey;
               return (
                 <button
-                  key={version.id}
+                  key={item.key}
                   type="button"
                   className={`pv-version-card ${active ? 'active' : ''}`}
-                  onClick={() => onSelect(version.id)}
-                  data-testid={`version-card-${version.leg}-${version.version}`}
+                  onClick={() => onSelect(item.key)}
+                  data-testid={`carousel-card-${item.key}`}
                 >
-                  <span className="pv-version-head">
-                    <span className="den-tag accent">v{version.version}</span>
-                    <span className="pv-version-leg">{version.leg}</span>
-                    {version.isHead && <span className="den-tag teal">head</span>}
-                  </span>
-                  {version.message ? <b className="pv-version-msg truncate">{version.message}</b> : <b className="pv-version-msg muted">no message</b>}
-                  <span className="pv-version-date">{new Date(version.createdAt).toLocaleDateString()} · {new Date(version.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                  {item.kind === 'version' ? (
+                    <>
+                      <span className="pv-version-head">
+                        <span className="den-tag accent">v{item.version}</span>
+                        <span className="pv-version-leg">{item.leg}</span>
+                        {item.isHead && <span className="den-tag teal">head</span>}
+                      </span>
+                      {item.message ? <b className="pv-version-msg truncate">{item.message}</b> : <b className="pv-version-msg muted">no message</b>}
+                      <span className="pv-version-date">{new Date(item.createdAt).toLocaleDateString()} · {new Date(item.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="pv-version-head">
+                        <span className="vs-thumb">
+                          {item.thumbUrl && item.media !== 'audio' ? (
+                            item.media === 'image' ? (
+                              <img
+                                src={item.thumbUrl}
+                                alt=""
+                                loading="lazy"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <video src={`${item.thumbUrl}#t=0.5`} muted playsInline preload="metadata" />
+                            )
+                          ) : (
+                            item.media === 'audio' ? <Mic2 size={14} /> : item.media === 'image' ? <ImageIcon size={14} /> : <FileVideo2 size={14} />
+                          )}
+                        </span>
+                        <span className="pv-version-leg">{item.kindLabel}</span>
+                        {item.status !== 'PROCESSED' && <span className="den-tag gold">processing</span>}
+                      </span>
+                      <b className="pv-version-msg truncate">{item.fileName}</b>
+                      <span className="pv-version-date">{item.status === 'PROCESSED' ? 'in the vault' : 'processing…'}</span>
+                    </>
+                  )}
                 </button>
               );
             })}
           </div>
-          <button type="button" className="pv-carousel-arrow" onClick={() => scrollByCards(1)} aria-label="Later versions" data-testid="carousel-next">
+          <button type="button" className="pv-carousel-arrow" onClick={() => scrollByCards(1)} aria-label="Later items" data-testid="carousel-next">
             <ChevronRight size={16} />
           </button>
         </div>
