@@ -1225,13 +1225,24 @@
   min-width: 0;
 }
 
-/* The relay deck — the middle column: original tab styling, horizontal scroll
-   when the tabs outrun the width. Stretched full height so the active-stage
-   rail sits on the row's baseline. */
-.cd-topnav-tabs {
+/* The relay deck — the middle column: tabs cut apart from the side columns by
+   a vertical divider on each side (mirrors the in-deck tab divider), with a
+   breathing gap before and after each cut. */
+.cd-topnav-deck {
   grid-column: 2; justify-self: center;
-  display: flex; align-items: stretch; gap: var(--sp-2);
+  display: flex; align-items: center;
+  gap: var(--sp-3);
   min-width: 0; max-width: 100%;
+}
+.cd-topnav-deck .cd-topnav-divider {
+  flex: 0 0 auto;
+  width: 1px; height: 24px;
+  background: linear-gradient(hsl(var(--border) / 0), hsl(var(--border)), hsl(var(--border) / 0));
+}
+.cd-topnav-tabs {
+  display: flex; align-items: stretch; gap: var(--sp-2);
+  align-self: stretch;            /* rail sits flush on the row's baseline */
+  min-width: 0;
   overflow-x: auto;               /* horizontal scroll when tabs outrun the width */
   scrollbar-width: none;
 }
