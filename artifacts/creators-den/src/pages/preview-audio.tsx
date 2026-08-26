@@ -23,7 +23,7 @@ import {
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
-import { EmptyPlayer } from '@/components/asset-preview';
+import { EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import {
   FullscreenButton,
@@ -71,9 +71,18 @@ function AudioCanvas({
       null,
     [assets],
   );
-  const assetId = clips[0]?.assetId ?? music[0]?.assetId ?? pickups[0]?.assetId ?? fallback?.id ?? '';
+  // Validate snapshot references against the vault so a stale/missing asset
+  // falls back to real, playable audio.
+  const firstValid = (id?: string) => (id && assets.some((a) => a.id === id) ? id : undefined);
+  const assetId = firstValid(clips[0]?.assetId) ?? firstValid(music[0]?.assetId) ?? firstValid(pickups[0]?.assetId) ?? fallback?.id ?? '';
   const detail = useGetVideoAsset(projectId, assetId, {
-    query: { queryKey: getGetVideoAssetQueryKey(projectId, assetId), enabled: Boolean(assetId) },
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, assetId),
+      enabled: Boolean(assetId),
+      // Keep fetching until the proxy finishes, then stop on its own — same
+      // behaviour as the vault player.
+      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+    },
   });
   const onSeek = (ms: number) => setPlayheadMs(ms);
 

@@ -23,7 +23,7 @@ import {
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
-import { AssetPlayer, EmptyPlayer } from '@/components/asset-preview';
+import { AssetPlayer, EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { formatTimecode } from '@/components/timeline';
 import {
@@ -70,9 +70,19 @@ function VideoCanvas({
       null,
     [assets],
   );
-  const assetId = activeClip?.assetId || fallback?.id || '';
+  // A snapshot clip may reference an asset that is no longer in the vault
+  // (or still processing) — validate against the project's assets so the
+  // canvas always falls back to real, playable media.
+  const clipAssetId = activeClip?.assetId && assets.some((a) => a.id === activeClip.assetId) ? activeClip.assetId : '';
+  const assetId = clipAssetId || fallback?.id || '';
   const detail = useGetVideoAsset(projectId, assetId, {
-    query: { queryKey: getGetVideoAssetQueryKey(projectId, assetId), enabled: Boolean(assetId) },
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, assetId),
+      enabled: Boolean(assetId),
+      // Keep fetching until the proxy finishes, then stop on its own — same
+      // behaviour as the vault player.
+      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+    },
   });
   const onSeek = (ms: number) => {
     setPlayheadMs(ms);
