@@ -271,6 +271,15 @@ export default function RoleScriptPage() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  // Restore the saved script into the editor on mount — the html state comes
+  // from localStorage but is only ever rendered here, so without this the
+  // editor would come back empty after leaving the page.
+  useEffect(() => {
+    const el = editorRef.current;
+    if (el && html) el.innerHTML = html;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Draw every script comment's highlighted passage into the editor (marks
   // already saved in the html are left alone). Edits never lose them — the
   // marks live inside the stored html.
