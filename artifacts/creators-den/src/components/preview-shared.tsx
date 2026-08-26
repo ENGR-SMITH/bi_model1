@@ -44,6 +44,9 @@ import { formatClock, proxyUrlFor } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
 import { geometryKey, parseGeometry, reviewerColor, reviewerLabel } from '@/lib/annotations';
 
+/** Green used to mark a resolved comment / annotation as solved. */
+const RESOLVED_GREEN = 'hsl(150 52% 42%)';
+
 // ---------------------------------------------------------------------------
 // PreviewLayout
 // ---------------------------------------------------------------------------
@@ -524,8 +527,11 @@ export function PreviewNotesPanel({
             const color = reviewerColor(first.authorId);
             const label = reviewerLabel(first.authorId);
             const times = [...new Set(pin.comments.map((c) => c.timecodeMs).filter((t): t is number => t != null))];
+            // A frame is solved when every note on it has been resolved — the
+            // tag turns green to show the issue is closed.
+            const resolved = pin.comments.length > 0 && pin.comments.every((c) => c.resolvedAt);
             return (
-              <div key={pin.key} className="pv-note-pin" data-testid={`preview-pin-${pin.key}`}>
+              <div key={pin.key} className={`pv-note-pin ${resolved ? 'is-resolved' : ''}`} data-testid={`preview-pin-${pin.key}`}>
                 <button
                   type="button"
                   className="pv-note-pin-head"
@@ -534,14 +540,18 @@ export function PreviewNotesPanel({
                   }}
                   title={times.length > 0 ? `Seek to ${formatTimecode(times[0])}` : 'on the frame'}
                 >
-                  <span className="annotation-pin-dot" style={{ background: color }}>{label}</span>
+                  <span className="annotation-pin-dot" style={{ background: resolved ? RESOLVED_GREEN : color }}>{label}</span>
                   <b>{pin.comments.length} note{pin.comments.length === 1 ? '' : 's'} on frame</b>
+                  {resolved && <span className="den-tag teal" data-testid={`preview-pin-solved-${pin.key}`}>solved</span>}
                   {times.length > 0 && <span className="mono-label">{formatTimecode(times[0])}</span>}
                 </button>
                 <div className="pv-note-pin-body">
                   {pin.comments.map((comment) => (
                     <div key={comment.id} className="list-row" data-testid={`preview-pin-comment-${comment.id}`}>
-                      <span className="annotation-pin-dot" style={{ background: reviewerColor(comment.authorId), width: 18, height: 18, fontSize: 9 }}>
+                      <span
+                        className="annotation-pin-dot"
+                        style={{ background: comment.resolvedAt ? RESOLVED_GREEN : reviewerColor(comment.authorId), width: 18, height: 18, fontSize: 9 }}
+                      >
                         {reviewerLabel(comment.authorId)}
                       </span>
                       <span>
@@ -550,7 +560,14 @@ export function PreviewNotesPanel({
                         </b>
                         <small className="!normal-case">{comment.body}</small>
                       </span>
-                      <button type="button" className="link-btn" onClick={() => onResolve(comment.id, !comment.resolvedAt)} title={comment.resolvedAt ? 'Reopen' : 'Resolve'}>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        style={comment.resolvedAt ? { color: RESOLVED_GREEN } : undefined}
+                        onClick={() => onResolve(comment.id, !comment.resolvedAt)}
+                        title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
+                        data-testid={`preview-resolve-${comment.id}`}
+                      >
                         <Check size={12} />
                       </button>
                     </div>
@@ -572,13 +589,26 @@ export function PreviewNotesPanel({
                 <b className="mono-label !text-[9px]">
                   {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'project note'}
                   {comment.color && comment.label && (
-                    <span className="annotation-pin-dot" style={{ background: comment.color, width: 14, height: 14, fontSize: 7, display: 'inline-flex', marginLeft: 6, verticalAlign: 'middle' }}>
+                    <span
+                      className="annotation-pin-dot"
+                      style={{ background: comment.resolvedAt ? RESOLVED_GREEN : comment.color, width: 14, height: 14, fontSize: 7, display: 'inline-flex', marginLeft: 6, verticalAlign: 'middle' }}
+                    >
                       {comment.label}
                     </span>
                   )}
                 </b>
                 <small className="!normal-case">{comment.body}</small>
               </span>
+              <button
+                type="button"
+                className="link-btn"
+                style={comment.resolvedAt ? { color: RESOLVED_GREEN } : undefined}
+                onClick={() => onResolve(comment.id, !comment.resolvedAt)}
+                title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
+                data-testid={`preview-note-resolve-${comment.id}`}
+              >
+                <Check size={12} />
+              </button>
               <button
                 type="button"
                 className="link-btn"

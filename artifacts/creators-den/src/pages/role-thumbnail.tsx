@@ -95,12 +95,15 @@ function ThumbnailCanvas({
       <div className="pv-stage-player mt-3">
         {assetId ? (
           <ImageStage src={proxyUrlFor(projectId, assetId)}>
+            {/* Review pins still render; the Annotate button is intentionally
+                off here — pins are managed from the preview studios instead. */}
             <AnnotationCanvas
               projectId={projectId}
               leg="THUMBNAIL"
               assetId={assetId}
               playheadMs={null}
               timelineVersionId={version?.id}
+              canAnnotate={false}
             />
             <FullscreenButton targetRef={stageRef} />
           </ImageStage>

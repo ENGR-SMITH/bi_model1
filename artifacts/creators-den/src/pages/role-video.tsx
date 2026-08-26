@@ -28,7 +28,6 @@ import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { VersionShelf, type ShelfItem } from '@/components/version-shelf';
 import { formatTimecode } from '@/components/timeline';
 import {
-  FullscreenButton,
   PreviewNotesPanel,
   RoleLayout,
   RoleUploadCard,
@@ -72,7 +71,6 @@ function VideoCanvas({
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
 
   const snap = version ? ((version.snapshot ?? null) as TimelineSnapshotLike | null) : null;
@@ -123,7 +121,7 @@ function VideoCanvas({
   }, [comments.data, clips, version]);
 
   return (
-    <div className="paper-card pv-stage" ref={stageRef} data-testid="video-canvas">
+    <div className="paper-card pv-stage" data-testid="video-canvas">
       <div className="inline-heading">
         <span className="eyebrow"><Play size={13} /> Big canvas{version ? ` · ${version.leg} v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
@@ -142,6 +140,9 @@ function VideoCanvas({
             onTimeUpdate={setPlayheadMs}
             markers={markers}
           >
+            {/* Review pins still render; the Annotate button is intentionally
+                off here — the video player has native fullscreen, and pins
+                are managed from the preview studios instead. */}
             <AnnotationCanvas
               projectId={projectId}
               leg={version?.leg ?? 'SELECTS'}
@@ -149,8 +150,8 @@ function VideoCanvas({
               playheadMs={playheadMs}
               onSeek={onSeek}
               timelineVersionId={version?.id}
+              canAnnotate={false}
             />
-            <FullscreenButton targetRef={stageRef} />
           </AssetPlayer>
         ) : (
           <EmptyPlayer>
