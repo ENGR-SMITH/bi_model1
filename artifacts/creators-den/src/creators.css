@@ -5,19 +5,20 @@
    Built on top of the shared design system (index.css).
    ============================================================================ */
 
-/* ---- Dropdowns: black, never white --------------------------------------- */
-/* Un-styled <select>s fall back to the browser's white default — force every
-   dropdown in Creator-Den to a black field with a black option list and
-   light text, and switch the native control to the dark colour scheme so the
-   arrow + popup follow. */
+/* ---- Dropdowns: the page's colour, never white --------------------------- */
+/* Un-styled <select>s fall back to the browser's white default — give every
+   dropdown in Creator-Den the page's own background colour (dark gray, not
+   pure black) with a matching option list, light text, and a dark colour
+   scheme so the arrow + popup follow. Intentional class styles (already
+   dark) keep theirs. */
 select {
-  background-color: #000 !important;
+  background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   color-scheme: dark;
 }
 select option,
 select optgroup {
-  background-color: #000;
+  background-color: hsl(var(--background));
   color: hsl(var(--foreground));
 }
 
