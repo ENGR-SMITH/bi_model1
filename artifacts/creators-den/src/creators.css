@@ -1891,9 +1891,12 @@
 }
 .pv-fs:hover { border-color: hsl(var(--accent)); background: hsl(0 0% 0% / .72); color: hsl(var(--accent)); }
 
-/* ---- Role pages: 10 / 50 / 40 columns, 68 / 32 rows ---- */
+/* ---- Role pages: 10 / 50 / 40 columns, 32 / 68 rows ---- */
 /* The role pages keep a slim margin gap around the grid (the full-bleed
-   edge-to-edge look was dropped in favour of a little breathing room). */
+   edge-to-edge look was dropped in favour of a little breathing room). The
+   oracle and the pin/comment wall swapped positions but kept their heights:
+   the oracle stays the short panel (32%, now on top) and the notes keep the
+   tall panel (68%, now on the bottom). */
 .role-page {
   max-width: none;
   padding: 20px clamp(18px, 2.5vw, 34px);
@@ -1904,7 +1907,7 @@
   min-height: 0;
   display: grid;
   grid-template-columns: 10fr 50fr 40fr;
-  grid-template-rows: minmax(0, 68fr) minmax(0, 32fr);
+  grid-template-rows: minmax(0, 32fr) minmax(0, 68fr);
   gap: 16px;
 }
 .role-versions-col {
@@ -2140,17 +2143,41 @@
 }
 
 /* ---- Version & vault vertical coverflow (role column 1) ----
-   The leg's timeline versions + the vault's uploads stack vertically in 3D:
-   the active (latest) item sits at the vertical focal point at full scale
-   and full opacity, while neighbours above and below recede with a rotateX +
-   translateZ tilt and fade towards the edges. Scroll or use the arrows to
-   bring any item to the focal point. */
+   The leg's timeline versions + the vault's uploads stack vertically in 3D.
+   A static blue focus frame is pinned at the column's vertical centre; the
+   item inside it sits at full scale and full opacity while neighbours above
+   and below recede with a rotateX + translateZ tilt and fade towards the
+   edges. The list scrolls under the fixed frame — scroll or use the arrows
+   to bring any item into it. */
 .vs-wrap {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.vs-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The fixed blue focus frame — centred on the column, never scrolls. Its
+   height is kept in sync (from JS) with the card currently inside it. */
+.vs-focus {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 2px solid hsl(212 90% 62%);
+  border-radius: 11px;
+  box-shadow:
+    0 0 0 3px hsl(212 90% 62% / .18),
+    0 0 20px hsl(212 90% 62% / .28);
+  pointer-events: none;
+  z-index: 5;
 }
 .vs-arrow {
   flex: 0 0 auto;

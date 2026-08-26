@@ -150,9 +150,11 @@ export function VersionCarousel({
 // ---------------------------------------------------------------------------
 // RoleLayout — the three role pages (Video / Audio / Thumbnail).
 // Three columns at 10 : 50 : 40, with the second and third columns split into
-// two rows at 68 : 32. Column one (the version & vault shelf) spans the full
+// two rows at 32 : 68. Column one (the version & vault shelf) spans the full
 // height; the bottom row of column two holds the upload card, and column
-// three stacks the oracle on top of the pin / comment wall.
+// three stacks the oracle on top of the pin / comment wall. The oracle and
+// the notes swapped positions but kept their heights — the oracle is the
+// short panel (32%, top), the notes the tall one (68%, bottom).
 // ---------------------------------------------------------------------------
 
 export function RoleLayout({
