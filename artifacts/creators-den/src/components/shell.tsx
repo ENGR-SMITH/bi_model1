@@ -215,57 +215,57 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        {/* Tier 2a — the workspace row (its own cut-out row, always visible). */}
-        <div className="cd-topnav-workspace-row">
-          <div className="top-workspace-wrap" onPointerLeave={() => setWorkspaceOpen(false)}>
-            <button
-              type="button"
-              className="top-workspace"
-              onClick={() => setWorkspaceOpen((open) => !open)}
-              data-testid="top-workspace"
-            >
-              <span>Workspace</span>
-              <b className="truncate">{current?.name ?? 'Home'}</b>
-              <ChevronDown size={13} />
-            </button>
-            {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
+        {/* Tier 2 — one row, three columns: workspace · relay deck · sign out. */}
+        <div className="cd-topnav-secondary">
+          <div className="cd-topnav-workspace-col">
+            <div className="top-workspace-wrap" onPointerLeave={() => setWorkspaceOpen(false)}>
+              <button
+                type="button"
+                className="top-workspace"
+                onClick={() => setWorkspaceOpen((open) => !open)}
+                data-testid="top-workspace"
+              >
+                <span>Workspace</span>
+                <b className="truncate">{current?.name ?? 'Home'}</b>
+                <ChevronDown size={13} />
+              </button>
+              {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
+            </div>
           </div>
-        </div>
 
-        {/* Tier 2b — the relay deck (middle row: project tabs, restored styling). */}
-        {projectId && (
-          <nav className="cd-topnav-tabs" aria-label="Project sections">
-            <div className="cd-tab-group">
-              {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
-              {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
-            </div>
-            <span className="cd-tab-divider" aria-hidden />
-            <div className="cd-tab-group cd-tab-stages">
-              {RELAY_LEGS.map((leg) => {
-                const href = `/projects/${projectId}/${leg.slug}`;
-                return (
-                  <Link
-                    key={leg.leg}
-                    href={href}
-                    title={leg.role}
-                    className={`cd-tab ${location === href ? 'active' : ''}`}
-                    data-testid={`nav-leg-${leg.slug}`}
-                  >
-                    <span className="cd-tab-num">{leg.number}</span>
-                    <span>{leg.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
-        )}
+          {projectId && (
+            <nav className="cd-topnav-tabs" aria-label="Project sections">
+              <div className="cd-tab-group">
+                {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
+                {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
+              </div>
+              <span className="cd-tab-divider" aria-hidden />
+              <div className="cd-tab-group cd-tab-stages">
+                {RELAY_LEGS.map((leg) => {
+                  const href = `/projects/${projectId}/${leg.slug}`;
+                  return (
+                    <Link
+                      key={leg.leg}
+                      href={href}
+                      title={leg.role}
+                      className={`cd-tab ${location === href ? 'active' : ''}`}
+                      data-testid={`nav-leg-${leg.slug}`}
+                    >
+                      <span className="cd-tab-num">{leg.number}</span>
+                      <span>{leg.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </nav>
+          )}
 
-        {/* Tier 2c — the sign-out row (its own cut-out row, bottom-right). */}
-        <div className="cd-topnav-signout-row">
-          <button type="button" className="cd-signout" onClick={logout} data-testid="button-creators-logout">
-            <LogOut size={14} />
-            <span>Sign out</span>
-          </button>
+          <div className="cd-topnav-signout-col">
+            <button type="button" className="cd-signout" onClick={logout} data-testid="button-creators-logout">
+              <LogOut size={14} />
+              <span>Sign out</span>
+            </button>
+          </div>
         </div>
       </header>
 
