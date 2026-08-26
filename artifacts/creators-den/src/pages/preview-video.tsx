@@ -62,7 +62,6 @@ function VideoCanvas({
   const [playheadMs, setPlayheadMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const annotationDockRef = useRef<HTMLDivElement>(null);
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
 
@@ -141,7 +140,6 @@ function VideoCanvas({
               playheadMs={playheadMs}
               onSeek={onSeek}
               timelineVersionId={version?.id}
-              dockRef={annotationDockRef}
               headerRef={annotationHeaderRef}
             />
             <FullscreenButton targetRef={stageRef} />
@@ -153,8 +151,6 @@ function VideoCanvas({
           </EmptyPlayer>
         )}
       </div>
-      {/* Annotation controls live below the player, not over the frame. */}
-      <div ref={annotationDockRef} className="annotation-dock" />
     </div>
   );
 }

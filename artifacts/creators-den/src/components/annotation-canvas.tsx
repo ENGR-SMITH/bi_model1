@@ -7,12 +7,14 @@
 // thread (and seeks the player to its timecode); with "Annotate" on, clicking
 // an empty part of the frame drops a new pin at that point, which becomes a
 // PIN comment scoped to the current playhead and (optionally) the head
-// timeline version. Reviewer color + label are derived from the author id, so
-// every reviewer is distinguishable with zero setup.
+// timeline version. The comment field pops up right at the clicked point.
+// Reviewer color + label are derived from the author id, so every reviewer is
+// distinguishable with zero setup.
 //
-// Pass `dockRef` to render the controls (Annotate toggle, composer, thread)
-// into a dock element below the player instead of overlaying the media; the
-// pins themselves always stay on the media.
+// Pass `headerRef` to render the annotate toggle as an edit (pencil) icon
+// button into that element (the card header's top-right corner); otherwise
+// the toggle stays as a pill over the media. Pass `dropLine` (audio wave) to
+// draw a red vertical line at the selected point while annotating.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
@@ -23,6 +25,7 @@ import { useUser } from '@clerk/react';
 import {
   getListVideoCommentsQueryKey,
   useCreateVideoComment,
+  useGetVideoProject,
   useListVideoComments,
 } from '@workspace/api-client-react';
 import type { VideoComment } from '@workspace/api-client-react';
@@ -52,8 +55,8 @@ export function AnnotationCanvas({
   canAnnotate = true,
   timelineVersionId,
   submissionId,
-  dockRef,
   headerRef,
+  dropLine = false,
 }: {
   projectId: string;
   leg: StudioLeg;
@@ -69,18 +72,18 @@ export function AnnotationCanvas({
   timelineVersionId?: string | null;
   /** Optional scope: the submission (PR) being reviewed — pins filter to it. */
   submissionId?: string | null;
-  /** When set, the controls (Annotate toggle, composer, thread) render into
-      this dock element below the player instead of overlaying the media. */
-  dockRef?: RefObject<HTMLDivElement | null>;
   /** When set, the annotate toggle renders as an edit (pencil) icon button
-      into this element (the card header's top-right corner) instead of the
-      dock / overlay — the familiar editing-tools affordance. */
+      into this element (the card header's top-right corner) instead of a pill
+      over the media — the familiar editing-tools affordance. */
   headerRef?: RefObject<HTMLDivElement | null>;
+  /** Draw a red vertical line at the selected point (the audio wave). */
+  dropLine?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { user } = useUser();
   const comments = useListVideoComments(projectId);
   const create = useCreateVideoComment();
+  const project = useGetVideoProject(projectId);
 
   const overlayRef = useRef<HTMLDivElement>(null);
   const [annotating, setAnnotating] = useState(false);
@@ -88,14 +91,9 @@ export function AnnotationCanvas({
   const [body, setBody] = useState('');
   const [openPin, setOpenPin] = useState<string | null>(null);
 
-  // The dock element, once the page's ref attaches (portal target for the
-  // controls when `dockRef` is provided). useLayoutEffect guarantees the
-  // portal mounts before the first paint, so nothing flashes over the media.
-  const [dockEl, setDockEl] = useState<HTMLElement | null>(null);
-  useLayoutEffect(() => {
-    if (dockRef?.current) setDockEl(dockRef.current);
-  }, [dockRef]);
-
+  // The header element, once the page's ref attaches (portal target for the
+  // edit toggle when `headerRef` is provided). useLayoutEffect guarantees the
+  // portal mounts before the first paint, so nothing flashes.
   const [headerEl, setHeaderEl] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => {
     if (headerRef?.current) setHeaderEl(headerRef.current);
@@ -111,6 +109,13 @@ export function AnnotationCanvas({
   const authorId = user?.id ?? '';
   const authorColor = reviewerColor(authorId);
   const authorLabel = reviewerLabel(authorId);
+
+  // userId → display name, so every comment shows who actually wrote it.
+  const memberNameById = useMemo(
+    () => new Map((project.data?.members ?? []).map((member) => [member.userId, member.name])),
+    [project.data?.members],
+  );
+  const nameOf = (id: string) => memberNameById.get(id) ?? id.slice(0, 8);
 
   // Comments for this leg + asset that carry a usable geometry, grouped into
   // pins by frame point. Timecode-only notes (kind TIMECODE) stay in the
@@ -197,7 +202,7 @@ export function AnnotationCanvas({
         if (pin.comments[0]?.timecodeMs != null) onSeek?.(pin.comments[0].timecodeMs);
         setOpenPin(pin.key === openPin ? null : pin.key);
       }}
-      title={`${pin.comments.length} note${pin.comments.length === 1 ? '' : 's'} — ${pin.comments[0]?.timecodeMs != null ? formatTimecode(pin.comments[0].timecodeMs) : 'on the frame'}`}
+      title={`${pin.comments.length} note${pin.comments.length === 1 ? '' : 's'} — ${nameOf(pin.comments[0].authorId)}${pin.comments[0]?.timecodeMs != null ? ` @ ${formatTimecode(pin.comments[0].timecodeMs)}` : ' on the frame'}`}
       data-testid={`annotation-pin-${pin.key}`}
     >
       <span className="annotation-pin-dot" style={{ background: reviewerColor(pin.comments[0].authorId) }}>
@@ -207,8 +212,21 @@ export function AnnotationCanvas({
     </button>
   ));
 
-  const panelControls = (
-    <>
+  return (
+    <div
+      ref={overlayRef}
+      className={annotating ? 'annotation-canvas annotating' : 'annotation-canvas'}
+      onPointerDown={onOverlayPointerDown}
+      data-testid="annotation-canvas"
+      data-annotating={annotating}
+    >
+      {pinsEl}
+
+      {/* The red vertical selector line on the audio wave while annotating. */}
+      {drop && dropLine && (
+        <span className="annotation-drop-line" style={{ left: `${drop.x * 100}%` }} data-testid="annotation-drop-line" />
+      )}
+
       {openGroup && (
         <div
           className="annotation-thread"
@@ -233,7 +251,7 @@ export function AnnotationCanvas({
                 </span>
                 <span>
                   <b className="mono-label !text-[9px]">
-                    {comment.authorId.slice(0, 8)} · {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'frame note'}
+                    {nameOf(comment.authorId)} · {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'frame note'}
                     {comment.timelineVersionId ? ` · v${comment.timelineVersionId.slice(0, 4)}` : ''}
                   </b>
                   <small className="!normal-case">{comment.body}</small>
@@ -242,6 +260,47 @@ export function AnnotationCanvas({
             ))}
           </div>
         </div>
+      )}
+
+      {annotating && canAnnotate && !drop && !headerRef && (
+        <button
+          type="button"
+          className="annotation-close-annotate"
+          onClick={(event) => {
+            event.stopPropagation();
+            setAnnotating(false);
+          }}
+          data-testid="annotation-stop"
+        >
+          <X size={12} /> Stop annotating
+        </button>
+      )}
+
+      {!annotating && canAnnotate && !headerRef && pins.length === 0 && (
+        <button
+          type="button"
+          className="annotation-toggle"
+          onClick={(event) => {
+            event.stopPropagation();
+            setAnnotating(true);
+          }}
+          data-testid="annotation-start"
+        >
+          <Pin size={12} /> Annotate
+        </button>
+      )}
+      {!annotating && canAnnotate && !headerRef && pins.length > 0 && (
+        <button
+          type="button"
+          className="annotation-toggle"
+          onClick={(event) => {
+            event.stopPropagation();
+            setAnnotating(true);
+          }}
+          data-testid="annotation-start"
+        >
+          <Pin size={12} /> {pins.length} pin{pins.length === 1 ? '' : 's'}
+        </button>
       )}
 
       {drop && (
@@ -276,109 +335,26 @@ export function AnnotationCanvas({
           )}
         </div>
       )}
-    </>
-  );
 
-  const toggleControls = (
-    <>
-      {annotating && canAnnotate && !drop && (
-        <button
-          type="button"
-          className="annotation-close-annotate"
-          onClick={(event) => {
-            event.stopPropagation();
-            setAnnotating(false);
-          }}
-          data-testid="annotation-stop"
-        >
-          <X size={12} /> Stop annotating
-        </button>
-      )}
-
-      {!annotating && canAnnotate && pins.length === 0 && (
-        <button
-          type="button"
-          className="annotation-toggle"
-          onClick={(event) => {
-            event.stopPropagation();
-            setAnnotating(true);
-          }}
-          data-testid="annotation-start"
-        >
-          <Pin size={12} /> Annotate
-        </button>
-      )}
-      {!annotating && canAnnotate && pins.length > 0 && (
-        <button
-          type="button"
-          className="annotation-toggle"
-          onClick={(event) => {
-            event.stopPropagation();
-            setAnnotating(true);
-          }}
-          data-testid="annotation-start"
-        >
-          <Pin size={12} /> {pins.length} pin{pins.length === 1 ? '' : 's'}
-        </button>
-      )}
-    </>
-  );
-
-  const overlay = (
-    <div
-      ref={overlayRef}
-      className={annotating ? 'annotation-canvas annotating' : 'annotation-canvas'}
-      onPointerDown={onOverlayPointerDown}
-      data-testid="annotation-canvas"
-      data-annotating={annotating}
-    >
-      {pinsEl}
+      {/* The header edit (pencil) button — the familiar editing-tools
+          affordance, portaled into the card header's top-right corner. */}
+      {headerRef && headerEl &&
+        createPortal(
+          <button
+            type="button"
+            className={`annotation-toggle annotation-edit-btn ${annotating ? 'active' : ''}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setAnnotating((a) => !a);
+            }}
+            aria-pressed={annotating}
+            title={annotating ? 'Stop annotating' : 'Annotate this media'}
+            data-testid="annotation-start"
+          >
+            <Pencil size={14} />
+          </button>,
+          headerEl,
+        )}
     </div>
-  );
-
-  // The header edit (pencil) button — the familiar editing-tools affordance,
-  // pinned to the card header's top-right corner (portaled into headerRef).
-  const headerToggle = headerRef ? (
-    <button
-      type="button"
-      className={`annotation-toggle annotation-edit-btn ${annotating ? 'active' : ''}`}
-      onClick={(event) => {
-        event.stopPropagation();
-        setAnnotating((a) => !a);
-      }}
-      aria-pressed={annotating}
-      title={annotating ? 'Stop annotating' : 'Annotate this media'}
-      data-testid="annotation-start"
-    >
-      <Pencil size={14} />
-    </button>
-  ) : null;
-
-  // Docked mode: pins stay on the media, the controls live in the dock below
-  // the player (outside the media overlay), and the toggle moves to the card
-  // header when a headerRef is provided.
-  if (dockRef) {
-    return (
-      <>
-        {overlay}
-        {dockEl &&
-          createPortal(
-            <div className="annotation-dock" data-testid="annotation-dock">
-              {headerRef ? null : toggleControls}
-              {panelControls}
-            </div>,
-            dockEl,
-          )}
-        {headerEl && createPortal(headerToggle, headerEl)}
-      </>
-    );
-  }
-
-  return (
-    <>
-      {overlay}
-      {toggleControls}
-      {panelControls}
-    </>
   );
 }

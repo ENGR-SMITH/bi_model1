@@ -37,6 +37,7 @@ import {
   getGetVideoProjectQueryKey,
   getListVideoCommentsQueryKey,
   getUploadVideoAssetUrl,
+  useGetVideoProject,
   useListVideoComments,
   useResolveVideoComment,
 } from '@workspace/api-client-react';
@@ -535,6 +536,14 @@ export function PreviewNotesPanel({
   const queryClient = useQueryClient();
   const comments = useListVideoComments(projectId);
   const resolve = useResolveVideoComment();
+  const project = useGetVideoProject(projectId);
+
+  // userId → display name, so every note shows who actually wrote it.
+  const memberNameById = useMemo(
+    () => new Map((project.data?.members ?? []).map((member) => [member.userId, member.name])),
+    [project.data?.members],
+  );
+  const nameOf = (id: string) => memberNameById.get(id) ?? id.slice(0, 8);
 
   const rows = useMemo(() => {
     const legSet = new Set(legs);
@@ -615,7 +624,7 @@ export function PreviewNotesPanel({
                       </span>
                       <span>
                         <b className="mono-label !text-[9px]">
-                          {comment.authorId.slice(0, 8)} · {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'frame note'}
+                          {nameOf(comment.authorId)} · {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'frame note'}
                         </b>
                         <small className="!normal-case">{comment.body}</small>
                       </span>
