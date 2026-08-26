@@ -9,9 +9,14 @@
 // PIN comment scoped to the current playhead and (optionally) the head
 // timeline version. Reviewer color + label are derived from the author id, so
 // every reviewer is distinguishable with zero setup.
+//
+// Pass `dockRef` to render the controls (Annotate toggle, composer, thread)
+// into a dock element below the player instead of overlaying the media; the
+// pins themselves always stay on the media.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { MessageSquare, Pin, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
@@ -47,6 +52,7 @@ export function AnnotationCanvas({
   canAnnotate = true,
   timelineVersionId,
   submissionId,
+  dockRef,
 }: {
   projectId: string;
   leg: StudioLeg;
@@ -62,6 +68,9 @@ export function AnnotationCanvas({
   timelineVersionId?: string | null;
   /** Optional scope: the submission (PR) being reviewed — pins filter to it. */
   submissionId?: string | null;
+  /** When set, the controls (Annotate toggle, composer, thread) render into
+      this dock element below the player instead of overlaying the media. */
+  dockRef?: RefObject<HTMLDivElement | null>;
 }) {
   const queryClient = useQueryClient();
   const { user } = useUser();
@@ -73,6 +82,14 @@ export function AnnotationCanvas({
   const [drop, setDrop] = useState<{ x: number; y: number } | null>(null);
   const [body, setBody] = useState('');
   const [openPin, setOpenPin] = useState<string | null>(null);
+
+  // The dock element, once the page's ref attaches (portal target for the
+  // controls when `dockRef` is provided). useLayoutEffect guarantees the
+  // portal mounts before the first paint, so nothing flashes over the media.
+  const [dockEl, setDockEl] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (dockRef?.current) setDockEl(dockRef.current);
+  }, [dockRef]);
 
   // Turn annotate mode off when the frame (asset) changes.
   useEffect(() => {
@@ -107,8 +124,14 @@ export function AnnotationCanvas({
 
   const openGroup = openPin ? pins.find((pin) => pin.key === openPin) ?? null : null;
 
-  const onOverlayClick = (event: React.MouseEvent) => {
+  // Dropping a pin listens on pointerdown, not click: the audio wave's own
+  // pointerdown handler calls setPointerCapture, which retargets the
+  // subsequent click to the wave — so a click-based drop never fired there.
+  const onOverlayPointerDown = (event: React.PointerEvent) => {
     if (!annotating || !canAnnotate || !assetId) return;
+    // Ignore presses that start on an existing pin or an open panel.
+    const target = event.target as HTMLElement;
+    if (target.closest('.annotation-pin, .annotation-thread, .annotation-composer, .annotation-close-annotate, .annotation-toggle')) return;
     const el = overlayRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -152,36 +175,30 @@ export function AnnotationCanvas({
 
   if (!assetId) return null;
 
-  return (
-    <div
-      ref={overlayRef}
-      className={annotating ? 'annotation-canvas annotating' : 'annotation-canvas'}
-      onClick={onOverlayClick}
-      data-testid="annotation-canvas"
-      data-annotating={annotating}
+  const pinsEl = pins.map((pin) => (
+    <button
+      key={pin.key}
+      type="button"
+      className="annotation-pin"
+      style={{ left: `${pin.geometry.x * 100}%`, top: `${pin.geometry.y * 100}%` }}
+      onClick={(event) => {
+        event.stopPropagation();
+        setDrop(null);
+        if (pin.comments[0]?.timecodeMs != null) onSeek?.(pin.comments[0].timecodeMs);
+        setOpenPin(pin.key === openPin ? null : pin.key);
+      }}
+      title={`${pin.comments.length} note${pin.comments.length === 1 ? '' : 's'} — ${pin.comments[0]?.timecodeMs != null ? formatTimecode(pin.comments[0].timecodeMs) : 'on the frame'}`}
+      data-testid={`annotation-pin-${pin.key}`}
     >
-      {pins.map((pin) => (
-        <button
-          key={pin.key}
-          type="button"
-          className="annotation-pin"
-          style={{ left: `${pin.geometry.x * 100}%`, top: `${pin.geometry.y * 100}%` }}
-          onClick={(event) => {
-            event.stopPropagation();
-            setDrop(null);
-            if (pin.comments[0]?.timecodeMs != null) onSeek?.(pin.comments[0].timecodeMs);
-            setOpenPin(pin.key === openPin ? null : pin.key);
-          }}
-          title={`${pin.comments.length} note${pin.comments.length === 1 ? '' : 's'} — ${pin.comments[0]?.timecodeMs != null ? formatTimecode(pin.comments[0].timecodeMs) : 'on the frame'}`}
-          data-testid={`annotation-pin-${pin.key}`}
-        >
-          <span className="annotation-pin-dot" style={{ background: reviewerColor(pin.comments[0].authorId) }}>
-            {reviewerLabel(pin.comments[0].authorId)}
-          </span>
-          {pin.comments.length > 1 && <span className="annotation-pin-count">{pin.comments.length}</span>}
-        </button>
-      ))}
+      <span className="annotation-pin-dot" style={{ background: reviewerColor(pin.comments[0].authorId) }}>
+        {reviewerLabel(pin.comments[0].authorId)}
+      </span>
+      {pin.comments.length > 1 && <span className="annotation-pin-count">{pin.comments.length}</span>}
+    </button>
+  ));
 
+  const controls = (
+    <>
       {openGroup && (
         <div
           className="annotation-thread"
@@ -290,6 +307,36 @@ export function AnnotationCanvas({
           )}
         </div>
       )}
+    </>
+  );
+
+  const overlay = (
+    <div
+      ref={overlayRef}
+      className={annotating ? 'annotation-canvas annotating' : 'annotation-canvas'}
+      onPointerDown={onOverlayPointerDown}
+      data-testid="annotation-canvas"
+      data-annotating={annotating}
+    >
+      {pinsEl}
     </div>
+  );
+
+  // Docked mode: pins stay on the media, the controls live in the dock below
+  // the player (outside the media overlay).
+  if (dockRef) {
+    return (
+      <>
+        {overlay}
+        {dockEl && createPortal(<div className="annotation-dock" data-testid="annotation-dock">{controls}</div>, dockEl)}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {overlay}
+      {controls}
+    </>
   );
 }

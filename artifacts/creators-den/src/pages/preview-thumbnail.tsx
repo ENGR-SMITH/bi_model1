@@ -46,6 +46,7 @@ function ThumbnailCanvas({
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
+  const annotationDockRef = useRef<HTMLDivElement>(null);
 
   const snap = version ? ((version.snapshot ?? null) as {
     designs?: Array<{ id?: string; assetId: string; title?: string; style?: string }>;
@@ -73,7 +74,7 @@ function ThumbnailCanvas({
           {!version && <span className="den-tag teal">vault preview</span>}
         </span>
       </div>
-      <div className="pv-stage-player mt-3">
+      <div className="pv-stage-player mt-2">
         {assetId ? (
           <ImageStage src={proxyUrlFor(projectId, assetId)}>
             <AnnotationCanvas
@@ -82,6 +83,7 @@ function ThumbnailCanvas({
               assetId={assetId}
               playheadMs={null}
               timelineVersionId={version?.id}
+              dockRef={annotationDockRef}
             />
             <FullscreenButton targetRef={stageRef} />
           </ImageStage>
@@ -92,6 +94,8 @@ function ThumbnailCanvas({
           </EmptyPlayer>
         )}
       </div>
+      {/* Annotation controls live below the player, not over the image. */}
+      <div ref={annotationDockRef} className="annotation-dock" />
     </div>
   );
 }

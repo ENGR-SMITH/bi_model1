@@ -53,6 +53,7 @@ function AudioCanvas({
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
+  const annotationDockRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
 
   const snap = version ? ((version.snapshot ?? null) as {
@@ -108,7 +109,7 @@ function AudioCanvas({
           {!version && <span className="den-tag teal">vault preview</span>}
         </span>
       </div>
-      <div className="pv-stage-player mt-3">
+      <div className="pv-stage-player mt-2">
         {assetId ? (
           <WaveformPlayer
             projectId={projectId}
@@ -126,6 +127,7 @@ function AudioCanvas({
               playheadMs={playheadMs}
               onSeek={onSeek}
               timelineVersionId={version?.id}
+              dockRef={annotationDockRef}
             />
             <FullscreenButton targetRef={stageRef} />
           </WaveformPlayer>
@@ -136,6 +138,8 @@ function AudioCanvas({
           </EmptyPlayer>
         )}
       </div>
+      {/* Annotation controls live below the player, not over the wave. */}
+      <div ref={annotationDockRef} className="annotation-dock" />
     </div>
   );
 }
