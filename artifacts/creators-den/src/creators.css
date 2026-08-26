@@ -1891,6 +1891,198 @@
 }
 .pv-fs:hover { border-color: hsl(var(--accent)); background: hsl(0 0% 0% / .72); color: hsl(var(--accent)); }
 
+/* ---- Role pages: 10 / 50 / 40 columns, 80 / 20 rows ---- */
+.role-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 10fr 50fr 40fr;
+  grid-template-rows: minmax(0, 80fr) minmax(0, 20fr);
+  gap: 16px;
+}
+.role-versions-col {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.role-canvas-main {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.role-canvas-bar {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+}
+.role-notes-main {
+  grid-column: 3;
+  grid-row: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.role-notes-bar {
+  grid-column: 3;
+  grid-row: 2;
+  min-height: 0;
+}
+
+/* The canvas / notes cards flex to fill their grid cells. */
+.role-canvas-main > .pv-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.role-canvas-main > .pv-script {
+  flex: 1;
+  min-height: 0;
+}
+.role-canvas-main .pv-stage-player {
+  flex: 1;
+  min-height: 0;
+}
+.role-canvas-main .pv-stage-player .den-player {
+  flex: 1;
+  min-height: 0;
+}
+.role-canvas-main .den-player video {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+.role-canvas-main .den-marker-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+}
+.role-canvas-main .thumbnail-stage {
+  height: 100%;
+  max-height: none;
+}
+.role-canvas-main .thumbnail-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.role-canvas-main .pv-wave-player {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.role-canvas-main .pv-wave {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.role-canvas-main .pv-script-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.role-notes-main > .pv-notes {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The slim download / upload bars. */
+.role-bar {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+}
+.role-bar .eyebrow { flex: 0 0 auto; white-space: nowrap; }
+.role-bar input[type='file'] {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.role-bar-progress {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+}
+.role-bar-progress .den-upload-progress-bar {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* Version list — first column, one scrollable rail. */
+.pv-versions-list {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.pv-versions-list-track {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-right: 6px;
+}
+.pv-version-row {
+  flex: 0 0 auto;
+  width: 100%;
+  text-align: left;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.pv-version-row:hover { border-color: hsl(var(--accent) / .5); }
+.pv-version-row.active {
+  border-color: hsl(var(--accent));
+  background: hsl(var(--accent) / .08);
+  box-shadow: inset 2px 0 0 hsl(var(--accent));
+}
+.pv-version-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pv-version-leg {
+  font: 700 11px var(--app-font-sans);
+  color: hsl(var(--foreground));
+  letter-spacing: .06em;
+}
+.pv-version-msg {
+  font-size: 11px;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.pv-version-msg.muted { color: hsl(var(--muted-foreground)); }
+.pv-version-date {
+  color: hsl(var(--muted-foreground));
+  font: 9px var(--app-font-mono);
+}
+
 /* ---- Version carousel ---- */
 .pv-carousel { overflow: hidden; }
 .pv-carousel-wrap {
@@ -2172,6 +2364,24 @@
   .pv-canvas-col .pv-wave { height: 150px; flex: none; }
   .pv-canvas-col .pv-script-area { min-height: 520px; overflow: visible; }
   .pv-notes-col > .pv-notes { flex: none; overflow: visible; }
+  .role-grid { grid-template-columns: 1fr; grid-template-rows: none; gap: 16px; }
+  .role-versions-col { grid-column: 1; grid-row: auto; }
+  .role-canvas-main { grid-column: 1; grid-row: auto; }
+  .role-canvas-bar { grid-column: 1; grid-row: auto; }
+  .role-notes-main { grid-column: 1; grid-row: auto; }
+  .role-notes-bar { grid-column: 1; grid-row: auto; }
+  .role-canvas-main > .pv-stage { flex: none; }
+  .role-canvas-main .pv-stage-player { flex: none; }
+  .role-canvas-main .pv-stage-player .den-player { flex: none; }
+  .role-canvas-main .den-player video { aspect-ratio: 16/9; height: auto; }
+  .role-canvas-main .thumbnail-stage { height: auto; max-height: 60vh; }
+  .role-canvas-main .pv-wave-player { flex: none; height: auto; }
+  .role-canvas-main .pv-wave { height: 150px; flex: none; }
+  .role-canvas-main .pv-script-area { min-height: 520px; overflow: visible; }
+  .role-notes-main > .pv-notes { flex: none; overflow: visible; }
+  .pv-versions-list { flex: none; }
+  .pv-versions-list-track { max-height: 260px; overflow-y: auto; }
+  .role-bar { flex-wrap: wrap; }
 }
 @media (max-width: 720px) {
   .pv-grid { grid-template-columns: 1fr; }
