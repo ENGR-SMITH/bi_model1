@@ -44,7 +44,7 @@ import {
   useGetVideoProject,
   useListVideoComments,
 } from '@workspace/api-client-react';
-import type { VideoComment, VideoTranscriptSegment } from '@workspace/api-client-react';
+import type { VideoTranscriptSegment } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
 import { pollWhileProcessing } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
@@ -52,9 +52,6 @@ import {
   applyScriptHighlights,
   findScriptMark,
   isScriptComment,
-  parseScriptRange,
-  scriptColor,
-  wrapScriptRange,
 } from '@/lib/script-comments';
 import { ScriptCommentsPanel } from '@/components/script-comments';
 
@@ -224,6 +221,9 @@ export default function RoleScriptPage() {
   const [saved, setSaved] = useState(true);
   const [toast, setToast] = useState('');
   const [exportFormat, setExportFormat] = useState<SubtitleFormat>('srt');
+  // The comment whose tag + editor highlight are currently picked; clicking
+  // again (on the tag or the highlighted passage) clears it.
+  const [selectedNote, setSelectedNote] = useState<string | null>(null);
 
   const comments = useListVideoComments(projectId);
 
@@ -292,26 +292,31 @@ export default function RoleScriptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comments.data]);
 
-  // Clicking a comment tag in the rail scrolls the editor to its highlighted
-  // passage and flashes it, so the note is anchored in the text.
-  const jumpToComment = (comment: VideoComment) => {
+  // Clicking a highlighted passage in the editor toggles its selection,
+  // which lights up the matching comment tag in the rail (and vice versa).
+  const onEditorMarkClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    const mark = target.closest('mark.pv-script-hl');
+    if (!mark) return;
+    const id = mark.getAttribute('data-comment-id');
+    if (!id) return;
+    event.preventDefault();
+    setSelectedNote((current) => (current === id ? null : id));
+  };
+
+  // Keep the selected mark and the rail tag in sync: lift the highlight onto
+  // the picked passage and bring it into view when a tag is clicked.
+  useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
-    const color = comment.color ?? scriptColor(comment.id);
-    let mark = findScriptMark(el, comment.id);
-    if (!mark) {
-      const range = parseScriptRange(comment.geometry);
-      if (range && wrapScriptRange(el, range, color, comment.id)) {
-        mark = findScriptMark(el, comment.id);
-        setHtml(el.innerHTML);
-      }
-    }
+    el.querySelectorAll('mark.pv-script-hl.is-selected').forEach((mark) => mark.classList.remove('is-selected'));
+    if (!selectedNote) return;
+    const mark = findScriptMark(el, selectedNote);
     if (mark) {
+      mark.classList.add('is-selected');
       mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      mark.classList.add('flash');
-      window.setTimeout(() => mark.classList.remove('flash'), 1800);
     }
-  };
+  }, [selectedNote]);
 
   useEffect(() => {
     const transcript = imported.data?.transcript;
@@ -521,7 +526,7 @@ export default function RoleScriptPage() {
   const processedMedia = p.assets.filter((asset) => asset.status === 'PROCESSED' && MEDIA_KINDS.has(asset.kind));
 
   return (
-    <div className="page pv-page">
+    <div className="page pv-page role-page">
       <div className="pv-top pv-script-top">
         <div className="pv-canvas-col">
           <div className="paper-card pv-script" data-testid="script-editor">
@@ -654,6 +659,7 @@ export default function RoleScriptPage() {
               contentEditable
               suppressContentEditableWarning
               onInput={onEditorInput}
+              onClick={onEditorMarkClick}
               data-placeholder="Begin where the pressure is…"
               data-testid="script-editor-area"
             />
@@ -673,7 +679,12 @@ export default function RoleScriptPage() {
           </div>
         </div>
         <div className="pv-script-notes-col">
-          <ScriptCommentsPanel projectId={p.id} allowResolve onJump={jumpToComment} />
+          <ScriptCommentsPanel
+            projectId={p.id}
+            allowResolve
+            selectedId={selectedNote}
+            onSelect={(id) => setSelectedNote((current) => (current === id ? null : id))}
+          />
         </div>
       </div>
       {toast && (

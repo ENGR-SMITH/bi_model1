@@ -18,7 +18,6 @@ import {
   useListVideoComments,
   useResolveVideoComment,
 } from '@workspace/api-client-react';
-import type { VideoComment } from '@workspace/api-client-react';
 import { reviewerLabel } from '@/lib/annotations';
 import { isScriptComment, parseScriptRange, scriptColor } from '@/lib/script-comments';
 import { RESOLVED_GREEN } from '@/components/preview-shared';
@@ -26,13 +25,16 @@ import { RESOLVED_GREEN } from '@/components/preview-shared';
 export function ScriptCommentsPanel({
   projectId,
   allowResolve = false,
-  onJump,
+  selectedId = null,
+  onSelect,
 }: {
   projectId: string;
   /** Whether the Resolve / Reopen control renders (main Script page only). */
   allowResolve?: boolean;
-  /** Clicking a tag scrolls the editor to the highlighted passage. */
-  onJump?: (comment: VideoComment) => void;
+  /** The comment whose tag is currently picked (mirrored from the editor). */
+  selectedId?: string | null;
+  /** Clicking a tag selects / deselects it and jumps to the passage. */
+  onSelect?: (commentId: string) => void;
 }) {
   const queryClient = useQueryClient();
   const comments = useListVideoComments(projectId);
@@ -69,7 +71,11 @@ export function ScriptCommentsPanel({
 
   return (
     <div className="paper-card pv-notes script-notes" data-testid="script-notes">
-      <div className="den-stack mt-3">
+      <div className="script-notes-head">
+        <span className="eyebrow"><MessageSquare size={12} /> Comments · notes</span>
+        <span className="den-tag accent">{rows.length}</span>
+      </div>
+      <div className="den-stack">
         {rows.length === 0 && (
           <p className="setting-copy mt-3">
             <MessageSquare size={12} className="inline" style={{ verticalAlign: -2, marginRight: 6 }} />
@@ -85,17 +91,17 @@ export function ScriptCommentsPanel({
           return (
             <div
               key={comment.id}
-              className={`list-row pv-comment-row script-note ${comment.resolvedAt ? 'is-resolved' : ''}`}
+              className={`list-row pv-comment-row script-note ${comment.resolvedAt ? 'is-resolved' : ''} ${selectedId === comment.id ? 'is-selected' : ''}`}
               role="button"
               tabIndex={0}
-              onClick={() => onJump?.(comment)}
+              onClick={() => onSelect?.(comment.id)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  onJump?.(comment);
+                  onSelect?.(comment.id);
                 }
               }}
-              title={onJump ? 'Jump to this passage in the script' : undefined}
+              title={onSelect ? 'Jump to this passage in the script' : undefined}
               data-testid={`script-note-${comment.id}`}
             >
               <span className="annotation-pin-dot" style={{ background: comment.resolvedAt ? RESOLVED_GREEN : color }}>
