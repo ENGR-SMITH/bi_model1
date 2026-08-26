@@ -27,6 +27,7 @@ import {
   List,
   ListOrdered,
   Loader2,
+  Pencil,
   Quote,
   Redo2,
   Save,
@@ -472,14 +473,25 @@ export default function ScriptPreviewPage() {
           <div className="paper-card pv-script" data-testid="script-editor">
             <div className="pv-script-head">
               <div className="pv-script-head-left">
-                <div className="eyebrow">SCRIPT / DRAFT</div>
-                <select value={pickerId} onChange={(event) => setPickerId(event.target.value)} data-testid="script-transcribe-picker">
+                <select
+                  value={pickerId}
+                  onChange={(event) => setPickerId(event.target.value)}
+                  className="pv-head-select"
+                  data-testid="script-transcribe-picker"
+                >
                   <option value="">Transcribe a file…</option>
                   {processedMedia.map((asset) => (
                     <option key={asset.id} value={asset.id}>{asset.fileName}</option>
                   ))}
                 </select>
-                <button type="button" className="secondary-btn !px-3 !py-1.5 !text-xs" onClick={transcribePicked} data-testid="script-transcribe-btn">
+                <button
+                  type="button"
+                  className="pv-head-btn"
+                  onClick={transcribePicked}
+                  disabled={!pickerId}
+                  title={pickerId ? 'Insert the selected file\'s transcript' : 'Choose a file to transcribe first'}
+                  data-testid="script-transcribe-btn"
+                >
                   <AudioLines size={13} /> Transcribe
                 </button>
                 <input
@@ -492,7 +504,7 @@ export default function ScriptPreviewPage() {
                 />
                 <button
                   type="button"
-                  className="icon-btn"
+                  className="pv-head-btn pv-head-icon"
                   title="Upload audio or video to transcribe"
                   onClick={() => transcribeFileRef.current?.click()}
                   data-testid="script-transcribe-upload"
@@ -501,14 +513,17 @@ export default function ScriptPreviewPage() {
                 </button>
               </div>
 
-              <input
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Name this script…"
-                className="pv-script-name"
-                maxLength={120}
-                data-testid="script-name"
-              />
+              <label className="pv-script-name-wrap" title="Click to name this script">
+                <Pencil size={12} />
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Name this script…"
+                  className="pv-script-name"
+                  maxLength={120}
+                  data-testid="script-name"
+                />
+              </label>
 
               <div className="pv-script-head-right">
                 <input
@@ -519,19 +534,19 @@ export default function ScriptPreviewPage() {
                   className="hidden"
                   data-testid="script-import-file"
                 />
-                <button type="button" className="link-btn !text-[11px]" onClick={() => scriptFileRef.current?.click()} data-testid="script-import-btn">
+                <button type="button" className="pv-head-btn" onClick={() => scriptFileRef.current?.click()} data-testid="script-import-btn">
                   <FileText size={12} /> Import script
                 </button>
-                <select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SubtitleFormat)} data-testid="script-export-format">
+                <select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SubtitleFormat)} className="pv-head-select pv-head-select-sm" data-testid="script-export-format">
                   <option value="srt">.srt</option>
                   <option value="vtt">.vtt</option>
                   <option value="sbv">.sbv</option>
                   <option value="sub">.sub</option>
                 </select>
-                <button type="button" className="link-btn !text-[11px]" onClick={() => exportScript(exportFormat)} data-testid="script-export-btn">
+                <button type="button" className="pv-head-btn" onClick={() => exportScript(exportFormat)} data-testid="script-export-btn">
                   <FileDown size={12} /> Export
                 </button>
-                <button type="button" className="icon-btn" title="Save now" onClick={saveNow} data-testid="script-save-btn">
+                <button type="button" className="pv-head-btn pv-head-icon" title="Save now" onClick={saveNow} data-testid="script-save-btn">
                   <Save size={15} />
                 </button>
                 <span className={`save-indicator ${saved ? '' : 'dirty'}`} data-testid="script-save-state">
