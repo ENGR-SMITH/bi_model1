@@ -2357,6 +2357,53 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/chat:
+    get:
+      operationId: listVideoChatMessages
+      tags: [content-creators]
+      summary: List the project's crew room chat messages, oldest first
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: Chat messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoChatMessage" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: sendVideoChatMessage
+      tags: [content-creators]
+      summary: Send a message to the project's crew room
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoChatMessageInput" }
+      responses:
+        "201":
+          description: Sent message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoChatMessage" }
+        "400":
+          description: Invalid message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/projects/{projectId}/jobs:
     get:
       operationId: listVideoJobs
@@ -3968,6 +4015,20 @@ components:
         leg: { type: string, enum: [SELECTS, CUT, SOUND, FINISH, THUMBNAIL] }
         note: { type: string, maxLength: 2000 }
       required: [leg]
+    VideoChatMessage:
+      type: object
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        authorId: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, projectId, authorId, body, createdAt]
+    VideoChatMessageInput:
+      type: object
+      properties:
+        body: { type: string, minLength: 1, maxLength: 2000 }
+      required: [body]
     VideoComment:
       type: object
       properties:

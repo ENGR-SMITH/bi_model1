@@ -1342,6 +1342,22 @@ export interface VideoSubmissionInput {
   note?: string;
 }
 
+export interface VideoChatMessage {
+  id: string;
+  projectId: string;
+  authorId: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface VideoChatMessageInput {
+  /**
+     * @minLength 1
+     * @maxLength 2000
+     */
+  body: string;
+}
+
 /**
  * @nullable
  */

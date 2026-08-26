@@ -2786,6 +2786,53 @@ export const ResolveVideoCommentResponse = zod.object({
 
 
 /**
+ * @summary List the project's crew room chat messages, oldest first
+ */
+
+
+
+export const ListVideoChatMessagesParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const ListVideoChatMessagesResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "authorId": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListVideoChatMessagesResponse = zod.array(ListVideoChatMessagesResponseItem)
+
+
+/**
+ * @summary Send a message to the project's crew room
+ */
+
+
+
+export const SendVideoChatMessageParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const sendVideoChatMessageBodyBodyMax = 2000;
+
+
+
+export const SendVideoChatMessageBody = zod.object({
+  "body": zod.string().min(1).max(sendVideoChatMessageBodyBodyMax)
+})
+
+export const SendVideoChatMessageResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "authorId": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
  * @summary List the processing jobs for a project
  */
 

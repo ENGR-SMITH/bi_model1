@@ -19,6 +19,7 @@ import {
 import { Link, useLocation } from 'wouter';
 import { useListVideoProjects } from '@workspace/api-client-react';
 import { useProjectPresence, useRealtimeSocket } from '@/lib/realtime';
+import { ProjectChat } from '@/components/project-chat';
 
 export function SectionEyebrow({ children }: { children: ReactNode }) {
   return <span className="eyebrow">{children}</span>;
@@ -290,6 +291,10 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             must not add a second one or the content gets doubled padding. */}
         {children}
       </main>
+
+      {/* The crew room floats over every project page, like the Author Den's
+          draggable chat — project-wide instead of a private 1:1 thread. */}
+      {projectId && <ProjectChat projectId={projectId} />}
     </div>
   );
 }

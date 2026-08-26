@@ -66,6 +66,8 @@ import type {
   VideoAssetDetail,
   VideoAssetUploadInput,
   VideoAudioPassInput,
+  VideoChatMessage,
+  VideoChatMessageInput,
   VideoCheckoutBundleStatus,
   VideoCheckoutExportInput,
   VideoCheckoutExportResponse,
@@ -8087,6 +8089,155 @@ export const useResolveVideoComment = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getResolveVideoCommentMutationOptions(options));
+    }
+
+export const getListVideoChatMessagesUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/chat`
+}
+
+/**
+ * @summary List the project's crew room chat messages, oldest first
+ */
+export const listVideoChatMessages = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoChatMessage[]> => {
+
+  return customFetch<VideoChatMessage[]>(getListVideoChatMessagesUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVideoChatMessagesQueryKey = (projectId: string,) => {
+    return [
+    `/api/video/projects/${projectId}/chat`
+    ] as const;
+    }
+
+
+export const getListVideoChatMessagesQueryOptions = <TData = Awaited<ReturnType<typeof listVideoChatMessages>>, TError = ErrorType<ErrorResponse>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoChatMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVideoChatMessagesQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoChatMessages>>> = ({ signal }) => listVideoChatMessages(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVideoChatMessages>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVideoChatMessagesQueryResult = NonNullable<Awaited<ReturnType<typeof listVideoChatMessages>>>
+export type ListVideoChatMessagesQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the project's crew room chat messages, oldest first
+ */
+
+export function useListVideoChatMessages<TData = Awaited<ReturnType<typeof listVideoChatMessages>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoChatMessages>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVideoChatMessagesQueryOptions(projectId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendVideoChatMessageUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/chat`
+}
+
+/**
+ * @summary Send a message to the project's crew room
+ */
+export const sendVideoChatMessage = async (projectId: string,
+    videoChatMessageInput: VideoChatMessageInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoChatMessage> => {
+
+  return customFetch<VideoChatMessage>(getSendVideoChatMessageUrl(projectId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(videoChatMessageInput)
+  }
+);}
+
+
+
+
+
+export const getSendVideoChatMessageMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendVideoChatMessage>>, TError,{projectId: string;data: BodyType<VideoChatMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendVideoChatMessage>>, TError,{projectId: string;data: BodyType<VideoChatMessageInput>}, TContext> => {
+
+const mutationKey = ['sendVideoChatMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendVideoChatMessage>>, {projectId: string;data: BodyType<VideoChatMessageInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  sendVideoChatMessage(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendVideoChatMessageMutationResult = NonNullable<Awaited<ReturnType<typeof sendVideoChatMessage>>>
+    export type SendVideoChatMessageMutationBody = BodyType<VideoChatMessageInput>
+    export type SendVideoChatMessageMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Send a message to the project's crew room
+ */
+export const useSendVideoChatMessage = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendVideoChatMessage>>, TError,{projectId: string;data: BodyType<VideoChatMessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendVideoChatMessage>>,
+        TError,
+        {projectId: string;data: BodyType<VideoChatMessageInput>},
+        TContext
+      > => {
+      return useMutation(getSendVideoChatMessageMutationOptions(options));
     }
 
 export const getListVideoJobsUrl = (projectId: string,) => {
