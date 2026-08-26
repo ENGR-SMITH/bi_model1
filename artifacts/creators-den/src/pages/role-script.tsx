@@ -594,9 +594,6 @@ export default function RoleScriptPage() {
                 <button type="button" className="pv-head-btn pv-head-icon" title="Save now" onClick={saveNow} data-testid="script-save-btn">
                   <Save size={15} />
                 </button>
-                <span className={`save-indicator ${saved ? '' : 'dirty'}`} data-testid="script-save-state">
-                  <span className="pulse-dot" /> {saved ? 'Autosaved' : 'Saving…'}
-                </span>
               </div>
             </div>
 
@@ -660,6 +657,9 @@ export default function RoleScriptPage() {
               )}
               <span className="footer-spacer" />
               <span className="mono-label">script{name ? ` · ${name}` : ''} · {p.name}</span>
+              <span className={`save-indicator ${saved ? '' : 'dirty'}`} data-testid="script-save-state">
+                <span className="pulse-dot" /> {saved ? 'Autosaved' : 'Saving…'}
+              </span>
             </div>
           </div>
         </div>
