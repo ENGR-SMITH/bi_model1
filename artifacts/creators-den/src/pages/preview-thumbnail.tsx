@@ -173,20 +173,12 @@ export default function ThumbnailPreviewPage() {
 
   return (
     <PreviewLayout
-      main={
-        <>
-          <ThumbnailCanvas
-            projectId={p.id}
-            version={selected ? { id: selected.id, version: selected.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
-            assets={p.assets}
-          />
-          <VersionCarousel
-            versions={versions}
-            selectedId={selected?.id ?? null}
-            onSelect={setSelectedId}
-            emptyText="No thumbnail versions saved yet — save a snapshot in the Thumbnail studio first."
-          />
-        </>
+      canvas={
+        <ThumbnailCanvas
+          projectId={p.id}
+          version={selected ? { id: selected.id, version: selected.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+          assets={p.assets}
+        />
       }
       rail={
         <PreviewNotesPanel
@@ -195,6 +187,14 @@ export default function ThumbnailPreviewPage() {
           assetId={activeAssetId}
           timelineVersionId={selected?.id}
           composerLeg="THUMBNAIL"
+        />
+      }
+      versions={
+        <VersionCarousel
+          versions={versions}
+          selectedId={selected?.id ?? null}
+          onSelect={setSelectedId}
+          emptyText="No thumbnail versions saved yet — save a snapshot in the Thumbnail studio first."
         />
       }
     />

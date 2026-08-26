@@ -225,20 +225,12 @@ export default function VideoPreviewPage() {
 
   return (
     <PreviewLayout
-      main={
-        <>
-          <VideoCanvas
-            projectId={p.id}
-            version={selected ? { id: selected.id, leg: selected.leg, version: selected.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
-            assets={p.assets}
-          />
-          <VersionCarousel
-            versions={versions}
-            selectedId={selected?.id ?? null}
-            onSelect={setSelectedId}
-            emptyText="No selects or cut versions saved yet — save a snapshot in the Selects or Cut studio first."
-          />
-        </>
+      canvas={
+        <VideoCanvas
+          projectId={p.id}
+          version={selected ? { id: selected.id, leg: selected.leg, version: selected.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+          assets={p.assets}
+        />
       }
       rail={
         <PreviewNotesPanel
@@ -246,6 +238,14 @@ export default function VideoPreviewPage() {
           legs={VIDEO_LEGS}
           timelineVersionId={selected?.id}
           composerLeg={selected?.leg ?? 'SELECTS'}
+        />
+      }
+      versions={
+        <VersionCarousel
+          versions={versions}
+          selectedId={selected?.id ?? null}
+          onSelect={setSelectedId}
+          emptyText="No selects or cut versions saved yet — save a snapshot in the Selects or Cut studio first."
         />
       }
     />

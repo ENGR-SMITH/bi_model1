@@ -45,15 +45,22 @@ import { geometryKey, parseGeometry, reviewerColor, reviewerLabel } from '@/lib/
 // PreviewLayout
 // ---------------------------------------------------------------------------
 
-export function PreviewLayout({ main, rail }: { main: ReactNode; rail: ReactNode }) {
+export function PreviewLayout({ canvas, rail, versions }: { canvas: ReactNode; rail: ReactNode; versions?: ReactNode }) {
   return (
-    <div className="pv-split" data-testid="preview-split">
-      <div className="pv-left">
-        {main}
+    <div className="page pv-page" data-testid="preview-page">
+      <div className="pv-top">
+        <div className="pv-canvas-col">
+          {canvas}
+        </div>
+        <div className="pv-notes-col">
+          {rail}
+        </div>
       </div>
-      <div className="pv-right">
-        {rail}
-      </div>
+      {versions && (
+        <div className="pv-versions-row">
+          {versions}
+        </div>
+      )}
     </div>
   );
 }
