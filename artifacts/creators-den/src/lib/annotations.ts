@@ -17,14 +17,14 @@ export interface AnnotationGeometry {
 }
 
 export const REVIEWER_COLORS = [
-  "#e05252", // red
-  "#f09d3d", // orange
-  "#f0c85c", // gold
-  "#4caf7d", // green
-  "#38b2ac", // teal
-  "#4a9ff5", // blue
-  "#8b7cf6", // violet
-  "#e56fb4", // pink
+  "#f08c7e", // coral
+  "#f2b263", // amber
+  "#e8d06a", // gold
+  "#86cf9c", // green
+  "#6fd0c6", // teal
+  "#86b9f0", // blue
+  "#b4a5f2", // violet
+  "#f0a0ce", // pink
 ] as const;
 
 export type ReviewerColor = (typeof REVIEWER_COLORS)[number];

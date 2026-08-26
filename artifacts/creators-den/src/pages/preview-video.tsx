@@ -153,6 +153,7 @@ function VideoCanvas({
               timelineVersionId={version?.id}
               headerRef={annotationHeaderRef}
               surfaceRef={stageRef}
+              timecodeReveal
             />
             <FullscreenButton targetRef={stageRef} />
           </AssetPlayer>

@@ -155,6 +155,7 @@ function VideoCanvas({
               onSeek={onSeek}
               timelineVersionId={version?.id}
               canAnnotate={false}
+              timecodeReveal
             />
           </AssetPlayer>
         ) : (
