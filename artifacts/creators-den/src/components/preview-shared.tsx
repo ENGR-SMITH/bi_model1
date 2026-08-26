@@ -47,7 +47,7 @@ import { formatTimecode } from '@/components/timeline';
 import { geometryKey, parseGeometry, reviewerColor, reviewerLabel } from '@/lib/annotations';
 
 /** Green used to mark a resolved comment / annotation as solved. */
-const RESOLVED_GREEN = 'hsl(150 52% 42%)';
+export const RESOLVED_GREEN = 'hsl(150 52% 42%)';
 
 // ---------------------------------------------------------------------------
 // PreviewLayout

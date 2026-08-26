@@ -42,11 +42,21 @@ import {
   getUploadVideoAssetUrl,
   useGetVideoAsset,
   useGetVideoProject,
+  useListVideoComments,
 } from '@workspace/api-client-react';
-import type { VideoTranscriptSegment } from '@workspace/api-client-react';
+import type { VideoComment, VideoTranscriptSegment } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
 import { pollWhileProcessing } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
+import { reviewerColor } from '@/lib/annotations';
+import {
+  applyScriptHighlights,
+  findScriptMark,
+  isScriptComment,
+  parseScriptRange,
+  wrapScriptRange,
+} from '@/lib/script-comments';
+import { ScriptCommentsPanel } from '@/components/script-comments';
 
 const stripHtml = (value: string): string =>
   value.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
@@ -215,6 +225,8 @@ export default function RoleScriptPage() {
   const [toast, setToast] = useState('');
   const [exportFormat, setExportFormat] = useState<SubtitleFormat>('srt');
 
+  const comments = useListVideoComments(projectId);
+
   // Transcribe source — pick an already-processed vault file, or upload one.
   const [pickerId, setPickerId] = useState('');
   const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'transcribing' | 'done'>('idle');
@@ -258,6 +270,39 @@ export default function RoleScriptPage() {
     const timer = window.setTimeout(() => setToast(''), 2600);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  // Draw every script comment's highlighted passage into the editor (marks
+  // already saved in the html are left alone). Edits never lose them — the
+  // marks live inside the stored html.
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const scriptComments = (comments.data ?? []).filter((comment) => isScriptComment(comment));
+    if (scriptComments.length === 0) return;
+    if (applyScriptHighlights(el, scriptComments) > 0) setHtml(el.innerHTML);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comments.data]);
+
+  // Clicking a comment tag in the rail scrolls the editor to its highlighted
+  // passage and flashes it, so the note is anchored in the text.
+  const jumpToComment = (comment: VideoComment) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const color = comment.color ?? reviewerColor(comment.authorId);
+    let mark = findScriptMark(el, comment.id);
+    if (!mark) {
+      const range = parseScriptRange(comment.geometry);
+      if (range && wrapScriptRange(el, range, color, comment.id)) {
+        mark = findScriptMark(el, comment.id);
+        setHtml(el.innerHTML);
+      }
+    }
+    if (mark) {
+      mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      mark.classList.add('flash');
+      window.setTimeout(() => mark.classList.remove('flash'), 1800);
+    }
+  };
 
   useEffect(() => {
     const transcript = imported.data?.transcript;
@@ -617,6 +662,9 @@ export default function RoleScriptPage() {
               <span className="mono-label">script{name ? ` · ${name}` : ''} · {p.name}</span>
             </div>
           </div>
+        </div>
+        <div className="pv-script-notes-col">
+          <ScriptCommentsPanel projectId={p.id} allowResolve onJump={jumpToComment} />
         </div>
       </div>
       {toast && (
