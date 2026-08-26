@@ -91,7 +91,7 @@ export function ScriptCommentsPanel({
           return (
             <div
               key={comment.id}
-              className={`list-row pv-comment-row script-note ${comment.resolvedAt ? 'is-resolved' : ''} ${selectedId === comment.id ? 'is-selected' : ''}`}
+              className={`script-note ${comment.resolvedAt ? 'is-resolved' : ''} ${selectedId === comment.id ? 'is-selected' : ''}`}
               role="button"
               tabIndex={0}
               onClick={() => onSelect?.(comment.id)}
@@ -104,33 +104,34 @@ export function ScriptCommentsPanel({
               title={onSelect ? 'Jump to this passage in the script' : undefined}
               data-testid={`script-note-${comment.id}`}
             >
-              <span className="annotation-pin-dot" style={{ background: comment.resolvedAt ? RESOLVED_GREEN : color }}>
-                {label}
-              </span>
-              <span>
-                <b className="mono-label !text-[9px]">
-                  <span style={{ color: comment.resolvedAt ? RESOLVED_GREEN : color }}>{nameOf(comment.authorId)}</span>
-                  {comment.resolvedAt && <span className="den-tag resolved" data-testid={`script-note-resolved-${comment.id}`}>resolved</span>}
+              <div className="script-note-top">
+                <span className="annotation-pin-dot" style={{ background: comment.resolvedAt ? RESOLVED_GREEN : color }}>
+                  {label}
+                </span>
+                <b className="mono-label !text-[10px]" style={{ color: comment.resolvedAt ? RESOLVED_GREEN : color }}>
+                  {nameOf(comment.authorId)}
                 </b>
-                {range && range.text && <span className="script-quote">“{range.text}”</span>}
-                <small className="!normal-case">{comment.body}</small>
-              </span>
-              {allowResolve && (
-                <button
-                  type="button"
-                  className={`link-btn resolve-btn ${comment.resolvedAt ? 'is-resolved' : ''}`}
-                  style={comment.resolvedAt ? { color: RESOLVED_GREEN, borderColor: 'hsl(150 52% 42% / .4)' } : undefined}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onResolve(comment.id, !comment.resolvedAt);
-                  }}
-                  title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
-                  data-testid={`script-note-resolve-${comment.id}`}
-                >
-                  <Check size={12} />
-                  <span>{comment.resolvedAt ? 'Reopen' : 'Resolve'}</span>
-                </button>
-              )}
+                {comment.resolvedAt && <span className="den-tag resolved" data-testid={`script-note-resolved-${comment.id}`}>resolved</span>}
+                <span className="script-note-spacer" />
+                {allowResolve && (
+                  <button
+                    type="button"
+                    className={`link-btn resolve-btn ${comment.resolvedAt ? 'is-resolved' : ''}`}
+                    style={comment.resolvedAt ? { color: RESOLVED_GREEN, borderColor: 'hsl(150 52% 42% / .4)' } : undefined}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onResolve(comment.id, !comment.resolvedAt);
+                    }}
+                    title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
+                    data-testid={`script-note-resolve-${comment.id}`}
+                  >
+                    <Check size={12} />
+                    <span>{comment.resolvedAt ? 'Reopen' : 'Resolve'}</span>
+                  </button>
+                )}
+              </div>
+              {range && range.text && <span className="script-quote">“{range.text}”</span>}
+              <small className="script-note-body">{comment.body}</small>
             </div>
           );
         })}

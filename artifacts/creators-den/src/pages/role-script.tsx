@@ -49,9 +49,10 @@ import { useProjectRealtime } from '@/lib/realtime';
 import { pollWhileProcessing } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
 import {
-  applyScriptHighlights,
   findScriptMark,
-  isScriptComment,
+  parseScriptRange,
+  scriptColor,
+  wrapScriptRange,
 } from '@/lib/script-comments';
 import { ScriptCommentsPanel } from '@/components/script-comments';
 
@@ -280,18 +281,6 @@ export default function RoleScriptPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Draw every script comment's highlighted passage into the editor (marks
-  // already saved in the html are left alone). Edits never lose them — the
-  // marks live inside the stored html.
-  useEffect(() => {
-    const el = editorRef.current;
-    if (!el) return;
-    const scriptComments = (comments.data ?? []).filter((comment) => isScriptComment(comment));
-    if (scriptComments.length === 0) return;
-    if (applyScriptHighlights(el, scriptComments) > 0) setHtml(el.innerHTML);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comments.data]);
-
   // Clicking a highlighted passage in the editor toggles its selection,
   // which lights up the matching comment tag in the rail (and vice versa).
   const onEditorMarkClick = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -304,18 +293,32 @@ export default function RoleScriptPage() {
     setSelectedNote((current) => (current === id ? null : id));
   };
 
-  // Keep the selected mark and the rail tag in sync: lift the highlight onto
-  // the picked passage and bring it into view when a tag is clicked.
+  // Selection drives the highlights: the picked comment's passage is wrapped
+  // in its colored mark (and brought into view), every other highlight is
+  // unwrapped — so deselecting a tag visibly removes the text highlight.
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
-    el.querySelectorAll('mark.pv-script-hl.is-selected').forEach((mark) => mark.classList.remove('is-selected'));
-    if (!selectedNote) return;
-    const mark = findScriptMark(el, selectedNote);
-    if (mark) {
-      mark.classList.add('is-selected');
-      mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const hadMarks = el.querySelector('mark.pv-script-hl') != null;
+    el.querySelectorAll('mark.pv-script-hl').forEach((mark) => {
+      mark.replaceWith(...Array.from(mark.childNodes));
+    });
+    let changed = hadMarks;
+    if (selectedNote) {
+      const comment = (comments.data ?? []).find((c) => c.id === selectedNote);
+      const range = comment ? parseScriptRange(comment.geometry) : null;
+      if (comment && range) {
+        const color = comment.color ?? scriptColor(comment.id);
+        if (wrapScriptRange(el, range, color, comment.id)) changed = true;
+        const mark = findScriptMark(el, selectedNote);
+        if (mark) {
+          mark.classList.add('is-selected');
+          mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
     }
+    if (changed) setHtml(el.innerHTML);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNote]);
 
   useEffect(() => {
