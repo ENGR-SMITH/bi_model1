@@ -2217,13 +2217,16 @@
   overflow-y: auto;
   overflow-x: hidden;
   scroll-snap-type: y proximity;
-  scrollbar-width: thin;
+  /* The scrollbar is hidden — the track stays scrollable (wheel / drag /
+     arrows) but no rail line shows on the timeline column. */
+  scrollbar-width: none;
   /* Vertical padding is driven from JS (half the track height) so the list
      is always scrollable — even with just one or two cards — and the first
      / last cards can still be brought into the focus frame. */
   padding: 0 4px;
   perspective: 700px;
 }
+.vs-track::-webkit-scrollbar { display: none; }
 .vs-item {
   position: relative;
   flex: 0 0 auto;
