@@ -173,12 +173,6 @@ export default function ThumbnailPreviewPage() {
 
   return (
     <PreviewLayout
-      eyebrow="Preview · thumbnail"
-      title="The cover."
-      description="Every chosen thumbnail design, full frame. Annotate the pixels and flip versions from the carousel."
-      backHref={`/projects/${p.id}/preview`}
-      backLabel="Preview room"
-      status={<span className="den-tag teal"><ImageIcon size={10} /> {versions.length} version{versions.length === 1 ? '' : 's'}</span>}
       main={
         <>
           <ThumbnailCanvas
@@ -190,7 +184,6 @@ export default function ThumbnailPreviewPage() {
             versions={versions}
             selectedId={selected?.id ?? null}
             onSelect={setSelectedId}
-            hint="Click a version to see its chosen design on the canvas."
             emptyText="No thumbnail versions saved yet — save a snapshot in the Thumbnail studio first."
           />
         </>

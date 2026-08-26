@@ -12,12 +12,10 @@ import {
   Film,
   Image as ImageIcon,
   Mic2,
-  Sparkles,
   Type,
 } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import { useGetVideoProject } from '@workspace/api-client-react';
-import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { proxyUrlFor } from '@/components/asset-preview';
 
@@ -168,21 +166,6 @@ export default function PreviewPage() {
 
   return (
     <div className="page">
-      <div className="page-header">
-        <div>
-          <SectionEyebrow>Preview · review room</SectionEyebrow>
-          <h1>The preview room.</h1>
-          <p>Everything the relay produced, side by side — the picture, the sound, the words and the cover. Pick a card to open its preview studio.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href={`/projects/${p.id}`} className="secondary-btn" data-testid="preview-back-vault">
-            <ArrowLeft size={14} />
-            The vault
-          </Link>
-          <span className="den-tag teal"><Sparkles size={10} /> {p.status.replaceAll('_', ' ')}</span>
-        </div>
-      </div>
-
       <div className="pv-grid" data-testid="preview-grid">
         {cards.map((card) => (
           <Link key={card.id} href={card.href} className="pv-card" data-testid={`preview-card-${card.id}`}>
@@ -201,11 +184,6 @@ export default function PreviewPage() {
           </Link>
         ))}
       </div>
-
-      <p className="den-footnote mt-8">
-        <Sparkles size={13} />
-        Annotations live on the frame, notes live on the timeline — every pin is colour-tagged to its reviewer, and nothing here unlocks the originals.
-      </p>
     </div>
   );
 }

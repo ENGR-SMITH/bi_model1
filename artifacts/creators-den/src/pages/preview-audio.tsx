@@ -211,12 +211,6 @@ export default function AudioPreviewPage() {
 
   return (
     <PreviewLayout
-      eyebrow="Preview · audio"
-      title="The sound."
-      description="Every sound version on one wave. Annotate the mix, seek with the red tick, and flip versions from the carousel."
-      backHref={`/projects/${p.id}/preview`}
-      backLabel="Preview room"
-      status={<span className="den-tag teal"><AudioLines size={10} /> {versions.length} version{versions.length === 1 ? '' : 's'}</span>}
       main={
         <>
           <AudioCanvas
@@ -228,7 +222,6 @@ export default function AudioPreviewPage() {
             versions={versions}
             selectedId={selected?.id ?? null}
             onSelect={setSelectedId}
-            hint="Click a version to hear it on the canvas — red ticks show where notes are pinned."
             emptyText="No sound versions saved yet — save a snapshot in the Sound studio first."
           />
         </>
