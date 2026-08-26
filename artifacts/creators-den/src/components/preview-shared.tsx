@@ -22,8 +22,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Download,
-  LockKeyhole,
+  FolderOpen,
   Maximize,
   MessageSquare,
   Minimize,
@@ -33,7 +32,6 @@ import {
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  getDownloadVideoFileUrl,
   getGetVideoProjectQueryKey,
   getListVideoCommentsQueryKey,
   getUploadVideoAssetUrl,
@@ -148,23 +146,28 @@ export function VersionCarousel({
 }
 
 // ---------------------------------------------------------------------------
-// RoleLayout — the four role pages (Video / Audio / Script / Thumbnail).
-// Three columns at 10 : 50 : 40, with the second and third columns split into
-// two rows at 80 : 20. Column one (the version list) spans the full height;
-// the bottom rows of columns two and three hold the download and upload bars.
+// RoleLayout — the three role pages (Video / Audio / Thumbnail).
+// Three columns at 14 : 46 : 40, with the second and third columns split into
+// two rows at 68 : 32. Column one (the coverflow) spans the full height; the
+// bottom rows of columns two and three hold the upload card and the oracle.
 // ---------------------------------------------------------------------------
 
 export function RoleLayout({
   versions,
   canvas,
-  download,
   notes,
+  oracle,
   upload,
 }: {
+  /** Column one — the coverflow of timeline versions + vault uploads. */
   versions: ReactNode;
+  /** Column two, row one — the big canvas. */
   canvas: ReactNode;
-  download: ReactNode;
+  /** Column three, row one — the pin / comment wall. */
   notes: ReactNode;
+  /** Column three, row two — the role oracle. */
+  oracle: ReactNode;
+  /** Column two, row two — the upload card. */
   upload: ReactNode;
 }) {
   return (
@@ -172,130 +175,64 @@ export function RoleLayout({
       <div className="role-grid">
         <div className="role-versions-col">{versions}</div>
         <div className="role-canvas-main">{canvas}</div>
-        <div className="role-canvas-bar">{download}</div>
+        <div className="role-canvas-bar">{upload}</div>
         <div className="role-notes-main">{notes}</div>
-        <div className="role-notes-bar">{upload}</div>
+        <div className="role-notes-bar">{oracle}</div>
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// VersionList — the first column of a role page: a single scrollable vertical
-// list of the project's timeline versions, labelled with their relay leg.
+// VAULT_KIND_LABELS — human labels for the vault asset kinds, shared by the
+// role upload cards and the coverflow shelf.
 // ---------------------------------------------------------------------------
 
-export function VersionList({
-  versions,
-  selectedId,
-  onSelect,
-  emptyText,
-}: {
-  versions: PreviewVersion[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  emptyText: string;
-}) {
-  return (
-    <div className="paper-card pv-versions-list" data-testid="version-list">
-      <div className="inline-heading">
-        <span className="eyebrow"><Clock3 size={13} /> Timeline versions</span>
-        <span className="mono-label">{versions.length} saved</span>
-      </div>
-      {versions.length === 0 ? (
-        <p className="setting-copy mt-2" data-testid="version-list-empty">{emptyText}</p>
-      ) : (
-        <div className="pv-versions-list-track" data-testid="version-list-track">
-          {versions.map((version) => {
-            const active = version.id === selectedId;
-            return (
-              <button
-                key={version.id}
-                type="button"
-                className={`pv-version-row ${active ? 'active' : ''}`}
-                onClick={() => onSelect(version.id)}
-                data-testid={`version-row-${version.leg}-${version.version}`}
-              >
-                <span className="pv-version-row-head">
-                  <span className="den-tag accent">v{version.version}</span>
-                  <span className="pv-version-leg">{version.leg}</span>
-                  {version.isHead && <span className="den-tag teal">head</span>}
-                </span>
-                {version.message ? <b className="pv-version-msg truncate">{version.message}</b> : <b className="pv-version-msg muted">no message</b>}
-                <span className="pv-version-date">{new Date(version.createdAt).toLocaleDateString()} · {new Date(version.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
+export const VAULT_KIND_LABELS: Record<string, string> = {
+  RAW_VIDEO: 'Camera footage',
+  RAW_AUDIO: 'Separate audio',
+  SCREEN_REC: 'Screen recording',
+  B_ROLL: 'B-roll',
+  REFERENCE: 'Reference video',
+  VO_PICKUP: 'Pickup voiceover',
+  GRAPHIC: 'Graphic',
+  THUMBNAIL_DESIGN: 'Thumbnail design',
+};
 
 // ---------------------------------------------------------------------------
-// RoleDownloadBar — the bottom row of the canvas column: download the file
-// currently shown in the player (role-appropriate by construction — it is the
-// asset already playing). Mirrors the vault's Lock: only once the project is
-// released (or a grant covers the file) does the server stream the original.
+// RoleUploadCard — the bottom row of the canvas column. A compact upload
+// section: a format dropdown (the page's own vault kinds), a clickable /
+// draggable drop zone, an upload button, and a progress row. The file joins
+// the vault under the chosen kind, guarded by the page's accept list + format
+// check, so a video can never be dropped on the thumbnail page and vice versa.
 // ---------------------------------------------------------------------------
 
-export function RoleDownloadBar({
-  projectId,
-  assetId,
-  label,
-  released,
-}: {
-  projectId: string;
-  assetId: string;
-  /** e.g. "video file" / "audio file" / "thumbnail design". */
-  label: string;
-  released: boolean;
-}) {
-  return (
-    <div className="paper-card role-bar" data-testid="role-download">
-      <span className="eyebrow"><Download size={13} /> Download {label}</span>
-      {assetId ? (
-        released ? (
-          <a href={getDownloadVideoFileUrl(projectId, assetId)} download className="secondary-btn" data-testid="role-download-link">
-            <Download size={13} /> Download
-          </a>
-        ) : (
-          <span className="den-tag teal" title="Downloads open once the Captain approves the final master"><LockKeyhole size={10} /> Locked</span>
-        )
-      ) : (
-        <span className="mono-label">Nothing to download yet</span>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// RoleUploadBar — the bottom row of the notes column: upload the role's file
-// format only (enforced by the accept list AND a client-side format check, so
-// a video can never be dropped on the thumbnail page and vice versa). The file
-// joins the vault under the role's asset kind.
-// ---------------------------------------------------------------------------
-
-export function RoleUploadBar({
+export function RoleUploadCard({
   projectId,
   label,
+  kinds,
+  defaultKind,
   accept,
-  kind,
   checkFormat,
 }: {
   projectId: string;
   /** e.g. "video file" / "audio file" / "thumbnail design". */
   label: string;
+  /** The vault kinds this page accepts, shown in the format dropdown. */
+  kinds: Array<{ value: string; label: string }>;
+  /** The kind selected by default (e.g. RAW_VIDEO on the video page). */
+  defaultKind: string;
   /** <input accept> — the allowed extensions/mime types. */
   accept: string;
-  /** Vault asset kind the uploaded file is stored as (RAW_VIDEO, RAW_AUDIO, THUMBNAIL_DESIGN). */
-  kind: string;
   /** Client-side format guard — returns an error message for a disallowed file. */
   checkFormat: (file: File) => string | null;
 }) {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const [kind, setKind] = useState(defaultKind);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [drag, setDrag] = useState(false);
   const [phase, setPhase] = useState<'idle' | 'uploading' | 'done'>('idle');
   const [progress, setProgress] = useState(0);
   const [name, setName] = useState('');
@@ -315,6 +252,7 @@ export function RoleUploadBar({
       return;
     }
     setError('');
+    setPendingFile(null);
     setName(file.name);
     setProgress(0);
     setPhase('uploading');
@@ -364,29 +302,101 @@ export function RoleUploadBar({
     setProgress(0);
   };
 
-  const onPickFile = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const pickFile = (file: File | undefined | null) => {
     if (!file) return;
-    startUpload(file);
+    const invalid = checkFormat(file);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    setError('');
+    setPendingFile(file);
     if (fileRef.current) fileRef.current.value = '';
   };
 
+  const onDropZoneClick = () => fileRef.current?.click();
+
+  const onDrop = (event: React.DragEvent) => {
+    event.preventDefault();
+    setDrag(false);
+    pickFile(event.dataTransfer.files?.[0]);
+  };
+
   return (
-    <div className="paper-card role-bar" data-testid="role-upload">
+    <div className="paper-card role-upload-card" data-testid="role-upload">
       <span className="eyebrow"><Upload size={13} /> Upload {label}</span>
-      <input ref={fileRef} type="file" accept={accept} onChange={onPickFile} disabled={phase === 'uploading'} data-testid="role-upload-input" />
+      <div className="role-upload-row">
+        <select
+          value={kind}
+          onChange={(event) => setKind(event.target.value)}
+          disabled={phase === 'uploading'}
+          aria-label="File format"
+          data-testid="role-upload-kind"
+        >
+          {kinds.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={() => pendingFile && startUpload(pendingFile)}
+          disabled={phase === 'uploading' || !pendingFile}
+          data-testid="role-upload-button"
+        >
+          <Upload size={13} />
+          {phase === 'uploading' ? `${progress}%` : 'Upload'}
+        </button>
+      </div>
+      <div
+        className={`role-upload-drop ${drag ? 'drag' : ''}`}
+        role="button"
+        tabIndex={0}
+        onClick={onDropZoneClick}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onDropZoneClick();
+          }
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDrag(true);
+        }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={onDrop}
+        title="Click to browse, or drop a file here"
+        data-testid="role-upload-drop"
+      >
+        {pendingFile ? (
+          <span><FolderOpen size={14} /> <b>{pendingFile.name}</b> — ready to upload</span>
+        ) : (
+          <span><FolderOpen size={14} /> Drag &amp; drop your {label} here, or click to browse</span>
+        )}
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept={accept}
+        onChange={(event) => pickFile(event.target.files?.[0])}
+        disabled={phase === 'uploading'}
+        className="hidden"
+        data-testid="role-upload-input"
+      />
       {phase === 'uploading' && (
-        <span className="role-bar-progress" data-testid="role-upload-progress">
+        <span className="role-upload-status" data-testid="role-upload-progress">
           <span className="den-upload-progress-bar"><span style={{ width: `${progress}%` }} /></span>
-          <b>{progress}%</b>
+          <b className="mono-label">{progress}%</b>
           <button type="button" onClick={cancel} className="den-upload-cancel">Cancel</button>
         </span>
       )}
       {phase === 'done' && (
-        <span className="den-footnote"><Check size={12} /> <b className="truncate">{name}</b> is in the vault</span>
+        <span className="role-upload-status" data-testid="role-upload-done">
+          <Check size={12} /> <b className="truncate">{name}</b> is in the vault
+        </span>
       )}
       {phase === 'idle' && error && (
-        <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }}>{error}</span>
+        <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-error">{error}</span>
       )}
     </div>
   );
