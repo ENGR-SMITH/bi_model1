@@ -1,9 +1,10 @@
 // ---------------------------------------------------------------------------
 // VersionShelf — the first column of a role page. A vertical 3D coverflow
 // carousel that stacks the leg's timeline versions together with the vault's
-// uploads. A static blue focus frame is pinned at the column's vertical
-// centre; the active (latest) item sits inside it at full scale and full
-// opacity, while neighbours above and below recede with a rotateX +
+// uploads. A static blue focus frame is pinned in the upper part of the
+// column — the active (latest) item sits inside it at full scale and full
+// opacity, with about one card's height of space above the frame and the
+// next card below, while the remaining neighbours recede with a rotateX +
 // translateZ tilt and fade towards the edges. The list itself scrolls under
 // the fixed frame — scroll (wheel / drag / trackbar) or use the arrows to
 // bring any item into the frame, which then becomes the active selection.
@@ -33,6 +34,11 @@ export type ShelfItem =
       thumbUrl?: string;
     };
 
+// The focal point sits in the upper part of the column (25% down) instead of
+// dead centre, so the newest (active) card rests inside the frame with about
+// one card's height of space above it and the next card below.
+const FOCUS_RATIO = 0.25;
+
 export function VersionShelf({
   items,
   activeKey,
@@ -52,26 +58,26 @@ export function VersionShelf({
   const activeKeyRef = useRef(activeKey);
   activeKeyRef.current = activeKey;
 
-  // Give the track half-a-viewport of padding above and below the cards, so
-  // the list is ALWAYS scrollable — even with just one or two cards — and
-  // the first / last cards can still be brought up into the fixed focus
-  // frame at the column centre. (CSS percentage padding would resolve
-  // against the column's width, which is too small to matter.)
+  // Give the track padding above and below the cards (down to the focal
+  // point above, and the remainder below), so the list is ALWAYS scrollable
+  // — even with just one or two cards — and the first / last cards can still
+  // be brought up into the fixed focus frame. (CSS percentage padding would
+  // resolve against the column's width, which is too small to matter.)
   const syncPadding = useCallback(() => {
     const container = trackRef.current;
     if (!container) return;
-    const half = container.clientHeight / 2;
-    container.style.paddingTop = `${half}px`;
-    container.style.paddingBottom = `${half}px`;
+    const top = container.clientHeight * FOCUS_RATIO;
+    container.style.paddingTop = `${top}px`;
+    container.style.paddingBottom = `${container.clientHeight - top}px`;
   }, []);
 
   useLayoutEffect(() => {
     syncPadding();
   }, [syncPadding, items.length]);
 
-  // The item whose centre is closest to the track's vertical centre.
+  // The item whose centre is closest to the track's focal point.
   const findNearestKey = useCallback((container: HTMLDivElement): string | null => {
-    const center = container.clientHeight / 2;
+    const center = container.clientHeight * FOCUS_RATIO;
     let nearestKey: string | null = null;
     let nearestDist = Infinity;
     for (const child of Array.from(container.children) as HTMLElement[]) {
@@ -85,14 +91,14 @@ export function VersionShelf({
     return nearestKey;
   }, []);
 
-  // Each card's 3D pose is a function of its distance from the track's
-  // vertical centre — the centred card is scale(1) / opacity(1), the cards
-  // above and below fan away with a rotateX + translateZ tilt. The focus
-  // frame's height tracks the card currently sitting inside it.
+  // Each card's 3D pose is a function of its distance from the track's focal
+  // point — the card in the frame is scale(1) / opacity(1), the cards above
+  // and below fan away with a rotateX + translateZ tilt. The focus frame's
+  // height tracks the card currently sitting inside it.
   const applyTransforms = useCallback(() => {
     const container = trackRef.current;
     if (!container) return;
-    const center = container.clientHeight / 2;
+    const center = container.clientHeight * FOCUS_RATIO;
     let nearest: HTMLElement | null = null;
     let nearestDist = Infinity;
     for (const child of Array.from(container.children) as HTMLElement[]) {
@@ -157,7 +163,8 @@ export function VersionShelf({
     if (!container) return;
     const el = Array.from(container.children).find((child) => (child as HTMLElement).dataset.key === key) as HTMLElement | null;
     if (!el) return;
-    container.scrollTo({ top: el.offsetTop - (container.clientHeight - el.offsetHeight) / 2, behavior: 'smooth' });
+    const focal = container.clientHeight * FOCUS_RATIO;
+    container.scrollTo({ top: el.offsetTop - (focal - el.offsetHeight / 2), behavior: 'smooth' });
   };
 
   // Keep the active item pinned inside the focus frame whenever it changes.
@@ -171,7 +178,7 @@ export function VersionShelf({
     if (!container) return;
     const children = Array.from(container.children) as HTMLElement[];
     if (children.length === 0) return;
-    const center = container.clientHeight / 2;
+    const center = container.clientHeight * FOCUS_RATIO;
     let nearestIndex = 0;
     let nearestDist = Infinity;
     children.forEach((child, index) => {
