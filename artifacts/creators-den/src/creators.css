@@ -5,6 +5,22 @@
    Built on top of the shared design system (index.css).
    ============================================================================ */
 
+/* ---- Dropdowns: black, never white --------------------------------------- */
+/* Un-styled <select>s fall back to the browser's white default — force every
+   dropdown in Creator-Den to a black field with a black option list and
+   light text, and switch the native control to the dark colour scheme so the
+   arrow + popup follow. */
+select {
+  background-color: #000 !important;
+  color: hsl(var(--foreground));
+  color-scheme: dark;
+}
+select option,
+select optgroup {
+  background-color: #000;
+  color: hsl(var(--foreground));
+}
+
 /* ---- Role tabs (the four legs) ---- */
 .role-tabs { display: flex; flex-wrap: wrap; gap: 3px; padding: 3px; border: 1px solid hsl(var(--border)); background: hsl(var(--card) / .86); box-shadow: var(--shadow-xs); border-radius: 999px; }
 .role-tabs button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 7px 13px; color: hsl(var(--muted-foreground)); background: transparent; font: 10px var(--app-font-mono); letter-spacing: .04em; text-transform: uppercase; transition: color .18s, background .18s, transform .18s; }
