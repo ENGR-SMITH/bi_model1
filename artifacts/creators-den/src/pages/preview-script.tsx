@@ -21,10 +21,11 @@ import {
 } from '@workspace/api-client-react';
 import { useUser } from '@clerk/react';
 import { useProjectRealtime } from '@/lib/realtime';
-import { reviewerColor, reviewerLabel } from '@/lib/annotations';
+import { reviewerLabel } from '@/lib/annotations';
 import {
   applyScriptHighlights,
   isScriptComment,
+  randomScriptColor,
   rangeToOffset,
   wrapScriptRange,
 } from '@/lib/script-comments';
@@ -73,7 +74,6 @@ export default function ScriptPreviewPage() {
   const create = useCreateVideoComment();
 
   const authorId = user?.id ?? '';
-  const authorColor = reviewerColor(authorId);
   const authorLabel = reviewerLabel(authorId);
 
   // Autosave (debounced) straight to the browser for this project — the
@@ -155,6 +155,9 @@ export default function ScriptPreviewPage() {
     if (!root || !composer || !pinBody.trim()) return;
     const range = rangeToOffset(root, composer.range);
     if (!range) return;
+    // Each pinned note draws a fresh color from the wide script palette, so
+    // the tags read as several different colors side by side.
+    const tagColor = randomScriptColor();
     create.mutate(
       {
         projectId,
@@ -162,14 +165,14 @@ export default function ScriptPreviewPage() {
           body: pinBody.trim(),
           kind: 'HIGHLIGHT',
           geometry: { start: range.start, length: range.length, text: range.text },
-          color: authorColor,
+          color: tagColor,
           label: authorLabel,
         },
       },
       {
         onSuccess: (comment) => {
           // Wrap the passage now so the highlight appears immediately.
-          wrapScriptRange(root, range, comment.color ?? authorColor, comment.id);
+          wrapScriptRange(root, range, comment.color ?? tagColor, comment.id);
           setHtml(root.innerHTML);
           setToast('Pin note added to the script.');
           window.getSelection()?.removeAllRanges();
