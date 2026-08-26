@@ -56,6 +56,7 @@ export function AnnotationCanvas({
   timelineVersionId,
   submissionId,
   headerRef,
+  surfaceRef,
   dropLine = false,
 }: {
   projectId: string;
@@ -76,6 +77,10 @@ export function AnnotationCanvas({
       into this element (the card header's top-right corner) instead of a pill
       over the media — the familiar editing-tools affordance. */
   headerRef?: RefObject<HTMLDivElement | null>;
+  /** The canvas card that holds the player — the comment field is portaled
+      here (positioned at the click point) so the audio wave's overflow /
+      pointer-capture can't clip it or swallow its buttons. */
+  surfaceRef?: RefObject<HTMLDivElement | null>;
   /** Draw a red vertical line at the selected point (the audio wave). */
   dropLine?: boolean;
 }) {
@@ -88,6 +93,8 @@ export function AnnotationCanvas({
   const overlayRef = useRef<HTMLDivElement>(null);
   const [annotating, setAnnotating] = useState(false);
   const [drop, setDrop] = useState<{ x: number; y: number } | null>(null);
+  // Pixel position of the composer within the surface card (when portaled).
+  const [dropPos, setDropPos] = useState<{ left: number; top: number } | null>(null);
   const [body, setBody] = useState('');
   const [openPin, setOpenPin] = useState<string | null>(null);
 
@@ -99,10 +106,16 @@ export function AnnotationCanvas({
     if (headerRef?.current) setHeaderEl(headerRef.current);
   }, [headerRef]);
 
+  const [surfaceEl, setSurfaceEl] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (surfaceRef?.current) setSurfaceEl(surfaceRef.current);
+  }, [surfaceRef]);
+
   // Turn annotate mode off when the frame (asset) changes.
   useEffect(() => {
     setAnnotating(false);
     setDrop(null);
+    setDropPos(null);
     setOpenPin(null);
   }, [assetId]);
 
@@ -142,16 +155,32 @@ export function AnnotationCanvas({
   // Dropping a pin listens on pointerdown, not click: the audio wave's own
   // pointerdown handler calls setPointerCapture, which retargets the
   // subsequent click to the wave — so a click-based drop never fired there.
+  // Presses that start on an existing pin or an open panel stop propagating
+  // so the wave never seeks or captures from them.
   const onOverlayPointerDown = (event: React.PointerEvent) => {
-    if (!annotating || !canAnnotate || !assetId) return;
-    // Ignore presses that start on an existing pin or an open panel.
     const target = event.target as HTMLElement;
-    if (target.closest('.annotation-pin, .annotation-thread, .annotation-composer, .annotation-close-annotate, .annotation-toggle')) return;
+    if (target.closest('.annotation-pin, .annotation-thread, .annotation-composer, .annotation-close-annotate, .annotation-toggle')) {
+      event.stopPropagation();
+      return;
+    }
+    if (!annotating || !canAnnotate || !assetId) return;
     const el = overlayRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const x = clamp01((event.clientX - rect.left) / rect.width);
     const y = clamp01((event.clientY - rect.top) / rect.height);
+    // Keep the composer in view wherever it pops up.
+    if (surfaceEl) {
+      const surfaceRect = surfaceEl.getBoundingClientRect();
+      const maxLeft = Math.max(8, surfaceRect.width - 262);
+      const maxTop = Math.max(8, surfaceRect.height - 180);
+      setDropPos({
+        left: Math.min(Math.max(8, event.clientX - surfaceRect.left), maxLeft),
+        top: Math.min(Math.max(8, event.clientY - surfaceRect.top), maxTop),
+      });
+    } else {
+      setDropPos(null);
+    }
     setOpenPin(null);
     setDrop({ x, y });
     setBody('');
@@ -304,36 +333,75 @@ export function AnnotationCanvas({
       )}
 
       {drop && (
-        <div
-          className="annotation-composer"
-          style={{ left: `${Math.min(drop.x * 100, 60)}%`, top: `${Math.min(drop.y * 100, 50)}%` }}
-          onClick={(event) => event.stopPropagation()}
-          data-testid="annotation-composer"
-        >
-          <span className="eyebrow">
-            <Pin size={11} /> Pin note {playheadMs != null ? `@ ${formatTimecode(playheadMs)}` : '· on the frame'}
-          </span>
-          <textarea
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            placeholder="Note on this frame…"
-            rows={2}
-            maxLength={4000}
-            autoFocus
-            data-testid="annotation-input"
-          />
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={submitDrop} disabled={create.isPending || !body.trim()} className="primary-btn !px-3 !py-1.5 !text-xs" data-testid="annotation-submit">
-              {create.isPending ? 'Pinning…' : 'Pin note'}
-            </button>
-            <button type="button" onClick={() => setDrop(null)} className="text-btn !text-xs">Cancel</button>
+        surfaceEl ? (
+          // The audio wave clips its children (overflow: hidden) and its
+          // pointer-capture swallows button clicks, so the composer is portaled
+          // up into the canvas card, anchored at the exact click point.
+          createPortal(
+            <div
+              className="annotation-composer"
+              style={dropPos ? { left: dropPos.left, top: dropPos.top } : { left: `${Math.min(drop.x * 100, 60)}%`, top: `${Math.min(drop.y * 100, 50)}%` }}
+              onClick={(event) => event.stopPropagation()}
+              data-testid="annotation-composer"
+            >
+              <span className="eyebrow">
+                <Pin size={11} /> Pin note {playheadMs != null ? `@ ${formatTimecode(playheadMs)}` : '· on the frame'}
+              </span>
+              <textarea
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                placeholder="Note on this frame…"
+                rows={2}
+                maxLength={4000}
+                autoFocus
+                data-testid="annotation-input"
+              />
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={submitDrop} disabled={create.isPending || !body.trim()} className="primary-btn !px-3 !py-1.5 !text-xs" data-testid="annotation-submit">
+                  {create.isPending ? 'Pinning…' : 'Pin note'}
+                </button>
+                <button type="button" onClick={() => setDrop(null)} className="text-btn !text-xs">Cancel</button>
+              </div>
+              {create.isError && (
+                <p className="setting-copy !text-[11px]" role="alert">
+                  {dropError?.response?.data?.error || 'The pin could not be added.'}
+                </p>
+              )}
+            </div>,
+            surfaceEl,
+          )
+        ) : (
+          <div
+            className="annotation-composer"
+            style={{ left: `${Math.min(drop.x * 100, 60)}%`, top: `${Math.min(drop.y * 100, 50)}%` }}
+            onClick={(event) => event.stopPropagation()}
+            data-testid="annotation-composer"
+          >
+            <span className="eyebrow">
+              <Pin size={11} /> Pin note {playheadMs != null ? `@ ${formatTimecode(playheadMs)}` : '· on the frame'}
+            </span>
+            <textarea
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+              placeholder="Note on this frame…"
+              rows={2}
+              maxLength={4000}
+              autoFocus
+              data-testid="annotation-input"
+            />
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={submitDrop} disabled={create.isPending || !body.trim()} className="primary-btn !px-3 !py-1.5 !text-xs" data-testid="annotation-submit">
+                {create.isPending ? 'Pinning…' : 'Pin note'}
+              </button>
+              <button type="button" onClick={() => setDrop(null)} className="text-btn !text-xs">Cancel</button>
+            </div>
+            {create.isError && (
+              <p className="setting-copy !text-[11px]" role="alert">
+                {dropError?.response?.data?.error || 'The pin could not be added.'}
+              </p>
+            )}
           </div>
-          {create.isError && (
-            <p className="setting-copy !text-[11px]" role="alert">
-              {dropError?.response?.data?.error || 'The pin could not be added.'}
-            </p>
-          )}
-        </div>
+        )
       )}
 
       {/* The header edit (pencil) button — the familiar editing-tools

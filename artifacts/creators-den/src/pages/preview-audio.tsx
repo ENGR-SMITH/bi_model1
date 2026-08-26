@@ -136,6 +136,7 @@ function AudioCanvas({
               onSeek={onSeek}
               timelineVersionId={version?.id}
               headerRef={annotationHeaderRef}
+              surfaceRef={stageRef}
               dropLine
             />
             <FullscreenButton targetRef={stageRef} />

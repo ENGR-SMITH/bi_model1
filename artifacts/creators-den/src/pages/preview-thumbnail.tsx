@@ -92,6 +92,7 @@ function ThumbnailCanvas({
               playheadMs={null}
               timelineVersionId={version?.id}
               headerRef={annotationHeaderRef}
+              surfaceRef={stageRef}
             />
             <FullscreenButton targetRef={stageRef} />
           </ImageStage>
