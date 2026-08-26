@@ -1200,49 +1200,69 @@
 
 /* ---- Tier 2: one row cut into three columns ------------------------------
    Workspace on the left, the relay deck (project tabs) centered in the middle,
-   and sign-out on the right — all on the same baseline with a gap between.
-   The three columns are 1fr / auto / 1fr so the deck stays optically centered;
-   when no project is open the middle column simply drops out. */
+   and sign-out on the right — all on the same baseline. Each column carries
+   its own fill; the row's background is removed in the gaps between columns
+   and the facing edges are sliced on the diagonal, so the gaps read as scissor
+   cuts. The deck sits in the middle of a 1fr/auto/auto/auto/1fr grid (the two
+   auto tracks are the cut marks); when no project is open those tracks drop
+   out and the side chips spread apart. */
 .cd-topnav-secondary {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: 1fr auto auto auto 1fr;
   align-items: stretch;
   gap: var(--sp-3);
   height: 46px;
   padding: 0 clamp(16px, 3vw, 40px);
   border-top: 1px solid hsl(var(--border) / .5);
-  background: hsl(var(--card) / .35);
 }
 
 .cd-topnav-workspace-col {
   grid-column: 1;
+  position: relative; isolation: isolate;
   display: flex; align-items: center;
   min-width: 0;
 }
 .cd-topnav-signout-col {
-  grid-column: 3;
+  grid-column: 5;
+  position: relative; isolation: isolate;
   display: flex; align-items: center; justify-content: flex-end;
   min-width: 0;
 }
 
-/* The relay deck — the middle column: tabs cut apart from the side columns by
-   a vertical divider on each side (mirrors the in-deck tab divider), with a
-   breathing gap before and after each cut. */
-.cd-topnav-deck {
-  grid-column: 2; justify-self: center;
-  display: flex; align-items: center;
-  gap: var(--sp-3);
-  min-width: 0; max-width: 100%;
+/* The cut-out chips: the row's fill lives on each column, sliced on the
+   diagonal where it meets a gap so the page shows through the notch. The chip
+   is a ::before so nothing inside the column (the workspace dropdown, the
+   tabs) ever gets clipped by it. */
+.cd-topnav-workspace-col::before,
+.cd-topnav-signout-col::before {
+  content: "";
+  position: absolute; inset: 0; z-index: -1;
+  background: hsl(var(--card) / .35);
 }
-.cd-topnav-deck .cd-topnav-divider {
-  flex: 0 0 auto;
+.cd-topnav-workspace-col::before {
+  clip-path: polygon(0 0, calc(100% - var(--sp-3)) 0, 100% 100%, 0 100%);
+}
+.cd-topnav-signout-col::before {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, var(--sp-3) 100%);
+}
+
+/* The cut marks floating in the notches — same gradient divider as the
+   in-deck tab divider. */
+.cd-topnav-divider {
   width: 1px; height: 24px;
+  align-self: center;
   background: linear-gradient(hsl(var(--border) / 0), hsl(var(--border)), hsl(var(--border) / 0));
 }
+
+/* The relay deck — the middle column chip with cut ends on both sides. The
+   fill and clip live on the nav itself: background-attachment: scroll keeps
+   the fill put while the tabs scroll, and the clip is on the nav's box. */
 .cd-topnav-tabs {
+  grid-column: 3;
   display: flex; align-items: stretch; gap: var(--sp-2);
-  align-self: stretch;            /* rail sits flush on the row's baseline */
-  min-width: 0;
+  min-width: 0; max-width: 100%;
+  background: hsl(var(--card) / .35);
+  clip-path: polygon(0 0, calc(100% - var(--sp-3)) 0, 100% 100%, var(--sp-3) 100%);
   overflow-x: auto;               /* horizontal scroll when tabs outrun the width */
   scrollbar-width: none;
 }
