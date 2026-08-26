@@ -221,6 +221,29 @@ select optgroup {
 .annotation-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: visible; }
 .annotation-canvas.annotating { pointer-events: auto; cursor: crosshair; }
 .annotation-pin { position: absolute; transform: translate(-50%, -50%); background: transparent; border: 0; padding: 0; cursor: pointer; pointer-events: auto; z-index: 4; display: flex; align-items: center; gap: 4px; touch-action: none; transition: opacity .35s ease; }
+
+/* Soft glowing wave radiating from open tags on the video / thumbnail
+   players — a ring that swells out of the pin dot and fades, repeating. */
+.annotation-pin.glow::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%) scale(.6);
+  background: var(--pin-glow, hsl(var(--accent)));
+  opacity: .5;
+  z-index: -1;
+  pointer-events: none;
+  animation: pin-glow-wave 2.2s ease-out infinite;
+}
+@keyframes pin-glow-wave {
+  0%   { transform: translate(-50%, -50%) scale(.6); opacity: .55; }
+  70%  { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+}
 .annotation-pin-dot { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; color: #fff; font: 800 10px var(--app-font-mono); box-shadow: 0 1px 4px hsl(0 0% 0% / .6), 0 0 0 2px hsl(0 0% 100% / .85); }
 .annotation-pin-count { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: hsl(var(--card) / .95); border: 1px solid hsl(var(--border)); color: hsl(var(--foreground)); font: 700 9px var(--app-font-mono); }
 .annotation-thread { position: absolute; width: 250px; max-height: 240px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--card) / .98); box-shadow: var(--shadow-md); pointer-events: auto; z-index: 6; }
@@ -2480,7 +2503,8 @@ select optgroup {
 .pv-comment-row .note-author { color: hsl(var(--muted-foreground)); }
 .pv-comment-row .den-tag.timechip { margin-left: 6px; }
 
-/* Resolve / Reopen control — only rendered on the main role pages. */
+/* Resolve / Reopen control — only rendered on the main role pages. Resolve
+   reads green so the action is clearly the positive one. */
 .pv-comment-row .resolve-btn {
   flex: 0 0 auto;
   display: inline-flex;
@@ -2488,21 +2512,22 @@ select optgroup {
   gap: 5px;
   padding: 4px 9px;
   border-radius: 999px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card) / .8);
-  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(150 52% 42% / .45);
+  background: hsl(150 52% 42% / .08);
+  color: hsl(150 52% 45%);
   font: 700 9px var(--app-font-mono);
   letter-spacing: .06em;
   text-transform: uppercase;
   white-space: nowrap;
 }
 .pv-comment-row .resolve-btn:hover {
-  border-color: hsl(150 52% 42% / .6);
-  color: hsl(150 52% 42%);
-  background: hsl(150 52% 42% / .1);
+  border-color: hsl(150 52% 42% / .8);
+  color: hsl(150 52% 40%);
+  background: hsl(150 52% 42% / .16);
 }
 .pv-comment-row .resolve-btn.is-resolved {
-  background: hsl(150 52% 42% / .12);
+  background: hsl(150 52% 42% / .18);
+  border-color: hsl(150 52% 42% / .65);
 }
 
 /* The green RESOLVED tag shown on a comment once it has been closed. */

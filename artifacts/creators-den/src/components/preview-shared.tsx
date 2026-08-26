@@ -568,14 +568,25 @@ export function PreviewNotesPanel({
       group.comments.push(comment);
       groups.set(key, group);
     }
-    return [...groups.values()].sort((a, b) => a.key.localeCompare(b.key));
+    return [...groups.values()]
+      // Closed tags sink to the bottom of the list; open ones stay on top.
+      .sort((a, b) => {
+        const resolvedA = a.comments.length > 0 && a.comments.every((c) => c.resolvedAt) ? 1 : 0;
+        const resolvedB = b.comments.length > 0 && b.comments.every((c) => c.resolvedAt) ? 1 : 0;
+        return resolvedA - resolvedB || a.key.localeCompare(b.key);
+      });
   }, [rows]);
 
   const timelineNotes = useMemo(
     () =>
       rows
         .filter((comment) => !parseGeometry(comment.geometry) && comment.timecodeMs != null)
-        .sort((a, b) => (a.timecodeMs ?? 0) - (b.timecodeMs ?? 0)),
+        // Closed notes sink to the bottom of the list; open ones stay on top.
+        .sort((a, b) => {
+          const resolvedA = a.resolvedAt ? 1 : 0;
+          const resolvedB = b.resolvedAt ? 1 : 0;
+          return resolvedA - resolvedB || (a.timecodeMs ?? 0) - (b.timecodeMs ?? 0);
+        }),
     [rows],
   );
 

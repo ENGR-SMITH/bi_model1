@@ -156,6 +156,7 @@ function VideoCanvas({
               timelineVersionId={version?.id}
               canAnnotate={false}
               timecodeReveal
+              glowPins
             />
           </AssetPlayer>
         ) : (
