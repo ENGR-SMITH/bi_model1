@@ -29,7 +29,6 @@ import {
   MessageSquare,
   Mic2,
   Minimize,
-  Play,
   Upload,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -524,6 +523,7 @@ export function PreviewNotesPanel({
   legs,
   assetId,
   onSeek,
+  allowResolve = false,
 }: {
   projectId: string;
   /** The relay legs whose notes this panel shows (e.g. SELECTS + CUT for video). */
@@ -532,6 +532,10 @@ export function PreviewNotesPanel({
   assetId?: string;
   /** Clicking a note with a timecode seeks the canvas here. */
   onSeek?: (ms: number) => void;
+  /** Whether the Resolve / Reopen controls appear on each comment. The
+      preview studios are for adding + reviewing comments; the main role
+      studios resolve them, so the buttons only render there. */
+  allowResolve?: boolean;
 }) {
   const queryClient = useQueryClient();
   const comments = useListVideoComments(projectId);
@@ -576,6 +580,7 @@ export function PreviewNotesPanel({
   );
 
   const onResolve = (commentId: string, resolved: boolean) => {
+    if (!allowResolve) return;
     resolve.mutate(
       { projectId, commentId, data: { resolved } },
       {
@@ -599,7 +604,12 @@ export function PreviewNotesPanel({
             // tag turns green to show the issue is closed.
             const resolved = pin.comments.length > 0 && pin.comments.every((c) => c.resolvedAt);
             return (
-              <div key={pin.key} className={`pv-note-pin ${resolved ? 'is-resolved' : ''}`} data-testid={`preview-pin-${pin.key}`}>
+              <div
+                key={pin.key}
+                className={`pv-note-pin ${resolved ? 'is-resolved' : ''}`}
+                style={!resolved ? { borderColor: `${color}55`, boxShadow: `inset 3px 0 0 ${color}` } : undefined}
+                data-testid={`preview-pin-${pin.key}`}
+              >
                 <button
                   type="button"
                   className="pv-note-pin-head"
@@ -611,11 +621,25 @@ export function PreviewNotesPanel({
                   <span className="annotation-pin-dot" style={{ background: resolved ? RESOLVED_GREEN : color }}>{label}</span>
                   <b>{pin.comments.length} note{pin.comments.length === 1 ? '' : 's'} on frame</b>
                   {resolved && <span className="den-tag teal" data-testid={`preview-pin-solved-${pin.key}`}>solved</span>}
-                  {times.length > 0 && <span className="mono-label">{formatTimecode(times[0])}</span>}
+                  {times.length > 0 && <span className="den-tag timechip">{formatTimecode(times[0])}</span>}
                 </button>
                 <div className="pv-note-pin-body">
                   {pin.comments.map((comment) => (
-                    <div key={comment.id} className="list-row" data-testid={`preview-pin-comment-${comment.id}`}>
+                    <div
+                      key={comment.id}
+                      className={`list-row pv-comment-row ${comment.resolvedAt ? 'is-resolved' : ''}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => comment.timecodeMs != null && onSeek?.(comment.timecodeMs)}
+                      onKeyDown={(event) => {
+                        if ((event.key === 'Enter' || event.key === ' ') && comment.timecodeMs != null) {
+                          event.preventDefault();
+                          onSeek?.(comment.timecodeMs);
+                        }
+                      }}
+                      title={comment.timecodeMs != null ? `Seek to ${formatTimecode(comment.timecodeMs)}` : undefined}
+                      data-testid={`preview-pin-comment-${comment.id}`}
+                    >
                       <span
                         className="annotation-pin-dot"
                         style={{ background: comment.resolvedAt ? RESOLVED_GREEN : reviewerColor(comment.authorId), width: 18, height: 18, fontSize: 9 }}
@@ -624,20 +648,28 @@ export function PreviewNotesPanel({
                       </span>
                       <span>
                         <b className="mono-label !text-[9px]">
-                          {nameOf(comment.authorId)} · {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'frame note'}
+                          <span style={{ color: comment.resolvedAt ? RESOLVED_GREEN : reviewerColor(comment.authorId) }}>
+                            {nameOf(comment.authorId)}
+                          </span>
+                          {comment.timecodeMs != null && <span className="den-tag timechip">{formatTimecode(comment.timecodeMs)}</span>}
                         </b>
                         <small className="!normal-case">{comment.body}</small>
                       </span>
-                      <button
-                        type="button"
-                        className="link-btn"
-                        style={comment.resolvedAt ? { color: RESOLVED_GREEN } : undefined}
-                        onClick={() => onResolve(comment.id, !comment.resolvedAt)}
-                        title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
-                        data-testid={`preview-resolve-${comment.id}`}
-                      >
-                        <Check size={12} />
-                      </button>
+                      {allowResolve && (
+                        <button
+                          type="button"
+                          className="link-btn resolve-btn"
+                          style={comment.resolvedAt ? { color: RESOLVED_GREEN } : undefined}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onResolve(comment.id, !comment.resolvedAt);
+                          }}
+                          title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
+                          data-testid={`preview-resolve-${comment.id}`}
+                        >
+                          <Check size={12} />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -651,11 +683,27 @@ export function PreviewNotesPanel({
         <div className="den-stack mt-3">
           <span className="mono-label">Timecode notes</span>
           {timelineNotes.map((comment) => (
-            <div key={comment.id} className="list-row" data-testid={`preview-note-${comment.id}`}>
+            <div
+              key={comment.id}
+              className={`list-row pv-comment-row ${comment.resolvedAt ? 'is-resolved' : ''}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => comment.timecodeMs != null && onSeek?.(comment.timecodeMs)}
+              onKeyDown={(event) => {
+                if ((event.key === 'Enter' || event.key === ' ') && comment.timecodeMs != null) {
+                  event.preventDefault();
+                  onSeek?.(comment.timecodeMs);
+                }
+              }}
+              title={comment.timecodeMs != null ? `Seek to ${formatTimecode(comment.timecodeMs)}` : undefined}
+              data-testid={`preview-note-${comment.id}`}
+            >
               <span className="world-symbol"><MessageSquare size={12} /></span>
               <span>
                 <b className="mono-label !text-[9px]">
-                  {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'project note'}
+                  <span style={{ color: comment.resolvedAt ? RESOLVED_GREEN : (comment.color ?? reviewerColor(comment.authorId)) }}>
+                    {comment.timecodeMs != null ? formatTimecode(comment.timecodeMs) : 'project note'}
+                  </span>
                   {comment.color && comment.label && (
                     <span
                       className="annotation-pin-dot"
@@ -664,27 +712,25 @@ export function PreviewNotesPanel({
                       {comment.label}
                     </span>
                   )}
+                  <span className="note-author">· {nameOf(comment.authorId)}</span>
                 </b>
                 <small className="!normal-case">{comment.body}</small>
               </span>
-              <button
-                type="button"
-                className="link-btn"
-                style={comment.resolvedAt ? { color: RESOLVED_GREEN } : undefined}
-                onClick={() => onResolve(comment.id, !comment.resolvedAt)}
-                title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
-                data-testid={`preview-note-resolve-${comment.id}`}
-              >
-                <Check size={12} />
-              </button>
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() => comment.timecodeMs != null && onSeek?.(comment.timecodeMs)}
-                title={comment.timecodeMs != null ? 'Seek to this note' : undefined}
-              >
-                <Play size={11} />
-              </button>
+              {allowResolve && (
+                <button
+                  type="button"
+                  className="link-btn resolve-btn"
+                  style={comment.resolvedAt ? { color: RESOLVED_GREEN } : undefined}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onResolve(comment.id, !comment.resolvedAt);
+                  }}
+                  title={comment.resolvedAt ? 'Reopen' : 'Resolve'}
+                  data-testid={`preview-note-resolve-${comment.id}`}
+                >
+                  <Check size={12} />
+                </button>
+              )}
             </div>
           ))}
         </div>

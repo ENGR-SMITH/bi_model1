@@ -2466,6 +2466,47 @@ select optgroup {
   padding: 6px 8px;
 }
 
+/* Comment rows inside the notes rail — whole row is a seek target, and the
+   resolved state gets the green treatment. */
+.pv-note-pin-body .list-row { gap: 8px; padding: 8px; }
+.pv-comment-row {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background .16s ease, box-shadow .16s ease;
+}
+.pv-comment-row:hover { background: hsl(var(--secondary) / .7); }
+.pv-comment-row:focus-visible { outline: 2px solid hsl(var(--accent) / .6); outline-offset: -2px; }
+.pv-comment-row.is-resolved { background: hsl(150 52% 42% / .08); }
+.pv-comment-row .note-author { color: hsl(var(--muted-foreground)); }
+.pv-comment-row .den-tag.timechip { margin-left: 6px; }
+
+/* Resolve / Reopen control — only rendered on the main role pages. */
+.pv-comment-row .resolve-btn {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / .8);
+  color: hsl(var(--muted-foreground));
+}
+.pv-comment-row .resolve-btn:hover {
+  border-color: hsl(150 52% 42% / .6);
+  color: hsl(150 52% 42%);
+  background: hsl(150 52% 42% / .1);
+}
+
+/* Small mono chip for a note's timecode inside the tag rows. */
+.den-tag.timechip {
+  color: hsl(var(--accent));
+  background: hsl(var(--accent) / .1);
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
 /* ---- Waveform player (audio canvas) ---- */
 .pv-wave-player { background: #000; }
 .pv-wave {
