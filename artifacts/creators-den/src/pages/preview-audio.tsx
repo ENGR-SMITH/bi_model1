@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, AudioLines, LockKeyhole, Play } from 'lucide-react';
+import { ArrowLeft, AudioLines, LockKeyhole } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
   getGetVideoAssetQueryKey,
@@ -35,8 +35,11 @@ import {
 } from '@/components/preview-shared';
 import type { StudioLeg } from '@/components/role-oracle';
 
+const AUDIO_KINDS = new Set(['RAW_AUDIO', 'VO_PICKUP']);
+
 // ---------------------------------------------------------------------------
-// AudioCanvas — the wave canvas for one selected SOUND version.
+// AudioCanvas — the wave canvas for one selected SOUND version. Falls back to
+// the vault's processed audio when the version has none on its timeline.
 // ---------------------------------------------------------------------------
 
 function AudioCanvas({
@@ -46,21 +49,29 @@ function AudioCanvas({
 }: {
   projectId: string;
   version: { id: string; leg: StudioLeg; version: number; snapshot: unknown } | null;
-  assets: Array<{ id: string; fileName: string }>;
+  assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
 
-  const snap = (version?.snapshot ?? null) as {
+  const snap = version ? ((version.snapshot ?? null) as {
     clips?: Array<{ id?: string; assetId: string; inMs: number; outMs: number }>;
     music?: Array<{ id?: string; assetId: string; inMs: number; outMs: number; duckUnderSpeech?: boolean }>;
     pickups?: Array<{ id?: string; assetId: string; timeMs: number }>;
-  } | null;
+  } | null) : null;
   const clips = Array.isArray(snap?.clips) ? snap!.clips! : [];
   const music = Array.isArray(snap?.music) ? snap!.music! : [];
   const pickups = Array.isArray(snap?.pickups) ? snap!.pickups! : [];
-  const assetId = clips[0]?.assetId ?? music[0]?.assetId ?? pickups[0]?.assetId ?? '';
+
+  const fallback = useMemo(
+    () =>
+      assets.find((a) => AUDIO_KINDS.has(a.kind) && a.status === 'PROCESSED') ??
+      assets.find((a) => AUDIO_KINDS.has(a.kind)) ??
+      null,
+    [assets],
+  );
+  const assetId = clips[0]?.assetId ?? music[0]?.assetId ?? pickups[0]?.assetId ?? fallback?.id ?? '';
   const detail = useGetVideoAsset(projectId, assetId, {
     query: { queryKey: getGetVideoAssetQueryKey(projectId, assetId), enabled: Boolean(assetId) },
   });
@@ -71,34 +82,24 @@ function AudioCanvas({
   // Red ticks = annotation timecodes + pickup pins; teal = clip boundaries.
   const markers = useMemo(() => {
     const list: Array<{ id: string; ms: number; tone: 'danger' | 'teal' }> = [];
-    for (const comment of comments.data ?? []) {
-      if (comment.timecodeMs == null || comment.leg !== version?.leg) continue;
-      list.push({ id: `note-${comment.id}`, ms: comment.timecodeMs, tone: 'danger' });
+    if (version) {
+      for (const comment of comments.data ?? []) {
+        if (comment.timecodeMs == null || comment.leg !== version.leg) continue;
+        list.push({ id: `note-${comment.id}`, ms: comment.timecodeMs, tone: 'danger' });
+      }
     }
     clips.forEach((clip, index) => list.push({ id: `clip-${index}`, ms: clip.inMs, tone: 'teal' }));
     pickups.forEach((pickup, index) => list.push({ id: `pickup-${index}`, ms: pickup.timeMs, tone: 'danger' }));
     return list;
-  }, [comments.data, clips, pickups, version?.leg]);
-
-  if (!version) {
-    return (
-      <div className="paper-card pv-stage" data-testid="audio-canvas">
-        <div className="inline-heading">
-          <span className="eyebrow"><Play size={13} /> Big canvas</span>
-        </div>
-        <EmptyPlayer className="mt-3">
-          <p className="text-sm font-semibold">No version selected yet.</p>
-        </EmptyPlayer>
-      </div>
-    );
-  }
+  }, [comments.data, clips, pickups, version]);
 
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="audio-canvas">
       <div className="inline-heading">
-        <span className="eyebrow"><AudioLines size={13} /> Big canvas · SOUND v{version.version}</span>
+        <span className="eyebrow"><AudioLines size={13} /> Big canvas{version ? ` · SOUND v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
           {assetId && <span className="den-tag gold truncate">{assetName}</span>}
+          {!version && <span className="den-tag teal">vault preview</span>}
         </span>
       </div>
       <div className="pv-stage-player mt-3">
@@ -115,17 +116,17 @@ function AudioCanvas({
           >
             <AnnotationCanvas
               projectId={projectId}
-              leg={version.leg}
+              leg={version?.leg ?? 'SOUND'}
               assetId={assetId}
               playheadMs={playheadMs}
               onSeek={onSeek}
-              timelineVersionId={version.id}
+              timelineVersionId={version?.id}
             />
           </WaveformPlayer>
         ) : (
           <EmptyPlayer>
-            <p className="text-sm font-semibold">This version has no audio on the timeline.</p>
-            <p className="text-xs opacity-70">Save a snapshot in the Sound studio to see it here.</p>
+            <p className="text-sm font-semibold">No audio in the vault yet.</p>
+            <p className="text-xs opacity-70">Add audio in the vault to preview it here.</p>
           </EmptyPlayer>
         )}
         <FullscreenButton targetRef={stageRef} />
@@ -135,7 +136,9 @@ function AudioCanvas({
           <span className="cd-metatext min-w-0">
             <b className="truncate">{assetName}</b>
             <small>
-              {clips.length} clip{clips.length === 1 ? '' : 's'} · {music.length} music track{music.length === 1 ? '' : 's'} · {pickups.length} pickup{pickups.length === 1 ? '' : 's'} in v{version.version}
+              {version
+                ? `${clips.length} clip${clips.length === 1 ? '' : 's'} · ${music.length} music track${music.length === 1 ? '' : 's'} · ${pickups.length} pickup${pickups.length === 1 ? '' : 's'} in v${version.version}`
+                : 'no version saved yet — showing the vault audio'}
             </small>
           </span>
         </div>

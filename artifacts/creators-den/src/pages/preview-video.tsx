@@ -37,9 +37,12 @@ import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
 import type { StudioLeg } from '@/components/role-oracle';
 
 const VIDEO_LEGS: StudioLeg[] = ['SELECTS', 'CUT'];
+const VIDEO_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE']);
 
 // ---------------------------------------------------------------------------
-// VideoCanvas — the big canvas for one selected version.
+// VideoCanvas — the big canvas for one selected version. When the version has
+// no clips (or no version is saved yet), it falls back to the vault's own
+// processed footage so the canvas always shows real media.
 // ---------------------------------------------------------------------------
 
 function VideoCanvas({
@@ -49,17 +52,25 @@ function VideoCanvas({
 }: {
   projectId: string;
   version: { id: string; leg: StudioLeg; version: number; snapshot: unknown } | null;
-  assets: Array<{ id: string; fileName: string }>;
+  assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
 
-  const snap = (version?.snapshot ?? null) as TimelineSnapshotLike | null;
+  const snap = version ? ((version.snapshot ?? null) as TimelineSnapshotLike | null) : null;
   const clips = Array.isArray(snap?.clips) ? snap!.clips! : [];
   const activeClip = activeClipAt(snap, playheadMs) ?? clips[0] ?? null;
-  const assetId = activeClip?.assetId ?? '';
+
+  const fallback = useMemo(
+    () =>
+      assets.find((a) => VIDEO_KINDS.has(a.kind) && a.status === 'PROCESSED') ??
+      assets.find((a) => VIDEO_KINDS.has(a.kind)) ??
+      null,
+    [assets],
+  );
+  const assetId = activeClip?.assetId || fallback?.id || '';
   const detail = useGetVideoAsset(projectId, assetId, {
     query: { queryKey: getGetVideoAssetQueryKey(projectId, assetId), enabled: Boolean(assetId) },
   });
@@ -73,35 +84,25 @@ function VideoCanvas({
   // Red ticks = annotation timecodes for this leg; teal ticks = clip boundaries.
   const markers = useMemo(() => {
     const list: Array<{ id: string; ms: number; tone: 'danger' | 'teal' }> = [];
-    for (const comment of comments.data ?? []) {
-      if (comment.timecodeMs == null || comment.leg !== version?.leg) continue;
-      list.push({ id: `note-${comment.id}`, ms: comment.timecodeMs, tone: 'danger' });
+    if (version) {
+      for (const comment of comments.data ?? []) {
+        if (comment.timecodeMs == null || comment.leg !== version.leg) continue;
+        list.push({ id: `note-${comment.id}`, ms: comment.timecodeMs, tone: 'danger' });
+      }
     }
     clips.forEach((clip, index) => {
       list.push({ id: `clip-${index}`, ms: clip.inMs, tone: 'teal' });
     });
     return list;
-  }, [comments.data, clips, version?.leg]);
-
-  if (!version) {
-    return (
-      <div className="paper-card pv-stage" data-testid="video-canvas">
-        <div className="inline-heading">
-          <span className="eyebrow"><Play size={13} /> Big canvas</span>
-        </div>
-        <EmptyPlayer className="mt-3">
-          <p className="text-sm font-semibold">No version selected yet.</p>
-        </EmptyPlayer>
-      </div>
-    );
-  }
+  }, [comments.data, clips, version]);
 
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="video-canvas">
       <div className="inline-heading">
-        <span className="eyebrow"><Play size={13} /> Big canvas · {version.leg} v{version.version}</span>
+        <span className="eyebrow"><Play size={13} /> Big canvas{version ? ` · ${version.leg} v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
-          {activeClip && <span className="den-tag gold truncate">{assetName}</span>}
+          {assetId && <span className="den-tag gold truncate">{assetName}</span>}
+          {!version && <span className="den-tag teal">vault preview</span>}
           <span className="mono-label">{formatTimecode(playheadMs)}</span>
         </span>
       </div>
@@ -119,34 +120,38 @@ function VideoCanvas({
           >
             <AnnotationCanvas
               projectId={projectId}
-              leg={version.leg}
+              leg={version?.leg ?? 'SELECTS'}
               assetId={assetId}
               playheadMs={playheadMs}
               onSeek={onSeek}
-              timelineVersionId={version.id}
+              timelineVersionId={version?.id}
             />
           </AssetPlayer>
         ) : (
           <EmptyPlayer>
-            <p className="text-sm font-semibold">This version has no clips on the timeline.</p>
-            <p className="text-xs opacity-70">Save a snapshot in the Selects or Cut studio to see it here.</p>
+            <p className="text-sm font-semibold">No video in the vault yet.</p>
+            <p className="text-xs opacity-70">Add footage in the vault to preview it here.</p>
           </EmptyPlayer>
         )}
         <FullscreenButton targetRef={stageRef} />
       </div>
-      {activeClip && (
+      {assetId && (
         <div className="cd-metarow mt-3">
           <span className="cd-metatext min-w-0">
             <b className="truncate">{assetName}</b>
             <small>
-              window {formatTimecode(activeClip.inMs)} → {formatTimecode(activeClip.outMs)} · {clips.length} clip{clips.length === 1 ? '' : 's'} in v{version.version}
+              {activeClip
+                ? `window ${formatTimecode(activeClip.inMs)} → ${formatTimecode(activeClip.outMs)} · ${clips.length} clip${clips.length === 1 ? '' : 's'} in v${version?.version ?? '—'} · red ticks are annotation timecodes`
+                : version
+                  ? 'no clips in this version — showing the vault footage'
+                  : 'no version saved yet — showing the vault footage'}
             </small>
           </span>
         </div>
       )}
       <p className="den-footnote mt-3">
         <LockKeyhole size={13} />
-        Streaming the degraded proxy — the locked original never leaves the vault. Red ticks mark annotation timecodes on the timeline.
+        Streaming the degraded proxy — the locked original never leaves the vault.
       </p>
     </div>
   );
