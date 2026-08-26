@@ -58,11 +58,13 @@ const words = (value: string): number => {
 const MEDIA_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE', 'RAW_AUDIO', 'VO_PICKUP']);
 const TRANSCRIBE_ACCEPT = 'audio/*,video/*,.mp4,.mov,.m4v,.mkv,.webm,.wav,.mp3,.m4a,.aac,.flac,.ogg,.aif,.aiff';
 
-// This page only ever imports/exports script files (.txt / .md) — no media.
-const SCRIPT_ACCEPT = '.txt,.md,.markdown';
-const SCRIPT_FILE_RE = /\.(txt|md|markdown)$/i;
+// This page only ever imports/exports subtitle script files — no media.
+const SCRIPT_ACCEPT = '.srt,.vtt,.sbv,.sub';
+const SCRIPT_FILE_RE = /\.(srt|vtt|sbv|sub)$/i;
 const checkScriptFile = (file: File): string | null =>
-  SCRIPT_FILE_RE.test(file.name) ? null : 'Only script files can be imported here (.txt, .md).';
+  SCRIPT_FILE_RE.test(file.name) ? null : 'Only subtitle script files can be imported here (.srt, .vtt, .sbv, .sub).';
+
+type SubtitleFormat = 'srt' | 'vtt' | 'sbv' | 'sub';
 
 function storageKey(projectId: string): string {
   return `creators-den-script-${projectId}`;
@@ -70,6 +72,112 @@ function storageKey(projectId: string): string {
 
 function nameKey(projectId: string): string {
   return `creators-den-script-name-${projectId}`;
+}
+
+const TIME_RE = /(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})/;
+
+function timeToMs(match: RegExpMatchArray): number {
+  return ((+match[1]) * 3600 + (+match[2]) * 60 + (+match[3])) * 1000 + Math.round(+`0.${match[4]}` * 1000);
+}
+
+/** Parse .srt / .vtt / .sbv / .sub into start-timestamped cues. */
+function parseSubtitle(text: string): Array<{ startMs: number; text: string }> {
+  const lines = text.split(/\r?\n/);
+  const cues: Array<{ startMs: number; text: string }> = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    // Arrow style (srt / vtt): 00:00:01,000 --> 00:00:04,000
+    const arrow = line.match(/(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})\s*-->/);
+    // Comma style (sbv / sub): 0:00:01.000,0:00:04.000
+    const comma = line.match(/^(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3}),\s*(\d{1,2}):(\d{2}):(\d{2})[.,](\d{1,3})/);
+    const match = arrow ?? comma;
+    if (match) {
+      const startMs = timeToMs(match);
+      const body: string[] = [];
+      let j = i + 1;
+      while (j < lines.length) {
+        const next = lines[j].trim();
+        if (!next) break;
+        if (arrow && /^\d{1,2}:\d{2}:\d{2}[.,]\d{1,3}\s*-->/.test(next)) break;
+        if (comma && /^\d{1,2}:\d{2}:\d{2}[.,]\d{1,3},/.test(next)) break;
+        body.push(next);
+        j += 1;
+      }
+      if (body.length > 0) cues.push({ startMs, text: body.join(' ') });
+      i = j;
+    } else {
+      i += 1;
+    }
+  }
+  return cues;
+}
+
+/** Read the editor's paragraphs (timecode tags optional) into timed cues. */
+function cuesFromEditor(root: HTMLElement | null): Array<{ startMs: number; endMs: number; text: string }> {
+  if (!root) return [];
+  const raw: Array<{ startMs: number | null; text: string }> = [];
+  for (const paragraph of Array.from(root.querySelectorAll('p'))) {
+    const clone = paragraph.cloneNode(true) as HTMLElement;
+    const tag = clone.querySelector('.pv-script-tc');
+    let startMs: number | null = null;
+    if (tag) {
+      const tc = tag.textContent?.trim();
+      const parsed = tc?.match(/^(\d+):(\d{2})$/);
+      if (parsed) startMs = ((+parsed[1]) * 60 + (+parsed[2])) * 1000;
+      tag.remove();
+    }
+    const text = (clone.innerText ?? '').trim();
+    if (text) raw.push({ startMs, text });
+  }
+  if (raw.length === 0) {
+    const text = (root.innerText ?? '').trim();
+    if (text) raw.push({ startMs: null, text });
+  }
+  // Anchored timecodes win; untimed paragraphs flow at 2s after the last cue.
+  const cues: Array<{ startMs: number; endMs: number; text: string }> = [];
+  let running = 0;
+  raw.forEach((cue, index) => {
+    const startMs = cue.startMs ?? running;
+    const next = raw[index + 1];
+    const endMs = next?.startMs != null && next.startMs > startMs ? next.startMs : startMs + 2000;
+    cues.push({ startMs, endMs, text: cue.text });
+    running = endMs;
+  });
+  return cues;
+}
+
+/** Serialize cues into the requested subtitle format. */
+function buildSubtitle(format: SubtitleFormat, cues: Array<{ startMs: number; endMs: number; text: string }>): string {
+  const pad = (n: number, width: number) => String(n).padStart(width, '0');
+  const hms = (ms: number, sep: string, frac: number) => {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const f = pad(Math.floor((ms % 1000) / (1000 / Math.pow(10, frac))), frac);
+    return `${pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)}${sep}${f}`;
+  };
+  if (format === 'srt') {
+    return cues
+      .map((cue, index) => `${index + 1}\n${hms(cue.startMs, ',', 3)} --> ${hms(cue.endMs, ',', 3)}\n${cue.text}\n`)
+      .join('\n');
+  }
+  if (format === 'vtt') {
+    return `WEBVTT\n\n${cues.map((cue) => `${hms(cue.startMs, '.', 3)} --> ${hms(cue.endMs, '.', 3)}\n${cue.text}\n`).join('\n')}`;
+  }
+  // .sbv uses millisecond fractions; .sub uses centiseconds (SubViewer).
+  const frac = format === 'sbv' ? 3 : 2;
+  const short = (ms: number) => {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const f = pad(Math.floor((ms % 1000) / (1000 / Math.pow(10, frac))), frac);
+    return `${h}:${pad(m, 2)}:${pad(s, 2)}.${f}`;
+  };
+  const body = cues.map((cue) => `${short(cue.startMs)},${short(cue.endMs)}\n${cue.text}\n`).join('\n');
+  return format === 'sub' ? `[INFORMATION]\n[TITLE]\n[END INFORMATION]\n\n${body}` : body;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +212,7 @@ export default function ScriptPreviewPage() {
   });
   const [saved, setSaved] = useState(true);
   const [toast, setToast] = useState('');
+  const [exportFormat, setExportFormat] = useState<SubtitleFormat>('srt');
 
   // Transcribe source — pick an already-processed vault file, or upload one.
   const [pickerId, setPickerId] = useState('');
@@ -289,33 +398,40 @@ export default function ScriptPreviewPage() {
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const text = String(reader.result ?? '');
+      const cues = parseSubtitle(String(reader.result ?? ''));
       const el = editorRef.current;
       if (!el) return;
+      if (cues.length === 0) {
+        setToast('No subtitle cues were found in that file.');
+        return;
+      }
       const frag = document.createElement('div');
-      for (const line of text.split(/\r?\n/)) {
-        if (!line.trim()) continue;
+      for (const cue of cues) {
         const paragraph = document.createElement('p');
-        paragraph.textContent = line;
+        const tag = document.createElement('span');
+        tag.className = 'pv-script-tc';
+        tag.textContent = formatTimecode(cue.startMs);
+        paragraph.appendChild(tag);
+        paragraph.appendChild(document.createTextNode(cue.text));
         frag.appendChild(paragraph);
       }
       el.appendChild(frag);
       setHtml(el.innerHTML);
-      setToast(`Imported ${file.name} into the script.`);
+      setToast(`Imported ${cues.length} cue${cues.length === 1 ? '' : 's'} from ${file.name}.`);
     };
     reader.readAsText(file);
   };
 
-  const exportScript = (format: 'txt' | 'md') => {
-    const text = editorRef.current?.innerText ?? stripHtml(html);
-    const blob = new Blob([text], { type: format === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' });
+  const exportScript = (format: SubtitleFormat) => {
+    const cues = cuesFromEditor(editorRef.current);
+    const blob = new Blob([buildSubtitle(format, cues)], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     link.download = `${name.trim() ? name.trim().replace(/\s+/g, '-') : 'script'}.${format}`;
     link.click();
     URL.revokeObjectURL(url);
-    setToast(`Exported the script as ${format === 'md' ? 'Markdown' : 'text'} (${count.words} words).`);
+    setToast(`Exported the script as .${format} (${cues.length} cue${cues.length === 1 ? '' : 's'}).`);
   };
 
   const count = useMemo(() => {
@@ -406,7 +522,13 @@ export default function ScriptPreviewPage() {
                 <button type="button" className="link-btn !text-[11px]" onClick={() => scriptFileRef.current?.click()} data-testid="script-import-btn">
                   <FileText size={12} /> Import script
                 </button>
-                <button type="button" className="link-btn !text-[11px]" onClick={() => exportScript('md')} data-testid="script-export-btn">
+                <select value={exportFormat} onChange={(event) => setExportFormat(event.target.value as SubtitleFormat)} data-testid="script-export-format">
+                  <option value="srt">.srt</option>
+                  <option value="vtt">.vtt</option>
+                  <option value="sbv">.sbv</option>
+                  <option value="sub">.sub</option>
+                </select>
+                <button type="button" className="link-btn !text-[11px]" onClick={() => exportScript(exportFormat)} data-testid="script-export-btn">
                   <FileDown size={12} /> Export
                 </button>
                 <button type="button" className="icon-btn" title="Save now" onClick={saveNow} data-testid="script-save-btn">
