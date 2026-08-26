@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useRef } from 'react';
-import { ChevronDown, ChevronUp, Clock3, FileVideo2, Image as ImageIcon, Mic2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, FileVideo2, Image as ImageIcon, Mic2 } from 'lucide-react';
 
 export type ShelfItem =
   | {
@@ -59,8 +59,8 @@ export function VersionShelf({
       const ratio = dist / (container.clientHeight * 0.5);
       const abs = Math.min(1, Math.abs(ratio));
       child.style.transform =
-        `translateY(${dist * 0.16}px) translateZ(${-abs * 70}px) rotateX(${ratio * 26}deg) scale(${1 - abs * 0.24})`;
-      child.style.opacity = String(1 - abs * 0.55);
+        `translateY(${dist * 0.18}px) translateZ(${-abs * 90}px) rotateX(${ratio * 30}deg) scale(${1 - abs * 0.34})`;
+      child.style.opacity = String(1 - abs * 0.65);
       child.style.zIndex = String(Math.round(100 - abs * 90));
     }
   }, []);
@@ -123,10 +123,6 @@ export function VersionShelf({
 
   return (
     <div className="paper-card pv-versions-list" data-testid="version-shelf">
-      <div className="inline-heading">
-        <span className="eyebrow"><Clock3 size={13} /> Timeline versions · vault</span>
-        <span className="mono-label">{items.length}</span>
-      </div>
       {items.length === 0 ? (
         <p className="setting-copy mt-2" data-testid="version-shelf-empty">{emptyText}</p>
       ) : (

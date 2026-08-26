@@ -1937,14 +1937,18 @@
   grid-column: 3;
   grid-row: 2;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-/* The canvas / notes cards flex to fill their grid cells. */
+/* The canvas / notes cards flex to fill their grid cells. The media player
+   gets the whole card with just a slim margin around it. */
 .role-canvas-main > .pv-stage {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 8px;
 }
 .role-canvas-main > .pv-script {
   flex: 1;
@@ -1996,7 +2000,7 @@
   min-height: 0;
   overflow-y: auto;
 }
-.role-notes-main > .pv-notes {
+.role-notes-bar > .pv-notes {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -2067,30 +2071,31 @@
 .role-upload-status .mono-label { white-space: nowrap; }
 .role-upload-card .primary-btn { flex: 0 0 auto; white-space: nowrap; }
 
-/* ---- Role oracle (third column, second row) ----
-   The oracle fills the bottom cell and scrolls its message list internally. */
-.role-notes-bar .den-oracle {
-  height: 100%;
+/* ---- Role oracle (third column, first row) ----
+   The oracle fills the top cell and scrolls its message list internally. */
+.role-notes-main .den-oracle {
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
-.role-notes-bar .den-oracle-messages {
+.role-notes-main .den-oracle-messages {
   flex: 1;
   min-height: 0;
   max-height: none;
 }
-.role-notes-bar .den-oracle-actions { flex: 0 0 auto; }
-.role-notes-bar .den-oracle-compose { flex: 0 0 auto; }
+.role-notes-main .den-oracle-actions { flex: 0 0 auto; }
+.role-notes-main .den-oracle-compose { flex: 0 0 auto; }
 
 /* Version & vault shelf — first column, one scrollable rail (reused by the
-   role pages' vertical carousel). */
+   role pages' vertical coverflow). Slim padding so the cards fill the column. */
 .pv-versions-list {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding: 10px;
 }
 .pv-version-row {
   flex: 0 0 auto;
@@ -2146,7 +2151,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 12px;
 }
 .vs-arrow {
   flex: 0 0 auto;
@@ -2181,7 +2185,7 @@
   position: relative;
   flex: 0 0 auto;
   width: 100%;
-  max-width: 148px;
+  max-width: none;
   scroll-snap-align: center;
   border: 1px solid hsl(var(--border));
   border-radius: 9px;
@@ -2661,12 +2665,13 @@
   .role-canvas-main .pv-script-area { min-height: 520px; overflow: visible; }
   .role-notes-main > .pv-notes { flex: none; overflow: visible; }
   .pv-versions-list { flex: none; }
-  /* The version shelf, upload card and oracle get explicit heights when the
-     grid stacks into one column. */
+  /* The version shelf, upload card, oracle and notes get explicit heights
+     when the grid stacks into one column. */
   .vs-wrap { flex: none; }
   .vs-track { max-height: 340px; padding: 12px 4px; }
   .role-upload-card { min-height: 210px; }
-  .role-notes-bar .den-oracle { height: 480px; }
+  .role-notes-main .den-oracle { height: 480px; }
+  .role-notes-bar > .pv-notes { height: 340px; }
 }
 @media (max-width: 720px) {
   .pv-grid { grid-template-columns: 1fr; }

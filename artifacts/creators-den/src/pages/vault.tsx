@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -11,28 +11,22 @@ import {
   Mic2,
   Image,
   Palette,
-  Play,
   Scissors,
   Sparkles,
-  Upload,
   UserPlus,
   X,
 } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  getDownloadVideoFileUrl,
-  getGetVideoAssetQueryKey,
   getGetVideoProjectQueryKey,
   getListVideoDownloadsQueryKey,
   getListVideoGrantsQueryKey,
   getListVideoJobsQueryKey,
   getListVideoSubmissionsQueryKey,
-  getUploadVideoAssetUrl,
   useAddVideoProjectMember,
   useApproveVideoSubmission,
   useCreateVideoGrant,
-  useGetVideoAsset,
   useGetVideoProject,
   useListVideoDownloads,
   useListVideoGrants,
@@ -41,12 +35,9 @@ import {
   useRejectVideoSubmission,
   useRevokeVideoGrant,
 } from '@workspace/api-client-react';
-import type { VideoAssetDetail, VideoAssetUploadInputKind } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
-import { AssetPlayer, isAudioKind, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
-import { CommitLog } from '@/components/commit-log';
-import { ActivityFeed } from '@/components/activity-feed';
+import { isAudioKind, proxyUrlFor } from '@/components/asset-preview';
 
 const LEG_META = {
   SELECTS: { label: 'Selects', role: 'Story Architect', icon: Film },
@@ -93,11 +84,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function formatDurationShort(ms: number | null): string {
-  if (!ms) return '';
-  return ` · ${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
-}
-
 /** True when an earlier vault asset holds the exact same bytes (Git-LFS dedupe). */
 function isDuplicateContent(assets: Array<{ contentHash?: string | null }>, index: number): boolean {
   const hash = assets[index].contentHash;
@@ -109,13 +95,13 @@ function isDuplicateContent(assets: Array<{ contentHash?: string | null }>, inde
 }
 
 // ---------------------------------------------------------------------------
-// PosterCard — a Netflix-style poster tile for one vault asset. Clicking it
-// features the asset in the player above. The proxy stream doubles as the
-// poster (first frame for video, the image itself for designs); an icon shows
-// through while processing or if the frame can't be decoded.
+// PosterCard — a Netflix-style poster tile for one vault asset. The proxy
+// stream doubles as the poster (first frame for video, the image itself for
+// designs); an icon shows through while processing or if the frame can't be
+// decoded.
 // ---------------------------------------------------------------------------
 
-function PosterCard({ projectId, asset, active, deduplicated, onSelect }: { projectId: string; asset: AssetSummary; active: boolean; deduplicated: boolean; onSelect: (id: string) => void }) {
+function PosterCard({ projectId, asset, deduplicated }: { projectId: string; asset: AssetSummary; deduplicated: boolean }) {
   const [broken, setBroken] = useState(false);
   const processed = asset.status === 'PROCESSED';
   const audio = isAudioKind(asset.kind);
@@ -123,13 +109,7 @@ function PosterCard({ projectId, asset, active, deduplicated, onSelect }: { proj
   const proxy = proxyUrlFor(projectId, asset.id);
 
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(asset.id)}
-      className="cd-card"
-      style={active ? { borderColor: 'hsl(var(--accent))' } : undefined}
-      data-testid={`card-asset-${asset.id}`}
-    >
+    <div className="cd-card" data-testid={`card-asset-${asset.id}`}>
       <div className="cd-card-thumb">
         {audio ? <Mic2 size={26} /> : <FileVideo2 size={26} />}
         {processed && !broken && (image ? (
@@ -138,11 +118,7 @@ function PosterCard({ projectId, asset, active, deduplicated, onSelect }: { proj
           <video src={`${proxy}#t=0.5`} muted playsInline preload="metadata" onError={() => setBroken(true)} />
         ) : null)}
         <span className="cd-card-badge">{KIND_LABELS[asset.kind] ?? asset.kind}</span>
-        {active ? (
-          <span className="cd-card-badge is-accent right">viewing</span>
-        ) : !processed ? (
-          <span className="cd-card-badge right">processing…</span>
-        ) : null}
+        {!processed && <span className="cd-card-badge right">processing…</span>}
       </div>
       <div className="cd-card-body">
         <span className="cd-card-title">{asset.fileName}</span>
@@ -151,234 +127,7 @@ function PosterCard({ projectId, asset, active, deduplicated, onSelect }: { proj
           {deduplicated && ' · deduped'}
         </span>
       </div>
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// FeaturedAsset — the "now viewing" player at the top of the vault. Streams the
-// selected asset's proxy and carries its download / studio affordances.
-// ---------------------------------------------------------------------------
-
-function FeaturedAsset({ projectId, asset, detail, released, deduplicated }: { projectId: string; asset: AssetSummary; detail: VideoAssetDetail | undefined; released: boolean; deduplicated: boolean }) {
-  return (
-    <div className="paper-card" data-testid="featured-asset">
-      <div className="inline-heading">
-        <span className="eyebrow"><Play size={13} /> Now viewing</span>
-        <span className="flex items-center gap-2">
-          {deduplicated && <span className="den-tag teal" title="Identical bytes are already in the vault — this entry points at the stored file">Already in vault</span>}
-          <span className="den-tag gold">{KIND_LABELS[asset.kind] ?? asset.kind}</span>
-        </span>
-      </div>
-
-      <AssetPlayer
-        className="mt-3"
-        projectId={projectId}
-        assetId={asset.id}
-        detail={detail}
-        title={asset.fileName}
-        audio={isAudioKind(asset.kind)}
-      />
-
-      <div className="cd-metarow mt-3" style={{ justifyContent: 'space-between' }}>
-        <span className="cd-metatext min-w-0">
-          <b className="truncate">{asset.fileName}</b>
-          <small>
-            {formatBytes(asset.sizeBytes)} · v{asset.version} · {asset.status.replaceAll('_', ' ')}
-            {formatDurationShort(asset.durationMs)}
-          </small>
-        </span>
-        <span className="flex items-center gap-2">
-          {released ? (
-            <a href={getDownloadVideoFileUrl(projectId, asset.id)} download className="secondary-btn" data-testid={`link-download-${asset.id}`}>
-              <Download size={13} /> Download
-            </a>
-          ) : (
-            <span className="den-tag teal"><LockKeyhole size={10} /> Locked</span>
-          )}
-          {asset.status === 'PROCESSED' && (
-            <Link href={`/projects/${projectId}/selects`} className="secondary-btn" data-testid={`link-studio-${asset.id}`}>
-              <Film size={13} /> Open studio
-            </Link>
-          )}
-        </span>
-      </div>
-
-      {asset.status === 'PROCESSED' ? (
-        <p className="den-footnote mt-3">
-          <LockKeyhole size={13} />
-          Streaming the degraded proxy — the locked original never leaves the vault.
-        </p>
-      ) : (
-        <p className="den-footnote mt-3">
-          <Sparkles size={13} />
-          Proxying and transcribing in the background — the preview appears here automatically.
-        </p>
-      )}
     </div>
-  );
-}
-
-function UploadForm({ projectId }: { projectId: string }) {
-  const queryClient = useQueryClient();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [kind, setKind] = useState<VideoAssetUploadInputKind>('RAW_VIDEO');
-  const [fileName, setFileName] = useState('');
-  const [noFile, setNoFile] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [uploadError, setUploadError] = useState('');
-  const xhrRef = useRef<XMLHttpRequest | null>(null);
-
-  // Abort any in-flight upload if the form unmounts mid-transfer.
-  useEffect(() => () => {
-    xhrRef.current?.abort();
-  }, []);
-
-  const cancel = () => {
-    xhrRef.current?.abort();
-  };
-
-  const startUpload = (file: File) => {
-    setNoFile(false);
-    setUploadError('');
-    setProgress(0);
-    setUploading(true);
-
-    // XHR instead of fetch so we can stream upload progress for large footage.
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('kind', kind);
-
-    const xhr = new XMLHttpRequest();
-    xhrRef.current = xhr;
-    xhr.open('POST', getUploadVideoAssetUrl(projectId));
-    xhr.upload.onprogress = (progressEvent) => {
-      if (progressEvent.lengthComputable && progressEvent.total > 0) {
-        setProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
-      }
-    };
-    xhr.onload = () => {
-      xhrRef.current = null;
-      setUploading(false);
-      if (xhr.status >= 200 && xhr.status < 300) {
-        setProgress(100);
-        queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
-        if (fileRef.current) fileRef.current.value = '';
-        setFileName('');
-      } else {
-        let message = 'The upload failed. Try once more.';
-        try {
-          const data = JSON.parse(xhr.responseText) as { error?: string };
-          if (typeof data?.error === 'string') message = data.error;
-        } catch {
-          // Non-JSON error body — fall through to the generic message.
-        }
-        setUploadError(message);
-      }
-    };
-    xhr.onerror = () => {
-      xhrRef.current = null;
-      setUploading(false);
-      setUploadError('The upload was interrupted — your connection dropped. Retry to send it again.');
-    };
-    xhr.onabort = () => {
-      xhrRef.current = null;
-      setUploading(false);
-      setProgress(0);
-    };
-    xhr.send(formData);
-  };
-
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const file = fileRef.current?.files?.[0];
-    if (!file) {
-      setNoFile(true);
-      fileRef.current?.focus();
-      return;
-    }
-    startUpload(file);
-  };
-
-  const retry = () => {
-    const file = fileRef.current?.files?.[0];
-    if (file) startUpload(file);
-  };
-
-  return (
-    <form onSubmit={submit} data-testid="form-upload-asset">
-      <div className="field">
-        <span>Raw file</span>
-        <input
-          ref={fileRef}
-          name="file"
-          type="file"
-          disabled={uploading}
-          onChange={(event) => {
-            setFileName(event.target.files?.[0]?.name ?? '');
-            setNoFile(false);
-          }}
-          data-testid="input-asset-file"
-        />
-      </div>
-      <div className="field">
-        <span>What is it?</span>
-        <select
-          value={kind}
-          disabled={uploading}
-          onChange={(event) => setKind(event.target.value as VideoAssetUploadInputKind)}
-          data-testid="select-asset-kind"
-        >
-          {Object.entries(KIND_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>{label}</option>
-          ))}
-        </select>
-      </div>
-      <button
-        type="submit"
-        disabled={uploading}
-        className="primary-btn"
-        data-testid="button-upload-asset"
-      >
-        <Upload size={14} />
-        {uploading ? 'Locking into the vault…' : 'Upload into the vault'}
-      </button>
-
-      {uploading && (
-        <div className="den-upload-progress" data-testid="upload-progress">
-          <div className="den-upload-progress-bar">
-            <span style={{ width: `${progress}%` }} />
-          </div>
-          <b>{progress}%</b>
-          <button type="button" onClick={cancel} className="den-upload-cancel" data-testid="button-cancel-upload">
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {!uploading && (fileName ? (
-        <p className="setting-copy mt-2" data-testid="upload-file-ready">
-          Ready to upload: <b>{fileName}</b>
-        </p>
-      ) : (
-        <p className="setting-copy mt-2">Choose a raw file above, then upload.</p>
-      ))}
-
-      {!uploading && noFile && !fileName && (
-        <p className="setting-copy mt-2" role="alert" style={{ color: 'hsl(var(--destructive))' }}>
-          Pick a file first — the vault can't upload nothing.
-        </p>
-      )}
-      {!uploading && uploadError && (
-        <div className="mt-2 flex flex-wrap items-center gap-3" role="alert" data-testid="upload-error">
-          <span className="setting-copy" style={{ color: 'hsl(var(--destructive))' }}>{uploadError}</span>
-          <button type="button" onClick={retry} className="secondary-btn" data-testid="button-retry-upload">
-            <Upload size={13} /> Retry
-          </button>
-        </div>
-      )}
-    </form>
   );
 }
 
@@ -689,23 +438,7 @@ export default function ContentCreatorsProjectPage() {
     },
   });
 
-  const [featuredId, setFeaturedId] = useState<string | null>(null);
   const assets = (project.data?.assets ?? []) as AssetSummary[];
-
-  // Default the featured player to the first ready asset (or the first asset).
-  useEffect(() => {
-    if (featuredId) return;
-    const first = assets.find((a) => a.status === 'PROCESSED') ?? assets[0];
-    if (first) setFeaturedId(first.id);
-  }, [assets, featuredId]);
-
-  const featured = useGetVideoAsset(projectId, featuredId ?? '', {
-    query: {
-      queryKey: getGetVideoAssetQueryKey(projectId, featuredId ?? ''),
-      enabled: Boolean(featuredId),
-      refetchInterval: (query) => pollWhileProcessing(query.state.data),
-    },
-  });
 
   if (project.isLoading) {
     return (
@@ -727,9 +460,6 @@ export default function ContentCreatorsProjectPage() {
 
   const p = project.data;
   const myRole = p.myRole ?? 'VIEWER';
-  const released = p.status === 'RELEASED';
-  const featuredAsset = assets.find((a) => a.id === featuredId) ?? null;
-  const featuredIndex = featuredAsset ? assets.findIndex((a) => a.id === featuredAsset.id) : -1;
 
   // Group assets into rails by kind, in a stable display order.
   const seen = new Set<string>();
@@ -766,32 +496,16 @@ export default function ContentCreatorsProjectPage() {
               <small>you are the {ROLE_LABELS[myRole] ?? myRole}</small>
             </span>
           </div>
-          <div className="cd-billboard-actions">
-            <Link href="/" className="cd-actionbtn" data-testid="link-project-back-room">
-              <ArrowLeft size={14} /> Home
-            </Link>
-            <a href="#vault-upload" className="cd-actionbtn is-primary">
-              <Upload size={14} /> Add footage
-            </a>
-          </div>
         </div>
       </div>
 
       <div className="cd-watch">
         <div className="cd-watch-main">
-          {featuredAsset ? (
-            <FeaturedAsset
-              projectId={p.id}
-              asset={featuredAsset}
-              detail={featured.data}
-              released={released}
-              deduplicated={featuredIndex >= 0 && isDuplicateContent(assets, featuredIndex)}
-            />
-          ) : (
+          {assets.length === 0 && (
             <div className="empty-state" data-testid="empty-vault">
               <Clapperboard size={22} />
               <h3>The vault is empty.</h3>
-              <p>Drop in the raw footage — camera files, separate audio, screen recordings, B-roll. Proxies and transcripts follow as the relay begins.</p>
+              <p>Camera files, separate audio, screen recordings, B-roll, and references will land here as the relay begins.</p>
             </div>
           )}
 
@@ -807,22 +521,12 @@ export default function ContentCreatorsProjectPage() {
                     key={asset.id}
                     projectId={p.id}
                     asset={asset}
-                    active={asset.id === featuredId}
                     deduplicated={isDuplicateContent(assets, assets.findIndex((a) => a.id === asset.id))}
-                    onSelect={setFeaturedId}
                   />
                 ))}
               </div>
             </div>
           ))}
-
-          <div className="paper-card accent-card" id="vault-upload" data-testid="card-upload">
-            <div className="inline-heading">
-              <span className="eyebrow"><Upload size={13} /> Add raw footage</span>
-            </div>
-            <p className="setting-copy">Camera files, separate audio, screen recordings, B-roll, references. Identical bytes are deduped automatically — the vault keeps one copy.</p>
-            <UploadForm projectId={p.id} />
-          </div>
 
           <div className="paper-card">
             <div className="inline-heading">
@@ -867,12 +571,7 @@ export default function ContentCreatorsProjectPage() {
           <JobProgressStrip projectId={p.id} />
           <GrantsPanel projectId={p.id} myRole={myRole} members={p.members} assets={p.assets} />
           <DownloadAuditPanel projectId={p.id} myRole={myRole} />
-          <ActivityFeed projectId={p.id} />
         </div>
-      </div>
-
-      <div className="mt-6">
-        <CommitLog projectId={p.id} members={p.members} />
       </div>
 
       <p className="den-footnote mt-8">
