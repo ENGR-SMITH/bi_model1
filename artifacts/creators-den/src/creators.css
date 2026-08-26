@@ -2263,13 +2263,59 @@
 
 /* ---- Script editor ---- */
 .pv-script { display: flex; flex-direction: column; }
+/* Script role page — the editor spans the whole row (no side cards). */
+.pv-script-top { grid-template-columns: 1fr; }
+
+/* Three zones: transcribe (left) · script name (centre) · import/export/save (right). */
 .pv-script-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px 14px;
   padding: 13px 16px 0;
 }
+.pv-script-head-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pv-script-head-left select {
+  max-width: 220px;
+  font-size: 11px;
+}
+.pv-script-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+.pv-script-name {
+  flex: 1 1 220px;
+  max-width: 420px;
+  margin: 0 auto;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  outline: none;
+  text-align: center;
+  font: 700 17px var(--app-font-serif);
+  letter-spacing: -.02em;
+  color: hsl(var(--foreground));
+  padding: 4px 8px;
+  transition: border-color .15s ease;
+}
+.pv-script-name:focus { border-bottom-color: hsl(var(--accent) / .55); }
+.pv-script-name::placeholder { color: hsl(var(--muted-foreground) / .65); }
 .pv-script-head .save-indicator.dirty { color: hsl(var(--sidebar-primary)); }
+.pv-script-upload {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px 0;
+}
+.pv-script-upload .den-upload-progress { flex: 1; margin-top: 0; }
 .pv-toolbar {
   display: flex;
   align-items: center;

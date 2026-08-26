@@ -1,12 +1,13 @@
 // ---------------------------------------------------------------------------
-// Script preview — the words studio.
+// Script role page — the words studio.
 //
-// A rich text editor in the spirit of the Author Den's draft page: format
-// bar, autosaved to the browser for the project, word/character/paragraph
-// counters. The import rail takes an audio or video file, locks it into the
-// vault (same PROXY + TRANSCRIBE pipeline), and types the transcription into
-// the editor where it stays fully editable — each line tagged with its
-// timecode. Existing vault footage with a transcript can be inserted too.
+// A full-width rich text editor (no side cards): the top bar carries the
+// transcribe dropdown + button and an upload-to-transcribe affordance on the
+// left, the script name input in the middle, and import / export / save on
+// the right. The script (name + body) autosaves to the browser for the
+// project, and the save button forces a save on demand. Transcribing a file
+// locks it into the vault (PROXY + TRANSCRIBE pipeline) and types the words
+// into the editor, each line tagged with its timecode.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -16,10 +17,9 @@ import {
   Bold,
   Check,
   Eraser,
-  FileAudio,
   FileDown,
+  FileText,
   FileUp,
-  FileVideo2,
   Heading1,
   Heading2,
   Italic,
@@ -29,7 +29,7 @@ import {
   Loader2,
   Quote,
   Redo2,
-  Sparkles,
+  Save,
   Strikethrough,
   Undo2,
 } from 'lucide-react';
@@ -50,71 +50,113 @@ import { formatTimecode } from '@/components/timeline';
 const stripHtml = (value: string): string =>
   value.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
 
+const words = (value: string): number => {
+  const text = stripHtml(value);
+  return text ? text.split(/\s+/).length : 0;
+};
+
+const MEDIA_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE', 'RAW_AUDIO', 'VO_PICKUP']);
+const TRANSCRIBE_ACCEPT = 'audio/*,video/*,.mp4,.mov,.m4v,.mkv,.webm,.wav,.mp3,.m4a,.aac,.flac,.ogg,.aif,.aiff';
+
 // This page only ever imports/exports script files (.txt / .md) — no media.
 const SCRIPT_ACCEPT = '.txt,.md,.markdown';
 const SCRIPT_FILE_RE = /\.(txt|md|markdown)$/i;
 const checkScriptFile = (file: File): string | null =>
   SCRIPT_FILE_RE.test(file.name) ? null : 'Only script files can be imported here (.txt, .md).';
 
-const words = (value: string): number => {
-  const text = stripHtml(value);
-  return text ? text.split(/\s+/).length : 0;
-};
-
 function storageKey(projectId: string): string {
   return `creators-den-script-${projectId}`;
 }
 
-type ImportPhase = 'idle' | 'uploading' | 'transcribing' | 'done';
+function nameKey(projectId: string): string {
+  return `creators-den-script-name-${projectId}`;
+}
 
 // ---------------------------------------------------------------------------
-// ImportRail — upload audio/video to transcribe, or insert an existing vault
-// transcript into the editor.
+// Page
 // ---------------------------------------------------------------------------
 
-function ImportRail({
-  projectId,
-  onTranscript,
-}: {
-  projectId: string;
-  onTranscript: (segments: VideoTranscriptSegment[], fileName: string) => void;
-}) {
-  const queryClient = useQueryClient();
+export default function ScriptPreviewPage() {
+  const { projectId } = useParams<{ projectId: string }>();
+  useProjectRealtime(projectId, null);
   const project = useGetVideoProject(projectId);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const editorRef = useRef<HTMLDivElement>(null);
+  const saveTimerRef = useRef<number | null>(null);
+  const scriptFileRef = useRef<HTMLInputElement>(null);
+  const transcribeFileRef = useRef<HTMLInputElement>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
-
-  const [phase, setPhase] = useState<ImportPhase>('idle');
-  const [progress, setProgress] = useState(0);
-  const [fileName, setFileName] = useState('');
-  const [error, setError] = useState('');
-  const [assetId, setAssetId] = useState<string | null>(null);
   const insertedRef = useRef<string | null>(null);
 
-  // Pick an existing processed asset whose transcript we can drop in.
+  const [html, setHtml] = useState<string>(() => {
+    try {
+      return localStorage.getItem(storageKey(projectId)) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const [name, setName] = useState<string>(() => {
+    try {
+      return localStorage.getItem(nameKey(projectId)) ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const [saved, setSaved] = useState(true);
+  const [toast, setToast] = useState('');
+
+  // Transcribe source — pick an already-processed vault file, or upload one.
   const [pickerId, setPickerId] = useState('');
+  const [uploadPhase, setUploadPhase] = useState<'idle' | 'uploading' | 'transcribing' | 'done'>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadName, setUploadName] = useState('');
+  const [uploadAssetId, setUploadAssetId] = useState<string | null>(null);
   const pickedDetail = useGetVideoAsset(projectId, pickerId, {
     query: { queryKey: getGetVideoAssetQueryKey(projectId, pickerId), enabled: Boolean(pickerId) },
   });
 
-  // Poll the freshly uploaded asset until its transcript is ready, then hand
-  // the segments to the editor exactly once.
-  const imported = useGetVideoAsset(projectId, assetId ?? '', {
+  // Poll a freshly uploaded file until its transcript is ready, then hand the
+  // segments to the editor exactly once.
+  const imported = useGetVideoAsset(projectId, uploadAssetId ?? '', {
     query: {
-      queryKey: getGetVideoAssetQueryKey(projectId, assetId ?? ''),
-      enabled: Boolean(assetId),
+      queryKey: getGetVideoAssetQueryKey(projectId, uploadAssetId ?? ''),
+      enabled: Boolean(uploadAssetId),
       refetchInterval: (query) => pollWhileProcessing(query.state.data),
     },
   });
 
+  // Autosave (debounced) the name + body straight to the browser for this project.
+  useEffect(() => {
+    setSaved(false);
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      try {
+        localStorage.setItem(storageKey(projectId), html);
+        localStorage.setItem(nameKey(projectId), name);
+      } catch {
+        // Storage unavailable — keep working in memory.
+      }
+      setSaved(true);
+    }, 450);
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    };
+  }, [html, name, projectId]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(''), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
   useEffect(() => {
     const transcript = imported.data?.transcript;
-    if (!transcript?.segments?.length || !assetId || insertedRef.current === assetId) return;
-    insertedRef.current = assetId;
-    setPhase('done');
-    onTranscript(transcript.segments, imported.data?.fileName ?? fileName);
+    if (!transcript?.segments?.length || !uploadAssetId || insertedRef.current === uploadAssetId) return;
+    insertedRef.current = uploadAssetId;
+    setUploadPhase('done');
+    insertTranscript(transcript.segments, imported.data?.fileName ?? uploadName);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imported.data, assetId]);
+  }, [imported.data, uploadAssetId]);
 
   useEffect(
     () => () => {
@@ -123,11 +165,61 @@ function ImportRail({
     [],
   );
 
-  const startUpload = (file: File) => {
-    setError('');
-    setFileName(file.name);
-    setProgress(0);
-    setPhase('uploading');
+  const command = (cmdName: string, value?: string) => {
+    document.execCommand(cmdName, false, value);
+    setHtml(editorRef.current?.innerHTML ?? '');
+  };
+
+  const onEditorInput = () => {
+    setHtml(editorRef.current?.innerHTML ?? '');
+  };
+
+  const saveNow = () => {
+    try {
+      localStorage.setItem(storageKey(projectId), html);
+      localStorage.setItem(nameKey(projectId), name);
+    } catch {
+      // Storage unavailable — the autosave path handles this silently.
+    }
+    setSaved(true);
+    setToast('Script saved.');
+  };
+
+  const insertTranscript = (segments: VideoTranscriptSegment[], fileName: string) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const frag = document.createElement('div');
+    for (const segment of segments) {
+      const paragraph = document.createElement('p');
+      const tag = document.createElement('span');
+      tag.className = 'pv-script-tc';
+      tag.textContent = formatTimecode(segment.startMs);
+      paragraph.appendChild(tag);
+      paragraph.appendChild(document.createTextNode(segment.text));
+      frag.appendChild(paragraph);
+    }
+    el.appendChild(frag);
+    setHtml(el.innerHTML);
+    setToast(`Transcribed ${segments.length} line${segments.length === 1 ? '' : 's'} from ${fileName}`);
+  };
+
+  const transcribePicked = () => {
+    if (!pickerId) {
+      setToast('Choose a file to transcribe first.');
+      return;
+    }
+    const transcript = pickedDetail.data?.transcript;
+    if (!transcript?.segments?.length) {
+      setToast('That file has no transcript yet — it is still being transcribed in the background.');
+      return;
+    }
+    insertTranscript(transcript.segments, pickedDetail.data?.fileName ?? pickerId);
+  };
+
+  const startTranscribeUpload = (file: File) => {
+    setUploadProgress(0);
+    setUploadName(file.name);
+    setUploadPhase('uploading');
     insertedRef.current = null;
 
     const kind = file.type.startsWith('audio') ? 'RAW_AUDIO' : 'RAW_VIDEO';
@@ -140,7 +232,7 @@ function ImportRail({
     xhr.open('POST', getUploadVideoAssetUrl(projectId));
     xhr.upload.onprogress = (progressEvent) => {
       if (progressEvent.lengthComputable && progressEvent.total > 0) {
-        setProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
+        setUploadProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
       }
     };
     xhr.onload = () => {
@@ -149,16 +241,16 @@ function ImportRail({
         try {
           const data = JSON.parse(xhr.responseText) as { id?: string };
           if (data.id) {
-            setAssetId(data.id);
-            setPhase('transcribing');
+            setUploadAssetId(data.id);
+            setUploadPhase('transcribing');
             queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
             return;
           }
         } catch {
           // fall through to the error path
         }
-        setPhase('idle');
-        setError('The upload did not return a vault asset id.');
+        setUploadPhase('idle');
+        setToast('The upload did not return a vault asset id.');
       } else {
         let message = 'The upload failed. Try once more.';
         try {
@@ -167,172 +259,23 @@ function ImportRail({
         } catch {
           // Non-JSON body — keep the generic message.
         }
-        setPhase('idle');
-        setError(message);
+        setUploadPhase('idle');
+        setToast(message);
       }
     };
     xhr.onerror = () => {
       xhrRef.current = null;
-      setPhase('idle');
-      setError('The upload was interrupted — your connection dropped.');
+      setUploadPhase('idle');
+      setToast('The upload was interrupted — your connection dropped.');
     };
     xhr.send(formData);
   };
 
-  const cancel = () => {
-    xhrRef.current?.abort();
-    xhrRef.current = null;
-    setPhase('idle');
-    setProgress(0);
-  };
-
-  const onPickFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const onPickTranscribeFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    startUpload(file);
-    if (fileRef.current) fileRef.current.value = '';
-  };
-
-  const insertPicked = () => {
-    const transcript = pickedDetail.data?.transcript;
-    if (!transcript?.segments?.length) {
-      setError('That file has no transcript yet — uploads are transcribed in the background.');
-      return;
-    }
-    setError('');
-    onTranscript(transcript.segments, pickedDetail.data?.fileName ?? pickerId);
-  };
-
-  const processedAssets = (project.data?.assets ?? []).filter((asset) => asset.status === 'PROCESSED');
-
-  return (
-    <div className="paper-card accent-card">
-      <div className="inline-heading">
-        <span className="eyebrow"><AudioLines size={13} /> Import · transcribe</span>
-        {phase === 'transcribing' && <span className="den-tag gold">transcribing</span>}
-        {phase === 'done' && <span className="den-tag teal">inserted</span>}
-      </div>
-      <p className="setting-copy">
-        Drop an audio or video file here — it is locked into the vault (deduped, proxied, transcribed in the background) and the words appear in the script below, editable.
-      </p>
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="audio/*,video/*,.mp4,.mov,.m4v,.mkv,.webm,.wav,.mp3,.m4a,.aac,.flac,.ogg,.aif,.aiff"
-        onChange={onPickFile}
-        disabled={phase === 'uploading' || phase === 'transcribing'}
-        data-testid="script-import-file"
-      />
-
-      {phase === 'uploading' && (
-        <div className="den-upload-progress mt-3" data-testid="script-upload-progress">
-          <div className="den-upload-progress-bar">
-            <span style={{ width: `${progress}%` }} />
-          </div>
-          <b>{progress}%</b>
-          <button type="button" onClick={cancel} className="den-upload-cancel" data-testid="script-upload-cancel">
-            Cancel
-          </button>
-        </div>
-      )}
-      {phase === 'transcribing' && (
-        <p className="den-footnote mt-3">
-          <Loader2 size={13} className="spin" />
-          Proxying and transcribing <b>{fileName}</b> in the background — the script fills itself in.
-        </p>
-      )}
-      {phase === 'done' && (
-        <p className="den-footnote mt-3">
-          <Check size={13} />
-          Transcribed <b>{fileName}</b> into the script below.
-        </p>
-      )}
-      {error && (
-        <p className="setting-copy mt-2" role="alert" style={{ color: 'hsl(var(--destructive))' }}>
-          {error}
-        </p>
-      )}
-
-      <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
-        <span className="eyebrow"><FileAudio size={12} /> From the vault</span>
-        <p className="setting-copy mt-1">Or drop an already-transcribed asset's words in:</p>
-        <div className="mt-2 flex gap-2">
-          <select value={pickerId} onChange={(event) => setPickerId(event.target.value)} data-testid="script-picker-asset">
-            <option value="">Choose a processed file…</option>
-            {processedAssets.map((asset) => (
-              <option key={asset.id} value={asset.id}>{asset.fileName}</option>
-            ))}
-          </select>
-          <button type="button" onClick={insertPicked} disabled={!pickerId} className="secondary-btn" data-testid="script-insert-picked">
-            <FileVideo2 size={13} /> Insert
-          </button>
-        </div>
-        {processedAssets.length === 0 && (
-          <p className="setting-copy mt-2">No processed footage yet — the upload above is the fastest way in.</p>
-        )}
-      </div>
-
-      <p className="den-footnote mt-3">
-        <Sparkles size={13} />
-        Uploads join the vault like any other raw footage; identical bytes are deduped, and the locked originals never leave.
-      </p>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
-
-export default function ScriptPreviewPage() {
-  const { projectId } = useParams<{ projectId: string }>();
-  useProjectRealtime(projectId, null);
-  const project = useGetVideoProject(projectId);
-  const editorRef = useRef<HTMLDivElement>(null);
-  const saveTimerRef = useRef<number | null>(null);
-  const scriptFileRef = useRef<HTMLInputElement>(null);
-
-  const [html, setHtml] = useState<string>(() => {
-    try {
-      return localStorage.getItem(storageKey(projectId)) ?? '';
-    } catch {
-      return '';
-    }
-  });
-  const [saved, setSaved] = useState(true);
-  const [toast, setToast] = useState('');
-
-  // Autosave (debounced) straight to the browser for this project.
-  useEffect(() => {
-    setSaved(false);
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(() => {
-      try {
-        localStorage.setItem(storageKey(projectId), html);
-      } catch {
-        // Storage unavailable — keep working in memory.
-      }
-      setSaved(true);
-    }, 450);
-    return () => {
-      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-    };
-  }, [html, projectId]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(''), 2600);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
-  const command = (name: string, value?: string) => {
-    document.execCommand(name, false, value);
-    setHtml(editorRef.current?.innerHTML ?? '');
-  };
-
-  const onEditorInput = () => {
-    setHtml(editorRef.current?.innerHTML ?? '');
+    if (transcribeFileRef.current) transcribeFileRef.current.value = '';
+    startTranscribeUpload(file);
   };
 
   const onImportScriptFile = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -369,28 +312,10 @@ export default function ScriptPreviewPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `script.${format}`;
+    link.download = `${name.trim() ? name.trim().replace(/\s+/g, '-') : 'script'}.${format}`;
     link.click();
     URL.revokeObjectURL(url);
     setToast(`Exported the script as ${format === 'md' ? 'Markdown' : 'text'} (${count.words} words).`);
-  };
-
-  const insertTranscript = (segments: VideoTranscriptSegment[], fileName: string) => {
-    const el = editorRef.current;
-    if (!el) return;
-    const frag = document.createElement('div');
-    for (const segment of segments) {
-      const paragraph = document.createElement('p');
-      const tag = document.createElement('span');
-      tag.className = 'pv-script-tc';
-      tag.textContent = formatTimecode(segment.startMs);
-      paragraph.appendChild(tag);
-      paragraph.appendChild(document.createTextNode(segment.text));
-      frag.appendChild(paragraph);
-    }
-    el.appendChild(frag);
-    setHtml(el.innerHTML);
-    setToast(`Transcribed ${segments.length} line${segments.length === 1 ? '' : 's'} from ${fileName}`);
   };
 
   const count = useMemo(() => {
@@ -422,15 +347,54 @@ export default function ScriptPreviewPage() {
   }
 
   const p = project.data;
+  const processedMedia = p.assets.filter((asset) => asset.status === 'PROCESSED' && MEDIA_KINDS.has(asset.kind));
 
   return (
     <div className="page pv-page">
-      <div className="pv-top">
+      <div className="pv-top pv-script-top">
         <div className="pv-canvas-col">
           <div className="paper-card pv-script" data-testid="script-editor">
             <div className="pv-script-head">
-              <div className="eyebrow">SCRIPT / DRAFT</div>
-              <span className="flex items-center gap-2">
+              <div className="pv-script-head-left">
+                <div className="eyebrow">SCRIPT / DRAFT</div>
+                <select value={pickerId} onChange={(event) => setPickerId(event.target.value)} data-testid="script-transcribe-picker">
+                  <option value="">Transcribe a file…</option>
+                  {processedMedia.map((asset) => (
+                    <option key={asset.id} value={asset.id}>{asset.fileName}</option>
+                  ))}
+                </select>
+                <button type="button" className="secondary-btn !px-3 !py-1.5 !text-xs" onClick={transcribePicked} data-testid="script-transcribe-btn">
+                  <AudioLines size={13} /> Transcribe
+                </button>
+                <input
+                  ref={transcribeFileRef}
+                  type="file"
+                  accept={TRANSCRIBE_ACCEPT}
+                  onChange={onPickTranscribeFile}
+                  className="hidden"
+                  data-testid="script-transcribe-upload-input"
+                />
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title="Upload audio or video to transcribe"
+                  onClick={() => transcribeFileRef.current?.click()}
+                  data-testid="script-transcribe-upload"
+                >
+                  <FileUp size={15} />
+                </button>
+              </div>
+
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Name this script…"
+                className="pv-script-name"
+                maxLength={120}
+                data-testid="script-name"
+              />
+
+              <div className="pv-script-head-right">
                 <input
                   ref={scriptFileRef}
                   type="file"
@@ -439,17 +403,21 @@ export default function ScriptPreviewPage() {
                   className="hidden"
                   data-testid="script-import-file"
                 />
-                <button type="button" className="secondary-btn !px-3 !py-1.5 !text-xs" onClick={() => scriptFileRef.current?.click()} data-testid="script-import-btn">
-                  <FileUp size={13} /> Import script
+                <button type="button" className="link-btn !text-[11px]" onClick={() => scriptFileRef.current?.click()} data-testid="script-import-btn">
+                  <FileText size={12} /> Import script
                 </button>
-                <button type="button" className="secondary-btn !px-3 !py-1.5 !text-xs" onClick={() => exportScript('md')} data-testid="script-export-btn">
-                  <FileDown size={13} /> Export
+                <button type="button" className="link-btn !text-[11px]" onClick={() => exportScript('md')} data-testid="script-export-btn">
+                  <FileDown size={12} /> Export
+                </button>
+                <button type="button" className="icon-btn" title="Save now" onClick={saveNow} data-testid="script-save-btn">
+                  <Save size={15} />
                 </button>
                 <span className={`save-indicator ${saved ? '' : 'dirty'}`} data-testid="script-save-state">
                   <span className="pulse-dot" /> {saved ? 'Autosaved' : 'Saving…'}
                 </span>
-              </span>
+              </div>
             </div>
+
             <div className="pv-toolbar" data-testid="script-toolbar">
               <button type="button" onClick={() => command('undo')} aria-label="Undo" title="Undo"><Undo2 size={15} /></button>
               <button type="button" onClick={() => command('redo')} aria-label="Redo" title="Redo"><Redo2 size={15} /></button>
@@ -475,6 +443,23 @@ export default function ScriptPreviewPage() {
               </button>
               <button type="button" onClick={() => command('removeFormat')} aria-label="Clear formatting" title="Clear formatting"><Eraser size={15} /></button>
             </div>
+
+            {(uploadPhase === 'uploading' || uploadPhase === 'transcribing') && (
+              <div className="pv-script-upload">
+                {uploadPhase === 'uploading' ? (
+                  <span className="den-upload-progress">
+                    <span className="den-upload-progress-bar"><span style={{ width: `${uploadProgress}%` }} /></span>
+                    <b>{uploadProgress}%</b>
+                  </span>
+                ) : (
+                  <span className="den-footnote">
+                    <Loader2 size={12} className="spin" />
+                    Proxying and transcribing <b>{uploadName}</b> in the background — the script fills itself in.
+                  </span>
+                )}
+              </div>
+            )}
+
             <div
               ref={editorRef}
               className="pv-script-area"
@@ -488,20 +473,20 @@ export default function ScriptPreviewPage() {
               <span><b>{count.words}</b> words</span>
               <span><b>{count.chars}</b> characters</span>
               <span><b>{count.paragraphs}</b> paragraphs</span>
+              {uploadPhase === 'done' && (
+                <span className="den-tag teal" data-testid="script-transcribe-done"><Check size={10} /> {uploadName} transcribed</span>
+              )}
               <span className="footer-spacer" />
-              <span className="mono-label">script · {p.name}</span>
+              <span className="mono-label">script{name ? ` · ${name}` : ''} · {p.name}</span>
             </div>
           </div>
         </div>
-        <div className="pv-notes-col">
-          <ImportRail projectId={p.id} onTranscript={insertTranscript} />
-          {toast && (
-            <p className="den-footnote mt-3" data-testid="script-toast">
-              <Check size={12} /> {toast}
-            </p>
-          )}
-        </div>
       </div>
+      {toast && (
+        <p className="den-footnote mt-3" data-testid="script-toast">
+          <Check size={12} /> {toast}
+        </p>
+      )}
     </div>
   );
 }
