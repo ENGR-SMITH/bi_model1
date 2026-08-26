@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useClerk, useUser } from '@clerk/react';
 import {
   Activity,
@@ -140,39 +140,28 @@ function WorkspaceMenu({ onClose }: { onClose: () => void }) {
   );
 }
 
-// The expanding search telescope in the centre of the top bar — collapses to a
-// magnifier and grows into a query field; submitting jumps to /explore?q=…
+// A long, always-visible search field in the centre of the top bar — the
+// telescope icon lives inside it; submitting jumps to /explore?q=…
 function ExploreSearch() {
   const [, setLocation] = useLocation();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState(false);
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const q = query.trim();
     setLocation(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
     setQuery('');
-    setExpanded(false);
-  };
-
-  const expand = () => {
-    setExpanded(true);
-    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   return (
     <div className="cd-explore-search">
-      <form className={`cd-explore-search-box ${expanded ? 'is-expanded' : ''}`} role="search" onSubmit={submit} data-testid="nav-explore">
-        <button type="button" className="cd-explore-search-icon" onClick={expand} aria-label="Search the den" data-testid="nav-explore-toggle">
+      <form className="cd-explore-search-box" role="search" onSubmit={submit} data-testid="nav-explore">
+        <button type="submit" className="cd-explore-search-icon" aria-label="Search the den" data-testid="nav-explore-toggle">
           <Search size={15} />
         </button>
         <input
-          ref={inputRef}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          onFocus={() => setExpanded(true)}
-          onBlur={() => !query.trim() && setExpanded(false)}
           placeholder="Search creators and projects…"
           aria-label="Search creators and projects"
           data-testid="nav-explore-input"
@@ -226,8 +215,8 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        {/* Tier 2 — always-visible workspace/sign-out row + collapsing project tabs. */}
-        <div className="cd-topnav-sub">
+        {/* Tier 2a — the workspace row (its own cut-out row, always visible). */}
+        <div className="cd-topnav-workspace-row">
           <div className="top-workspace-wrap" onPointerLeave={() => setWorkspaceOpen(false)}>
             <button
               type="button"
@@ -241,34 +230,38 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             </button>
             {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
           </div>
+        </div>
 
-          {projectId && (
-            <div className="cd-tab-scroll">
-              <div className="cd-tab-group">
-                {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
-                {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
-              </div>
-              <span className="cd-tab-divider" aria-hidden />
-              <div className="cd-tab-group cd-tab-stages">
-                {RELAY_LEGS.map((leg) => {
-                  const href = `/projects/${projectId}/${leg.slug}`;
-                  return (
-                    <Link
-                      key={leg.leg}
-                      href={href}
-                      title={leg.role}
-                      className={`cd-tab ${location === href ? 'active' : ''}`}
-                      data-testid={`nav-leg-${leg.slug}`}
-                    >
-                      <span className="cd-tab-num">{leg.number}</span>
-                      <span>{leg.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
+        {/* Tier 2b — the relay deck (middle row: project tabs, restored styling). */}
+        {projectId && (
+          <nav className="cd-topnav-tabs" aria-label="Project sections">
+            <div className="cd-tab-group">
+              {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
+              {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
             </div>
-          )}
+            <span className="cd-tab-divider" aria-hidden />
+            <div className="cd-tab-group cd-tab-stages">
+              {RELAY_LEGS.map((leg) => {
+                const href = `/projects/${projectId}/${leg.slug}`;
+                return (
+                  <Link
+                    key={leg.leg}
+                    href={href}
+                    title={leg.role}
+                    className={`cd-tab ${location === href ? 'active' : ''}`}
+                    data-testid={`nav-leg-${leg.slug}`}
+                  >
+                    <span className="cd-tab-num">{leg.number}</span>
+                    <span>{leg.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        )}
 
+        {/* Tier 2c — the sign-out row (its own cut-out row, bottom-right). */}
+        <div className="cd-topnav-signout-row">
           <button type="button" className="cd-signout" onClick={logout} data-testid="button-creators-logout">
             <LogOut size={14} />
             <span>Sign out</span>
