@@ -17,7 +17,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import { MessageSquare, Pin, X } from 'lucide-react';
+import { MessageSquare, Pencil, Pin, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import {
@@ -53,6 +53,7 @@ export function AnnotationCanvas({
   timelineVersionId,
   submissionId,
   dockRef,
+  headerRef,
 }: {
   projectId: string;
   leg: StudioLeg;
@@ -71,6 +72,10 @@ export function AnnotationCanvas({
   /** When set, the controls (Annotate toggle, composer, thread) render into
       this dock element below the player instead of overlaying the media. */
   dockRef?: RefObject<HTMLDivElement | null>;
+  /** When set, the annotate toggle renders as an edit (pencil) icon button
+      into this element (the card header's top-right corner) instead of the
+      dock / overlay — the familiar editing-tools affordance. */
+  headerRef?: RefObject<HTMLDivElement | null>;
 }) {
   const queryClient = useQueryClient();
   const { user } = useUser();
@@ -90,6 +95,11 @@ export function AnnotationCanvas({
   useLayoutEffect(() => {
     if (dockRef?.current) setDockEl(dockRef.current);
   }, [dockRef]);
+
+  const [headerEl, setHeaderEl] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (headerRef?.current) setHeaderEl(headerRef.current);
+  }, [headerRef]);
 
   // Turn annotate mode off when the frame (asset) changes.
   useEffect(() => {
@@ -197,7 +207,7 @@ export function AnnotationCanvas({
     </button>
   ));
 
-  const controls = (
+  const panelControls = (
     <>
       {openGroup && (
         <div
@@ -234,6 +244,43 @@ export function AnnotationCanvas({
         </div>
       )}
 
+      {drop && (
+        <div
+          className="annotation-composer"
+          style={{ left: `${Math.min(drop.x * 100, 60)}%`, top: `${Math.min(drop.y * 100, 50)}%` }}
+          onClick={(event) => event.stopPropagation()}
+          data-testid="annotation-composer"
+        >
+          <span className="eyebrow">
+            <Pin size={11} /> Pin note {playheadMs != null ? `@ ${formatTimecode(playheadMs)}` : '· on the frame'}
+          </span>
+          <textarea
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Note on this frame…"
+            rows={2}
+            maxLength={4000}
+            autoFocus
+            data-testid="annotation-input"
+          />
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={submitDrop} disabled={create.isPending || !body.trim()} className="primary-btn !px-3 !py-1.5 !text-xs" data-testid="annotation-submit">
+              {create.isPending ? 'Pinning…' : 'Pin note'}
+            </button>
+            <button type="button" onClick={() => setDrop(null)} className="text-btn !text-xs">Cancel</button>
+          </div>
+          {create.isError && (
+            <p className="setting-copy !text-[11px]" role="alert">
+              {dropError?.response?.data?.error || 'The pin could not be added.'}
+            </p>
+          )}
+        </div>
+      )}
+    </>
+  );
+
+  const toggleControls = (
+    <>
       {annotating && canAnnotate && !drop && (
         <button
           type="button"
@@ -274,39 +321,6 @@ export function AnnotationCanvas({
           <Pin size={12} /> {pins.length} pin{pins.length === 1 ? '' : 's'}
         </button>
       )}
-
-      {drop && (
-        <div
-          className="annotation-composer"
-          style={{ left: `${Math.min(drop.x * 100, 60)}%`, top: `${Math.min(drop.y * 100, 50)}%` }}
-          onClick={(event) => event.stopPropagation()}
-          data-testid="annotation-composer"
-        >
-          <span className="eyebrow">
-            <Pin size={11} /> Pin note {playheadMs != null ? `@ ${formatTimecode(playheadMs)}` : '· on the frame'}
-          </span>
-          <textarea
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-            placeholder="Note on this frame…"
-            rows={2}
-            maxLength={4000}
-            autoFocus
-            data-testid="annotation-input"
-          />
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={submitDrop} disabled={create.isPending || !body.trim()} className="primary-btn !px-3 !py-1.5 !text-xs" data-testid="annotation-submit">
-              {create.isPending ? 'Pinning…' : 'Pin note'}
-            </button>
-            <button type="button" onClick={() => setDrop(null)} className="text-btn !text-xs">Cancel</button>
-          </div>
-          {create.isError && (
-            <p className="setting-copy !text-[11px]" role="alert">
-              {dropError?.response?.data?.error || 'The pin could not be added.'}
-            </p>
-          )}
-        </div>
-      )}
     </>
   );
 
@@ -322,13 +336,40 @@ export function AnnotationCanvas({
     </div>
   );
 
+  // The header edit (pencil) button — the familiar editing-tools affordance,
+  // pinned to the card header's top-right corner (portaled into headerRef).
+  const headerToggle = headerRef ? (
+    <button
+      type="button"
+      className={`annotation-toggle annotation-edit-btn ${annotating ? 'active' : ''}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        setAnnotating((a) => !a);
+      }}
+      aria-pressed={annotating}
+      title={annotating ? 'Stop annotating' : 'Annotate this media'}
+      data-testid="annotation-start"
+    >
+      <Pencil size={14} />
+    </button>
+  ) : null;
+
   // Docked mode: pins stay on the media, the controls live in the dock below
-  // the player (outside the media overlay).
+  // the player (outside the media overlay), and the toggle moves to the card
+  // header when a headerRef is provided.
   if (dockRef) {
     return (
       <>
         {overlay}
-        {dockEl && createPortal(<div className="annotation-dock" data-testid="annotation-dock">{controls}</div>, dockEl)}
+        {dockEl &&
+          createPortal(
+            <div className="annotation-dock" data-testid="annotation-dock">
+              {headerRef ? null : toggleControls}
+              {panelControls}
+            </div>,
+            dockEl,
+          )}
+        {headerEl && createPortal(headerToggle, headerEl)}
       </>
     );
   }
@@ -336,7 +377,8 @@ export function AnnotationCanvas({
   return (
     <>
       {overlay}
-      {controls}
+      {toggleControls}
+      {panelControls}
     </>
   );
 }
