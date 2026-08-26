@@ -620,7 +620,7 @@ export function PreviewNotesPanel({
                 >
                   <span className="annotation-pin-dot" style={{ background: resolved ? RESOLVED_GREEN : color }}>{label}</span>
                   <b>{pin.comments.length} note{pin.comments.length === 1 ? '' : 's'} on frame</b>
-                  {resolved && <span className="den-tag teal" data-testid={`preview-pin-solved-${pin.key}`}>solved</span>}
+                  {resolved && <span className="den-tag resolved" data-testid={`preview-pin-solved-${pin.key}`}>resolved</span>}
                   {times.length > 0 && <span className="den-tag timechip">{formatTimecode(times[0])}</span>}
                 </button>
                 <div className="pv-note-pin-body">
@@ -652,14 +652,15 @@ export function PreviewNotesPanel({
                             {nameOf(comment.authorId)}
                           </span>
                           {comment.timecodeMs != null && <span className="den-tag timechip">{formatTimecode(comment.timecodeMs)}</span>}
+                          {comment.resolvedAt && <span className="den-tag resolved" data-testid={`preview-comment-resolved-${comment.id}`}>resolved</span>}
                         </b>
                         <small className="!normal-case">{comment.body}</small>
                       </span>
                       {allowResolve && (
                         <button
                           type="button"
-                          className="link-btn resolve-btn"
-                          style={comment.resolvedAt ? { color: RESOLVED_GREEN } : undefined}
+                          className={`link-btn resolve-btn ${comment.resolvedAt ? 'is-resolved' : ''}`}
+                          style={comment.resolvedAt ? { color: RESOLVED_GREEN, borderColor: 'hsl(150 52% 42% / .4)' } : undefined}
                           onClick={(event) => {
                             event.stopPropagation();
                             onResolve(comment.id, !comment.resolvedAt);
@@ -668,6 +669,7 @@ export function PreviewNotesPanel({
                           data-testid={`preview-resolve-${comment.id}`}
                         >
                           <Check size={12} />
+                          <span>{comment.resolvedAt ? 'Reopen' : 'Resolve'}</span>
                         </button>
                       )}
                     </div>
@@ -712,6 +714,7 @@ export function PreviewNotesPanel({
                       {comment.label}
                     </span>
                   )}
+                  {comment.resolvedAt && <span className="den-tag resolved" data-testid={`preview-note-resolved-${comment.id}`}>resolved</span>}
                   <span className="note-author">· {nameOf(comment.authorId)}</span>
                 </b>
                 <small className="!normal-case">{comment.body}</small>
@@ -719,8 +722,8 @@ export function PreviewNotesPanel({
               {allowResolve && (
                 <button
                   type="button"
-                  className="link-btn resolve-btn"
-                  style={comment.resolvedAt ? { color: RESOLVED_GREEN } : undefined}
+                  className={`link-btn resolve-btn ${comment.resolvedAt ? 'is-resolved' : ''}`}
+                  style={comment.resolvedAt ? { color: RESOLVED_GREEN, borderColor: 'hsl(150 52% 42% / .4)' } : undefined}
                   onClick={(event) => {
                     event.stopPropagation();
                     onResolve(comment.id, !comment.resolvedAt);
@@ -729,6 +732,7 @@ export function PreviewNotesPanel({
                   data-testid={`preview-note-resolve-${comment.id}`}
                 >
                   <Check size={12} />
+                  <span>{comment.resolvedAt ? 'Reopen' : 'Resolve'}</span>
                 </button>
               )}
             </div>

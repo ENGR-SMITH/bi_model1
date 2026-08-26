@@ -220,7 +220,7 @@ select optgroup {
 /* ---- Annotation canvas (spatial review over the proxy frame) ---- */
 .annotation-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 3; overflow: visible; }
 .annotation-canvas.annotating { pointer-events: auto; cursor: crosshair; }
-.annotation-pin { position: absolute; transform: translate(-50%, -50%); background: transparent; border: 0; padding: 0; cursor: pointer; pointer-events: auto; z-index: 4; display: flex; align-items: center; gap: 4px; touch-action: none; }
+.annotation-pin { position: absolute; transform: translate(-50%, -50%); background: transparent; border: 0; padding: 0; cursor: pointer; pointer-events: auto; z-index: 4; display: flex; align-items: center; gap: 4px; touch-action: none; transition: opacity .35s ease; }
 .annotation-pin-dot { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; color: #fff; font: 800 10px var(--app-font-mono); box-shadow: 0 1px 4px hsl(0 0% 0% / .6), 0 0 0 2px hsl(0 0% 100% / .85); }
 .annotation-pin-count { display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: hsl(var(--card) / .95); border: 1px solid hsl(var(--border)); color: hsl(var(--foreground)); font: 700 9px var(--app-font-mono); }
 .annotation-thread { position: absolute; width: 250px; max-height: 240px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--card) / .98); box-shadow: var(--shadow-md); pointer-events: auto; z-index: 6; }
@@ -2483,20 +2483,33 @@ select optgroup {
 /* Resolve / Reopen control — only rendered on the main role pages. */
 .pv-comment-row .resolve-btn {
   flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 50%;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
   border: 1px solid hsl(var(--border));
   background: hsl(var(--card) / .8);
   color: hsl(var(--muted-foreground));
+  font: 700 9px var(--app-font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 .pv-comment-row .resolve-btn:hover {
   border-color: hsl(150 52% 42% / .6);
   color: hsl(150 52% 42%);
   background: hsl(150 52% 42% / .1);
+}
+.pv-comment-row .resolve-btn.is-resolved {
+  background: hsl(150 52% 42% / .12);
+}
+
+/* The green RESOLVED tag shown on a comment once it has been closed. */
+.den-tag.resolved {
+  color: hsl(150 52% 45%);
+  background: hsl(150 52% 42% / .12);
+  font-weight: 700;
 }
 
 /* Small mono chip for a note's timecode inside the tag rows. */

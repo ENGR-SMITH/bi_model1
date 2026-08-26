@@ -58,6 +58,7 @@ export function AnnotationCanvas({
   headerRef,
   surfaceRef,
   dropLine = false,
+  timecodeReveal = false,
 }: {
   projectId: string;
   leg: StudioLeg;
@@ -83,6 +84,10 @@ export function AnnotationCanvas({
   surfaceRef?: RefObject<HTMLDivElement | null>;
   /** Draw a red vertical line at the selected point (the audio wave). */
   dropLine?: boolean;
+  /** Video only: keep pins whose timecode is still ahead of the playhead
+      semi-transparent, and light them up once the playhead reaches the
+      comment's timestamp (they stay lit long after passing it). */
+  timecodeReveal?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { user } = useUser();
@@ -219,12 +224,22 @@ export function AnnotationCanvas({
 
   if (!assetId) return null;
 
-  const pinsEl = pins.map((pin) => (
+  const pinsEl = pins.map((pin) => {
+    // While the video plays, a pin stays dim until the playhead reaches the
+    // comment's timestamp — then it lights up and remains fully visible well
+    // past that point. Pins without a timecode never dim.
+    const pinTime = pin.comments[0]?.timecodeMs ?? null;
+    const dimmed =
+      timecodeReveal &&
+      pinTime != null &&
+      playheadMs != null &&
+      playheadMs < pinTime;
+    return (
     <button
       key={pin.key}
       type="button"
-      className="annotation-pin"
-      style={{ left: `${pin.geometry.x * 100}%`, top: `${pin.geometry.y * 100}%` }}
+      className={`annotation-pin ${dimmed ? 'is-dimmed' : ''}`}
+      style={{ left: `${pin.geometry.x * 100}%`, top: `${pin.geometry.y * 100}%`, opacity: dimmed ? 0.35 : 1 }}
       onClick={(event) => {
         event.stopPropagation();
         setDrop(null);
@@ -239,7 +254,8 @@ export function AnnotationCanvas({
       </span>
       {pin.comments.length > 1 && <span className="annotation-pin-count">{pin.comments.length}</span>}
     </button>
-  ));
+    );
+  });
 
   return (
     <div
