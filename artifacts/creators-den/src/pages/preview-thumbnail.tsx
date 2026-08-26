@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Image as ImageIcon, LockKeyhole } from 'lucide-react';
+import { ArrowLeft, Image as ImageIcon } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
   getGetVideoTimelineVersionQueryKey,
@@ -61,19 +61,18 @@ function ThumbnailCanvas({
     [assets],
   );
   const assetId = design?.assetId || fallback?.id || '';
-  const assetName = assets.find((a) => a.id === assetId)?.fileName ?? assetId.slice(0, 8);
-  const stageTitle = [design?.title, design?.style].filter(Boolean).join(' · ') || assetName || 'Design preview';
 
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="thumbnail-canvas">
       <div className="inline-heading">
         <span className="eyebrow"><ImageIcon size={13} /> Big canvas{version ? ` · THUMBNAIL v${version.version}` : ''}</span>
-        {assetId && <span className="den-tag gold truncate">{design?.title || assetName}</span>}
-        {!version && <span className="den-tag teal">vault preview</span>}
+        <span className="flex items-center gap-2">
+          {!version && <span className="den-tag teal">vault preview</span>}
+        </span>
       </div>
       <div className="pv-stage-player mt-3">
         {assetId ? (
-          <ImageStage src={proxyUrlFor(projectId, assetId)} title={stageTitle}>
+          <ImageStage src={proxyUrlFor(projectId, assetId)}>
             <AnnotationCanvas
               projectId={projectId}
               leg="THUMBNAIL"
@@ -81,6 +80,7 @@ function ThumbnailCanvas({
               playheadMs={null}
               timelineVersionId={version?.id}
             />
+            <FullscreenButton targetRef={stageRef} />
           </ImageStage>
         ) : (
           <EmptyPlayer>
@@ -88,24 +88,7 @@ function ThumbnailCanvas({
             <p className="text-xs opacity-70">Add a design in the vault to preview it here.</p>
           </EmptyPlayer>
         )}
-        <FullscreenButton targetRef={stageRef} />
       </div>
-      {assetId && (
-        <div className="cd-metarow mt-3">
-          <span className="cd-metatext min-w-0">
-            <b className="truncate">{design?.title || assetName}</b>
-            <small>
-              {design
-                ? `${design.style ? `style · ${design.style} · ` : ''}${designs.length} design${designs.length === 1 ? '' : 's'} in v${version?.version ?? '—'}`
-                : 'no version saved yet — showing the vault design'}
-            </small>
-          </span>
-        </div>
-      )}
-      <p className="den-footnote mt-3">
-        <LockKeyhole size={13} />
-        The design is rendered from the degraded proxy — the locked original never leaves the vault. Pins sit directly on the pixels.
-      </p>
     </div>
   );
 }
@@ -188,8 +171,6 @@ export default function ThumbnailPreviewPage() {
           projectId={p.id}
           legs={['THUMBNAIL']}
           assetId={activeAssetId}
-          timelineVersionId={selected?.id}
-          composerLeg="THUMBNAIL"
         />
       }
       versions={

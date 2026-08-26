@@ -9,14 +9,14 @@
 //                       versions (v1, v2, …), labelled with their relay leg.
 //   PreviewNotesPanel — the right rail: every annotation pin (grouped by
 //                       frame point with its reviewer colour tag) plus the
-//                       timecode notes, with a composer that pins at the
-//                       current playhead.
-//   FullscreenButton  — expands the canvas container to full screen.
+//                       timecode notes.
+//   FullscreenButton  — expands the canvas container to full screen. Rendered
+//                       inside the media player, pinned to its bottom-right.
 //   WaveformPlayer    — audio player rendered as a wavelength bar view with
 //                       a red tick at the exact playhead / annotation time.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   Check,
   ChevronLeft,
@@ -31,7 +31,6 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getListVideoCommentsQueryKey,
-  useCreateVideoComment,
   useListVideoComments,
   useResolveVideoComment,
 } from '@workspace/api-client-react';
@@ -169,6 +168,7 @@ export function FullscreenButton({ targetRef, label = 'Full screen' }: { targetR
       type="button"
       className="pv-fs"
       onClick={toggle}
+      onPointerDown={(event) => event.stopPropagation()}
       title={active ? 'Exit full screen' : 'Expand the media to full screen'}
       data-testid="preview-fullscreen"
     >
@@ -193,30 +193,19 @@ export function PreviewNotesPanel({
   projectId,
   legs,
   assetId,
-  timelineVersionId,
-  playheadMs,
   onSeek,
-  composerLeg,
 }: {
   projectId: string;
   /** The relay legs whose notes this panel shows (e.g. SELECTS + CUT for video). */
   legs: StudioLeg[];
   /** Optional scope: notes pinned to a specific asset. */
   assetId?: string;
-  /** Optional scope: the timeline version being reviewed. */
-  timelineVersionId?: string | null;
-  /** Playhead used when the composer pins a note. */
-  playheadMs?: number | null;
   /** Clicking a note with a timecode seeks the canvas here. */
   onSeek?: (ms: number) => void;
-  /** The leg new notes are written with (the version currently selected). */
-  composerLeg: StudioLeg;
 }) {
   const queryClient = useQueryClient();
   const comments = useListVideoComments(projectId);
-  const create = useCreateVideoComment();
   const resolve = useResolveVideoComment();
-  const [body, setBody] = useState('');
 
   const rows = useMemo(() => {
     const legSet = new Set(legs);
@@ -248,29 +237,6 @@ export function PreviewNotesPanel({
     [rows],
   );
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!body.trim()) return;
-    create.mutate(
-      {
-        projectId,
-        data: {
-          leg: composerLeg,
-          assetId: assetId ?? undefined,
-          timecodeMs: playheadMs ?? undefined,
-          body: body.trim(),
-          timelineVersionId: timelineVersionId ?? undefined,
-        },
-      },
-      {
-        onSuccess: () => {
-          setBody('');
-          queryClient.invalidateQueries({ queryKey: getListVideoCommentsQueryKey(projectId) });
-        },
-      },
-    );
-  };
-
   const onResolve = (commentId: string, resolved: boolean) => {
     resolve.mutate(
       { projectId, commentId, data: { resolved } },
@@ -282,19 +248,12 @@ export function PreviewNotesPanel({
     );
   };
 
-  const createError = create.error as { response?: { data?: { error?: string } } } | null;
-
   return (
     <div className="paper-card pv-notes" data-testid="preview-notes">
       <div className="inline-heading">
         <span className="eyebrow"><Pin size={13} /> Pins · comments · notes</span>
         <span className="mono-label">{rows.length}</span>
       </div>
-      {timelineVersionId && (
-        <p className="den-footnote mt-1">
-          scoped to {legs.join(' / ')} · v{timelineVersionId.slice(0, 8)}
-        </p>
-      )}
 
       {pins.length > 0 && (
         <div className="den-stack mt-3">
@@ -372,32 +331,8 @@ export function PreviewNotesPanel({
       )}
 
       {pins.length === 0 && timelineNotes.length === 0 && (
-        <p className="setting-copy mt-3">No pins or notes yet — drop pins on the canvas with <b>Annotate</b>, or pin a note at the playhead below.</p>
+        <p className="setting-copy mt-3">No pins or notes yet — drop pins on the canvas with <b>Annotate</b> and they'll appear here.</p>
       )}
-
-      <form className="mt-4 space-y-2 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }} onSubmit={submit} data-testid="preview-note-composer">
-        <span className="eyebrow"><MessageSquare size={12} /> Pin a note</span>
-        <textarea
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          placeholder="Note at this moment…"
-          maxLength={4000}
-          rows={2}
-          data-testid="preview-note-input"
-        />
-        <div className="flex items-center gap-2">
-          <span className="mono-label">at {playheadMs != null ? formatTimecode(playheadMs) : 'playhead'}</span>
-          <button type="submit" disabled={create.isPending || !body.trim()} className="primary-btn ml-auto !px-3 !py-1.5 !text-xs" data-testid="preview-note-submit">
-            <Pin size={12} />
-            {create.isPending ? 'Pinning…' : 'Pin note'}
-          </button>
-        </div>
-        {create.isError && (
-          <p className="setting-copy !text-[11px]" role="alert">
-            {createError?.response?.data?.error || 'The note could not be pinned.'}
-          </p>
-        )}
-      </form>
     </div>
   );
 }

@@ -155,7 +155,7 @@ export default function PreviewPage() {
       eyebrow: 'The cover',
       icon: <ImageIcon size={22} />,
       count: `${imageAssets.length} design${imageAssets.length === 1 ? '' : 's'}`,
-      description: 'Chosen designs across every thumbnail version — annotated as a static frame.',
+      description: 'Chosen designs across every thumbnail version, reviewed side by side.',
       preview: firstImage ? (
         <img className="pv-card-media" src={proxyUrlFor(p.id, firstImage.id)} alt="" />
       ) : (

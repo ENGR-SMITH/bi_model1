@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, LockKeyhole, Play } from 'lucide-react';
+import { ArrowLeft, Play } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
   getGetVideoAssetQueryKey,
@@ -74,8 +74,6 @@ function VideoCanvas({
   const detail = useGetVideoAsset(projectId, assetId, {
     query: { queryKey: getGetVideoAssetQueryKey(projectId, assetId), enabled: Boolean(assetId) },
   });
-  const assetName = assets.find((a) => a.id === assetId)?.fileName ?? assetId.slice(0, 8);
-
   const onSeek = (ms: number) => {
     setPlayheadMs(ms);
     if (videoRef.current) videoRef.current.currentTime = ms / 1000;
@@ -101,7 +99,6 @@ function VideoCanvas({
       <div className="inline-heading">
         <span className="eyebrow"><Play size={13} /> Big canvas{version ? ` · ${version.leg} v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
-          {assetId && <span className="den-tag gold truncate">{assetName}</span>}
           {!version && <span className="den-tag teal">vault preview</span>}
           <span className="mono-label">{formatTimecode(playheadMs)}</span>
         </span>
@@ -116,7 +113,6 @@ function VideoCanvas({
             playheadMs={playheadMs}
             onTimeUpdate={setPlayheadMs}
             markers={markers}
-            title={assetName}
           >
             <AnnotationCanvas
               projectId={projectId}
@@ -126,6 +122,7 @@ function VideoCanvas({
               onSeek={onSeek}
               timelineVersionId={version?.id}
             />
+            <FullscreenButton targetRef={stageRef} />
           </AssetPlayer>
         ) : (
           <EmptyPlayer>
@@ -133,26 +130,7 @@ function VideoCanvas({
             <p className="text-xs opacity-70">Add footage in the vault to preview it here.</p>
           </EmptyPlayer>
         )}
-        <FullscreenButton targetRef={stageRef} />
       </div>
-      {assetId && (
-        <div className="cd-metarow mt-3">
-          <span className="cd-metatext min-w-0">
-            <b className="truncate">{assetName}</b>
-            <small>
-              {activeClip
-                ? `window ${formatTimecode(activeClip.inMs)} → ${formatTimecode(activeClip.outMs)} · ${clips.length} clip${clips.length === 1 ? '' : 's'} in v${version?.version ?? '—'} · red ticks are annotation timecodes`
-                : version
-                  ? 'no clips in this version — showing the vault footage'
-                  : 'no version saved yet — showing the vault footage'}
-            </small>
-          </span>
-        </div>
-      )}
-      <p className="den-footnote mt-3">
-        <LockKeyhole size={13} />
-        Streaming the degraded proxy — the locked original never leaves the vault.
-      </p>
     </div>
   );
 }
@@ -241,8 +219,6 @@ export default function VideoPreviewPage() {
         <PreviewNotesPanel
           projectId={p.id}
           legs={VIDEO_LEGS}
-          timelineVersionId={selected?.id}
-          composerLeg={selected?.leg ?? 'SELECTS'}
         />
       }
       versions={

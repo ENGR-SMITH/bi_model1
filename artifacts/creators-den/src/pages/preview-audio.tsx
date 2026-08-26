@@ -10,7 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, AudioLines, LockKeyhole } from 'lucide-react';
+import { ArrowLeft, AudioLines } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
   getGetVideoAssetQueryKey,
@@ -75,8 +75,6 @@ function AudioCanvas({
   const detail = useGetVideoAsset(projectId, assetId, {
     query: { queryKey: getGetVideoAssetQueryKey(projectId, assetId), enabled: Boolean(assetId) },
   });
-  const assetName = assets.find((a) => a.id === assetId)?.fileName ?? assetId.slice(0, 8);
-
   const onSeek = (ms: number) => setPlayheadMs(ms);
 
   // Red ticks = annotation timecodes + pickup pins; teal = clip boundaries.
@@ -98,7 +96,6 @@ function AudioCanvas({
       <div className="inline-heading">
         <span className="eyebrow"><AudioLines size={13} /> Big canvas{version ? ` · SOUND v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
-          {assetId && <span className="den-tag gold truncate">{assetName}</span>}
           {!version && <span className="den-tag teal">vault preview</span>}
         </span>
       </div>
@@ -112,7 +109,6 @@ function AudioCanvas({
             onTimeUpdate={onSeek}
             onPlayheadChange={onSeek}
             markers={markers}
-            title={assetName}
           >
             <AnnotationCanvas
               projectId={projectId}
@@ -122,6 +118,7 @@ function AudioCanvas({
               onSeek={onSeek}
               timelineVersionId={version?.id}
             />
+            <FullscreenButton targetRef={stageRef} />
           </WaveformPlayer>
         ) : (
           <EmptyPlayer>
@@ -129,24 +126,7 @@ function AudioCanvas({
             <p className="text-xs opacity-70">Add audio in the vault to preview it here.</p>
           </EmptyPlayer>
         )}
-        <FullscreenButton targetRef={stageRef} />
       </div>
-      {assetId && (
-        <div className="cd-metarow mt-3">
-          <span className="cd-metatext min-w-0">
-            <b className="truncate">{assetName}</b>
-            <small>
-              {version
-                ? `${clips.length} clip${clips.length === 1 ? '' : 's'} · ${music.length} music track${music.length === 1 ? '' : 's'} · ${pickups.length} pickup${pickups.length === 1 ? '' : 's'} in v${version.version}`
-                : 'no version saved yet — showing the vault audio'}
-            </small>
-          </span>
-        </div>
-      )}
-      <p className="den-footnote mt-3">
-        <LockKeyhole size={13} />
-        Streaming the degraded proxy — the locked original never leaves the vault. The red tick marks the exact annotation time on the wave.
-      </p>
     </div>
   );
 }
@@ -225,8 +205,6 @@ export default function AudioPreviewPage() {
         <PreviewNotesPanel
           projectId={p.id}
           legs={['SOUND']}
-          timelineVersionId={selected?.id}
-          composerLeg="SOUND"
         />
       }
       versions={
