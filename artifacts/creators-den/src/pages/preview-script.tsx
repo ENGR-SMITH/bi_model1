@@ -210,11 +210,6 @@ export default function ScriptPreviewPage() {
       <div className="pv-top">
         <div className="pv-canvas-col">
           <div className="paper-card pv-script" data-testid="script-editor">
-            <div className="pv-script-head">
-              <span className={`save-indicator ${saved ? '' : 'dirty'}`} data-testid="script-save-state">
-                <span className="pulse-dot" /> {saved ? 'Autosaved' : 'Saving…'}
-              </span>
-            </div>
             <div
               ref={editorRef}
               className="pv-script-area pv-script-area-readonly"
@@ -232,6 +227,9 @@ export default function ScriptPreviewPage() {
               <span><b>{count.paragraphs}</b> paragraphs</span>
               <span className="footer-spacer" />
               <span className="mono-label">script · {p.name}</span>
+              <span className={`save-indicator ${saved ? '' : 'dirty'}`} data-testid="script-save-state">
+                <span className="pulse-dot" /> {saved ? 'Autosaved' : 'Saving…'}
+              </span>
             </div>
 
             {composer && (
