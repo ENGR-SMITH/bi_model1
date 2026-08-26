@@ -93,6 +93,7 @@ function ThumbnailCanvas({
               timelineVersionId={version?.id}
               headerRef={annotationHeaderRef}
               surfaceRef={stageRef}
+              glowPins
             />
             <FullscreenButton targetRef={stageRef} />
           </ImageStage>

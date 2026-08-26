@@ -59,6 +59,7 @@ export function AnnotationCanvas({
   surfaceRef,
   dropLine = false,
   timecodeReveal = false,
+  glowPins = false,
 }: {
   projectId: string;
   leg: StudioLeg;
@@ -88,6 +89,9 @@ export function AnnotationCanvas({
       semi-transparent, and light them up once the playhead reaches the
       comment's timestamp (they stay lit long after passing it). */
   timecodeReveal?: boolean;
+  /** Video + thumbnail only: draw a soft glowing wave that radiates from
+      each pin dot, so open tags catch the eye on the frame. */
+  glowPins?: boolean;
 }) {
   const queryClient = useQueryClient();
   const { user } = useUser();
@@ -152,7 +156,11 @@ export function AnnotationCanvas({
       group.comments.push(comment);
       groups.set(key, group);
     }
-    return [...groups.values()].sort((a, b) => a.key.localeCompare(b.key));
+    return [...groups.values()]
+      // Resolved pins leave the frame — every note on them is closed, so the
+      // tag pointer disappears from the player immediately.
+      .filter((group) => !(group.comments.length > 0 && group.comments.every((c) => c.resolvedAt)))
+      .sort((a, b) => a.key.localeCompare(b.key));
   }, [comments.data, leg, assetId, submissionId]);
 
   const openGroup = openPin ? pins.find((pin) => pin.key === openPin) ?? null : null;
@@ -238,8 +246,8 @@ export function AnnotationCanvas({
     <button
       key={pin.key}
       type="button"
-      className={`annotation-pin ${dimmed ? 'is-dimmed' : ''}`}
-      style={{ left: `${pin.geometry.x * 100}%`, top: `${pin.geometry.y * 100}%`, opacity: dimmed ? 0.35 : 1 }}
+      className={`annotation-pin ${dimmed ? 'is-dimmed' : ''} ${glowPins ? 'glow' : ''}`}
+      style={{ left: `${pin.geometry.x * 100}%`, top: `${pin.geometry.y * 100}%`, opacity: dimmed ? 0.35 : 1, '--pin-glow': reviewerColor(pin.comments[0].authorId) } as React.CSSProperties}
       onClick={(event) => {
         event.stopPropagation();
         setDrop(null);

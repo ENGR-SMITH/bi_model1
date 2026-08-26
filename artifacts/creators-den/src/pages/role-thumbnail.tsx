@@ -98,6 +98,7 @@ function ThumbnailCanvas({
               playheadMs={null}
               timelineVersionId={version?.id}
               canAnnotate={false}
+              glowPins
             />
             <FullscreenButton targetRef={stageRef} />
           </ImageStage>

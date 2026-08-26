@@ -154,6 +154,7 @@ function VideoCanvas({
               headerRef={annotationHeaderRef}
               surfaceRef={stageRef}
               timecodeReveal
+              glowPins
             />
             <FullscreenButton targetRef={stageRef} />
           </AssetPlayer>

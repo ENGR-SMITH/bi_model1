@@ -24,7 +24,7 @@ export const REVIEWER_COLORS = [
   "#6fd0c6", // teal
   "#86b9f0", // blue
   "#b4a5f2", // violet
-  "#f0a0ce", // pink
+  "#ef6b6b", // red
 ] as const;
 
 export type ReviewerColor = (typeof REVIEWER_COLORS)[number];
