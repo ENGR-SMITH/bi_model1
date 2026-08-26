@@ -1,13 +1,12 @@
 // ---------------------------------------------------------------------------
 // Thumbnail role page — the cover studio.
 //
-// Column one: a 3D coverflow shelf mixing the project's THUMBNAIL versions
-// with the vault's image uploads — the active (latest) item sits centred at
-// full scale and full opacity. Column two, row 1: the big canvas — the
-// selected version's chosen design (or the picked vault file) rendered at its
-// natural aspect, with spatial pins and a full-screen expand button. Column
-// two, row 2: the upload card. Column three, row 1: the pin / comment wall;
-// row 2: the Thumbnail Designer's oracle.
+// Column one: a vertical scrolling shelf mixing the project's THUMBNAIL
+// versions with the vault's image uploads. Column two, row 1: the big canvas
+// — the selected version's chosen design (or the picked vault file) rendered
+// at its natural aspect, with spatial pins and a full-screen expand button.
+// Column two, row 2: the upload card. Column three, row 1: the pin / comment
+// wall; row 2: the Thumbnail Designer's oracle.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -23,7 +22,7 @@ import {
 import { useProjectRealtime } from '@/lib/realtime';
 import { EmptyPlayer, ImageStage, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
-import { CoverflowCarousel, type CoverflowItem } from '@/components/coverflow';
+import { VersionShelf, type ShelfItem } from '@/components/version-shelf';
 import {
   FullscreenButton,
   PreviewNotesPanel,
@@ -60,7 +59,7 @@ function ThumbnailCanvas({
   projectId: string;
   version: { id: string; version: number; snapshot: unknown } | null;
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
-  /** Explicit vault asset to preview (picked from the coverflow shelf). */
+  /** Explicit vault asset to preview (picked from the version shelf). */
   vaultAssetId?: string;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
@@ -80,7 +79,7 @@ function ThumbnailCanvas({
   );
   // A version's chosen design may reference an asset that is no longer in the
   // vault — validate it so the stage always shows a real image. An explicitly
-  // picked vault file (from the coverflow) wins over everything.
+  // picked vault file (from the shelf) wins over everything.
   const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : '';
   const designAssetId = design?.assetId && assets.some((a) => a.id === design.assetId) ? design.assetId : '';
   const assetId = explicitAsset || designAssetId || fallback?.id || '';
@@ -147,7 +146,7 @@ export default function RoleThumbnailPage() {
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
 
   // Default to the newest version once the list arrives (unless a vault file
-  // has been picked from the coverflow shelf).
+  // has been picked from the version shelf).
   useEffect(() => {
     if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
   }, [versions, selectedId, vaultAssetId]);
@@ -164,10 +163,10 @@ export default function RoleThumbnailPage() {
   // canvas shows the picked file instead of the newest version's design.
   const activeVersion = vaultAssetId ? null : selected;
 
-  // Coverflow shelf: THUMBNAIL versions (newest first) + the vault's images.
-  const coverflowItems = useMemo<CoverflowItem[]>(() => {
+  // Version shelf: THUMBNAIL versions (newest first) + the vault's images.
+  const shelfItems = useMemo<ShelfItem[]>(() => {
     const proj = project.data;
-    const versionItems: CoverflowItem[] = versions.map((v) => ({
+    const versionItems: ShelfItem[] = versions.map((v) => ({
       key: `version-${v.id}`,
       kind: 'version' as const,
       version: v.version,
@@ -176,7 +175,7 @@ export default function RoleThumbnailPage() {
       createdAt: v.createdAt,
       isHead: v.isHead,
     }));
-    const vaultItems: CoverflowItem[] = (proj?.assets ?? [])
+    const vaultItems: ShelfItem[] = (proj?.assets ?? [])
       .filter((a) => IMAGE_KINDS.has(a.kind))
       .map((a) => ({
         key: `asset-${a.id}`,
@@ -191,9 +190,9 @@ export default function RoleThumbnailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versions, project.data?.assets, projectId]);
 
-  const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : coverflowItems[0]?.key ?? null;
+  const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : shelfItems[0]?.key ?? null;
 
-  const onCoverflowSelect = (key: string) => {
+  const onShelfSelect = (key: string) => {
     if (key.startsWith('asset-')) {
       setVaultAssetId(key.slice('asset-'.length));
       setSelectedId(null);
@@ -244,10 +243,10 @@ export default function RoleThumbnailPage() {
   return (
     <RoleLayout
       versions={
-        <CoverflowCarousel
-          items={coverflowItems}
+        <VersionShelf
+          items={shelfItems}
           activeKey={activeKey}
-          onSelect={onCoverflowSelect}
+          onSelect={onShelfSelect}
           emptyText="No versions or vault files yet — save a snapshot in the Thumbnail studio, or upload a design above."
         />
       }

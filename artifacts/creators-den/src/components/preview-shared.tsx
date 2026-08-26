@@ -148,8 +148,9 @@ export function VersionCarousel({
 // ---------------------------------------------------------------------------
 // RoleLayout — the three role pages (Video / Audio / Thumbnail).
 // Three columns at 14 : 46 : 40, with the second and third columns split into
-// two rows at 68 : 32. Column one (the coverflow) spans the full height; the
-// bottom rows of columns two and three hold the upload card and the oracle.
+// two rows at 68 : 32. Column one (the version & vault shelf) spans the full
+// height; the bottom rows of columns two and three hold the upload card and
+// the oracle.
 // ---------------------------------------------------------------------------
 
 export function RoleLayout({
@@ -159,7 +160,7 @@ export function RoleLayout({
   oracle,
   upload,
 }: {
-  /** Column one — the coverflow of timeline versions + vault uploads. */
+  /** Column one — the vertical shelf of timeline versions + vault uploads. */
   versions: ReactNode;
   /** Column two, row one — the big canvas. */
   canvas: ReactNode;
@@ -185,7 +186,7 @@ export function RoleLayout({
 
 // ---------------------------------------------------------------------------
 // VAULT_KIND_LABELS — human labels for the vault asset kinds, shared by the
-// role upload cards and the coverflow shelf.
+// role upload cards and the version shelf.
 // ---------------------------------------------------------------------------
 
 export const VAULT_KIND_LABELS: Record<string, string> = {

@@ -1,13 +1,12 @@
 // ---------------------------------------------------------------------------
 // Video role page — the picture studio.
 //
-// Column one: a 3D coverflow shelf mixing the project's SELECTS + CUT versions
-// with the vault's video uploads — the active (latest) item sits centred at
-// full scale and full opacity. Column two, row 1: the big canvas — the
-// selected version's clip (or the picked vault file) streams as a proxy, with
-// the spatial AnnotationCanvas on top and a full-screen expand button. Column
-// two, row 2: the upload card. Column three, row 1: the pin / comment wall;
-// row 2: the Visual Editor's oracle.
+// Column one: a vertical scrolling shelf mixing the project's SELECTS + CUT
+// versions with the vault's video uploads. Column two, row 1: the big canvas
+// — the selected version's clip (or the picked vault file) streams as a
+// proxy, with the spatial AnnotationCanvas on top and a full-screen expand
+// button. Column two, row 2: the upload card. Column three, row 1: the pin /
+// comment wall; row 2: the Visual Editor's oracle.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -26,7 +25,7 @@ import {
 import { useProjectRealtime } from '@/lib/realtime';
 import { AssetPlayer, EmptyPlayer, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
-import { CoverflowCarousel, type CoverflowItem } from '@/components/coverflow';
+import { VersionShelf, type ShelfItem } from '@/components/version-shelf';
 import { formatTimecode } from '@/components/timeline';
 import {
   FullscreenButton,
@@ -68,7 +67,7 @@ function VideoCanvas({
   projectId: string;
   version: { id: string; leg: StudioLeg; version: number; snapshot: unknown } | null;
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
-  /** Explicit vault asset to preview (picked from the coverflow shelf). */
+  /** Explicit vault asset to preview (picked from the version shelf). */
   vaultAssetId?: string;
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
@@ -90,7 +89,7 @@ function VideoCanvas({
   // A snapshot clip may reference an asset that is no longer in the vault
   // (or still processing) — validate against the project's assets so the
   // canvas always falls back to real, playable media. An explicitly picked
-  // vault file (from the coverflow) wins over everything.
+  // vault file (from the shelf) wins over everything.
   const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : '';
   const clipAssetId = activeClip?.assetId && assets.some((a) => a.id === activeClip.assetId) ? activeClip.assetId : '';
   const assetId = explicitAsset || clipAssetId || fallback?.id || '';
@@ -204,7 +203,7 @@ export default function RoleVideoPage() {
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
 
   // Default to the newest version once the list arrives (unless a vault file
-  // has been picked from the coverflow shelf).
+  // has been picked from the version shelf).
   useEffect(() => {
     if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
   }, [versions, selectedId, vaultAssetId]);
@@ -221,11 +220,11 @@ export default function RoleVideoPage() {
   // canvas shows the picked file instead of the newest version's clip.
   const activeVersion = vaultAssetId ? null : selected;
 
-  // Coverflow shelf: timeline versions (newest first) + the vault's video
+  // Version shelf: timeline versions (newest first) + the vault's video
   // uploads, each tagged with its leg / kind.
-  const coverflowItems = useMemo<CoverflowItem[]>(() => {
+  const shelfItems = useMemo<ShelfItem[]>(() => {
     const proj = project.data;
-    const versionItems: CoverflowItem[] = versions.map((v) => ({
+    const versionItems: ShelfItem[] = versions.map((v) => ({
       key: `version-${v.id}`,
       kind: 'version' as const,
       version: v.version,
@@ -234,7 +233,7 @@ export default function RoleVideoPage() {
       createdAt: v.createdAt,
       isHead: v.isHead,
     }));
-    const vaultItems: CoverflowItem[] = (proj?.assets ?? [])
+    const vaultItems: ShelfItem[] = (proj?.assets ?? [])
       .filter((a) => VIDEO_KINDS.has(a.kind))
       .map((a) => ({
         key: `asset-${a.id}`,
@@ -249,9 +248,9 @@ export default function RoleVideoPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versions, project.data?.assets, projectId]);
 
-  const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : coverflowItems[0]?.key ?? null;
+  const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : shelfItems[0]?.key ?? null;
 
-  const onCoverflowSelect = (key: string) => {
+  const onShelfSelect = (key: string) => {
     if (key.startsWith('asset-')) {
       setVaultAssetId(key.slice('asset-'.length));
       setSelectedId(null);
@@ -321,10 +320,10 @@ export default function RoleVideoPage() {
   return (
     <RoleLayout
       versions={
-        <CoverflowCarousel
-          items={coverflowItems}
+        <VersionShelf
+          items={shelfItems}
           activeKey={activeKey}
-          onSelect={onCoverflowSelect}
+          onSelect={onShelfSelect}
           emptyText="No versions or vault files yet — save a snapshot in the Selects or Cut studio, or upload footage above."
         />
       }
