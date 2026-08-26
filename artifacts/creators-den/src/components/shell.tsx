@@ -246,11 +246,11 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
               <div className="cd-tab-group">
                 {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
                 {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
-                {tab(`/projects/${projectId}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview')}
-                {tab(`/projects/${projectId}/preview/video`, 'Video', <Video size={15} />, 'nav-role-video', true)}
-                {tab(`/projects/${projectId}/preview/audio`, 'Audio', <Mic2 size={15} />, 'nav-role-audio', true)}
-                {tab(`/projects/${projectId}/preview/script`, 'Script', <FileText size={15} />, 'nav-role-script', true)}
-                {tab(`/projects/${projectId}/preview/thumbnail`, 'Thumbnail', <Image size={15} />, 'nav-role-thumbnail', true)}
+                {tab(`/projects/${projectId}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview', true)}
+                {tab(`/projects/${projectId}/role/video`, 'Video', <Video size={15} />, 'nav-role-video', true)}
+                {tab(`/projects/${projectId}/role/audio`, 'Audio', <Mic2 size={15} />, 'nav-role-audio', true)}
+                {tab(`/projects/${projectId}/role/script`, 'Script', <FileText size={15} />, 'nav-role-script', true)}
+                {tab(`/projects/${projectId}/role/thumbnail`, 'Thumbnail', <Image size={15} />, 'nav-role-thumbnail', true)}
               </div>
               <span className="cd-tab-divider" aria-hidden />
               <div className="cd-tab-group cd-tab-stages">

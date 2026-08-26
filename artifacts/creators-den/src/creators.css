@@ -2266,11 +2266,13 @@
 /* Script role page — the editor spans the whole row (no side cards). */
 .pv-script-top { grid-template-columns: 1fr; }
 
-/* Three zones: transcribe (left) · script name (centre) · import/export/save (right). */
+/* The role script desk head: transcribe (left) · name (centre) · save (right).
+   The preview script desk reuses the same head with just the eyebrow + save. */
 .pv-script-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: 10px 14px;
   padding: 13px 16px 0;
 }
