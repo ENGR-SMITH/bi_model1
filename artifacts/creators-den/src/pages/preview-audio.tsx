@@ -211,20 +211,12 @@ export default function AudioPreviewPage() {
 
   return (
     <PreviewLayout
-      main={
-        <>
-          <AudioCanvas
-            projectId={p.id}
-            version={selected ? { id: selected.id, leg: selected.leg, version: selected.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
-            assets={p.assets}
-          />
-          <VersionCarousel
-            versions={versions}
-            selectedId={selected?.id ?? null}
-            onSelect={setSelectedId}
-            emptyText="No sound versions saved yet — save a snapshot in the Sound studio first."
-          />
-        </>
+      canvas={
+        <AudioCanvas
+          projectId={p.id}
+          version={selected ? { id: selected.id, leg: selected.leg, version: selected.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+          assets={p.assets}
+        />
       }
       rail={
         <PreviewNotesPanel
@@ -232,6 +224,14 @@ export default function AudioPreviewPage() {
           legs={['SOUND']}
           timelineVersionId={selected?.id}
           composerLeg="SOUND"
+        />
+      }
+      versions={
+        <VersionCarousel
+          versions={versions}
+          selectedId={selected?.id ?? null}
+          onSelect={setSelectedId}
+          emptyText="No sound versions saved yet — save a snapshot in the Sound studio first."
         />
       }
     />

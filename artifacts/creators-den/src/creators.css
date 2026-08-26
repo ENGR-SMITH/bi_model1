@@ -1755,26 +1755,111 @@
   background: hsl(var(--muted) / .8);
 }
 
-/* ---- Two-column preview split ---- */
-.pv-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 22px;
-  align-items: start;
+/* ---- Full-screen preview grid ----
+   The page is a viewport-height column: a 60% / 40% top row (canvas | notes)
+   flexes to fill, and the timeline-versions row runs full-width beneath both
+   columns. */
+.pv-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* topnav (107) + presence strip (30) + this page's own vertical padding */
+  height: calc(100dvh - 107px - 30px - 40px);
+  min-height: 460px;
+  padding: 22px clamp(20px, 3vw, 40px) 18px;
+  overflow: hidden;
 }
-.pv-left {
+.pv-top {
+  flex: 1;
+  min-height: 0;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  display: grid;
+  grid-template-columns: 3fr 2fr; /* 60% / 40% */
+  gap: 16px;
 }
-.pv-right {
+.pv-canvas-col {
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  position: sticky;
-  top: 86px;
-  max-height: calc(100dvh - 110px);
+  gap: 16px;
+  overflow: hidden;
+}
+.pv-notes-col {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+.pv-versions-row {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+/* Canvas card flexes to fill its column; the media fills the box. */
+.pv-canvas-col > .pv-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pv-canvas-col > .pv-script {
+  flex: 1;
+  min-height: 0;
+}
+.pv-canvas-col .pv-stage-player {
+  flex: 1;
+  min-height: 0;
+}
+.pv-canvas-col .pv-stage-player .den-player {
+  flex: 1;
+  min-height: 0;
+}
+.pv-canvas-col .den-player video {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
+}
+.pv-canvas-col .den-marker-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+}
+.pv-canvas-col .thumbnail-stage {
+  height: 100%;
+  max-height: none;
+}
+.pv-canvas-col .thumbnail-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.pv-canvas-col .pv-wave-player {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pv-canvas-col .pv-wave {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.pv-canvas-col .pv-script-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Notes wall fills the right column and scrolls internally. */
+.pv-notes-col > .pv-notes {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -2070,8 +2155,19 @@
 
 /* ---- Preview responsive ---- */
 @media (max-width: 1240px) {
-  .pv-split { grid-template-columns: 1fr; }
-  .pv-right { position: static; max-height: none; overflow: visible; }
+  .pv-page { height: auto; min-height: 0; overflow: visible; }
+  .pv-top { grid-template-columns: 1fr; }
+  .pv-canvas-col, .pv-notes-col { overflow: visible; }
+  .pv-canvas-col > .pv-stage { flex: none; }
+  .pv-canvas-col > .pv-script { flex: none; min-height: 640px; }
+  .pv-canvas-col .pv-stage-player { flex: none; }
+  .pv-canvas-col .pv-stage-player .den-player { flex: none; }
+  .pv-canvas-col .den-player video { aspect-ratio: 16/9; height: auto; }
+  .pv-canvas-col .thumbnail-stage { height: auto; max-height: 60vh; }
+  .pv-canvas-col .pv-wave-player { flex: none; height: auto; }
+  .pv-canvas-col .pv-wave { height: 150px; flex: none; }
+  .pv-canvas-col .pv-script-area { min-height: 520px; overflow: visible; }
+  .pv-notes-col > .pv-notes { flex: none; overflow: visible; }
 }
 @media (max-width: 720px) {
   .pv-grid { grid-template-columns: 1fr; }

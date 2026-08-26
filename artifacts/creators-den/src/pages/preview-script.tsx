@@ -375,9 +375,9 @@ export default function ScriptPreviewPage() {
   const p = project.data;
 
   return (
-    <div className="page">
-      <div className="cd-watch">
-        <div className="cd-watch-main">
+    <div className="page pv-page">
+      <div className="pv-top">
+        <div className="pv-canvas-col">
           <div className="paper-card pv-script" data-testid="script-editor">
             <div className="pv-script-head">
               <div className="eyebrow">SCRIPT / DRAFT</div>
@@ -428,8 +428,7 @@ export default function ScriptPreviewPage() {
             </div>
           </div>
         </div>
-
-        <div className="cd-watch-rail">
+        <div className="pv-notes-col">
           <ImportRail projectId={p.id} onTranscript={insertTranscript} />
           {toast && (
             <p className="den-footnote mt-3" data-testid="script-toast">
