@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Image as ImageIcon, LockKeyhole, Play } from 'lucide-react';
+import { ArrowLeft, Image as ImageIcon, LockKeyhole } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
   getGetVideoTimelineVersionQueryKey,
@@ -29,8 +29,11 @@ import {
   type PreviewVersion,
 } from '@/components/preview-shared';
 
+const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
+
 // ---------------------------------------------------------------------------
 // ThumbnailCanvas — the design canvas for one selected THUMBNAIL version.
+// Falls back to the vault's processed design images when the version has none.
 // ---------------------------------------------------------------------------
 
 function ThumbnailCanvas({
@@ -40,37 +43,33 @@ function ThumbnailCanvas({
 }: {
   projectId: string;
   version: { id: string; version: number; snapshot: unknown } | null;
-  assets: Array<{ id: string; fileName: string }>;
+  assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
 
-  const snap = (version?.snapshot ?? null) as {
+  const snap = version ? ((version.snapshot ?? null) as {
     designs?: Array<{ id?: string; assetId: string; title?: string; style?: string }>;
-  } | null;
+  } | null) : null;
   const designs = Array.isArray(snap?.designs) ? snap!.designs! : [];
   const design = designs[0] ?? null;
-  const assetId = design?.assetId ?? '';
+
+  const fallback = useMemo(
+    () =>
+      assets.find((a) => IMAGE_KINDS.has(a.kind) && a.status === 'PROCESSED') ??
+      assets.find((a) => IMAGE_KINDS.has(a.kind)) ??
+      null,
+    [assets],
+  );
+  const assetId = design?.assetId || fallback?.id || '';
   const assetName = assets.find((a) => a.id === assetId)?.fileName ?? assetId.slice(0, 8);
   const stageTitle = [design?.title, design?.style].filter(Boolean).join(' · ') || assetName || 'Design preview';
-
-  if (!version) {
-    return (
-      <div className="paper-card pv-stage" data-testid="thumbnail-canvas">
-        <div className="inline-heading">
-          <span className="eyebrow"><Play size={13} /> Big canvas</span>
-        </div>
-        <EmptyPlayer className="mt-3">
-          <p className="text-sm font-semibold">No version selected yet.</p>
-        </EmptyPlayer>
-      </div>
-    );
-  }
 
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="thumbnail-canvas">
       <div className="inline-heading">
-        <span className="eyebrow"><ImageIcon size={13} /> Big canvas · THUMBNAIL v{version.version}</span>
-        {design && <span className="den-tag gold truncate">{design.title || assetName}</span>}
+        <span className="eyebrow"><ImageIcon size={13} /> Big canvas{version ? ` · THUMBNAIL v${version.version}` : ''}</span>
+        {assetId && <span className="den-tag gold truncate">{design?.title || assetName}</span>}
+        {!version && <span className="den-tag teal">vault preview</span>}
       </div>
       <div className="pv-stage-player mt-3">
         {assetId ? (
@@ -80,22 +79,26 @@ function ThumbnailCanvas({
               leg="THUMBNAIL"
               assetId={assetId}
               playheadMs={null}
-              timelineVersionId={version.id}
+              timelineVersionId={version?.id}
             />
           </ImageStage>
         ) : (
           <EmptyPlayer>
-            <p className="text-sm font-semibold">This version has no chosen design.</p>
-            <p className="text-xs opacity-70">Save a thumbnail snapshot with a chosen image to see it here.</p>
+            <p className="text-sm font-semibold">No thumbnail design in the vault yet.</p>
+            <p className="text-xs opacity-70">Add a design in the vault to preview it here.</p>
           </EmptyPlayer>
         )}
         <FullscreenButton targetRef={stageRef} />
       </div>
-      {design && (
+      {assetId && (
         <div className="cd-metarow mt-3">
           <span className="cd-metatext min-w-0">
-            <b className="truncate">{design.title || assetName}</b>
-            <small>{design.style ? `style · ${design.style}` : 'chosen design'} · {designs.length} design{designs.length === 1 ? '' : 's'} in v{version.version}</small>
+            <b className="truncate">{design?.title || assetName}</b>
+            <small>
+              {design
+                ? `${design.style ? `style · ${design.style} · ` : ''}${designs.length} design${designs.length === 1 ? '' : 's'} in v${version?.version ?? '—'}`
+                : 'no version saved yet — showing the vault design'}
+            </small>
           </span>
         </div>
       )}
