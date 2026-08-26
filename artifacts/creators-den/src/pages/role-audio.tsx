@@ -1,13 +1,12 @@
 // ---------------------------------------------------------------------------
 // Audio role page — the sound studio.
 //
-// Column one: a 3D coverflow shelf mixing the project's SOUND versions with
-// the vault's audio uploads — the active (latest) item sits centred at full
-// scale and full opacity. Column two, row 1: the big canvas — the selected
-// version's audio (or the picked vault file) plays as a wavelength bar view
-// with a red tick at the playhead; pins drop straight on the wave. Column
-// two, row 2: the upload card. Column three, row 1: the pin / comment wall;
-// row 2: the Sound Designer's oracle.
+// Column one: a vertical scrolling shelf mixing the project's SOUND versions
+// with the vault's audio uploads. Column two, row 1: the big canvas — the
+// selected version's audio (or the picked vault file) plays as a wavelength
+// bar view with a red tick at the playhead; pins drop straight on the wave.
+// Column two, row 2: the upload card. Column three, row 1: the pin / comment
+// wall; row 2: the Sound Designer's oracle.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -26,7 +25,7 @@ import {
 import { useProjectRealtime } from '@/lib/realtime';
 import { EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
-import { CoverflowCarousel, type CoverflowItem } from '@/components/coverflow';
+import { VersionShelf, type ShelfItem } from '@/components/version-shelf';
 import { formatTimecode } from '@/components/timeline';
 import {
   FullscreenButton,
@@ -66,7 +65,7 @@ function AudioCanvas({
   projectId: string;
   version: { id: string; leg: StudioLeg; version: number; snapshot: unknown } | null;
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
-  /** Explicit vault asset to preview (picked from the coverflow shelf). */
+  /** Explicit vault asset to preview (picked from the version shelf). */
   vaultAssetId?: string;
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
@@ -91,7 +90,7 @@ function AudioCanvas({
   );
   // Validate snapshot references against the vault so a stale/missing asset
   // falls back to real, playable audio. An explicitly picked vault file (from
-  // the coverflow) wins over everything.
+  // the shelf) wins over everything.
   const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : undefined;
   const firstValid = (id?: string) => (id && assets.some((a) => a.id === id) ? id : undefined);
   const assetId = explicitAsset ?? firstValid(clips[0]?.assetId) ?? firstValid(music[0]?.assetId) ?? firstValid(pickups[0]?.assetId) ?? fallback?.id ?? '';
@@ -191,7 +190,7 @@ export default function RoleAudioPage() {
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
 
   // Default to the newest version once the list arrives (unless a vault file
-  // has been picked from the coverflow shelf).
+  // has been picked from the version shelf).
   useEffect(() => {
     if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
   }, [versions, selectedId, vaultAssetId]);
@@ -208,10 +207,10 @@ export default function RoleAudioPage() {
   // canvas shows the picked file instead of the newest version's mix.
   const activeVersion = vaultAssetId ? null : selected;
 
-  // Coverflow shelf: SOUND versions (newest first) + the vault's audio uploads.
-  const coverflowItems = useMemo<CoverflowItem[]>(() => {
+  // Version shelf: SOUND versions (newest first) + the vault's audio uploads.
+  const shelfItems = useMemo<ShelfItem[]>(() => {
     const proj = project.data;
-    const versionItems: CoverflowItem[] = versions.map((v) => ({
+    const versionItems: ShelfItem[] = versions.map((v) => ({
       key: `version-${v.id}`,
       kind: 'version' as const,
       version: v.version,
@@ -220,7 +219,7 @@ export default function RoleAudioPage() {
       createdAt: v.createdAt,
       isHead: v.isHead,
     }));
-    const vaultItems: CoverflowItem[] = (proj?.assets ?? [])
+    const vaultItems: ShelfItem[] = (proj?.assets ?? [])
       .filter((a) => AUDIO_KINDS.has(a.kind))
       .map((a) => ({
         key: `asset-${a.id}`,
@@ -234,9 +233,9 @@ export default function RoleAudioPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [versions, project.data?.assets]);
 
-  const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : coverflowItems[0]?.key ?? null;
+  const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : shelfItems[0]?.key ?? null;
 
-  const onCoverflowSelect = (key: string) => {
+  const onShelfSelect = (key: string) => {
     if (key.startsWith('asset-')) {
       setVaultAssetId(key.slice('asset-'.length));
       setSelectedId(null);
@@ -313,10 +312,10 @@ export default function RoleAudioPage() {
   return (
     <RoleLayout
       versions={
-        <CoverflowCarousel
-          items={coverflowItems}
+        <VersionShelf
+          items={shelfItems}
           activeKey={activeKey}
-          onSelect={onCoverflowSelect}
+          onSelect={onShelfSelect}
           emptyText="No versions or vault files yet — save a snapshot in the Sound studio, or upload audio above."
         />
       }
