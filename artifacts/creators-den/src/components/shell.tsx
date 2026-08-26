@@ -236,30 +236,32 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           </div>
 
           {projectId && (
-            <nav className="cd-topnav-tabs" aria-label="Project sections">
-              <div className="cd-tab-group">
-                {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
-                {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
-              </div>
-              <span className="cd-tab-divider" aria-hidden />
-              <div className="cd-tab-group cd-tab-stages">
-                {RELAY_LEGS.map((leg) => {
-                  const href = `/projects/${projectId}/${leg.slug}`;
-                  return (
-                    <Link
-                      key={leg.leg}
-                      href={href}
-                      title={leg.role}
-                      className={`cd-tab ${location === href ? 'active' : ''}`}
-                      data-testid={`nav-leg-${leg.slug}`}
-                    >
-                      <span className="cd-tab-num">{leg.number}</span>
-                      <span>{leg.label}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </nav>
+            <div className="cd-topnav-deck">
+              <nav className="cd-topnav-tabs" aria-label="Project sections">
+                <div className="cd-tab-group">
+                  {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
+                  {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
+                </div>
+                <span className="cd-tab-divider" aria-hidden />
+                <div className="cd-tab-group cd-tab-stages">
+                  {RELAY_LEGS.map((leg) => {
+                    const href = `/projects/${projectId}/${leg.slug}`;
+                    return (
+                      <Link
+                        key={leg.leg}
+                        href={href}
+                        title={leg.role}
+                        className={`cd-tab ${location === href ? 'active' : ''}`}
+                        data-testid={`nav-leg-${leg.slug}`}
+                      >
+                        <span className="cd-tab-num">{leg.number}</span>
+                        <span>{leg.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </nav>
+            </div>
           )}
 
           <div className="cd-topnav-signout-col">

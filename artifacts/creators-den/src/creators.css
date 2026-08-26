@@ -1229,12 +1229,13 @@
 
 /* A chip is the column's fill shrink-wrapped to its content. The fill lives
    on a ::before so the workspace dropdown (and the tabs) are never clipped
-   by the cut. The bottom border is the row's baseline — a clear, quiet line,
-   drawn only under the chips so the gaps stay clean. */
+   by the cut. The row's baseline is a soft 2px line along each chip's bottom
+   and sides — the same line everywhere — drawn only on the chips so the gaps
+   stay clean. Lines fade gently where they meet the cut corners or the open
+   top edge. */
 .cd-topnav-chip {
   position: relative; isolation: isolate;
   display: flex; align-items: center;
-  border-bottom: 2px solid hsl(var(--foreground) / .5);
 }
 .cd-topnav-chip::before {
   content: "";
@@ -1243,21 +1244,64 @@
 }
 .cd-topnav-workspace-col .cd-topnav-chip::before {
   clip-path: polygon(0 0, calc(100% - var(--sp-3)) 0, 100% 100%, 0 100%);
+  background:
+    linear-gradient(90deg, hsl(var(--foreground) / .4) 0, hsl(var(--foreground) / .4) calc(100% - var(--sp-3)), transparent 100%) bottom / 100% 2px no-repeat,
+    linear-gradient(180deg, transparent 0, hsl(var(--foreground) / .4) 18%, hsl(var(--foreground) / .4) 100%) left / 2px 100% no-repeat,
+    hsl(var(--card) / .35);
 }
 .cd-topnav-signout-col .cd-topnav-chip::before {
   clip-path: polygon(0 0, 100% 0, 100% 100%, var(--sp-3) 100%);
+  background:
+    linear-gradient(90deg, transparent 0, hsl(var(--foreground) / .4) var(--sp-3), hsl(var(--foreground) / .4) 100%) bottom / 100% 2px no-repeat,
+    linear-gradient(180deg, transparent 0, hsl(var(--foreground) / .4) 18%, hsl(var(--foreground) / .4) 100%) right / 2px 100% no-repeat,
+    hsl(var(--card) / .35);
+}
+
+/* The slanted cut edges get the same line, rotated to follow the
+   12px-over-46px slant, fading at both ends. */
+.cd-topnav-chip::after {
+  content: "";
+  position: absolute; top: 0;
+  width: 2px; height: 47.5px;     /* √(46² + 12²) — the slant's true length */
+  background: linear-gradient(180deg, transparent 0, hsl(var(--foreground) / .4) 25%, hsl(var(--foreground) / .4) 75%, transparent 100%);
+  transform-origin: top left;
+}
+.cd-topnav-workspace-col .cd-topnav-chip::after {
+  left: calc(100% - var(--sp-3));
+  transform: rotate(14.6deg);     /* lean down-right along the cut */
+}
+.cd-topnav-signout-col .cd-topnav-chip::after {
+  left: var(--sp-3);
+  transform: rotate(-14.6deg);
 }
 
 /* The relay deck — the middle chip with cut ends on both sides. The fill and
-   clip live on the nav itself: background-attachment: scroll keeps the fill
-   put while the tabs scroll, and the clip is on the nav's box. Its bottom
-   border is the row's baseline — clear and quiet, like the side chips. */
-.cd-topnav-tabs {
+   clip live on the nav itself (background-attachment: scroll keeps the fill
+   put while the tabs scroll); the wrapper carries the two slanted side lines
+   because the nav's clip-path would cut them off. */
+.cd-topnav-deck {
   grid-column: 2;
+  position: relative;
+  display: flex; align-items: stretch;
+  min-width: 0; max-width: 100%;
+}
+.cd-topnav-deck::before,
+.cd-topnav-deck::after {
+  content: "";
+  position: absolute; top: 0;
+  width: 2px; height: 47.5px;
+  background: linear-gradient(180deg, transparent 0, hsl(var(--foreground) / .4) 25%, hsl(var(--foreground) / .4) 75%, transparent 100%);
+  transform-origin: top left;
+}
+.cd-topnav-deck::before { left: var(--sp-3); transform: rotate(-14.6deg); }
+.cd-topnav-deck::after { right: var(--sp-3); transform-origin: top right; transform: rotate(14.6deg); }
+
+.cd-topnav-tabs {
   display: flex; align-items: stretch; gap: var(--sp-2);
   min-width: 0; max-width: 100%;
-  background: hsl(var(--card) / .35);
-  border-bottom: 2px solid hsl(var(--foreground) / .5);
+  background:
+    linear-gradient(90deg, transparent 0, hsl(var(--foreground) / .4) var(--sp-3), hsl(var(--foreground) / .4) calc(100% - var(--sp-3)), transparent 100%) bottom / 100% 2px no-repeat,
+    hsl(var(--card) / .35);
   clip-path: polygon(0 0, calc(100% - var(--sp-3)) 0, 100% 100%, var(--sp-3) 100%);
   overflow-x: auto;               /* horizontal scroll when tabs outrun the width */
   scrollbar-width: none;
