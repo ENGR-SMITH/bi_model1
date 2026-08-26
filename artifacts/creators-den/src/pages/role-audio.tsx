@@ -138,6 +138,8 @@ function AudioCanvas({
             onPlayheadChange={onSeek}
             markers={markers}
           >
+            {/* Review pins still render; the Annotate button is intentionally
+                off here — pins are managed from the preview studios instead. */}
             <AnnotationCanvas
               projectId={projectId}
               leg={version?.leg ?? 'SOUND'}
@@ -145,6 +147,7 @@ function AudioCanvas({
               playheadMs={playheadMs}
               onSeek={onSeek}
               timelineVersionId={version?.id}
+              canAnnotate={false}
             />
             <FullscreenButton targetRef={stageRef} />
           </WaveformPlayer>

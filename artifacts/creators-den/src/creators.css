@@ -2134,10 +2134,12 @@
   font: 9px var(--app-font-mono);
 }
 
-/* ---- Version & vault shelf (role column 1) ----
-   A vertical scrolling carousel: the leg's timeline versions + the vault's
-   uploads stacked as rows, with up/down arrows nudging the track. Versions
-   reuse the .pv-version-row styling; uploads add a proxy thumbnail chip. */
+/* ---- Version & vault vertical coverflow (role column 1) ----
+   The leg's timeline versions + the vault's uploads stack vertically in 3D:
+   the active (latest) item sits at the vertical focal point at full scale
+   and full opacity, while neighbours above and below recede with a rotateX +
+   translateZ tilt and fade towards the edges. Scroll or use the arrows to
+   bring any item to the focal point. */
 .vs-wrap {
   flex: 1;
   min-height: 0;
@@ -2161,19 +2163,81 @@
 }
 .vs-arrow:hover { border-color: hsl(var(--accent)); color: hsl(var(--accent)); }
 .vs-track {
+  position: relative;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding-right: 6px;
+  align-items: center;
+  gap: 6px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-snap-type: y proximity;
+  scrollbar-width: thin;
+  padding: 50% 4px;
+  perspective: 700px;
+}
+.vs-item {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 148px;
+  scroll-snap-align: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9px;
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-sm), var(--edge-hi);
+  color: hsl(var(--foreground));
+  text-align: left;
+  cursor: pointer;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  transition: transform .22s ease, opacity .22s ease, border-color .15s, box-shadow .15s;
+}
+.vs-item:hover { border-color: hsl(var(--accent) / .6); }
+.vs-item.active {
+  border-color: hsl(var(--accent));
+  box-shadow: 0 0 0 1px hsl(var(--accent) / .45), var(--shadow-md);
+}
+.vs-item-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.vs-leg {
+  font: 700 9px var(--app-font-mono);
+  letter-spacing: .08em;
+  color: hsl(var(--muted-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vs-title {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vs-title.muted { color: hsl(var(--muted-foreground)); font-style: italic; }
+.vs-meta {
+  color: hsl(var(--muted-foreground));
+  font: 9px var(--app-font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .vs-thumb {
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
-  border-radius: 7px;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -2262,6 +2326,10 @@
   border-radius: 9px;
   background: hsl(var(--secondary) / .4);
   overflow: hidden;
+}
+.pv-note-pin.is-resolved {
+  border-color: hsl(150 52% 42% / .55);
+  background: hsl(150 52% 42% / .06);
 }
 .pv-note-pin-head {
   display: flex;
@@ -2596,7 +2664,7 @@
   /* The version shelf, upload card and oracle get explicit heights when the
      grid stacks into one column. */
   .vs-wrap { flex: none; }
-  .vs-track { max-height: 300px; }
+  .vs-track { max-height: 340px; padding: 12px 4px; }
   .role-upload-card { min-height: 210px; }
   .role-notes-bar .den-oracle { height: 480px; }
 }

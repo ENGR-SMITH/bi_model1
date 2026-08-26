@@ -1,12 +1,13 @@
 // ---------------------------------------------------------------------------
-// VersionShelf — the first column of a role page. A vertical scrolling
+// VersionShelf — the first column of a role page. A vertical 3D coverflow
 // carousel that stacks the leg's timeline versions together with the vault's
-// uploads as rows (versions show v-tag + leg + message, uploads show a proxy
-// thumbnail + kind). The active item is highlighted and kept in view; the
-// up/down arrows nudge the track, and the wheel/trackbar scroll as usual.
+// uploads. The active (latest) item sits at the vertical focal point — full
+// scale, full opacity — while neighbours above and below recede with a
+// rotateX + translateZ tilt and fade towards the edges. Scrolling (wheel,
+// drag, trackbar) or the up/down arrows bring any item to the focal point.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronUp, Clock3, FileVideo2, Image as ImageIcon, Mic2 } from 'lucide-react';
 
 export type ShelfItem =
@@ -37,25 +38,87 @@ export function VersionShelf({
   emptyText,
 }: {
   items: ShelfItem[];
-  /** The currently-active item's key (highlighted + kept in view). */
+  /** The currently-active item's key (held at the focal point). */
   activeKey: string | null;
   onSelect: (key: string) => void;
   emptyText: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number | null>(null);
 
-  // Keep the active item in view whenever it changes (initial + selection).
+  // Each card's 3D pose is a function of its distance from the track's
+  // vertical centre — the centred card is scale(1) / opacity(1), the cards
+  // above and below fan away with a rotateX + translateZ tilt.
+  const applyTransforms = useCallback(() => {
+    const container = trackRef.current;
+    if (!container) return;
+    const center = container.clientHeight / 2;
+    for (const child of Array.from(container.children) as HTMLElement[]) {
+      const itemCenter = child.offsetTop + child.offsetHeight / 2 - container.scrollTop;
+      const dist = itemCenter - center;
+      const ratio = dist / (container.clientHeight * 0.5);
+      const abs = Math.min(1, Math.abs(ratio));
+      child.style.transform =
+        `translateY(${dist * 0.16}px) translateZ(${-abs * 70}px) rotateX(${ratio * 26}deg) scale(${1 - abs * 0.24})`;
+      child.style.opacity = String(1 - abs * 0.55);
+      child.style.zIndex = String(Math.round(100 - abs * 90));
+    }
+  }, []);
+
+  // Re-pose on scroll (rAF-throttled) and whenever the shelf changes size.
   useEffect(() => {
     const container = trackRef.current;
     if (!container) return;
-    const el = Array.from(container.children).find((child) => (child as HTMLElement).dataset.key === activeKey) as HTMLElement | null;
-    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const onScroll = () => {
+      if (rafRef.current != null) return;
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        applyTransforms();
+      });
+    };
+    container.addEventListener('scroll', onScroll, { passive: true });
+    applyTransforms();
+    const observer = new ResizeObserver(() => applyTransforms());
+    observer.observe(container);
+    return () => {
+      container.removeEventListener('scroll', onScroll);
+      observer.disconnect();
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [applyTransforms, items.length]);
+
+  const scrollToKey = (key: string) => {
+    const container = trackRef.current;
+    if (!container) return;
+    const el = Array.from(container.children).find((child) => (child as HTMLElement).dataset.key === key) as HTMLElement | null;
+    if (!el) return;
+    container.scrollTo({ top: el.offsetTop - (container.clientHeight - el.offsetHeight) / 2, behavior: 'smooth' });
+  };
+
+  // Keep the active item pinned at the focal point whenever it changes.
+  useEffect(() => {
+    if (activeKey) scrollToKey(activeKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey]);
 
-  const scrollBy = (dir: 1 | -1) => {
-    const el = trackRef.current;
-    if (!el) return;
-    el.scrollBy({ top: dir * 120, behavior: 'smooth' });
+  const step = (dir: 1 | -1) => {
+    const container = trackRef.current;
+    if (!container) return;
+    const children = Array.from(container.children) as HTMLElement[];
+    if (children.length === 0) return;
+    const center = container.clientHeight / 2;
+    let nearestIndex = 0;
+    let nearestDist = Infinity;
+    children.forEach((child, index) => {
+      const itemCenter = child.offsetTop + child.offsetHeight / 2 - container.scrollTop;
+      const dist = Math.abs(itemCenter - center);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestIndex = index;
+      }
+    });
+    const target = children[Math.min(children.length - 1, Math.max(0, nearestIndex + dir))];
+    container.scrollTo({ top: target.offsetTop - (container.clientHeight - target.offsetHeight) / 2, behavior: 'smooth' });
   };
 
   return (
@@ -68,7 +131,7 @@ export function VersionShelf({
         <p className="setting-copy mt-2" data-testid="version-shelf-empty">{emptyText}</p>
       ) : (
         <div className="vs-wrap">
-          <button type="button" className="vs-arrow" onClick={() => scrollBy(-1)} aria-label="Earlier items" data-testid="shelf-prev">
+          <button type="button" className="vs-arrow" onClick={() => step(-1)} aria-label="Earlier items" data-testid="shelf-prev">
             <ChevronUp size={14} />
           </button>
           <div className="vs-track" ref={trackRef} data-testid="version-shelf-track">
@@ -79,25 +142,25 @@ export function VersionShelf({
                   key={item.key}
                   type="button"
                   data-key={item.key}
-                  className={`pv-version-row ${active ? 'active' : ''}`}
+                  className={`vs-item ${active ? 'active' : ''}`}
                   onClick={() => onSelect(item.key)}
                   data-testid={`shelf-item-${item.key}`}
                 >
                   {item.kind === 'version' ? (
                     <>
-                      <span className="pv-version-row-head">
+                      <span className="vs-item-head">
                         <span className="den-tag accent">v{item.version}</span>
-                        <span className="pv-version-leg">{item.leg}</span>
+                        <span className="vs-leg">{item.leg}</span>
                         {item.isHead && <span className="den-tag teal">head</span>}
                       </span>
-                      {item.message ? <b className="pv-version-msg truncate">{item.message}</b> : <b className="pv-version-msg muted">no message</b>}
-                      <span className="pv-version-date">
+                      <span className={`vs-title ${item.message ? '' : 'muted'}`}>{item.message || 'no message'}</span>
+                      <span className="vs-meta">
                         {new Date(item.createdAt).toLocaleDateString()} · {new Date(item.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                       </span>
                     </>
                   ) : (
                     <>
-                      <span className="pv-version-row-head">
+                      <span className="vs-item-head">
                         <span className="vs-thumb">
                           {item.thumbUrl && item.media !== 'audio' ? (
                             item.media === 'image' ? (
@@ -116,18 +179,18 @@ export function VersionShelf({
                             item.media === 'audio' ? <Mic2 size={15} /> : item.media === 'image' ? <ImageIcon size={15} /> : <FileVideo2 size={15} />
                           )}
                         </span>
-                        <span className="pv-version-leg">{item.kindLabel}</span>
+                        <span className="vs-leg">{item.kindLabel}</span>
                         {item.status !== 'PROCESSED' && <span className="den-tag gold">processing</span>}
                       </span>
-                      <b className="pv-version-msg truncate">{item.fileName}</b>
-                      <span className="pv-version-date">{item.status === 'PROCESSED' ? 'in the vault' : 'processing…'}</span>
+                      <span className="vs-title">{item.fileName}</span>
+                      <span className="vs-meta">{item.status === 'PROCESSED' ? 'in the vault' : 'processing…'}</span>
                     </>
                   )}
                 </button>
               );
             })}
           </div>
-          <button type="button" className="vs-arrow" onClick={() => scrollBy(1)} aria-label="Later items" data-testid="shelf-next">
+          <button type="button" className="vs-arrow" onClick={() => step(1)} aria-label="Later items" data-testid="shelf-next">
             <ChevronDown size={14} />
           </button>
         </div>
