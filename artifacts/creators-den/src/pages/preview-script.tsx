@@ -111,6 +111,14 @@ export default function ScriptPreviewPage() {
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
 
+  // Restore the saved script into the view-only editor on mount — the html
+  // state comes from localStorage but is only ever rendered here.
+  useEffect(() => {
+    const el = editorRef.current;
+    if (el && html) el.innerHTML = html;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Draw every script comment's highlighted passage into the editor, keeping
   // marks that were already saved in the html (idempotent).
   useEffect(() => {
