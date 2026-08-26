@@ -234,7 +234,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           </div>
 
           {projectId && (
-            <div className="cd-topnav-deck">
+            <>
               <span className="cd-topnav-divider" aria-hidden />
               <nav className="cd-topnav-tabs" aria-label="Project sections">
                 <div className="cd-tab-group">
@@ -261,7 +261,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 </div>
               </nav>
               <span className="cd-topnav-divider" aria-hidden />
-            </div>
+            </>
           )}
 
           <div className="cd-topnav-signout-col">
