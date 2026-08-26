@@ -28,9 +28,11 @@ import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { formatTimecode } from '@/components/timeline';
 import {
   FullscreenButton,
-  PreviewLayout,
   PreviewNotesPanel,
-  VersionCarousel,
+  RoleDownloadBar,
+  RoleLayout,
+  RoleUploadBar,
+  VersionList,
   type PreviewVersion,
 } from '@/components/preview-shared';
 import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
@@ -38,6 +40,15 @@ import type { StudioLeg } from '@/components/role-oracle';
 
 const VIDEO_LEGS: StudioLeg[] = ['SELECTS', 'CUT'];
 const VIDEO_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE']);
+
+// This role page accepts video files only — the accept list and the client
+// check below reject anything else (no audio / image / script files here).
+const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.m4v,.mkv,.webm,.avi,.mpg,.mpeg';
+const VIDEO_FILE_RE = /\.(mp4|mov|m4v|mkv|webm|avi|mpg|mpeg)$/i;
+const checkVideoFile = (file: File): string | null =>
+  file.type.startsWith('video/') || VIDEO_FILE_RE.test(file.name)
+    ? null
+    : 'Only video files can be uploaded here (.mp4, .mov, .webm, .mkv, .avi).';
 
 // ---------------------------------------------------------------------------
 // VideoCanvas — the big canvas for one selected version. When the version has
@@ -216,8 +227,24 @@ export default function VideoPreviewPage() {
 
   const p = project.data;
 
+  // The file shown in the player — the selected version's first clip when it
+  // still exists in the vault, otherwise the first playable video asset.
+  const versionSnap = (selectedDetail.data?.snapshot ?? null) as TimelineSnapshotLike | null;
+  const versionClips = Array.isArray(versionSnap?.clips) ? versionSnap!.clips! : [];
+  const firstClipAsset = versionClips[0]?.assetId;
+  const vaultVideo = p.assets.find((a) => VIDEO_KINDS.has(a.kind) && a.status === 'PROCESSED') ?? p.assets.find((a) => VIDEO_KINDS.has(a.kind)) ?? null;
+  const downloadAssetId = (firstClipAsset && p.assets.some((a) => a.id === firstClipAsset) ? firstClipAsset : '') || vaultVideo?.id || '';
+
   return (
-    <PreviewLayout
+    <RoleLayout
+      versions={
+        <VersionList
+          versions={versions}
+          selectedId={selected?.id ?? null}
+          onSelect={setSelectedId}
+          emptyText="No selects or cut versions saved yet — save a snapshot in the Selects or Cut studio first."
+        />
+      }
       canvas={
         <VideoCanvas
           projectId={p.id}
@@ -225,19 +252,17 @@ export default function VideoPreviewPage() {
           assets={p.assets}
         />
       }
-      rail={
+      download={
+        <RoleDownloadBar projectId={p.id} assetId={downloadAssetId} label="video file" released={p.status === 'RELEASED'} />
+      }
+      notes={
         <PreviewNotesPanel
           projectId={p.id}
           legs={VIDEO_LEGS}
         />
       }
-      versions={
-        <VersionCarousel
-          versions={versions}
-          selectedId={selected?.id ?? null}
-          onSelect={setSelectedId}
-          emptyText="No selects or cut versions saved yet — save a snapshot in the Selects or Cut studio first."
-        />
+      upload={
+        <RoleUploadBar projectId={p.id} label="video file" accept={VIDEO_ACCEPT} kind="RAW_VIDEO" checkFormat={checkVideoFile} />
       }
     />
   );

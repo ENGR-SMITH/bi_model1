@@ -17,6 +17,8 @@ import {
   Check,
   Eraser,
   FileAudio,
+  FileDown,
+  FileUp,
   FileVideo2,
   Heading1,
   Heading2,
@@ -47,6 +49,12 @@ import { formatTimecode } from '@/components/timeline';
 
 const stripHtml = (value: string): string =>
   value.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+
+// This page only ever imports/exports script files (.txt / .md) — no media.
+const SCRIPT_ACCEPT = '.txt,.md,.markdown';
+const SCRIPT_FILE_RE = /\.(txt|md|markdown)$/i;
+const checkScriptFile = (file: File): string | null =>
+  SCRIPT_FILE_RE.test(file.name) ? null : 'Only script files can be imported here (.txt, .md).';
 
 const words = (value: string): number => {
   const text = stripHtml(value);
@@ -283,6 +291,7 @@ export default function ScriptPreviewPage() {
   const project = useGetVideoProject(projectId);
   const editorRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<number | null>(null);
+  const scriptFileRef = useRef<HTMLInputElement>(null);
 
   const [html, setHtml] = useState<string>(() => {
     try {
@@ -324,6 +333,46 @@ export default function ScriptPreviewPage() {
 
   const onEditorInput = () => {
     setHtml(editorRef.current?.innerHTML ?? '');
+  };
+
+  const onImportScriptFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (scriptFileRef.current) scriptFileRef.current.value = '';
+    const invalid = checkScriptFile(file);
+    if (invalid) {
+      setToast(invalid);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result ?? '');
+      const el = editorRef.current;
+      if (!el) return;
+      const frag = document.createElement('div');
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) continue;
+        const paragraph = document.createElement('p');
+        paragraph.textContent = line;
+        frag.appendChild(paragraph);
+      }
+      el.appendChild(frag);
+      setHtml(el.innerHTML);
+      setToast(`Imported ${file.name} into the script.`);
+    };
+    reader.readAsText(file);
+  };
+
+  const exportScript = (format: 'txt' | 'md') => {
+    const text = editorRef.current?.innerText ?? stripHtml(html);
+    const blob = new Blob([text], { type: format === 'md' ? 'text/markdown;charset=utf-8' : 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `script.${format}`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setToast(`Exported the script as ${format === 'md' ? 'Markdown' : 'text'} (${count.words} words).`);
   };
 
   const insertTranscript = (segments: VideoTranscriptSegment[], fileName: string) => {
@@ -381,8 +430,24 @@ export default function ScriptPreviewPage() {
           <div className="paper-card pv-script" data-testid="script-editor">
             <div className="pv-script-head">
               <div className="eyebrow">SCRIPT / DRAFT</div>
-              <span className={`save-indicator ${saved ? '' : 'dirty'}`} data-testid="script-save-state">
-                <span className="pulse-dot" /> {saved ? 'Autosaved' : 'Saving…'}
+              <span className="flex items-center gap-2">
+                <input
+                  ref={scriptFileRef}
+                  type="file"
+                  accept={SCRIPT_ACCEPT}
+                  onChange={onImportScriptFile}
+                  className="hidden"
+                  data-testid="script-import-file"
+                />
+                <button type="button" className="secondary-btn !px-3 !py-1.5 !text-xs" onClick={() => scriptFileRef.current?.click()} data-testid="script-import-btn">
+                  <FileUp size={13} /> Import script
+                </button>
+                <button type="button" className="secondary-btn !px-3 !py-1.5 !text-xs" onClick={() => exportScript('md')} data-testid="script-export-btn">
+                  <FileDown size={13} /> Export
+                </button>
+                <span className={`save-indicator ${saved ? '' : 'dirty'}`} data-testid="script-save-state">
+                  <span className="pulse-dot" /> {saved ? 'Autosaved' : 'Saving…'}
+                </span>
               </span>
             </div>
             <div className="pv-toolbar" data-testid="script-toolbar">

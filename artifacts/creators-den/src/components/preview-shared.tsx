@@ -22,15 +22,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Download,
+  LockKeyhole,
   Maximize,
   MessageSquare,
   Minimize,
   Pin,
   Play,
+  Upload,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  getDownloadVideoFileUrl,
+  getGetVideoProjectQueryKey,
   getListVideoCommentsQueryKey,
+  getUploadVideoAssetUrl,
   useListVideoComments,
   useResolveVideoComment,
 } from '@workspace/api-client-react';
@@ -136,6 +142,251 @@ export function VersionCarousel({
             <ChevronRight size={16} />
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RoleLayout — the four role pages (Video / Audio / Script / Thumbnail).
+// Three columns at 10 : 50 : 40, with the second and third columns split into
+// two rows at 80 : 20. Column one (the version list) spans the full height;
+// the bottom rows of columns two and three hold the download and upload bars.
+// ---------------------------------------------------------------------------
+
+export function RoleLayout({
+  versions,
+  canvas,
+  download,
+  notes,
+  upload,
+}: {
+  versions: ReactNode;
+  canvas: ReactNode;
+  download: ReactNode;
+  notes: ReactNode;
+  upload: ReactNode;
+}) {
+  return (
+    <div className="page pv-page role-page" data-testid="role-page">
+      <div className="role-grid">
+        <div className="role-versions-col">{versions}</div>
+        <div className="role-canvas-main">{canvas}</div>
+        <div className="role-canvas-bar">{download}</div>
+        <div className="role-notes-main">{notes}</div>
+        <div className="role-notes-bar">{upload}</div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// VersionList — the first column of a role page: a single scrollable vertical
+// list of the project's timeline versions, labelled with their relay leg.
+// ---------------------------------------------------------------------------
+
+export function VersionList({
+  versions,
+  selectedId,
+  onSelect,
+  emptyText,
+}: {
+  versions: PreviewVersion[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  emptyText: string;
+}) {
+  return (
+    <div className="paper-card pv-versions-list" data-testid="version-list">
+      <div className="inline-heading">
+        <span className="eyebrow"><Clock3 size={13} /> Timeline versions</span>
+        <span className="mono-label">{versions.length} saved</span>
+      </div>
+      {versions.length === 0 ? (
+        <p className="setting-copy mt-2" data-testid="version-list-empty">{emptyText}</p>
+      ) : (
+        <div className="pv-versions-list-track" data-testid="version-list-track">
+          {versions.map((version) => {
+            const active = version.id === selectedId;
+            return (
+              <button
+                key={version.id}
+                type="button"
+                className={`pv-version-row ${active ? 'active' : ''}`}
+                onClick={() => onSelect(version.id)}
+                data-testid={`version-row-${version.leg}-${version.version}`}
+              >
+                <span className="pv-version-row-head">
+                  <span className="den-tag accent">v{version.version}</span>
+                  <span className="pv-version-leg">{version.leg}</span>
+                  {version.isHead && <span className="den-tag teal">head</span>}
+                </span>
+                {version.message ? <b className="pv-version-msg truncate">{version.message}</b> : <b className="pv-version-msg muted">no message</b>}
+                <span className="pv-version-date">{new Date(version.createdAt).toLocaleDateString()} · {new Date(version.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RoleDownloadBar — the bottom row of the canvas column: download the file
+// currently shown in the player (role-appropriate by construction — it is the
+// asset already playing). Mirrors the vault's Lock: only once the project is
+// released (or a grant covers the file) does the server stream the original.
+// ---------------------------------------------------------------------------
+
+export function RoleDownloadBar({
+  projectId,
+  assetId,
+  label,
+  released,
+}: {
+  projectId: string;
+  assetId: string;
+  /** e.g. "video file" / "audio file" / "thumbnail design". */
+  label: string;
+  released: boolean;
+}) {
+  return (
+    <div className="paper-card role-bar" data-testid="role-download">
+      <span className="eyebrow"><Download size={13} /> Download {label}</span>
+      {assetId ? (
+        released ? (
+          <a href={getDownloadVideoFileUrl(projectId, assetId)} download className="secondary-btn" data-testid="role-download-link">
+            <Download size={13} /> Download
+          </a>
+        ) : (
+          <span className="den-tag teal" title="Downloads open once the Captain approves the final master"><LockKeyhole size={10} /> Locked</span>
+        )
+      ) : (
+        <span className="mono-label">Nothing to download yet</span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RoleUploadBar — the bottom row of the notes column: upload the role's file
+// format only (enforced by the accept list AND a client-side format check, so
+// a video can never be dropped on the thumbnail page and vice versa). The file
+// joins the vault under the role's asset kind.
+// ---------------------------------------------------------------------------
+
+export function RoleUploadBar({
+  projectId,
+  label,
+  accept,
+  kind,
+  checkFormat,
+}: {
+  projectId: string;
+  /** e.g. "video file" / "audio file" / "thumbnail design". */
+  label: string;
+  /** <input accept> — the allowed extensions/mime types. */
+  accept: string;
+  /** Vault asset kind the uploaded file is stored as (RAW_VIDEO, RAW_AUDIO, THUMBNAIL_DESIGN). */
+  kind: string;
+  /** Client-side format guard — returns an error message for a disallowed file. */
+  checkFormat: (file: File) => string | null;
+}) {
+  const queryClient = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'uploading' | 'done'>('idle');
+  const [progress, setProgress] = useState(0);
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(
+    () => () => {
+      xhrRef.current?.abort();
+    },
+    [],
+  );
+
+  const startUpload = (file: File) => {
+    const invalid = checkFormat(file);
+    if (invalid) {
+      setError(invalid);
+      return;
+    }
+    setError('');
+    setName(file.name);
+    setProgress(0);
+    setPhase('uploading');
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('kind', kind);
+
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+    xhr.open('POST', getUploadVideoAssetUrl(projectId));
+    xhr.upload.onprogress = (progressEvent) => {
+      if (progressEvent.lengthComputable && progressEvent.total > 0) {
+        setProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      xhrRef.current = null;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        setPhase('done');
+        queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+        if (fileRef.current) fileRef.current.value = '';
+      } else {
+        let message = 'The upload failed. Try once more.';
+        try {
+          const data = JSON.parse(xhr.responseText) as { error?: string };
+          if (typeof data?.error === 'string') message = data.error;
+        } catch {
+          // Non-JSON body — keep the generic message.
+        }
+        setPhase('idle');
+        setError(message);
+      }
+    };
+    xhr.onerror = () => {
+      xhrRef.current = null;
+      setPhase('idle');
+      setError('The upload was interrupted — your connection dropped.');
+    };
+    xhr.send(formData);
+  };
+
+  const cancel = () => {
+    xhrRef.current?.abort();
+    xhrRef.current = null;
+    setPhase('idle');
+    setProgress(0);
+  };
+
+  const onPickFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    startUpload(file);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  return (
+    <div className="paper-card role-bar" data-testid="role-upload">
+      <span className="eyebrow"><Upload size={13} /> Upload {label}</span>
+      <input ref={fileRef} type="file" accept={accept} onChange={onPickFile} disabled={phase === 'uploading'} data-testid="role-upload-input" />
+      {phase === 'uploading' && (
+        <span className="role-bar-progress" data-testid="role-upload-progress">
+          <span className="den-upload-progress-bar"><span style={{ width: `${progress}%` }} /></span>
+          <b>{progress}%</b>
+          <button type="button" onClick={cancel} className="den-upload-cancel">Cancel</button>
+        </span>
+      )}
+      {phase === 'done' && (
+        <span className="den-footnote"><Check size={12} /> <b className="truncate">{name}</b> is in the vault</span>
+      )}
+      {phase === 'idle' && error && (
+        <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }}>{error}</span>
       )}
     </div>
   );
