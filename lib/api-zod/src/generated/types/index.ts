@@ -79,6 +79,8 @@ export * from './videoAssetUploadInput';
 export * from './videoAssetUploadInputKind';
 export * from './videoAudioPassInput';
 export * from './videoAudioPassInputAction';
+export * from './videoChatMessage';
+export * from './videoChatMessageInput';
 export * from './videoCheckoutBundleStatus';
 export * from './videoCheckoutExportInput';
 export * from './videoCheckoutExportResponse';

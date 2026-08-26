@@ -29,6 +29,7 @@ import {
   getGetVideoReferenceQueryKey,
   getGetVideoTimelineQueryKey,
   getListVideoActivityQueryKey,
+  getListVideoChatMessagesQueryKey,
   getListVideoCommentsQueryKey,
   getListVideoTimelineVersionsQueryKey,
   getListVideoDownloadsQueryKey,
@@ -130,6 +131,10 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
       if (payload.projectId !== projectId) return;
       invalidate([getListVideoCommentsQueryKey(projectId)]);
     };
+    const onChat = (payload: { projectId: string }) => {
+      if (payload.projectId !== projectId) return;
+      invalidate([getListVideoChatMessagesQueryKey(projectId)]);
+    };
     const onSubmission = (payload: { projectId: string }) => {
       if (payload.projectId !== projectId) return;
       invalidate([
@@ -164,6 +169,7 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
     };
 
     socket.on('job.progress', onJob);
+    socket.on('chat.new', onChat);
     socket.on('comment.new', onComment);
     socket.on('comment.updated', onComment);
     socket.on('submission.new', onSubmission);
@@ -176,6 +182,7 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
 
     return () => {
       socket.off('job.progress', onJob);
+      socket.off('chat.new', onChat);
       socket.off('comment.new', onComment);
       socket.off('comment.updated', onComment);
       socket.off('submission.new', onSubmission);

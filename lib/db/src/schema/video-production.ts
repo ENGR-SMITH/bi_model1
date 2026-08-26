@@ -131,6 +131,17 @@ export const tandemVideoSubmissionsTable = pgTable("tandem_video_submissions", {
 // PIN / HIGHLIGHT / MARK annotations; `color` + `label` identify the reviewer
 // on a shared canvas; `submissionId` / `timelineVersionId` scope the comment
 // to a specific review (PR) or version.
+// Project-wide chat: one row per message, visible to every active member of
+// the project (the Captain, the leg owners, and reviewers). Lightweight and
+// intentionally freeform — this is the crew room, not an annotation system.
+export const tandemVideoChatMessagesTable = pgTable("tandem_video_chat_messages", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  authorId: text("author_id").notNull(),
+  body: text("body").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const tandemVideoCommentsTable = pgTable("tandem_video_comments", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
@@ -271,6 +282,7 @@ export const insertTandemVideoTranscriptSegmentSchema = createInsertSchema(tande
 export const insertTandemVideoTimelineSchema = createInsertSchema(tandemVideoTimelinesTable);
 export const insertTandemVideoTimelineVersionSchema = createInsertSchema(tandemVideoTimelineVersionsTable);
 export const insertTandemVideoSubmissionSchema = createInsertSchema(tandemVideoSubmissionsTable);
+export const insertTandemVideoChatMessageSchema = createInsertSchema(tandemVideoChatMessagesTable);
 export const insertTandemVideoCommentSchema = createInsertSchema(tandemVideoCommentsTable);
 export const insertTandemVideoJobSchema = createInsertSchema(tandemVideoJobsTable);
 export const insertTandemVideoSyncSchema = createInsertSchema(tandemVideoSyncsTable);
@@ -290,6 +302,7 @@ export type TandemVideoTranscriptSegment = typeof tandemVideoTranscriptSegmentsT
 export type TandemVideoTimeline = typeof tandemVideoTimelinesTable.$inferSelect;
 export type TandemVideoTimelineVersion = typeof tandemVideoTimelineVersionsTable.$inferSelect;
 export type TandemVideoSubmission = typeof tandemVideoSubmissionsTable.$inferSelect;
+export type TandemVideoChatMessage = typeof tandemVideoChatMessagesTable.$inferSelect;
 export type TandemVideoComment = typeof tandemVideoCommentsTable.$inferSelect;
 export type TandemVideoJob = typeof tandemVideoJobsTable.$inferSelect;
 

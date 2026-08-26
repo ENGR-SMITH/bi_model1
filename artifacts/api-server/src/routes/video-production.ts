@@ -6,6 +6,7 @@ import {
   db,
   tandemVideoAssetFilesTable,
   tandemVideoAssetsTable,
+  tandemVideoChatMessagesTable,
   tandemVideoCommentsTable,
   tandemVideoMembersTable,
   tandemVideoProjectsTable,
@@ -26,6 +27,11 @@ import {
   CreateVideoCommentBody,
   CreateVideoCommentParams,
   CreateVideoCommentResponse,
+  ListVideoChatMessagesParams,
+  ListVideoChatMessagesResponse,
+  SendVideoChatMessageBody,
+  SendVideoChatMessageParams,
+  SendVideoChatMessageResponse,
   CreateVideoSubmissionBody,
   CreateVideoSubmissionParams,
   CreateVideoSubmissionResponse,
@@ -1173,6 +1179,76 @@ router.patch(
     emitToProject(params.data.projectId, "comment.updated", updated);
 
     res.json(ResolveVideoCommentResponse.parse(updated));
+  },
+);
+
+// GET /video/projects/:projectId/chat — the project crew room, oldest first.
+router.get(
+  "/video/projects/:projectId/chat",
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = ListVideoChatMessagesParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid project id" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const messages = await db
+      .select()
+      .from(tandemVideoChatMessagesTable)
+      .where(eq(tandemVideoChatMessagesTable.projectId, params.data.projectId))
+      .orderBy(asc(tandemVideoChatMessagesTable.createdAt));
+
+    res.json(ListVideoChatMessagesResponse.parse(messages));
+  },
+);
+
+// POST /video/projects/:projectId/chat — send a crew room message.
+router.post(
+  "/video/projects/:projectId/chat",
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = SendVideoChatMessageParams.safeParse(req.params);
+    const body = SendVideoChatMessageBody.safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({ error: "Invalid message" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const [message] = await db
+      .insert(tandemVideoChatMessagesTable)
+      .values({
+        id: randomUUID(),
+        projectId: params.data.projectId,
+        authorId: userId,
+        body: body.data.body,
+      })
+      .returning();
+
+    // Realtime: crew room messages land on every open project socket.
+    emitToProject(params.data.projectId, "chat.new", message);
+
+    res.status(201).json(SendVideoChatMessageResponse.parse(message));
   },
 );
 
