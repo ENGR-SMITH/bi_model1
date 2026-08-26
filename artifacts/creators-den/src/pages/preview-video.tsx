@@ -141,6 +141,7 @@ function VideoCanvas({
               onSeek={onSeek}
               timelineVersionId={version?.id}
               headerRef={annotationHeaderRef}
+              surfaceRef={stageRef}
             />
             <FullscreenButton targetRef={stageRef} />
           </AssetPlayer>
