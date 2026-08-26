@@ -2240,13 +2240,14 @@ select optgroup {
   gap: 6px;
   overflow-y: auto;
   overflow-x: hidden;
-  scroll-snap-type: y proximity;
-  /* The scrollbar is hidden — the track stays scrollable (wheel / drag /
-     arrows) but no rail line shows on the timeline column. */
+  /* No scroll-snap: snapping would pull cards to the container centre (50%)
+     while the focus frame sits at 25% — the JS settle-select aligns cards
+     to the frame instead. */
   scrollbar-width: none;
-  /* Vertical padding is driven from JS (half the track height) so the list
-     is always scrollable — even with just one or two cards — and the first
-     / last cards can still be brought into the focus frame. */
+  /* Vertical padding is driven from JS (down to the focal point above, the
+     remainder below) so the list is always scrollable — even with just one
+     or two cards — and the first / last cards can still be brought into
+     the focus frame. */
   padding: 0 4px;
   perspective: 700px;
 }
@@ -2256,7 +2257,6 @@ select optgroup {
   flex: 0 0 auto;
   width: 100%;
   max-width: none;
-  scroll-snap-align: center;
   border: 1px solid hsl(var(--border));
   border-radius: 9px;
   background: hsl(var(--card));

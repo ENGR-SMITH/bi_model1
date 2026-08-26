@@ -62,13 +62,17 @@ export function VersionShelf({
   // point above, and the remainder below), so the list is ALWAYS scrollable
   // — even with just one or two cards — and the first / last cards can still
   // be brought up into the fixed focus frame. (CSS percentage padding would
-  // resolve against the column's width, which is too small to matter.)
+  // resolve against the column's width, which is too small to matter.) The
+  // frame's top is pinned from the SAME measurement the scroll math uses, so
+  // the frame centre and the focal point are pixel-exact.
   const syncPadding = useCallback(() => {
     const container = trackRef.current;
     if (!container) return;
     const top = container.clientHeight * FOCUS_RATIO;
     container.style.paddingTop = `${top}px`;
     container.style.paddingBottom = `${container.clientHeight - top}px`;
+    const focus = focusRef.current;
+    if (focus) focus.style.top = `${top}px`;
   }, []);
 
   useLayoutEffect(() => {
