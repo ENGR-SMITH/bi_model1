@@ -23,13 +23,24 @@ import { EmptyPlayer, ImageStage, proxyUrlFor } from '@/components/asset-preview
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import {
   FullscreenButton,
-  PreviewLayout,
   PreviewNotesPanel,
-  VersionCarousel,
+  RoleDownloadBar,
+  RoleLayout,
+  RoleUploadBar,
+  VersionList,
   type PreviewVersion,
 } from '@/components/preview-shared';
 
 const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
+
+// This role page accepts image files only — the accept list and the client
+// check below reject anything else (no video / audio / script files here).
+const IMAGE_ACCEPT = 'image/*,.png,.jpg,.jpeg,.webp,.gif,.avif';
+const IMAGE_FILE_RE = /\.(png|jpe?g|webp|gif|avif)$/i;
+const checkImageFile = (file: File): string | null =>
+  file.type.startsWith('image/') || IMAGE_FILE_RE.test(file.name)
+    ? null
+    : 'Only image files can be uploaded here (.png, .jpg, .webp).';
 
 // ---------------------------------------------------------------------------
 // ThumbnailCanvas — the design canvas for one selected THUMBNAIL version.
@@ -100,7 +111,7 @@ function ThumbnailCanvas({
 // Page
 // ---------------------------------------------------------------------------
 
-export default function ThumbnailPreviewPage() {
+export default function RoleThumbnailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   useProjectRealtime(projectId, null);
   const project = useGetVideoProject(projectId);
@@ -160,8 +171,21 @@ export default function ThumbnailPreviewPage() {
   const design = Array.isArray(snap?.designs) ? snap!.designs![0] : null;
   const activeAssetId = design?.assetId ?? undefined;
 
+  // The design shown on the stage — the chosen design when it still exists in
+  // the vault, otherwise the first playable image asset.
+  const vaultImage = p.assets.find((a) => IMAGE_KINDS.has(a.kind) && a.status === 'PROCESSED') ?? p.assets.find((a) => IMAGE_KINDS.has(a.kind)) ?? null;
+  const downloadAssetId = (activeAssetId && p.assets.some((a) => a.id === activeAssetId) ? activeAssetId : '') || vaultImage?.id || '';
+
   return (
-    <PreviewLayout
+    <RoleLayout
+      versions={
+        <VersionList
+          versions={versions}
+          selectedId={selected?.id ?? null}
+          onSelect={setSelectedId}
+          emptyText="No thumbnail versions saved yet — save a snapshot in the Thumbnail studio first."
+        />
+      }
       canvas={
         <ThumbnailCanvas
           projectId={p.id}
@@ -169,20 +193,18 @@ export default function ThumbnailPreviewPage() {
           assets={p.assets}
         />
       }
-      rail={
+      download={
+        <RoleDownloadBar projectId={p.id} assetId={downloadAssetId} label="thumbnail design" released={p.status === 'RELEASED'} />
+      }
+      notes={
         <PreviewNotesPanel
           projectId={p.id}
           legs={['THUMBNAIL']}
           assetId={activeAssetId}
         />
       }
-      versions={
-        <VersionCarousel
-          versions={versions}
-          selectedId={selected?.id ?? null}
-          onSelect={setSelectedId}
-          emptyText="No thumbnail versions saved yet — save a snapshot in the Thumbnail studio first."
-        />
+      upload={
+        <RoleUploadBar projectId={p.id} label="thumbnail design" accept={IMAGE_ACCEPT} kind="THUMBNAIL_DESIGN" checkFormat={checkImageFile} />
       }
     />
   );

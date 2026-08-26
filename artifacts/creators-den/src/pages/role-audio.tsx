@@ -27,15 +27,26 @@ import { EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import {
   FullscreenButton,
-  PreviewLayout,
   PreviewNotesPanel,
-  VersionCarousel,
+  RoleDownloadBar,
+  RoleLayout,
+  RoleUploadBar,
+  VersionList,
   WaveformPlayer,
   type PreviewVersion,
 } from '@/components/preview-shared';
 import type { StudioLeg } from '@/components/role-oracle';
 
 const AUDIO_KINDS = new Set(['RAW_AUDIO', 'VO_PICKUP']);
+
+// This role page accepts audio files only — the accept list and the client
+// check below reject anything else (no video / image / script files here).
+const AUDIO_ACCEPT = 'audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.aif,.aiff,.opus';
+const AUDIO_FILE_RE = /\.(wav|mp3|m4a|aac|flac|ogg|aif|aiff|opus)$/i;
+const checkAudioFile = (file: File): string | null =>
+  file.type.startsWith('audio/') || AUDIO_FILE_RE.test(file.name)
+    ? null
+    : 'Only audio files can be uploaded here (.wav, .mp3, .m4a, .flac, .ogg).';
 
 // ---------------------------------------------------------------------------
 // AudioCanvas — the wave canvas for one selected SOUND version. Falls back to
@@ -144,7 +155,7 @@ function AudioCanvas({
 // Page
 // ---------------------------------------------------------------------------
 
-export default function AudioPreviewPage() {
+export default function RoleAudioPage() {
   const { projectId } = useParams<{ projectId: string }>();
   useProjectRealtime(projectId, null);
   const project = useGetVideoProject(projectId);
@@ -201,8 +212,31 @@ export default function AudioPreviewPage() {
 
   const p = project.data;
 
+  // The file shown in the player — the selected version's first audio reference
+  // when it still exists in the vault, otherwise the first playable audio asset.
+  const versionSnap = (selectedDetail.data?.snapshot ?? null) as {
+    clips?: Array<{ assetId: string }>;
+    music?: Array<{ assetId: string }>;
+    pickups?: Array<{ assetId: string }>;
+  } | null;
+  const versionAsset =
+    (Array.isArray(versionSnap?.clips) ? versionSnap!.clips![0]?.assetId : undefined) ??
+    (Array.isArray(versionSnap?.music) ? versionSnap!.music![0]?.assetId : undefined) ??
+    (Array.isArray(versionSnap?.pickups) ? versionSnap!.pickups![0]?.assetId : undefined) ??
+    '';
+  const vaultAudio = p.assets.find((a) => AUDIO_KINDS.has(a.kind) && a.status === 'PROCESSED') ?? p.assets.find((a) => AUDIO_KINDS.has(a.kind)) ?? null;
+  const downloadAssetId = (versionAsset && p.assets.some((a) => a.id === versionAsset) ? versionAsset : '') || vaultAudio?.id || '';
+
   return (
-    <PreviewLayout
+    <RoleLayout
+      versions={
+        <VersionList
+          versions={versions}
+          selectedId={selected?.id ?? null}
+          onSelect={setSelectedId}
+          emptyText="No sound versions saved yet — save a snapshot in the Sound studio first."
+        />
+      }
       canvas={
         <AudioCanvas
           projectId={p.id}
@@ -210,19 +244,17 @@ export default function AudioPreviewPage() {
           assets={p.assets}
         />
       }
-      rail={
+      download={
+        <RoleDownloadBar projectId={p.id} assetId={downloadAssetId} label="audio file" released={p.status === 'RELEASED'} />
+      }
+      notes={
         <PreviewNotesPanel
           projectId={p.id}
           legs={['SOUND']}
         />
       }
-      versions={
-        <VersionCarousel
-          versions={versions}
-          selectedId={selected?.id ?? null}
-          onSelect={setSelectedId}
-          emptyText="No sound versions saved yet — save a snapshot in the Sound studio first."
-        />
+      upload={
+        <RoleUploadBar projectId={p.id} label="audio file" accept={AUDIO_ACCEPT} kind="RAW_AUDIO" checkFormat={checkAudioFile} />
       }
     />
   );
