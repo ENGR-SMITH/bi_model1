@@ -149,11 +149,12 @@ export function VersionCarousel({
 
 // ---------------------------------------------------------------------------
 // RoleLayout — the three role pages (Video / Audio / Thumbnail).
-// Three columns at 10 : 50 : 40, with the second and third columns split into
-// two rows at 32 : 68. Column one (the version & vault shelf) spans the full
-// height; the bottom row of column two holds the upload card, and column
-// three stacks the oracle on top of the pin / comment wall — the oracle is
-// the short panel (32%, top), the notes the tall one (68%, bottom).
+// Three columns at 10 : 50 : 40. Column one (the version & vault shelf)
+// spans the full height. Columns two and three each split into their own
+// two-row grid, so each column keeps its own proportions: column two stays
+// 68 : 32 (big canvas on top, upload card below), while column three is
+// 32 : 68 (the oracle is the short panel on top, the pin / comment wall the
+// tall one on the bottom).
 // ---------------------------------------------------------------------------
 
 export function RoleLayout({
@@ -178,10 +179,14 @@ export function RoleLayout({
     <div className="page pv-page role-page" data-testid="role-page">
       <div className="role-grid">
         <div className="role-versions-col">{versions}</div>
-        <div className="role-canvas-main">{canvas}</div>
-        <div className="role-canvas-bar">{upload}</div>
-        <div className="role-notes-main">{oracle}</div>
-        <div className="role-notes-bar">{notes}</div>
+        <div className="role-col-2">
+          <div className="role-canvas-main">{canvas}</div>
+          <div className="role-canvas-bar">{upload}</div>
+        </div>
+        <div className="role-col-3">
+          <div className="role-notes-main">{oracle}</div>
+          <div className="role-notes-bar">{notes}</div>
+        </div>
       </div>
     </div>
   );
