@@ -1892,6 +1892,13 @@
 .pv-fs:hover { border-color: hsl(var(--accent)); background: hsl(0 0% 0% / .72); color: hsl(var(--accent)); }
 
 /* ---- Role pages: 10 / 50 / 40 columns, 80 / 20 rows ---- */
+/* The role pages fill the whole screen — no page margins, no max-width
+   centring (the preview pages keep their normal page margins). */
+.role-page {
+  max-width: none;
+  padding: 0;
+  height: calc(100dvh - 107px - 30px);
+}
 .role-grid {
   flex: 1;
   min-height: 0;
