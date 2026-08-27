@@ -25,6 +25,7 @@ import {
 import { useProjectRealtime } from '@/lib/realtime';
 import { EmptyPlayer, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
+import { PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
 import {
   FullscreenButton,
   PreviewLayout,
@@ -178,6 +179,20 @@ export default function AudioPreviewPage() {
   const soundVersions = useListVideoTimelineVersions(projectId, 'SOUND');
   const soundTimeline = useGetVideoTimeline(projectId, 'SOUND');
 
+  // Raw SOUND version rows feed the split-screen diff (selected vs its
+  // immediate predecessor).
+  const diffVersions = useMemo<PreviewDiffSelection[]>(
+    () =>
+      (soundVersions.data ?? []).map((v) => ({
+        id: v.id,
+        leg: 'SOUND' as const,
+        version: v.version,
+        parentVersionId: v.parentVersionId ?? null,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [soundVersions.data],
+  );
+
   const versions = useMemo<PreviewVersion[]>(
     () =>
       (soundVersions.data ?? [])
@@ -275,13 +290,23 @@ export default function AudioPreviewPage() {
   return (
     <PreviewLayout
       canvas={
-        <AudioCanvas
-          projectId={p.id}
-          version={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
-          assets={p.assets}
-          vaultAssetId={vaultAssetId ?? undefined}
-          seekRequest={seekRequest}
-        />
+        <>
+          <AudioCanvas
+            projectId={p.id}
+            version={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+            assets={p.assets}
+            vaultAssetId={vaultAssetId ?? undefined}
+            seekRequest={seekRequest}
+          />
+          {/* Split-screen VCS: the selected version vs its immediate predecessor,
+              shown beneath the canvas when there's an older version to compare. */}
+          <PreviewDiff
+            projectId={p.id}
+            leg="SOUND"
+            versions={diffVersions}
+            selected={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version } : null}
+          />
+        </>
       }
       rail={
         <PreviewNotesPanel

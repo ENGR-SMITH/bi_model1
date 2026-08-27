@@ -35,6 +35,7 @@ import {
   type CarouselItem,
   type PreviewVersion,
 } from '@/components/preview-shared';
+import { PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
 import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
 import type { StudioLeg } from '@/components/role-oracle';
 
@@ -187,6 +188,17 @@ export default function VideoPreviewPage() {
   const selectsTimeline = useGetVideoTimeline(projectId, 'SELECTS');
   const cutTimeline = useGetVideoTimeline(projectId, 'CUT');
 
+  // Both legs' raw version rows feed the split-screen diff (the selected
+  // version is diffed against its immediate predecessor in the same leg).
+  const diffVersions = useMemo<PreviewDiffSelection[]>(
+    () => [
+      ...(selectsVersions.data ?? []).map((v) => ({ id: v.id, leg: 'SELECTS' as const, version: v.version, parentVersionId: v.parentVersionId ?? null })),
+      ...(cutVersions.data ?? []).map((v) => ({ id: v.id, leg: 'CUT' as const, version: v.version, parentVersionId: v.parentVersionId ?? null })),
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectsVersions.data, cutVersions.data],
+  );
+
   // Both legs' versions, newest first, each tagged with its leg + head state.
   const versions = useMemo<PreviewVersion[]>(() => {
     const rows: PreviewVersion[] = [];
@@ -293,13 +305,23 @@ export default function VideoPreviewPage() {
   return (
     <PreviewLayout
       canvas={
-        <VideoCanvas
-          projectId={p.id}
-          version={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
-          assets={p.assets}
-          vaultAssetId={vaultAssetId ?? undefined}
-          seekRequest={seekRequest}
-        />
+        <>
+          <VideoCanvas
+            projectId={p.id}
+            version={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+            assets={p.assets}
+            vaultAssetId={vaultAssetId ?? undefined}
+            seekRequest={seekRequest}
+          />
+          {/* Split-screen VCS: the selected version vs its immediate predecessor,
+              shown beneath the canvas when there's an older version to compare. */}
+          <PreviewDiff
+            projectId={p.id}
+            leg={activeVersion?.leg ?? 'SELECTS'}
+            versions={diffVersions}
+            selected={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, parentVersionId: undefined } : null}
+          />
+        </>
       }
       rail={
         <PreviewNotesPanel

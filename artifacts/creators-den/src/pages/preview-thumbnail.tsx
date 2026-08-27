@@ -21,6 +21,7 @@ import {
 import { useProjectRealtime } from '@/lib/realtime';
 import { EmptyPlayer, ImageStage, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
+import { PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
 import {
   FullscreenButton,
   PreviewLayout,
@@ -118,6 +119,20 @@ export default function ThumbnailPreviewPage() {
   const project = useGetVideoProject(projectId);
   const thumbVersions = useListVideoTimelineVersions(projectId, 'THUMBNAIL');
   const thumbTimeline = useGetVideoTimeline(projectId, 'THUMBNAIL');
+
+  // Raw THUMBNAIL version rows feed the split-screen diff (selected vs its
+  // immediate predecessor).
+  const diffVersions = useMemo<PreviewDiffSelection[]>(
+    () =>
+      (thumbVersions.data ?? []).map((v) => ({
+        id: v.id,
+        leg: 'THUMBNAIL' as const,
+        version: v.version,
+        parentVersionId: v.parentVersionId ?? null,
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [thumbVersions.data],
+  );
 
   const versions = useMemo<PreviewVersion[]>(
     () =>
@@ -219,12 +234,22 @@ export default function ThumbnailPreviewPage() {
   return (
     <PreviewLayout
       canvas={
-        <ThumbnailCanvas
-          projectId={p.id}
-          version={activeVersion ? { id: activeVersion.id, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
-          assets={p.assets}
-          vaultAssetId={vaultAssetId ?? undefined}
-        />
+        <>
+          <ThumbnailCanvas
+            projectId={p.id}
+            version={activeVersion ? { id: activeVersion.id, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+            assets={p.assets}
+            vaultAssetId={vaultAssetId ?? undefined}
+          />
+          {/* Split-screen VCS: the selected version vs its immediate predecessor,
+              shown beneath the canvas when there's an older version to compare. */}
+          <PreviewDiff
+            projectId={p.id}
+            leg="THUMBNAIL"
+            versions={diffVersions}
+            selected={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version } : null}
+          />
+        </>
       }
       rail={
         <PreviewNotesPanel

@@ -1867,7 +1867,9 @@ select optgroup {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow: hidden;
+  /* Allow the split-screen diff panel (below the canvas) to scroll into view
+     on shorter windows instead of being clipped out of the fixed column. */
+  overflow-y: auto;
 }
 .pv-notes-col {
   min-width: 0;
@@ -1940,6 +1942,20 @@ select optgroup {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* Split-screen VCS diff panel — sits under the big canvas in the first
+   column. Keeps the canvas dominant and scrolls internally if the compare
+   surface is taller than the space left over. */
+.preview-diff-panel {
+  flex: 1 1 auto;
+  min-height: 200px;
+  max-height: 48%;
+  overflow-y: auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: linear-gradient(180deg, hsl(var(--card)), hsl(var(--background)));
+  box-shadow: var(--shadow-sm);
 }
 
 /* Notes wall fills the right column and scrolls internally. */
