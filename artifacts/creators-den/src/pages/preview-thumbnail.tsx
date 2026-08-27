@@ -248,6 +248,7 @@ export default function ThumbnailPreviewPage() {
             leg="THUMBNAIL"
             versions={diffVersions}
             selected={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version } : null}
+            fallbackAssetIds={(p.assets ?? []).filter((a) => IMAGE_KINDS.has(a.kind)).map((a) => a.id)}
           />
         </>
       }
