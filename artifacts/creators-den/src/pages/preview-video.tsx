@@ -320,6 +320,7 @@ export default function VideoPreviewPage() {
             leg={activeVersion?.leg ?? 'SELECTS'}
             versions={diffVersions}
             selected={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, parentVersionId: undefined } : null}
+            fallbackAssetIds={(p.assets ?? []).filter((a) => VIDEO_KINDS.has(a.kind)).map((a) => a.id)}
           />
         </>
       }

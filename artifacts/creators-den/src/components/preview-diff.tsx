@@ -16,6 +16,7 @@
 // chain (`parentVersionId`, falling back to the previous sequential version).
 // ---------------------------------------------------------------------------
 
+import { Component, type ReactNode } from 'react';
 import { DiffMap } from '@/components/diff-map';
 import { AudioDiffMap } from '@/components/audio-diff-map';
 import {
@@ -23,6 +24,38 @@ import {
   useGetVideoTimelineVersion,
 } from '@workspace/api-client-react';
 import type { StudioLeg } from '@/components/role-oracle';
+
+/**
+ * Catches a runtime crash inside a diff surface (worker init, canvas draw,
+ * decode, …) so the whole canvas column doesn't unmount to nothing — it shows
+ * the actual error text below the preview instead.
+ */
+class DiffBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
+  override state = { error: null as string | null };
+  static getDerivedStateFromError(err: unknown) {
+    return { error: String((err as { message?: string })?.message ?? err) };
+  }
+  override componentDidCatch(err: unknown) {
+    // eslint-disable-next-line no-console
+    console.error('DiffMap crashed:', err);
+  }
+  override render() {
+    if (this.state.error) {
+      return (
+        <div
+          className="preview-diff-panel preview-diff-note"
+          role="alert"
+          style={{ flex: 'none' }}
+        >
+          <p>
+            <b>Split-screen diff failed to render</b> · {this.state.error}
+          </p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 /** Snapshot of what the preview page knows about one timeline version. */
 export interface PreviewDiffSelection {
@@ -64,15 +97,15 @@ type MediaSnapshot = {
   designs?: Array<{ assetId?: string }>;
 };
 
-function mediaAssetId(leg: StudioLeg, snapshot: unknown): string {
+function mediaAssetId(leg: StudioLeg, snapshot: unknown, fallback: string[] = []): string {
   const snap = (snapshot ?? null) as MediaSnapshot | null;
-  if (leg === 'THUMBNAIL') return snap?.designs?.[0]?.assetId ?? '';
+  if (leg === 'THUMBNAIL') return snap?.designs?.[0]?.assetId ?? fallback[0] ?? '';
   const clip = snap?.clips?.[0]?.assetId;
   if (clip) return clip;
   if (leg === 'SOUND') {
-    return snap?.music?.[0]?.assetId ?? snap?.pickups?.[0]?.assetId ?? '';
+    return snap?.music?.[0]?.assetId ?? snap?.pickups?.[0]?.assetId ?? fallback[0] ?? '';
   }
-  return '';
+  return fallback[0] ?? '';
 }
 
 const VIDEO_LIKE_LEGS = new Set<StudioLeg>(['SELECTS', 'CUT']);
@@ -90,11 +123,16 @@ export function PreviewDiff({
   leg,
   versions,
   selected,
+  fallbackAssetIds = [],
 }: {
   projectId: string;
   leg: StudioLeg;
   versions: PreviewDiffSelection[];
   selected: PreviewDiffSelection | null;
+  /** Vault asset ids (of the right media kind) to fall back on when a version
+   * snapshot carries no explicit clip/design — mirrors how the canvas already
+   * falls back to a vault asset. */
+  fallbackAssetIds?: string[];
 }) {
   const base = selected ?? null;
   const predecessor = predecessorOf(versions, base);
@@ -117,30 +155,57 @@ export function PreviewDiff({
     },
   });
 
-  // No older version to compare against (oldest / lone version) — the column
-  // falls back to showing only the single canvas, exactly as before.
+  // No older version exists (oldest / lone version) — per design the column
+  // keeps showing only the single canvas.
   if (!base || !predecessor) return null;
-  // Readied only once both snapshots are present.
-  if (!own.data || !prev.data) return null;
 
-  const newerAssetId = mediaAssetId(leg, own.data.snapshot);
-  const olderAssetId = mediaAssetId(leg, prev.data.snapshot);
+  const ownError = own.error ? String((own.error as { message?: string })?.message ?? own.error) : null;
+  const prevError = prev.error ? String((prev.error as { message?: string })?.message ?? prev.error) : null;
 
-  // No comparable media on either side — nothing to diff.
-  if (!newerAssetId || !olderAssetId) return null;
+  // Loading the two snapshots — surface progress instead of a silent blank.
+  if (!own.data || !prev.data) {
+    return (
+      <div className="preview-diff-panel preview-diff-note" data-testid="preview-diff">
+        <p>
+          {ownError || prevError
+            ? `Couldn't load the compare data: ${ownError ?? prevError}`
+            : `Building the split-screen diff between ${leg} v${base.version} and v${predecessor.version}…`}
+        </p>
+      </div>
+    );
+  }
+
+  const newerAssetId = mediaAssetId(leg, own.data.snapshot, fallbackAssetIds);
+  const olderAssetId = mediaAssetId(leg, prev.data.snapshot, fallbackAssetIds);
+
+  // One/both snapshots reference no comparable media — surface a clear notice
+  // instead of silently rendering nothing, so the missing-diff isn't a mystery.
+  if (!newerAssetId || !olderAssetId) {
+    const missing = !newerAssetId ? `v${own.data.version}` : `v${prev.data.version}`;
+    return (
+      <div className="preview-diff-panel preview-diff-note" data-testid="preview-diff">
+        <p>
+          No comparable {leg === 'THUMBNAIL' ? 'design image' : 'clip'} on{' '}
+          <b>{missing}</b> to diff against the other version — add media to that
+          version's timeline first.
+        </p>
+      </div>
+    );
+  }
 
   if (VIDEO_LIKE_LEGS.has(leg)) {
     return (
       <div className="preview-diff-panel" data-testid="preview-diff">
-        <DiffMap
-          key={`${leg}-${base.id}-vs-${predecessor.id}`}
-          projectId={projectId}
-          kind="video"
-          newerAssetId={newerAssetId}
-          olderAssetId={olderAssetId}
-          newerLabel={`${leg} v${own.data.version}`}
-          olderLabel={`v${prev.data.version}`}
-        />
+        <DiffBoundary key={`${leg}-${base.id}-vs-${predecessor.id}`}>
+          <DiffMap
+            projectId={projectId}
+            kind="video"
+            newerAssetId={newerAssetId}
+            olderAssetId={olderAssetId}
+            newerLabel={`${leg} v${own.data.version}`}
+            olderLabel={`v${prev.data.version}`}
+          />
+        </DiffBoundary>
       </div>
     );
   }
@@ -148,15 +213,16 @@ export function PreviewDiff({
   if (leg === 'THUMBNAIL') {
     return (
       <div className="preview-diff-panel" data-testid="preview-diff">
-        <DiffMap
-          key={`${leg}-${base.id}-vs-${predecessor.id}`}
-          projectId={projectId}
-          kind="image"
-          newerAssetId={newerAssetId}
-          olderAssetId={olderAssetId}
-          newerLabel={`THUMBNAIL v${own.data.version}`}
-          olderLabel={`v${prev.data.version}`}
-        />
+        <DiffBoundary key={`${leg}-${base.id}-vs-${predecessor.id}`}>
+          <DiffMap
+            projectId={projectId}
+            kind="image"
+            newerAssetId={newerAssetId}
+            olderAssetId={olderAssetId}
+            newerLabel={`THUMBNAIL v${own.data.version}`}
+            olderLabel={`v${prev.data.version}`}
+          />
+        </DiffBoundary>
       </div>
     );
   }
@@ -164,14 +230,15 @@ export function PreviewDiff({
   // SOUND — spectral diff-map on the decoded audio proxies.
   return (
     <div className="preview-diff-panel" data-testid="preview-diff">
-      <AudioDiffMap
-        key={`${leg}-${base.id}-vs-${predecessor.id}`}
-        projectId={projectId}
-        newerAssetId={newerAssetId}
-        olderAssetId={olderAssetId}
-        newerLabel={`SOUND v${own.data.version}`}
-        olderLabel={`v${prev.data.version}`}
-      />
+      <DiffBoundary key={`${leg}-${base.id}-vs-${predecessor.id}`}>
+        <AudioDiffMap
+          projectId={projectId}
+          newerAssetId={newerAssetId}
+          olderAssetId={olderAssetId}
+          newerLabel={`SOUND v${own.data.version}`}
+          olderLabel={`v${prev.data.version}`}
+        />
+      </DiffBoundary>
     </div>
   );
 }
