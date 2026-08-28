@@ -190,15 +190,20 @@ export default function VideoPreviewPage() {
   const selectsTimeline = useGetVideoTimeline(projectId, 'SELECTS');
   const cutTimeline = useGetVideoTimeline(projectId, 'CUT');
 
-  // Both legs' raw version rows feed the split-screen diff (the selected
-  // version is diffed against its immediate predecessor in the same leg).
+  // Every comparable item in the timeline: saved SELECTS / CUT versions AND
+  // the vault's video files. A version compares against its older version in
+  // the same leg; a file compares against the older video file — so the
+  // diff-map works even when only raw footage was uploaded (no versions yet).
   const diffVersions = useMemo<PreviewDiffSelection[]>(
     () => [
-      ...(selectsVersions.data ?? []).map((v) => ({ id: v.id, leg: 'SELECTS' as const, version: v.version, parentVersionId: v.parentVersionId ?? null })),
-      ...(cutVersions.data ?? []).map((v) => ({ id: v.id, leg: 'CUT' as const, version: v.version, parentVersionId: v.parentVersionId ?? null })),
+      ...(selectsVersions.data ?? []).map((v) => ({ key: `version-${v.id}`, id: v.id, leg: 'SELECTS' as const, kind: 'version' as const, version: v.version, parentVersionId: v.parentVersionId ?? null, createdAt: v.createdAt })),
+      ...(cutVersions.data ?? []).map((v) => ({ key: `version-${v.id}`, id: v.id, leg: 'CUT' as const, kind: 'version' as const, version: v.version, parentVersionId: v.parentVersionId ?? null, createdAt: v.createdAt })),
+      ...(project.data?.assets ?? [])
+        .filter((a) => VIDEO_KINDS.has(a.kind))
+        .map((a) => ({ key: `asset-${a.id}`, id: a.id, leg: 'SELECTS' as const, kind: 'asset' as const, createdAt: a.createdAt, label: a.fileName })),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectsVersions.data, cutVersions.data],
+    [selectsVersions.data, cutVersions.data, project.data?.assets],
   );
 
   // Both legs' versions, newest first, each tagged with its leg + head state.
@@ -246,11 +251,14 @@ export default function VideoPreviewPage() {
   // canvas shows the picked file instead of the newest version's clip.
   const activeVersion = vaultAssetId ? null : selected;
 
-  // The selected version as a diff selection, plus whether it actually has an
-  // older predecessor to diff against (oldest / lone → no diff-map).
-  const activeSelection: PreviewDiffSelection | null = activeVersion
-    ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version }
-    : null;
+  // The selected timeline item as a diff selection — a version OR a vault
+  // video file — plus whether it has an older same-kind predecessor.
+  const activeSelection: PreviewDiffSelection | null =
+    (vaultAssetId
+      ? diffVersions.find((s) => s.key === `asset-${vaultAssetId}`)
+      : activeVersion
+        ? diffVersions.find((s) => s.key === `version-${activeVersion.id}`)
+        : null) ?? null;
   const hasDiff = Boolean(activeSelection && predecessorOf(diffVersions, activeSelection));
 
   // If the selected version suddenly has no older version to compare (e.g. the

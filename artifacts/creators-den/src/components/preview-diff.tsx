@@ -57,35 +57,59 @@ class DiffBoundary extends Component<{ children: ReactNode }, { error: string | 
   }
 }
 
-/** Snapshot of what the preview page knows about one timeline version. */
+/**
+ * One item the split-screen diff can compare. A saved timeline version
+ * (`kind: 'version'`, compared against its older version) or a vault file
+ * (`kind: 'asset'`, compared against the older file of the same media).
+ */
 export interface PreviewDiffSelection {
+  /** Carousel key, e.g. `version-…` or `asset-…`. */
+  key: string;
+  /** Version id (for versions) or asset id (for assets). */
   id: string;
   leg: StudioLeg;
-  version: number;
+  kind: 'version' | 'asset';
+  /** Version number — present for versions. */
+  version?: number;
   parentVersionId?: string | null;
+  /** Creation time, used to order assets (older = earlier). */
+  createdAt: string;
+  /** Human label for assets (e.g. the file name); versions use `leg vN`. */
+  label?: string;
 }
 
 /**
- * Pick the "older" version to diff a selected version against. Versions are
- * supplied newest-first (as the API returns them). The direct parent wins
- * (most faithful lineage); otherwise the previous sequential version of the
- * same leg is used. Returns null for the oldest version / a lone version.
+ * Pick the "older" item to diff a selected item against. Versions compare
+ * against their parent version (falling back to the previous sequential
+ * version of the same leg); vault assets compare against the previous asset
+ * of the same media. Returns null for the oldest / lone item.
  */
 export function predecessorOf(
-  versions: PreviewDiffSelection[],
+  items: PreviewDiffSelection[],
   selected: PreviewDiffSelection | null,
 ): PreviewDiffSelection | null {
   if (!selected) return null;
-  const sameLeg = versions.filter((v) => v.leg === selected.leg && v.id !== selected.id);
+  const sameLeg = items.filter((s) => s.leg === selected.leg && s.key !== selected.key);
   if (sameLeg.length === 0) return null;
-  if (selected.parentVersionId) {
-    const parent = sameLeg.find((v) => v.id === selected.parentVersionId);
-    if (parent) return parent;
+
+  if (selected.kind === 'version') {
+    const versions = sameLeg.filter((s) => s.kind === 'version');
+    if (selected.parentVersionId) {
+      const parent = versions.find((s) => s.id === selected.parentVersionId);
+      if (parent) return parent;
+    }
+    return (
+      versions
+        .filter((v) => (v.version ?? 0) < (selected.version ?? 0))
+        .sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0] ?? null
+    );
   }
+
+  // Assets: the immediately older file of the same media (by recency).
   return (
     sameLeg
-      .filter((v) => v.version < selected.version)
-      .sort((a, b) => b.version - a.version)[0] ?? null
+      .filter((s) => s.kind === 'asset' && new Date(s.createdAt).getTime() < new Date(selected.createdAt).getTime())
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] ?? null
   );
 }
 
@@ -141,31 +165,76 @@ export function PreviewDiff({
   const baseLeg: StudioLeg = base?.leg ?? 'SELECTS';
   const prevLeg: StudioLeg = predecessor?.leg ?? 'SELECTS';
 
+  // Asset-vs-asset comparisons use the file ids directly; only version
+  // comparisons need the two snapshots fetched.
+  const baseIsVersion = base?.kind === 'version';
+  const prevIsVersion = predecessor?.kind === 'version';
+  const needsSnapshots = Boolean(base && predecessor && baseIsVersion && prevIsVersion);
+
   // Hooks run unconditionally (Rules of Hooks) — `enabled` guards the fetch.
-  const own = useGetVideoTimelineVersion(projectId, baseLeg, base?.id ?? '', {
+  const own = useGetVideoTimelineVersion(projectId, baseLeg, baseIsVersion ? (base?.id ?? '') : '', {
     query: {
-      queryKey: getGetVideoTimelineVersionQueryKey(projectId, baseLeg, base?.id ?? ''),
-      enabled: Boolean(base && predecessor),
+      queryKey: getGetVideoTimelineVersionQueryKey(projectId, baseLeg, baseIsVersion ? (base?.id ?? '') : ''),
+      enabled: needsSnapshots,
     },
   });
-  const prev = useGetVideoTimelineVersion(projectId, prevLeg, predecessor?.id ?? '', {
+  const prev = useGetVideoTimelineVersion(projectId, prevLeg, prevIsVersion ? (predecessor?.id ?? '') : '', {
     query: {
-      queryKey: getGetVideoTimelineVersionQueryKey(projectId, prevLeg, predecessor?.id ?? ''),
-      enabled: Boolean(base && predecessor),
+      queryKey: getGetVideoTimelineVersionQueryKey(projectId, prevLeg, prevIsVersion ? (predecessor?.id ?? '') : ''),
+      enabled: needsSnapshots,
     },
   });
 
-  // No older version exists (oldest / lone version) — per design the column
-  // keeps showing only the single canvas. In diff view we explain this
-  // instead of silently returning nothing, so the toggle never looks broken.
+  // No older item exists (oldest / lone item) — explain instead of a blank.
   if (!base || !predecessor) {
     return (
       <div className="preview-diff-panel preview-diff-note" data-testid="preview-diff">
         <p>
-          <b>v{base?.version ?? 0}</b> is the {base ? 'oldest' : 'only'} version of{' '}
-          {leg} — there's nothing older to compare it against. Pick a newer
-          version in the timeline to see the split-screen diff map.
+          {base?.kind === 'asset'
+            ? `“${base.label ?? 'This file'}” is the only ${leg} file here — there's nothing older to compare it against.`
+            : `${leg} has no older version than <b>v${base?.version ?? 1}</b> — save a newer snapshot in the ${leg} studio to compare.`}
         </p>
+      </div>
+    );
+  }
+
+  // Asset comparison — the two file ids ARE the media.
+  if (!baseIsVersion || !prevIsVersion) {
+    const newerAssetId = base.id;
+    const olderAssetId = predecessor.id;
+    const newerLabel = base.label ?? `${leg} file`;
+    const olderLabel = predecessor.label ?? `${leg} file`;
+    return (
+      <div className="preview-diff-panel" data-testid="preview-diff">
+        <DiffBoundary key={`${leg}-${base.key}-vs-${predecessor.key}`}>
+          {leg === 'SOUND' ? (
+            <AudioDiffMap
+              projectId={projectId}
+              newerAssetId={newerAssetId}
+              olderAssetId={olderAssetId}
+              newerLabel={newerLabel}
+              olderLabel={olderLabel}
+            />
+          ) : leg === 'THUMBNAIL' ? (
+            <DiffMap
+              projectId={projectId}
+              kind="image"
+              newerAssetId={newerAssetId}
+              olderAssetId={olderAssetId}
+              newerLabel={newerLabel}
+              olderLabel={olderLabel}
+            />
+          ) : (
+            <DiffMap
+              projectId={projectId}
+              kind="video"
+              newerAssetId={newerAssetId}
+              olderAssetId={olderAssetId}
+              newerLabel={newerLabel}
+              olderLabel={olderLabel}
+            />
+          )}
+        </DiffBoundary>
       </div>
     );
   }
@@ -211,11 +280,10 @@ export function PreviewDiff({
     return (
       <div className="preview-diff-panel preview-diff-note" data-testid="preview-diff">
         <p>
-          Both {leg === 'THUMBNAIL' ? 'versions' : 'versions'} reference the
-          same media (<b className="mono-label">{newerAssetId.slice(0, 8)}</b>) —
-          there's no difference to map. Give{'  '}
-          <b>v{own.data.version}</b> a different clip than{' '}
-          <b>v{prev.data.version}</b> to compare.
+          Both versions reference the same media{' '}
+          (<b className="mono-label">{newerAssetId.slice(0, 8)}</b>) — there's
+          no difference to map. Give <b>v{own.data.version}</b> a different clip
+          than <b>v{prev.data.version}</b> to compare.
         </p>
       </div>
     );
