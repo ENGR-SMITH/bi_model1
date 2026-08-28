@@ -248,28 +248,30 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
                 {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
                 {tab(`/projects/${projectId}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview', true)}
-                {tab(`/projects/${projectId}/role/video`, 'Video', <Video size={15} />, 'nav-role-video', true)}
-                {tab(`/projects/${projectId}/role/audio`, 'Audio', <Mic2 size={15} />, 'nav-role-audio', true)}
-                {tab(`/projects/${projectId}/role/script`, 'Script', <FileText size={15} />, 'nav-role-script', true)}
-                {tab(`/projects/${projectId}/role/thumbnail`, 'Thumbnail', <Image size={15} />, 'nav-role-thumbnail', true)}
               </div>
               <span className="cd-tab-divider" aria-hidden />
+              {/* The four studios sit on the relay rail (numbered, lit on hover /
+                  active) — the removed Selects / Cut / Sound / Finish stages now
+                  live here as Video / Audio / Script / Thumbnail. */}
               <div className="cd-tab-group cd-tab-stages">
-                {RELAY_LEGS.map((leg) => {
-                  const href = `/projects/${projectId}/${leg.slug}`;
-                  return (
-                    <Link
-                      key={leg.leg}
-                      href={href}
-                      title={leg.role}
-                      className={`cd-tab ${location === href ? 'active' : ''}`}
-                      data-testid={`nav-leg-${leg.slug}`}
-                    >
-                      <span className="cd-tab-num">{leg.number}</span>
-                      <span>{leg.label}</span>
-                    </Link>
-                  );
-                })}
+                {[
+                  { href: `/projects/${projectId}/role/video`, number: '01', label: 'Video', icon: <Video size={15} />, testId: 'nav-role-video' },
+                  { href: `/projects/${projectId}/role/audio`, number: '02', label: 'Audio', icon: <Mic2 size={15} />, testId: 'nav-role-audio' },
+                  { href: `/projects/${projectId}/role/script`, number: '03', label: 'Script', icon: <FileText size={15} />, testId: 'nav-role-script' },
+                  { href: `/projects/${projectId}/role/thumbnail`, number: '04', label: 'Thumbnail', icon: <Image size={15} />, testId: 'nav-role-thumbnail' },
+                ].map((item) => (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    title={item.label}
+                    className={`cd-tab ${location === item.href || location.startsWith(`${item.href}/`) ? 'active' : ''}`}
+                    data-testid={item.testId}
+                  >
+                    <span className="cd-tab-num">{item.number}</span>
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </Link>
+                ))}
               </div>
             </nav>
           )}

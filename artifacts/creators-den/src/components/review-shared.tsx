@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Shared review surfaces — the version-history/submit panel and the timecode
-// comments panel. Extracted from pages/selects.tsx so every stage page and the
-// PR review panel can import them from a neutral module (no page → page import).
+// comments panel. Extracted from the former selects stage page so every review
+// surface can import them from a neutral module (no page → page import).
 // Pure move: behavior is unchanged.
 // ---------------------------------------------------------------------------
 

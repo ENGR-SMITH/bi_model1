@@ -288,7 +288,7 @@ export function AudioDiffMap({
               onSeek={(ms) => seek(ms / 1000)}
               timelineVersionId={timelineVersionId}
               headerRef={annotationHeaderRef}
-              surfaceRef={stageRef}
+              surfaceRef={newerLaneRef}
               dropLine
             />
           </div>
