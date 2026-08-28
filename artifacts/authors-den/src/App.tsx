@@ -152,11 +152,40 @@ function loadCollaborationClones(): CollaborationClone[] {
   }
 }
 
+// The guided Lesson is first-time onboarding: it only auto-opens for new
+// users. Completing it (or leaving it for Draft) sets a local flag so the
+// desk opens in Draft mode from then on — the tutorial stays reachable from
+// the sidebar's "Explore the tutorial" button.
+const LESSON_COMPLETE_KEY = "authors-den-lesson-complete";
+function lessonComplete(): boolean {
+  try {
+    return localStorage.getItem(LESSON_COMPLETE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function markLessonComplete(): void {
+  try {
+    localStorage.setItem(LESSON_COMPLETE_KEY, "1");
+  } catch {
+    // Storage unavailable — the lesson is just not remembered.
+  }
+}
+
 function App() {
   const [projects, setProjects] = useState<Project[]>(loadProjects);
   const [collaborationClones] = useState<CollaborationClone[]>(loadCollaborationClones);
-  const [projectId, setProjectId] = useState(() => projects.find((item) => item.isTutorial)?.id ?? projects[0]?.id ?? "");
-  const [view, setView] = useState<View>("general");
+  // New users land on the Lesson (the tutorial project); once the lesson is
+  // complete the desk opens on the user's own work (or the library when they
+  // have only the tutorial left).
+  const [projectId, setProjectId] = useState(() =>
+    lessonComplete()
+      ? projects.find((item) => !item.isTutorial)?.id ?? projects[0]?.id ?? ""
+      : projects.find((item) => item.isTutorial)?.id ?? projects[0]?.id ?? "",
+  );
+  const [view, setView] = useState<View>(() =>
+    lessonComplete() && projects.every((item) => item.isTutorial) ? "home" : "general",
+  );
   const [editorSceneId, setEditorSceneId] = useState<string | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
   // The rail starts collapsed; hovering the sidebar auto-expands it.
@@ -167,7 +196,7 @@ function App() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [sidebarWorkspaceOpen, setSidebarWorkspaceOpen] = useState(false);
   const [topWorkspaceOpen, setTopWorkspaceOpen] = useState(false);
-  const [mode, setMode] = useState<"lesson" | "draft">("lesson");
+  const [mode, setMode] = useState<"lesson" | "draft">(() => (lessonComplete() ? "draft" : "lesson"));
   const [draftNudge, setDraftNudge] = useState(false);
   const [toast, setToast] = useState("");
   const { user } = useUser();
@@ -566,8 +595,8 @@ function App() {
   const tutorialViews: View[] = ["general", "outline", "editor", "settings"];
   const startTutorial = () => { const tutorial = projects.find((item) => item.isTutorial) ?? project ?? sample(); if (!projects.some((item) => item.id === tutorial.id)) setProjects((items) => [tutorial, ...items]); setMode("lesson"); setProjectId(tutorial.id); setEditorSceneId(tutorial.scenes[0]?.id ?? null); setTutorialStep(0); setView("general"); setTutorialOpen(false); setModal("tutorial"); };
   const closeTutorial = () => { setModal(null); setTutorialOpen(true); };
-  const nextLesson = () => { if (tutorialStep >= tutorialViews.length - 1) { setTutorialOpen(false); notify("Tutorial complete — make the desk yours"); return; } const next = tutorialStep + 1; setTutorialStep(next); setView(tutorialViews[next]); if (next === 2) setEditorSceneId(project?.scenes[0]?.id ?? null); setModal("tutorial"); setTutorialOpen(false); };
-  const createProject = (template: string, title: string, author: string) => { const seed = sample(); const item: Project = { ...seed, id: uid(), title: title || `Untitled ${template}`, author: author || "Untitled author", template, isTutorial: false, premise: "", synopsis: "", summary: "", characters: [], plots: [], world: [], revisions: [], scenes: [{ ...seed.scenes[0], id: uid(), title: "Untitled scene", synopsis: "", content: "", status: "Idea", pov: "", labels: "", notes: "", media: [] }] }; setMode("draft"); setDraftNudge(false); setProjects((items) => [item, ...items]); setProjectId(item.id); setEditorSceneId(item.scenes[0].id); setModal(null); setTutorialOpen(false); setView("editor"); notify("Project created — your blank desk is ready"); };
+  const nextLesson = () => { if (tutorialStep >= tutorialViews.length - 1) { markLessonComplete(); setTutorialOpen(false); notify("Tutorial complete — make the desk yours"); return; } const next = tutorialStep + 1; setTutorialStep(next); setView(tutorialViews[next]); if (next === 2) setEditorSceneId(project?.scenes[0]?.id ?? null); setModal("tutorial"); setTutorialOpen(false); };
+  const createProject = (template: string, title: string, author: string) => { markLessonComplete(); const seed = sample(); const item: Project = { ...seed, id: uid(), title: title || `Untitled ${template}`, author: author || "Untitled author", template, isTutorial: false, premise: "", synopsis: "", summary: "", characters: [], plots: [], world: [], revisions: [], scenes: [{ ...seed.scenes[0], id: uid(), title: "Untitled scene", synopsis: "", content: "", status: "Idea", pov: "", labels: "", notes: "", media: [] }] }; setMode("draft"); setDraftNudge(false); setProjects((items) => [item, ...items]); setProjectId(item.id); setEditorSceneId(item.scenes[0].id); setModal(null); setTutorialOpen(false); setView("editor"); notify("Project created — your blank desk is ready"); };
   const duplicateProject = (item: Project) => {
     const duplicate: Project = {
       ...item,
@@ -698,7 +727,7 @@ function App() {
     });
   };
   const switchToLesson = () => { startTutorial(); };
-  const switchToDraft = () => { setMode("draft"); setModal(null); setTutorialOpen(false); if (project?.isTutorial) { setDraftNudge(!hasUserProject); setView("home"); } else { setDraftNudge(false); setEditorSceneId(project?.scenes[0]?.id ?? null); setView(project ? "editor" : "home"); } };
+  const switchToDraft = () => { markLessonComplete(); setMode("draft"); setModal(null); setTutorialOpen(false); if (project?.isTutorial) { setDraftNudge(!hasUserProject); setView("home"); } else { setDraftNudge(false); setEditorSceneId(project?.scenes[0]?.id ?? null); setView(project ? "editor" : "home"); } };
   const exportFile = async (format: ExportFormat) => { if (!project) return; await exportProject({ ...project, scenes: project.scenes.map((scene) => ({ id: scene.id, title: scene.title, synopsis: scene.synopsis, content: scene.content, status: scene.status, pov: scene.pov })) }, format); notify(format === "print" ? "Print window opened" : `Downloaded ${format.toUpperCase()}`); };
   const importFile = (file: File) => { const reader = new FileReader(); reader.onload = () => { try { const raw = String(reader.result); const parsed = file.name.endsWith(".json") || file.name.endsWith(".msk") ? JSON.parse(raw) : { ...sample(), title: raw.split("\n")[0] || "Imported work", scenes: [{ ...sample().scenes[0], id: uid(), title: "Imported draft", content: textToHtml(raw) }] }; setProjects((items) => [{ ...sample(), ...parsed, id: uid(), isTutorial: false, updated: now() }, ...items]); setModal(null); notify("Import complete"); } catch { notify("That file could not be read"); } }; reader.readAsText(file); };
     return <div className={`app-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
@@ -707,7 +736,10 @@ function App() {
       <header className="topbar">
         <button className="icon-btn mobile-only" aria-label="Open navigation" onClick={() => setMobileNav(true)}><Menu size={19} /></button>
         <div className="top-workspace-wrap" onPointerLeave={() => setTopWorkspaceOpen(false)}><button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)}><span>Workspace</span><ChevronDown size={13} /><b>{project?.title ?? "Your projects"}</b></button>{topWorkspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setTopWorkspaceOpen(false); }} onNew={() => { setModal("project"); setTopWorkspaceOpen(false); }} />}</div>
-         <div className="mode-switch" role="tablist" aria-label="Writing mode"><button className={`${mode === "draft" ? "active " : ""}draft-mode-tab ${mode === "lesson" ? "wave-nudge" : ""}`} onClick={switchToDraft} role="tab" aria-selected={mode === "draft"}><PenLine size={13} /> Draft</button><button className={mode === "lesson" ? "active" : ""} onClick={switchToLesson} role="tab" aria-selected={mode === "lesson"}><BookOpen size={13} /> Lesson</button></div>
+         {/* The Draft/Lesson switch only appears while on the Lesson — in Draft
+             mode the lesson stays reachable from the sidebar's "Explore the
+             tutorial" button instead of cluttering the top bar. */}
+         {mode === "lesson" && <div className="mode-switch" role="tablist" aria-label="Writing mode"><button className="draft-mode-tab wave-nudge" onClick={switchToDraft} role="tab" aria-selected={false}><PenLine size={13} /> Draft</button><button className="active" onClick={switchToLesson} role="tab" aria-selected={true}><BookOpen size={13} /> Lesson</button></div>}
          <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><button className="avatar" aria-label="Author settings" onClick={() => project && setView("settings")}>{project?.author?.slice(0, 1) ?? "A"}</button></div>
       </header>
         {cloneBusy && <div className="den-status-banner"><RefreshCw size={15} className="spin" /> Opening your fork of this seed…</div>}
