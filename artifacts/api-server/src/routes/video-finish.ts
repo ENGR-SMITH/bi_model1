@@ -97,8 +97,8 @@ async function requireLegEditor(
 ): Promise<TandemVideoMember | null> {
   const member = await requireMember(projectId, userId);
   if (!member) return null;
-  if (member.roles.includes("CAPTAIN")) return member;
-  return member.roles.includes(LEG_ROLES[leg]) ? member : null;
+  if ((member.roles ?? []).includes("CAPTAIN")) return member;
+  return (member.roles ?? []).includes(LEG_ROLES[leg]) ? member : null;
 }
 
 // POST /video/projects/:projectId/audio — queue an audio pass for the SOUND
@@ -345,10 +345,11 @@ router.get(
             gt(tandemVideoGrantsTable.expiresAt, new Date()),
           ),
         );
-      const allowed = grants.some((grant) =>
-        grant.roles.includes("ALL") ||
-        (fileRole !== null && grant.roles.includes(fileRole)),
-      );
+      const allowed = grants.some((grant) => {
+        const grantRoles = grant.roles ?? [];
+        return grantRoles.includes("ALL") ||
+          (fileRole !== null && grantRoles.includes(fileRole));
+      });
       if (!allowed) {
         res.status(403).json({
           error: "The Lock is still on — downloads open once the Captain approves the final master",
