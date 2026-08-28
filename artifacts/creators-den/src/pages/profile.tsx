@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'wouter';
 import { useUser } from '@clerk/react';
-import { ArrowLeft, Eye, Film, LockKeyhole, UserRound } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Eye, Film, LockKeyhole, UserRound } from 'lucide-react';
+import { tandemUid } from '@/lib/tandem-uid';
 import {
   getGetUserProfileQueryKey,
   getGetVideoUserContributionsQueryKey,
@@ -154,6 +155,7 @@ export default function ProfilePage() {
   const params = useParams<{ userId?: string }>();
   const { user } = useUser();
   const [followTab, setFollowTab] = useState<'followers' | 'following' | null>(null);
+  const [copiedUid, setCopiedUid] = useState(false);
 
   const viewingSelf = !params.userId || params.userId === user?.id;
   const profileUserId = params.userId ?? user?.id ?? '';
@@ -232,6 +234,26 @@ export default function ProfilePage() {
                 <span className="mono-label ml-2">{track.length} public project{track.length === 1 ? '' : 's'}</span>
                 <span className="mono-label ml-2">{followerCount} follower{followerCount === 1 ? '' : 's'} · {followingCount} following</span>
               </p>
+              {/* The unique Tandem ID — invite someone with it, no email needed. */}
+              <div className="profile-uid" data-testid="profile-uid">
+                <span className="mono-label">{viewingSelf ? 'Your unique Tandem ID' : 'Tandem ID'}</span>
+                <button
+                  type="button"
+                  className="profile-uid-value"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(tandemUid(profileUserId)).then(() => {
+                      setCopiedUid(true);
+                      window.setTimeout(() => setCopiedUid(false), 1800);
+                    });
+                  }}
+                  title="Copy to clipboard"
+                  data-testid="profile-uid-copy"
+                >
+                  {tandemUid(profileUserId)}
+                  {copiedUid ? <Check size={12} className="profile-uid-copied" /> : <Copy size={12} />}
+                </button>
+                <span className="profile-uid-hint mono-label">{copiedUid ? 'Copied!' : 'share this to be invited'}</span>
+              </div>
             </div>
           </div>
           <div className="cd-billboard-actions">

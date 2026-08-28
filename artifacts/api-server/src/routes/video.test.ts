@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import { runWorkerCycle } from "../video/worker";
 import { backfillContentHashes } from "../video/content-address";
 import { clearUserNameCache } from "../lib/user-names";
+import { tandemUid } from "../lib/tandem-uid";
 
 // Uploads land on disk; point multer at a throwaway temp dir for tests.
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "video-test-"));
@@ -25,7 +26,28 @@ vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: state.userId }),
   clerkClient: {
     users: {
-      getUserList: async (params: { emailAddress?: string[]; userId?: string[] }) => {
+      getUserList: async (params: { limit?: number; offset?: number; emailAddress?: string[]; userId?: string[] }) => {
+        const all = () => {
+          const rows = Object.entries(state.clerkIdToName).map(([id, name]) => {
+            const [first, ...rest] = name.split(" ");
+            return {
+              id,
+              firstName: first || null,
+              lastName: rest.join(" ") || null,
+              username: null,
+              emailAddresses: [],
+            };
+          });
+          // Emails may map to users with no resolved name — include them too so
+          // the paginated Tandem-ID invite lookup can find them.
+          const known = new Set(Object.keys(state.clerkIdToName));
+          for (const id of Object.values(state.clerkEmailToUser)) {
+            if (id && !known.has(id)) {
+              rows.push({ id, firstName: null, lastName: null, username: null, emailAddresses: [] });
+            }
+          }
+          return rows;
+        };
         if (params.userId) {
           return {
             data: params.userId.map((id) => {
@@ -40,9 +62,15 @@ vi.mock("@clerk/express", () => ({
             }),
           };
         }
-        const email = params.emailAddress?.[0] ?? "";
-        const id = state.clerkEmailToUser[email] ?? null;
-        return { data: id ? [{ id }] : [] };
+        if (params.emailAddress) {
+          const id = state.clerkEmailToUser[params.emailAddress[0] ?? ""] ?? null;
+          return { data: id ? all().filter((u) => u.id === id) : [] };
+        }
+        // Paginated walk used by the Tandem-ID invite lookup.
+        const users = all();
+        const offset = params.offset ?? 0;
+        const limit = params.limit ?? users.length;
+        return { data: users.slice(offset, offset + limit) };
       },
     },
   },
@@ -170,7 +198,7 @@ describe("projects", () => {
     state.userId = "captain-1";
     await request(API)
       .post(`/api/video/projects/${owned.id}/members`)
-      .send({ email: "creator2@example.com", role: "ARCHITECT" });
+      .send({ uid: tandemUid("captain-2"), role: "ARCHITECT" });
 
     state.userId = "captain-2";
     const list = await request(API).get("/api/video/projects");
@@ -192,7 +220,7 @@ describe("project deletion", () => {
     state.userId = "captain-1";
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "editor@example.com", role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
     await request(API)
       .post(`/api/video/projects/${project.id}/assets`)
       .field("kind", "RAW_VIDEO")
@@ -224,7 +252,7 @@ describe("project deletion", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "editor@example.com", role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
 
     state.userId = "user-2";
     expect((await request(API).delete(`/api/video/projects/${project.id}`)).status).toBe(403);
@@ -261,7 +289,7 @@ describe("project visibility (public profile track history)", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "editor@example.com", role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
 
     state.userId = "user-2";
     const memberRes = await request(API)
@@ -295,7 +323,7 @@ describe("project visibility (public profile track history)", () => {
     // (participated) even though captain-2 doesn't own it.
     await request(API)
       .post(`/api/video/projects/${owned.id}/members`)
-      .send({ email: "creator2@example.com", role: "ARCHITECT" });
+      .send({ uid: tandemUid("captain-2"), role: "ARCHITECT" });
 
     state.userId = "captain-1";
     const captain1Profile = await request(API).get("/api/video/users/captain-1/projects");
@@ -314,12 +342,12 @@ describe("project visibility (public profile track history)", () => {
 });
 
 describe("members", () => {
-  it("adds a member by email with a leg role", async () => {
+  it("adds a member by Tandem ID with a leg role", async () => {
     const project = await createProject();
     state.userId = "captain-1";
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "editor@example.com", role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
     expect(res.status).toBe(201);
     expect(res.body.userId).toBe("user-2");
     expect(res.body.role).toBe("VISUAL_EDITOR");
@@ -330,29 +358,29 @@ describe("members", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "editor@example.com", role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
     state.userId = "user-2";
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "sound@example.com", role: "SOUND_DESIGNER" });
+      .send({ uid: tandemUid("user-3"), role: "SOUND_DESIGNER" });
     expect(res.status).toBe(403);
   });
 
-  it("rejects unknown emails and duplicate members", async () => {
+  it("rejects unknown Tandem IDs and duplicate members", async () => {
     const project = await createProject();
     state.userId = "captain-1";
     const unknown = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "nobody@example.com", role: "VIEWER" });
+      .send({ uid: "TANDEMZZZZZ", role: "VIEWER" });
     expect(unknown.status).toBe(400);
 
     const added = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "editor@example.com", role: "ARCHITECT" });
+      .send({ uid: tandemUid("user-2"), role: "ARCHITECT" });
     expect(added.status).toBe(201);
     const duplicate = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "editor@example.com", role: "ARCHITECT" });
+      .send({ uid: tandemUid("user-2"), role: "ARCHITECT" });
     expect(duplicate.status).toBe(409);
   });
 });
@@ -415,7 +443,7 @@ describe("vault assets", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ email: "editor@example.com", role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
     state.userId = "user-2";
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/assets`)

@@ -1009,8 +1009,16 @@ export const VideoMemberInputRole = {
   VIEWER: 'VIEWER',
 } as const;
 
+/**
+ * Invite a teammate by their unique Tandem ID (e.g. TANDEM6EUHY) — the handle shown on every user's profile.
+ */
 export interface VideoMemberInput {
-  email: string;
+  /**
+     * The invitee's unique Tandem ID, e.g. TANDEM6EUHY.
+     * @minLength 1
+     * @maxLength 20
+     */
+  uid: string;
   role: VideoMemberInputRole;
 }
 

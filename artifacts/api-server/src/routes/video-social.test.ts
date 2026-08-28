@@ -3,6 +3,7 @@ import express, { type Express } from "express";
 import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { clearUserNameCache } from "../lib/user-names";
+import { tandemUid } from "../lib/tandem-uid";
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -16,7 +17,27 @@ vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: state.userId }),
   clerkClient: {
     users: {
-      getUserList: async (params: { emailAddress?: string[]; userId?: string[] }) => {
+      getUserList: async (params: { limit?: number; offset?: number; emailAddress?: string[]; userId?: string[] }) => {
+        const all = () => {
+          const rows = Object.entries(state.clerkIdToName).map(([id, name]) => {
+            const [first, ...rest] = name.split(" ");
+            return {
+              id,
+              firstName: first || null,
+              lastName: rest.join(" ") || null,
+              username: null,
+              emailAddresses: [],
+              imageUrl: null,
+            };
+          });
+          const known = new Set(Object.keys(state.clerkIdToName));
+          for (const id of Object.values(state.clerkEmailToUser)) {
+            if (id && !known.has(id)) {
+              rows.push({ id, firstName: null, lastName: null, username: null, emailAddresses: [], imageUrl: null });
+            }
+          }
+          return rows;
+        };
         if (params.userId) {
           return {
             data: params.userId.map((id) => {
@@ -32,9 +53,14 @@ vi.mock("@clerk/express", () => ({
             }),
           };
         }
-        const email = params.emailAddress?.[0] ?? "";
-        const id = state.clerkEmailToUser[email] ?? null;
-        return { data: id ? [{ id }] : [] };
+        if (params.emailAddress) {
+          const id = state.clerkEmailToUser[params.emailAddress[0] ?? ""] ?? null;
+          return { data: id ? all().filter((u) => u.id === id) : [] };
+        }
+        const users = all();
+        const offset = params.offset ?? 0;
+        const limit = params.limit ?? users.length;
+        return { data: users.slice(offset, offset + limit) };
       },
     },
   },
@@ -115,7 +141,7 @@ describe("explore — creators", () => {
     state.userId = "captain-1";
     await request(API)
       .post(`/api/video/projects/${owned.id}/members`)
-      .send({ email: "editor@example.com", role: "ARCHITECT" });
+      .send({ uid: tandemUid("user-2"), role: "ARCHITECT" });
 
     state.userId = "captain-1";
     const res = await request(API).get("/api/video/explore/creators");
