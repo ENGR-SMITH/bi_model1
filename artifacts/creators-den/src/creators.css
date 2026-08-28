@@ -22,6 +22,12 @@ select optgroup {
   color: hsl(var(--foreground));
 }
 
+/* The vault page gets a tighter frame — less empty margin around the rails
+   and crew cards than the standard `.page` padding. */
+.page.vault-page {
+  padding: var(--sp-6) clamp(14px, 2vw, 26px) 60px;
+}
+
 /* ---- Role tabs (the four legs) ---- */
 .role-tabs { display: flex; flex-wrap: wrap; gap: 3px; padding: 3px; border: 1px solid hsl(var(--border)); background: hsl(var(--card) / .86); box-shadow: var(--shadow-xs); border-radius: 999px; }
 .role-tabs button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 7px 13px; color: hsl(var(--muted-foreground)); background: transparent; font: 10px var(--app-font-mono); letter-spacing: .04em; text-transform: uppercase; transition: color .18s, background .18s, transform .18s; }
@@ -1051,7 +1057,9 @@ select optgroup {
   border-color: hsl(212 80% 60% / .42);
   background: linear-gradient(180deg, hsl(212 42% 12.5%), hsl(213 34% 9%));
 }
-.snake-card.is-upload:hover { border-color: hsl(212 80% 62% / .6); }
+/* Hover swaps the tone: a blue vault card turns red, a red repeat-upload card
+   turns blue — the two kinds cross-fade on hover. */
+.snake-card.is-upload:hover { border-color: hsl(var(--destructive) / .6); }
 
 /* Later upload of the same file type — red "another take" design: same dashed
    vault shape, but the red role tone so the original stays unmistakable. */
@@ -1059,7 +1067,7 @@ select optgroup {
   border-color: hsl(var(--destructive) / .45);
   background: linear-gradient(180deg, hsl(0 55% 13%), hsl(0 42% 9%));
 }
-.snake-card.is-upload-later:hover { border-color: hsl(var(--destructive) / .6); }
+.snake-card.is-upload-later:hover { border-color: hsl(212 80% 62% / .6); }
 .snake-card.is-upload-later .snake-card-kind { color: hsl(var(--destructive) / .72); }
 .snake-card.is-upload-later .snake-card-meta { border-top-color: hsl(var(--destructive) / .26); }
 .snake-card.is-upload-later .snake-card-id:hover { color: hsl(var(--destructive) / .8); }
@@ -3530,8 +3538,8 @@ select optgroup {
 --------------------------------------------------------------------------- */
 .finish-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
 }
 .finish-card {
   display: flex;

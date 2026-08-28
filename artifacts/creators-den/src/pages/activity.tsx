@@ -26,7 +26,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { Link, useParams } from 'wouter';
+import { Link, useLocation, useParams } from 'wouter';
 import { useListVideoActivity } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { VersionTimeline } from '@/components/version-timeline';
@@ -84,6 +84,29 @@ function eventToNodeKey(ev: LedgerEvent): string | null {
   }
 }
 
+// The review page that opens for a version/upload ledger event — the same
+// mapping the snake cards use, so clicking a ledger row lands on the matching
+// preview page with the node preselected (?v= for versions, ?a= for uploads).
+// FINISH opens the export desk; other events (submissions, reviews…) return
+// null and keep the cross-column pin behaviour.
+const LEDGER_LEG_PREVIEW: Record<string, string> = {
+  SELECTS: '/preview/video',
+  CUT: '/preview/video',
+  SOUND: '/preview/audio',
+  FINISH: '/preview/finish',
+  THUMBNAIL: '/preview/thumbnail',
+};
+
+function ledgerPreviewHref(projectId: string, ev: LedgerEvent): string | null {
+  const page = ev.leg ? LEDGER_LEG_PREVIEW[ev.leg] : null;
+  if (!page || !ev.resourceId) return null;
+  const query =
+    ev.eventType === 'asset_uploaded'
+      ? `?a=${encodeURIComponent(ev.resourceId)}`
+      : `?v=${encodeURIComponent(ev.resourceId)}`;
+  return `/projects/${projectId}${page}${query}`;
+}
+
 function timeAgo(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
   if (seconds < 60) return 'just now';
@@ -120,6 +143,7 @@ function dayLabel(iso: string): string {
 
 export default function ActivityPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const [, setLocation] = useLocation();
   const [leg, setLeg] = useState<string>('all');
   // Cross-column highlight: hovering shows a transient match, clicking pins it
   // until another card is clicked (or the same one again to unpin).
@@ -285,7 +309,14 @@ export default function ActivityPage() {
                           data-testid={`ledger-${ev.eventType}`}
                           onMouseEnter={() => setHoverKey(nodeKey)}
                           onMouseLeave={() => setHoverKey(null)}
-                          onClick={() => nodeKey && togglePin(nodeKey)}
+                          onClick={() => {
+                            const href = ledgerPreviewHref(projectId, ev);
+                            if (href) {
+                              setLocation(href);
+                              return;
+                            }
+                            if (nodeKey) togglePin(nodeKey);
+                          }}
                         >
                           <span className={`cd-ledger-dot ${meta.tone}`} aria-hidden>
                             <Icon size={13} />
