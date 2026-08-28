@@ -265,6 +265,7 @@ export function AudioDiffMap({
       <div className="df-audio-stage" ref={stageRef}>
         <div className="df-audio-rows">
           <div className="df-wave-row" ref={newerLaneRef}>
+            <span className="df-pane-label" data-testid="df-audio-label-newer">NEWEST</span>
             {newerPcm ? (
               <WaveformLane
                 samples={fadeIn(newerPcm.samples, 0.01, ANALYSIS_RATE)}
@@ -293,6 +294,7 @@ export function AudioDiffMap({
             />
           </div>
           <div className="df-wave-row">
+            <span className="df-pane-label df-right" data-testid="df-audio-label-older">OLDER</span>
             {olderPcm ? (
               <WaveformLane
                 samples={fadeIn(olderPcm.samples, 0.01, ANALYSIS_RATE)}
