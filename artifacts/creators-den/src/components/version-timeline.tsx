@@ -31,12 +31,31 @@
 // ---------------------------------------------------------------------------
 
 import { useMemo, type CSSProperties } from 'react';
-import { Film, History, Image as ImageIcon, Music, Paperclip } from 'lucide-react';
+import { ArrowUpRight, Film, History, Image as ImageIcon, Music, Paperclip } from 'lucide-react';
+import { useLocation } from 'wouter';
 import {
   useGetVideoProject,
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import { RELAY_LEGS } from '@/components/shell';
+
+// A node's relay leg maps to the preview page that reviews that media. Clicking
+// a card opens that page with the node preselected in the "Timeline versions"
+// carousel — versions via `?v=`, vault uploads via `?a=`. FINISH has no preview
+// page yet, so its cards keep the plain pin behaviour.
+const LEG_PREVIEW: Record<string, string> = {
+  SELECTS: '/preview/video',
+  CUT: '/preview/video',
+  SOUND: '/preview/audio',
+  THUMBNAIL: '/preview/thumbnail',
+};
+
+function previewHrefFor(projectId: string, node: TLNode): string | null {
+  const page = node.leg ? LEG_PREVIEW[node.leg] : null;
+  if (!page) return null;
+  const query = node.kind === 'version' ? `?v=${encodeURIComponent(node.id)}` : `?a=${encodeURIComponent(node.id)}`;
+  return `/projects/${projectId}${page}${query}`;
+}
 
 const LEG_TONES: Record<string, string> = {
   SELECTS: 'gold',
@@ -195,6 +214,7 @@ export function VersionTimeline({
   onHover: (key: string | null) => void;
   onPin: (key: string | null) => void;
 }) {
+  const [, setLocation] = useLocation();
   const selects = useListVideoTimelineVersions(projectId, 'SELECTS');
   const cut = useListVideoTimelineVersions(projectId, 'CUT');
   const sound = useListVideoTimelineVersions(projectId, 'SOUND');
@@ -305,12 +325,21 @@ export function VersionTimeline({
     if (opts.lone && opts.col == null) style.gridColumn = '1 / -1';
     else if (opts.col) style.gridColumn = String(opts.col);
 
-    // Cross-column sync: hovering or clicking a card highlights the matching
-    // ledger row (and vice versa). Clicking again unpins.
+    // Cards jump to the preview page that reviews this leg's media, with the
+    // node preselected in the "Timeline versions" carousel. Cards for legs
+    // without a preview page (FINISH) keep the cross-column pin behaviour;
+    // hovering always highlights the matching ledger row.
+    const previewHref = previewHrefFor(projectId, node);
     const syncHandlers = {
       onMouseEnter: () => onHover(keyOf(node)),
       onMouseLeave: () => onHover(null),
-      onClick: () => onPin(keyOf(node)),
+      onClick: () => {
+        if (previewHref) {
+          setLocation(previewHref);
+          return;
+        }
+        onPin(keyOf(node));
+      },
     };
 
     const className = [
@@ -352,6 +381,11 @@ export function VersionTimeline({
             <span className="snake-card-file" title={node.fileName}>
               {node.fileName}
             </span>
+            {previewHref && (
+              <span className="snake-open" title="Open in preview" aria-hidden>
+                <ArrowUpRight size={12} />
+              </span>
+            )}
           </div>
           <p className="snake-card-kind">{KIND_LABELS[node.assetKind ?? ''] ?? node.assetKind}</p>
           <div className="snake-card-meta">
@@ -388,6 +422,11 @@ export function VersionTimeline({
           </span>
           <span className="snake-card-ver">v{node.versionNo}</span>
           {isHead && <span className="snake-card-latest">Latest</span>}
+          {previewHref && (
+            <span className="snake-open" title="Open in preview" aria-hidden>
+              <ArrowUpRight size={12} />
+            </span>
+          )}
         </div>
         {node.message && <p className="snake-card-msg">{node.message}</p>}
         <div className="snake-card-meta">

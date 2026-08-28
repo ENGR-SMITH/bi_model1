@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ArrowLeft, Play } from 'lucide-react';
-import { Link, useParams } from 'wouter';
+import { Link, useParams, useSearch } from 'wouter';
 import {
   getGetVideoAssetQueryKey,
   getGetVideoTimelineVersionQueryKey,
@@ -236,10 +236,34 @@ export default function VideoPreviewPage() {
   // Diff-map settings, driven by the settings dropdown beside the toggle.
   const [diffSettings, setDiffSettings] = useState<DiffSettings>(DEFAULT_DIFF_SETTINGS);
 
+  // A deep link from the Timeline page: ?v=<versionId> or ?a=<assetId>
+  // preselects that exact item in the "Timeline versions" carousel.
+  const search = useSearch();
+  const queryPick = useMemo(() => {
+    const params = new URLSearchParams(search);
+    const v = params.get('v');
+    if (v) return { kind: 'version' as const, id: v };
+    const a = params.get('a');
+    if (a) return { kind: 'asset' as const, id: a };
+    return null;
+  }, [search]);
+
   // Default to a version with diff-able history once the list arrives (unless
   // a vault file has been picked from the timeline row).
   useEffect(() => {
     if (selectedId || vaultAssetId) return;
+    // The linked item wins over the defaults once it is present in the list.
+    if (queryPick) {
+      if (queryPick.kind === 'version') {
+        if (versions.some((v) => v.id === queryPick.id)) {
+          setSelectedId(queryPick.id);
+          return;
+        }
+      } else if (diffVersions.some((s) => s.key === `asset-${queryPick.id}`)) {
+        setVaultAssetId(queryPick.id);
+        return;
+      }
+    }
     if (versions.length > 0) {
       // Prefer the newest version that actually has an older sibling to
       // compare against, so the diff-map engages on open whenever the
@@ -263,7 +287,7 @@ export default function VideoPreviewPage() {
     const firstAsset = withDiff ?? byRecency[0];
     if (firstAsset) setVaultAssetId(firstAsset.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versions, selectedId, vaultAssetId, project.data?.assets, diffVersions]);
+  }, [versions, selectedId, vaultAssetId, project.data?.assets, diffVersions, queryPick]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
   const selectedDetail = useGetVideoTimelineVersion(projectId, selected?.leg ?? '', selected?.id ?? '', {

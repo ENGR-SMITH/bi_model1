@@ -1067,6 +1067,16 @@ select optgroup {
   color: hsl(var(--accent)); background: hsl(var(--accent) / .13);
   box-shadow: inset 0 0 0 1px hsl(var(--accent) / .3);
 }
+
+/* Cards that open their leg's preview page carry a subtle corner arrow. */
+.snake-open {
+  margin-left: auto; flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 999px;
+  color: hsl(var(--muted-foreground)); background: hsl(var(--foreground) / .06);
+  transition: color .15s ease, background .15s ease, transform .15s ease;
+}
+.snake-card.is-head .snake-open { margin-left: 2px; } /* sits right after the Latest chip */
+.snake-card:hover .snake-open { color: hsl(var(--accent)); background: hsl(var(--accent) / .12); transform: translate(1px, -1px); }
 .snake-card-msg { margin: 0; font: 500 13px var(--app-font-sans); line-height: 1.5; color: hsl(var(--foreground) / .9); overflow-wrap: anywhere; }
 
 .snake-card-meta {
