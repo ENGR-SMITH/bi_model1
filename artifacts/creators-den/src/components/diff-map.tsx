@@ -143,16 +143,16 @@ export function DiffMap({
   const [wipePos, setWipePos] = useState(0.8);
   const [mismatch, setMismatch] = useState(false);
   const [ready, setReady] = useState(false);
-  // The older (reference) media loads independently — track its readiness so
+  // The second (hidden) media loads independently — track its readiness so
   // the diff redraws the moment it arrives instead of staying blank on open.
-  const [olderReady, setOlderReady] = useState(false);
+  const [secondReady, setSecondReady] = useState(false);
 
   const newerVideoRef = useRef<HTMLVideoElement>(null);
   const olderVideoRef = useRef<HTMLVideoElement>(null);
   const newerImgRef = useRef<HTMLImageElement>(null);
   const olderImgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const newestPaneRef = useRef<HTMLDivElement>(null);
+  const olderPaneRef = useRef<HTMLDivElement>(null);
   const mapPaneRef = useRef<HTMLDivElement>(null);
   const surfRef = useRef<HTMLElement>(null);
   const draggingRef = useRef(false);
@@ -163,20 +163,21 @@ export function DiffMap({
 
   const isImage = kind === 'image';
 
-  // Determine duration + readiness once media metadata loads. The older
-  // (reference) media may arrive after the newer one — `olderReady` flips from
-  // its own load events so the diff redraws once both sides are available.
+  // Determine duration + readiness once media metadata loads. The visible
+  // (oldest) media drives the shared playhead/duration; the hidden (newest)
+  // media may arrive after it — `secondReady` flips from its own load events
+  // so the diff redraws once both sides are available.
   useEffect(() => {
     setReady(false);
-    setOlderReady(false);
+    setSecondReady(false);
     if (isImage) {
-      if (newerImgRef.current?.complete && olderImgRef.current?.complete) {
+      if (olderImgRef.current?.complete && newerImgRef.current?.complete) {
         setReady(true);
-        setOlderReady(true);
+        setSecondReady(true);
       }
       return;
     }
-    const v = newerVideoRef.current;
+    const v = olderVideoRef.current;
     if (!v) return;
     const onMeta = () => {
       if (Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration);
@@ -281,19 +282,19 @@ export function DiffMap({
       });
     }, 70);
     return () => window.clearTimeout(timer);
-  }, [playhead, duration, ready, olderReady, isImage, playing]);
+  }, [playhead, duration, ready, secondReady, isImage, playing]);
 
-  // Image: draw once ready (and once the older still arrives), and on
+  // Image: draw once ready (and once the second still arrives), and on
   // sensitivity/wipe changes.
   useEffect(() => {
     if (isImage) drawRef.current();
-  }, [sensitivity, wipePos, ready, olderReady, isImage, newerAssetId, olderAssetId]);
+  }, [sensitivity, wipePos, ready, secondReady, isImage, newerAssetId, olderAssetId]);
 
   // Redraw instantly on wipe / sensitivity drags without seeking.
   useEffect(() => {
     if (!ready) return;
     drawRef.current();
-  }, [wipePos, sensitivity, ready, olderReady]);
+  }, [wipePos, sensitivity, ready, secondReady]);
 
   // Dual-video sync + redraw on timeupdate.
   useEffect(() => {
@@ -358,20 +359,20 @@ export function DiffMap({
     <section className="df-surf" ref={surfRef} data-testid="diff-map">
       <div className="df-stage">
         {!isImage && (
-          <video ref={olderVideoRef} src={olderUrl} muted playsInline preload="auto" className="df-hidden" onLoadedMetadata={() => setOlderReady(true)} onCanPlay={() => setOlderReady(true)} data-testid="df-video-older" />
+          <video ref={newerVideoRef} src={newerUrl} muted playsInline preload="auto" className="df-hidden" onLoadedMetadata={() => setSecondReady(true)} onCanPlay={() => setSecondReady(true)} data-testid="df-video-newer" />
         )}
         {isImage && (
-          <img ref={olderImgRef} src={olderUrl} alt="" className="df-hidden" onLoad={() => { setReady(true); setOlderReady(true); }} data-testid="df-img-older" />
+          <img ref={newerImgRef} src={newerUrl} alt="" className="df-hidden" onLoad={() => setSecondReady(true)} data-testid="df-img-newer" />
         )}
         <div className="df-split">
-          {/* Left pane — the older reference media. */}
-          <div className="df-pane" ref={newestPaneRef}>
+          {/* Left pane — the older reference media (labeled OLDEST). */}
+          <div className="df-pane" ref={olderPaneRef}>
             <span className="df-pane-label" data-testid="df-pane-label-oldest">OLDEST</span>
             {isImage ? (
-              <img ref={newerImgRef} src={newerUrl} alt={newerLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-newer" />
+              <img ref={olderImgRef} src={olderUrl} alt={olderLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-older" />
             ) : (
-              <video ref={newerVideoRef} src={newerUrl} muted={!playing} playsInline preload="auto" autoPlay={undefined} className="df-pane-media" onLoadedMetadata={() => {
-                const v = newerVideoRef.current;
+              <video ref={olderVideoRef} src={olderUrl} muted={!playing} playsInline preload="auto" autoPlay={undefined} className="df-pane-media" onLoadedMetadata={() => {
+                const v = olderVideoRef.current;
                 if (v && Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration);
                 setReady(true);
               }} data-testid="df-pane-video" />
