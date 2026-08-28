@@ -193,6 +193,23 @@ export function PreviewDiff({
     );
   }
 
+  // Both versions resolve to the same vault asset. The pixel diff between an
+  // asset and itself is a meaningless, all-gray frame — surface that clearly
+  // instead of rendering a blank diff the user would read as "not working".
+  if (newerAssetId === olderAssetId) {
+    return (
+      <div className="preview-diff-panel preview-diff-note" data-testid="preview-diff">
+        <p>
+          Both {leg === 'THUMBNAIL' ? 'versions' : 'versions'} reference the
+          same media (<b className="mono-label">{newerAssetId.slice(0, 8)}</b>) —
+          there's no difference to map. Give{'  '}
+          <b>v{own.data.version}</b> a different clip than{' '}
+          <b>v{prev.data.version}</b> to compare.
+        </p>
+      </div>
+    );
+  }
+
   if (VIDEO_LIKE_LEGS.has(leg)) {
     return (
       <div className="preview-diff-panel" data-testid="preview-diff">

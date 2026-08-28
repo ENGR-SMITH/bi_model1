@@ -150,13 +150,13 @@ export function PreviewCanvasColumn({
 }) {
   const showDiff = hasDiff && view === 'diff';
   return (
-    <div className="pv-canvas-col">
+    <>
       <div className="pv-canvas-head">
         {eyebrow}
         <PreviewViewToggle view={view} onChange={onViewChange} hasDiff={hasDiff} />
       </div>
       {showDiff ? <div className="pv-canvas-col-full">{diff}</div> : preview}
-    </div>
+    </>
   );
 }
 
