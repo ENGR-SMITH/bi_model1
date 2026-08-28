@@ -43,12 +43,14 @@ import { RELAY_LEGS } from '@/components/shell';
 
 // A node's relay leg maps to the preview page that reviews that media. Clicking
 // a card opens that page with the node preselected in the "Timeline versions"
-// carousel — versions via `?v=`, vault uploads via `?a=`. FINISH has no preview
-// page yet, so its cards keep the plain pin behaviour.
+// carousel — versions via `?v=`, vault uploads via `?a=`. Every leg maps to a
+// page (FINISH opens the export desk), so every card — including the newest
+// "Latest" card — navigates instead of just pinning.
 const LEG_PREVIEW: Record<string, string> = {
   SELECTS: '/preview/video',
   CUT: '/preview/video',
   SOUND: '/preview/audio',
+  FINISH: '/preview/finish',
   THUMBNAIL: '/preview/thumbnail',
 };
 

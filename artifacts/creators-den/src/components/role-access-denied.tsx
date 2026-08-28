@@ -16,13 +16,6 @@ export function RoleAccessDenied({ role, projectId }: { role: string; projectId:
         <span className="film-strip film-strip-b" />
         <VideoOff size={44} className="film-cross-icon" />
       </div>
-      <div className="page-guide">
-        <span className="guide-pin" />
-        <div>
-          <b>STUDIO LOCKED</b>
-          <span>The {role} studio is not in your crew role.</span>
-        </div>
-      </div>
       <h1 style={{ font: '700 clamp(30px, 4vw, 43px) var(--app-font-serif)', letterSpacing: '-.045em', margin: '9px 0 20px' }}>
         You can't access the {role} page.
       </h1>
