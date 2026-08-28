@@ -178,8 +178,8 @@ router.post("/video/projects", async (req, res): Promise<void> => {
   res.status(201).json(
     CreateVideoProjectResponse.parse({
       ...project,
-      myRoles: member.roles,
-      members: [{ ...member, name: captainNames[member.userId] ?? null }],
+      myRoles: member.roles ?? [],
+      members: [{ ...member, roles: member.roles ?? [], name: captainNames[member.userId] ?? null }],
       assets: [],
     }),
   );
@@ -239,8 +239,8 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
   res.json(
     GetVideoProjectResponse.parse({
       ...project,
-      myRoles: member.roles,
-      members: members.map((row) => ({ ...row, name: memberNames[row.userId] ?? null })),
+      myRoles: member.roles ?? [],
+      members: members.map((row) => ({ ...row, roles: row.roles ?? [], name: memberNames[row.userId] ?? null })),
       assets,
     }),
   );
@@ -541,9 +541,10 @@ router.post(
     // edit step.
     const existing = await requireMember(project.id, clerkUserId);
     if (existing) {
-      const merged = existing.roles.includes(body.data.role)
-        ? existing.roles
-        : [...existing.roles, body.data.role];
+      const existingRoles = existing.roles ?? [];
+      const merged = existingRoles.includes(body.data.role)
+        ? existingRoles
+        : [...existingRoles, body.data.role];
       const [updated] = await db
         .update(tandemVideoMembersTable)
         .set({ roles: merged })
@@ -629,7 +630,7 @@ router.patch(
       res.status(404).json({ error: "Member not found" });
       return;
     }
-    if (member.roles.includes("CAPTAIN")) {
+    if ((member.roles ?? []).includes("CAPTAIN")) {
       res.status(403).json({ error: "The Captain's roles cannot be changed" });
       return;
     }
@@ -701,7 +702,7 @@ router.delete(
       res.status(404).json({ error: "Member not found" });
       return;
     }
-    if (member.roles.includes("CAPTAIN")) {
+    if ((member.roles ?? []).includes("CAPTAIN")) {
       res.status(403).json({ error: "The Captain cannot be removed" });
       return;
     }

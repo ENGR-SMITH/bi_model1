@@ -116,7 +116,7 @@ router.post(
     }
 
     const member = await requireMember(params.data.projectId, userId);
-    if (!member || (!member.roles.includes("CAPTAIN") && !member.roles.includes(LEG_ROLES.SELECTS))) {
+    if (!member || (!(member.roles ?? []).includes("CAPTAIN") && !(member.roles ?? []).includes(LEG_ROLES.SELECTS))) {
       res.status(403).json({ error: "Only the Video editor (or the Captain) can analyze a reference" });
       return;
     }
@@ -209,7 +209,11 @@ router.get(
       .where(eq(tandemVideoGrantsTable.projectId, params.data.projectId))
       .orderBy(desc(tandemVideoGrantsTable.createdAt));
 
-    res.json(ListVideoGrantsResponse.parse(grants));
+    res.json(
+      ListVideoGrantsResponse.parse(
+        grants.map((grant) => ({ ...grant, roles: grant.roles ?? [] })),
+      ),
+    );
   },
 );
 

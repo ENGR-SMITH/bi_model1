@@ -11,6 +11,7 @@
     "test": "vitest run",
     "workers": "node --enable-source-maps ./dist/workers/all.mjs",
     "backfill:hashes": "node --enable-source-maps ./dist/scripts/backfill-content-hashes.mjs",
+    "backfill:roles": "node --enable-source-maps ./dist/scripts/backfill-roles.mjs",
     "consolidate:hashes": "node --enable-source-maps ./dist/scripts/consolidate-content-hashes.mjs",
     "worker:proxy": "node --enable-source-maps ./dist/workers/proxy-worker.mjs",
     "worker:transcribe": "node --enable-source-maps ./dist/workers/transcribe-worker.mjs",

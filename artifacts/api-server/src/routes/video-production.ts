@@ -155,8 +155,8 @@ async function requireLegEditor(
 ): Promise<TandemVideoMember | null> {
   const member = await requireMember(projectId, userId);
   if (!member) return null;
-  if (member.roles.includes("CAPTAIN")) return member;
-  return member.roles.includes(LEG_ROLES[leg]) ? member : null;
+  if ((member.roles ?? []).includes("CAPTAIN")) return member;
+  return (member.roles ?? []).includes(LEG_ROLES[leg]) ? member : null;
 }
 
 async function buildTimelineResponse(projectId: string, leg: string) {
@@ -1166,7 +1166,7 @@ router.patch(
     }
 
     const isAuthor = comment.authorId === userId;
-    const isCaptain = member.roles.includes("CAPTAIN");
+    const isCaptain = (member.roles ?? []).includes("CAPTAIN");
     if (!isAuthor && !isCaptain) {
       res.status(403).json({ error: "Only the author or the Captain can resolve this comment" });
       return;

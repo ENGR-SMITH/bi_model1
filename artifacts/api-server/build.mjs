@@ -29,6 +29,7 @@ async function buildAll() {
     entryPoints: [
       path.resolve(artifactDir, "src/index.ts"),
       path.resolve(artifactDir, "src/scripts/backfill-content-hashes.ts"),
+      path.resolve(artifactDir, "src/scripts/backfill-roles.ts"),
       path.resolve(artifactDir, "src/scripts/consolidate-content-hashes.ts"),
       ...workerEntryPoints,
     ],
