@@ -28,14 +28,16 @@ import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { formatTimecode } from '@/components/timeline';
 import {
   FullscreenButton,
+  PreviewCanvasColumn,
   PreviewLayout,
   PreviewNotesPanel,
   VAULT_KIND_LABELS,
   VersionCarousel,
   type CarouselItem,
   type PreviewVersion,
+  type PreviewView,
 } from '@/components/preview-shared';
-import { PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
+import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
 import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
 import type { StudioLeg } from '@/components/role-oracle';
 
@@ -223,6 +225,8 @@ export default function VideoPreviewPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
+  // Preview / split-screen diff-map toggle for the big-canvas column.
+  const [view, setView] = useState<PreviewView>('preview');
 
   // Default to the newest version once the list arrives (unless a vault file
   // has been picked from the timeline row).
@@ -241,6 +245,19 @@ export default function VideoPreviewPage() {
   // While a vault file is being previewed there is no active version — the
   // canvas shows the picked file instead of the newest version's clip.
   const activeVersion = vaultAssetId ? null : selected;
+
+  // The selected version as a diff selection, plus whether it actually has an
+  // older predecessor to diff against (oldest / lone → no diff-map).
+  const activeSelection: PreviewDiffSelection | null = activeVersion
+    ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version }
+    : null;
+  const hasDiff = Boolean(activeSelection && predecessorOf(diffVersions, activeSelection));
+
+  // If the selected version suddenly has no older version to compare (e.g. the
+  // oldest one is picked), fall the column back to the plain preview view.
+  useEffect(() => {
+    if (!hasDiff) setView('preview');
+  }, [hasDiff]);
 
   // Timeline row: versions (newest first) + the vault's video uploads.
   const carouselItems = useMemo<CarouselItem[]>(() => {
@@ -305,24 +322,32 @@ export default function VideoPreviewPage() {
   return (
     <PreviewLayout
       canvas={
-        <>
-          <VideoCanvas
-            projectId={p.id}
-            version={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
-            assets={p.assets}
-            vaultAssetId={vaultAssetId ?? undefined}
-            seekRequest={seekRequest}
-          />
-          {/* Split-screen VCS: the selected version vs its immediate predecessor,
-              shown beneath the canvas when there's an older version to compare. */}
-          <PreviewDiff
-            projectId={p.id}
-            leg={activeVersion?.leg ?? 'SELECTS'}
-            versions={diffVersions}
-            selected={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, parentVersionId: undefined } : null}
-            fallbackAssetIds={(p.assets ?? []).filter((a) => VIDEO_KINDS.has(a.kind)).map((a) => a.id)}
-          />
-        </>
+        <PreviewCanvasColumn
+          view={view}
+          onViewChange={setView}
+          hasDiff={hasDiff}
+          eyebrow={<span className="eyebrow">Big canvas</span>}
+          preview={
+            <VideoCanvas
+              projectId={p.id}
+              version={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+              assets={p.assets}
+              vaultAssetId={vaultAssetId ?? undefined}
+              seekRequest={seekRequest}
+            />
+          }
+          diff={
+            // Split-screen VCS: the selected version vs its immediate
+            // predecessor (renders nothing for the oldest / lone version).
+            <PreviewDiff
+              projectId={p.id}
+              leg={activeVersion?.leg ?? 'SELECTS'}
+              versions={diffVersions}
+              selected={activeSelection}
+              fallbackAssetIds={(p.assets ?? []).filter((a) => VIDEO_KINDS.has(a.kind)).map((a) => a.id)}
+            />
+          }
+        />
       }
       rail={
         <PreviewNotesPanel

@@ -21,15 +21,17 @@ import {
 import { useProjectRealtime } from '@/lib/realtime';
 import { EmptyPlayer, ImageStage, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
-import { PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
+import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
 import {
   FullscreenButton,
+  PreviewCanvasColumn,
   PreviewLayout,
   PreviewNotesPanel,
   VAULT_KIND_LABELS,
   VersionCarousel,
   type CarouselItem,
   type PreviewVersion,
+  type PreviewView,
 } from '@/components/preview-shared';
 
 const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
@@ -152,6 +154,8 @@ export default function ThumbnailPreviewPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
+  // Preview / split-screen diff-map toggle for the big-canvas column.
+  const [view, setView] = useState<PreviewView>('preview');
 
   useEffect(() => {
     if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
@@ -167,6 +171,19 @@ export default function ThumbnailPreviewPage() {
 
   // While a vault file is being previewed there is no active version.
   const activeVersion = vaultAssetId ? null : selected;
+
+  // The selected version as a diff selection, plus whether it actually has an
+  // older predecessor to diff against (oldest / lone → no diff-map).
+  const activeSelection: PreviewDiffSelection | null = activeVersion
+    ? { id: activeVersion.id, leg: 'THUMBNAIL', version: activeVersion.version }
+    : null;
+  const hasDiff = Boolean(activeSelection && predecessorOf(diffVersions, activeSelection));
+
+  // If the selected version suddenly has no older version to compare (e.g. the
+  // oldest one is picked), fall the column back to the plain preview view.
+  useEffect(() => {
+    if (!hasDiff) setView('preview');
+  }, [hasDiff]);
 
   // Timeline row: versions (newest first) + the vault's image uploads.
   const carouselItems = useMemo<CarouselItem[]>(() => {
@@ -234,23 +251,31 @@ export default function ThumbnailPreviewPage() {
   return (
     <PreviewLayout
       canvas={
-        <>
-          <ThumbnailCanvas
-            projectId={p.id}
-            version={activeVersion ? { id: activeVersion.id, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
-            assets={p.assets}
-            vaultAssetId={vaultAssetId ?? undefined}
-          />
-          {/* Split-screen VCS: the selected version vs its immediate predecessor,
-              shown beneath the canvas when there's an older version to compare. */}
-          <PreviewDiff
-            projectId={p.id}
-            leg="THUMBNAIL"
-            versions={diffVersions}
-            selected={activeVersion ? { id: activeVersion.id, leg: activeVersion.leg, version: activeVersion.version } : null}
-            fallbackAssetIds={(p.assets ?? []).filter((a) => IMAGE_KINDS.has(a.kind)).map((a) => a.id)}
-          />
-        </>
+        <PreviewCanvasColumn
+          view={view}
+          onViewChange={setView}
+          hasDiff={hasDiff}
+          eyebrow={<span className="eyebrow">Big canvas</span>}
+          preview={
+            <ThumbnailCanvas
+              projectId={p.id}
+              version={activeVersion ? { id: activeVersion.id, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
+              assets={p.assets}
+              vaultAssetId={vaultAssetId ?? undefined}
+            />
+          }
+          diff={
+            // Split-screen VCS: the selected version vs its immediate
+            // predecessor (renders nothing for the oldest / lone version).
+            <PreviewDiff
+              projectId={p.id}
+              leg="THUMBNAIL"
+              versions={diffVersions}
+              selected={activeSelection}
+              fallbackAssetIds={(p.assets ?? []).filter((a) => IMAGE_KINDS.has(a.kind)).map((a) => a.id)}
+            />
+          }
+        />
       }
       rail={
         <PreviewNotesPanel

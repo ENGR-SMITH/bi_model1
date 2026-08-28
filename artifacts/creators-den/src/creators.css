@@ -1944,6 +1944,77 @@ select optgroup {
   overflow-y: auto;
 }
 
+/* Column header — eyebrow on the left, the preview / diff-map toggle on the
+   right. Sits above whichever surface fills the column (media card or diff). */
+.pv-canvas-head {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Segmented view toggle (Preview / Diff map) at the top of the canvas column. */
+.pv-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9px;
+  background: hsl(var(--secondary) / .35);
+  box-shadow: var(--shadow-sm);
+}
+.pv-view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font: 600 11px var(--app-font-sans);
+  letter-spacing: .02em;
+  cursor: pointer;
+  transition: color .15s, background .15s, box-shadow .15s;
+}
+.pv-view-toggle-btn:hover:not(:disabled) { color: hsl(var(--foreground)); }
+.pv-view-toggle-btn.active {
+  background: hsl(var(--card));
+  color: hsl(var(--accent));
+  box-shadow: var(--shadow-sm);
+}
+.pv-view-toggle-btn.disabled {
+  opacity: .45;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.pv-view-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: hsl(var(--accent));
+  box-shadow: 0 0 6px hsl(var(--accent) / .8);
+}
+
+/* When switched to diff mode, the diff surface fills the whole canvas column
+   (like the media card does in preview mode) instead of the 48%-height
+   sub-panel used when shown below the canvas. */
+.pv-canvas-col-full {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pv-canvas-col-full .preview-diff-panel {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
 /* Split-screen VCS diff panel — sits under the big canvas in the first
    column. Keeps the canvas dominant and scrolls internally if the compare
    surface is taller than the space left over. */
