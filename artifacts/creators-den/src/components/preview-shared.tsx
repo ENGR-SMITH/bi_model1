@@ -74,6 +74,93 @@ export function PreviewLayout({ canvas, rail, versions }: { canvas: ReactNode; r
 }
 
 // ---------------------------------------------------------------------------
+// PreviewViewToggle — the top-of-column control that switches the big-canvas
+// column between the plain media preview and the split-screen diff map (the
+// version-control comparison surface). "Diff map" is dimmed / non-switchable
+// when the selected version has no older version to compare against (oldest /
+// lone version), so the column stays on the single preview in that case.
+// ---------------------------------------------------------------------------
+
+export type PreviewView = 'preview' | 'diff';
+
+export function PreviewViewToggle({
+  view,
+  onChange,
+  hasDiff,
+}: {
+  view: PreviewView;
+  onChange: (view: PreviewView) => void;
+  /** False when the selected version has no older version to compare with. */
+  hasDiff: boolean;
+}) {
+  const segments: Array<{ value: PreviewView; label: string; title: string; glow?: boolean }> = [
+    { value: 'preview', label: 'Preview', title: 'Show the selected media on its own' },
+    { value: 'diff', label: 'Diff map', title: hasDiff ? 'Compare the selected version against its older predecessor' : 'No older version to compare this against yet', glow: true },
+  ];
+  return (
+    <div className="pv-view-toggle" role="tablist" aria-label="Canvas view" data-testid="preview-view-toggle">
+      {segments.map((segment) => {
+        const disabled = segment.value === 'diff' && !hasDiff;
+        const active = view === segment.value;
+        return (
+          <button
+            key={segment.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            disabled={disabled}
+            className={['pv-view-toggle-btn', active ? 'active' : '', disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
+            onClick={() => onChange(segment.value)}
+            title={segment.title}
+            data-testid={active ? `preview-view-${segment.value}-active` : `preview-view-${segment.value}`}
+          >
+            {segment.label}
+            {segment.glow && hasDiff && <span className="pv-view-toggle-dot" aria-hidden />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PreviewCanvasColumn — the top-of-column header holding the canvas eyebrow +
+// the PreviewViewToggle, then the column content switched on `view`. In
+// "diff" mode the split-screen diff surface fills the column in place of the
+// single media preview.
+// ---------------------------------------------------------------------------
+
+export function PreviewCanvasColumn({
+  view,
+  onViewChange,
+  hasDiff,
+  eyebrow,
+  preview,
+  diff,
+}: {
+  view: PreviewView;
+  onViewChange: (view: PreviewView) => void;
+  hasDiff: boolean;
+  /** Label shown in the column header, e.g. the canvas eyebrow. */
+  eyebrow?: ReactNode;
+  /** The plain media card (video / waveform / image). */
+  preview: ReactNode;
+  /** The split-screen diff surface (or a notice when nothing to compare). */
+  diff: ReactNode;
+}) {
+  const showDiff = hasDiff && view === 'diff';
+  return (
+    <div className="pv-canvas-col">
+      <div className="pv-canvas-head">
+        {eyebrow}
+        <PreviewViewToggle view={view} onChange={onViewChange} hasDiff={hasDiff} />
+      </div>
+      {showDiff ? <div className="pv-canvas-col-full">{diff}</div> : preview}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // VersionCarousel — horizontal scroll row of timeline versions.
 // ---------------------------------------------------------------------------
 
