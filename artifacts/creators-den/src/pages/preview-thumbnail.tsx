@@ -179,8 +179,24 @@ export default function ThumbnailPreviewPage() {
   const [diffSettings, setDiffSettings] = useState<DiffSettings>(DEFAULT_DIFF_SETTINGS);
 
   useEffect(() => {
-    if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
-  }, [versions, selectedId, vaultAssetId]);
+    if (selectedId || vaultAssetId) return;
+    if (versions.length > 0) {
+      // Prefer the newest version that actually has an older sibling to
+      // compare against, so the diff-map engages on open whenever the
+      // timeline has history.
+      const withDiff = versions.find((v) => {
+        const item = diffVersions.find((s) => s.key === `version-${v.id}`);
+        return item ? Boolean(predecessorOf(diffVersions, item)) : false;
+      });
+      setSelectedId((withDiff ?? versions[0]).id);
+      return;
+    }
+    // No saved versions yet — default to the newest vault design image so the
+    // diff still engages when only raw uploads exist.
+    const firstAsset = (project.data?.assets ?? []).find((a) => IMAGE_KINDS.has(a.kind));
+    if (firstAsset) setVaultAssetId(firstAsset.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions, selectedId, vaultAssetId, project.data?.assets]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
   const selectedDetail = useGetVideoTimelineVersion(projectId, selected?.leg ?? '', selected?.id ?? '', {
@@ -208,15 +224,17 @@ export default function ThumbnailPreviewPage() {
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
 
   // Default the column to the diff map when the timeline has something to
-  // compare (2+ items), otherwise keep the plain preview.
+  // compare (2+ items), otherwise keep the plain preview. Waits until the
+  // selection has actually resolved — diffVersions can be non-empty from vault
+  // files before the versions list arrives, and hasDiff isn't meaningful then.
   const defaultedRef = useRef(false);
   useEffect(() => {
     if (defaultedRef.current) return;
-    if (diffVersions.length === 0) return; // still loading
+    if (!selected && !vaultAssetId) return; // selection not resolved yet
     defaultedRef.current = true;
     setView(hasDiff ? 'diff' : 'preview');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasDiff, diffVersions.length]);
+  }, [hasDiff, diffVersions.length, selected, vaultAssetId]);
 
   // If the selected version suddenly has no older version to compare (e.g. the
   // oldest one is picked), fall the column back to the plain preview view.
