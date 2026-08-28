@@ -1,6 +1,7 @@
 import { createInsertSchema } from "drizzle-zod";
 import {
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -30,14 +31,16 @@ export const tandemVideoProjectsTable = pgTable("tandem_video_projects", {
 
 // One row per (project, user). The Captain is the owner; every leg role maps
 // to one of the roles below. Identity is the Clerk user id, shared with the
-// rest of the parent app.
+// rest of the parent app. A member can hold several roles at once (e.g.
+// VIDEO + THUMBNAIL), so `roles` is an array; CAPTAIN is granted at creation.
 export const tandemVideoMembersTable = pgTable(
   "tandem_video_members",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
     userId: text("user_id").notNull(),
-    role: text("role").notNull().default("VIEWER"),
+    // JSON array of role strings, e.g. ["VIDEO", "THUMBNAIL"].
+    roles: jsonb("roles").$type<string[]>().notNull().default([]),
     status: text("status").notNull().default("ACTIVE"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -101,14 +104,13 @@ export type TandemVideoProject = typeof tandemVideoProjectsTable.$inferSelect;
 export type TandemVideoMember = typeof tandemVideoMembersTable.$inferSelect;
 export type TandemVideoAsset = typeof tandemVideoAssetsTable.$inferSelect;
 export type TandemVideoFollow = typeof tandemVideoFollowsTable.$inferSelect;
-export type TandemVideoRole = "CAPTAIN" | "UPLOADER" | "ARCHITECT" | "VISUAL_EDITOR" | "SOUND_DESIGNER" | "MOTION_COLOR" | "THUMBNAIL_DESIGNER" | "VIEWER";
+export type TandemVideoRole = "CAPTAIN" | "VIDEO" | "AUDIO" | "SCRIPT" | "THUMBNAIL" | "UPLOADER" | "VIEWER";
 export const tandemVideoRoleSchema = z.enum([
   "CAPTAIN",
+  "VIDEO",
+  "AUDIO",
+  "SCRIPT",
+  "THUMBNAIL",
   "UPLOADER",
-  "ARCHITECT",
-  "VISUAL_EDITOR",
-  "SOUND_DESIGNER",
-  "MOTION_COLOR",
-  "THUMBNAIL_DESIGNER",
   "VIEWER",
 ]);

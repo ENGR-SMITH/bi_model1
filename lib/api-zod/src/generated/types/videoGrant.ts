@@ -6,10 +6,14 @@
  * OpenAPI spec version: 0.2.0
  */
 
+/**
+ * A timed download grant covering every file version under one or more roles (or ALL roles), not a single file.
+ */
 export interface VideoGrant {
   id: string;
   projectId: string;
-  fileId: string;
+  /** The roles whose files the member may download, e.g. ["VIDEO", "AUDIO"]; ["ALL"] covers every file in the project. */
+  roles: string[];
   memberId: string;
   reason: string;
   grantedById: string;

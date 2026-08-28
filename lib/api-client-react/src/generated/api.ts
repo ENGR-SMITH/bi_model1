@@ -87,6 +87,7 @@ import type {
   VideoJob,
   VideoMember,
   VideoMemberInput,
+  VideoMemberRolesInput,
   VideoNotification,
   VideoProject,
   VideoProjectDetail,
@@ -5949,6 +5950,155 @@ export const useAddVideoProjectMember = <TError = ErrorType<ErrorResponse>,
       return useMutation(getAddVideoProjectMemberMutationOptions(options));
     }
 
+export const getUpdateVideoProjectMemberRolesUrl = (projectId: string,
+    memberId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/members/${memberId}`
+}
+
+/**
+ * Replaces the roles a member holds — grant more roles, or take them away. The Captain's own roles cannot be changed.
+ * @summary Update a member's roles (Captain only)
+ */
+export const updateVideoProjectMemberRoles = async (projectId: string,
+    memberId: string,
+    videoMemberRolesInput: VideoMemberRolesInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoMember> => {
+
+  return customFetch<VideoMember>(getUpdateVideoProjectMemberRolesUrl(projectId,memberId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(videoMemberRolesInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateVideoProjectMemberRolesMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVideoProjectMemberRoles>>, TError,{projectId: string;memberId: string;data: BodyType<VideoMemberRolesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateVideoProjectMemberRoles>>, TError,{projectId: string;memberId: string;data: BodyType<VideoMemberRolesInput>}, TContext> => {
+
+const mutationKey = ['updateVideoProjectMemberRoles'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateVideoProjectMemberRoles>>, {projectId: string;memberId: string;data: BodyType<VideoMemberRolesInput>}> = (props) => {
+          const {projectId,memberId,data} = props ?? {};
+
+          return  updateVideoProjectMemberRoles(projectId,memberId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateVideoProjectMemberRolesMutationResult = NonNullable<Awaited<ReturnType<typeof updateVideoProjectMemberRoles>>>
+    export type UpdateVideoProjectMemberRolesMutationBody = BodyType<VideoMemberRolesInput>
+    export type UpdateVideoProjectMemberRolesMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update a member's roles (Captain only)
+ */
+export const useUpdateVideoProjectMemberRoles = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateVideoProjectMemberRoles>>, TError,{projectId: string;memberId: string;data: BodyType<VideoMemberRolesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateVideoProjectMemberRoles>>,
+        TError,
+        {projectId: string;memberId: string;data: BodyType<VideoMemberRolesInput>},
+        TContext
+      > => {
+      return useMutation(getUpdateVideoProjectMemberRolesMutationOptions(options));
+    }
+
+export const getRemoveVideoProjectMemberUrl = (projectId: string,
+    memberId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/members/${memberId}`
+}
+
+/**
+ * Removes the member's access, active download grants, and submissions. The Captain cannot be removed.
+ * @summary Remove a member from the project (Captain only)
+ */
+export const removeVideoProjectMember = async (projectId: string,
+    memberId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRemoveVideoProjectMemberUrl(projectId,memberId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveVideoProjectMemberMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeVideoProjectMember>>, TError,{projectId: string;memberId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeVideoProjectMember>>, TError,{projectId: string;memberId: string}, TContext> => {
+
+const mutationKey = ['removeVideoProjectMember'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeVideoProjectMember>>, {projectId: string;memberId: string}> = (props) => {
+          const {projectId,memberId} = props ?? {};
+
+          return  removeVideoProjectMember(projectId,memberId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveVideoProjectMemberMutationResult = NonNullable<Awaited<ReturnType<typeof removeVideoProjectMember>>>
+
+    export type RemoveVideoProjectMemberMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Remove a member from the project (Captain only)
+ */
+export const useRemoveVideoProjectMember = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeVideoProjectMember>>, TError,{projectId: string;memberId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeVideoProjectMember>>,
+        TError,
+        {projectId: string;memberId: string},
+        TContext
+      > => {
+      return useMutation(getRemoveVideoProjectMemberMutationOptions(options));
+    }
+
 export const getListVideoAssetsUrl = (projectId: string,) => {
 
 
@@ -8768,7 +8918,7 @@ export const getDownloadVideoFileUrl = (projectId: string,
 }
 
 /**
- * @summary Download a file once the Lock is released (audited)
+ * @summary Download a file once the Lock is released, or under an active role grant (audited)
  */
 export const downloadVideoFile = async (projectId: string,
     fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
@@ -8818,7 +8968,7 @@ export type DownloadVideoFileQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary Download a file once the Lock is released (audited)
+ * @summary Download a file once the Lock is released, or under an active role grant (audited)
  */
 
 export function useDownloadVideoFile<TData = Awaited<ReturnType<typeof downloadVideoFile>>, TError = ErrorType<ErrorResponse>>(
@@ -9158,7 +9308,7 @@ export const getCreateVideoGrantUrl = (projectId: string,) => {
 }
 
 /**
- * @summary Grant a member a temporary download (Captain)
+ * @summary Grant a member a temporary download by role (Captain)
  */
 export const createVideoGrant = async (projectId: string,
     videoGrantInput: VideoGrantInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoGrant> => {
@@ -9208,7 +9358,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateVideoGrantMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Grant a member a temporary download (Captain)
+ * @summary Grant a member a temporary download by role (Captain)
  */
 export const useCreateVideoGrant = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVideoGrant>>, TError,{projectId: string;data: BodyType<VideoGrantInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

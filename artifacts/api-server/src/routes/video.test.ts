@@ -179,11 +179,11 @@ describe("projects", () => {
   it("creates a project and makes the creator the Captain", async () => {
     const project = await createProject();
     expect(project.ownerId).toBe("captain-1");
-    expect(project.myRole).toBe("CAPTAIN");
+    expect(project.myRoles).toEqual(["CAPTAIN"]);
     expect(project.name).toBe("The Salt Road Vlog");
     expect(project.status).toBe("VAULT");
     expect(project.members).toHaveLength(1);
-    expect(project.members[0].role).toBe("CAPTAIN");
+    expect(project.members[0].roles).toEqual(["CAPTAIN"]);
     // Member ids resolve to Clerk display names on the project detail.
     expect(project.members[0].name).toBe("Ada Captain");
     expect(project.assets).toHaveLength(0);
@@ -194,11 +194,11 @@ describe("projects", () => {
     // captain-2 creates their own project.
     const other = await createProject("captain-2", "Other Vlog");
 
-    // captain-1 adds captain-2 as architect, then captain-2 sees both.
+    // captain-1 adds captain-2 as a video editor, then captain-2 sees both.
     state.userId = "captain-1";
     await request(API)
       .post(`/api/video/projects/${owned.id}/members`)
-      .send({ uid: tandemUid("captain-2"), role: "ARCHITECT" });
+      .send({ uid: tandemUid("captain-2"), role: "VIDEO" });
 
     state.userId = "captain-2";
     const list = await request(API).get("/api/video/projects");
@@ -220,7 +220,7 @@ describe("project deletion", () => {
     state.userId = "captain-1";
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
     await request(API)
       .post(`/api/video/projects/${project.id}/assets`)
       .field("kind", "RAW_VIDEO")
@@ -252,7 +252,7 @@ describe("project deletion", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
 
     state.userId = "user-2";
     expect((await request(API).delete(`/api/video/projects/${project.id}`)).status).toBe(403);
@@ -289,7 +289,7 @@ describe("project visibility (public profile track history)", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
 
     state.userId = "user-2";
     const memberRes = await request(API)
@@ -323,7 +323,7 @@ describe("project visibility (public profile track history)", () => {
     // (participated) even though captain-2 doesn't own it.
     await request(API)
       .post(`/api/video/projects/${owned.id}/members`)
-      .send({ uid: tandemUid("captain-2"), role: "ARCHITECT" });
+      .send({ uid: tandemUid("captain-2"), role: "SCRIPT" });
 
     state.userId = "captain-1";
     const captain1Profile = await request(API).get("/api/video/users/captain-1/projects");
@@ -342,15 +342,15 @@ describe("project visibility (public profile track history)", () => {
 });
 
 describe("members", () => {
-  it("adds a member by Tandem ID with a leg role", async () => {
+  it("adds a member by Tandem ID with one of the four content roles", async () => {
     const project = await createProject();
     state.userId = "captain-1";
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
     expect(res.status).toBe(201);
     expect(res.body.userId).toBe("user-2");
-    expect(res.body.role).toBe("VISUAL_EDITOR");
+    expect(res.body.roles).toEqual(["VIDEO"]);
     expect(res.body.status).toBe("ACTIVE");
   });
 
@@ -358,30 +358,112 @@ describe("members", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
     state.userId = "user-2";
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-3"), role: "SOUND_DESIGNER" });
+      .send({ uid: tandemUid("user-3"), role: "AUDIO" });
     expect(res.status).toBe(403);
   });
 
-  it("rejects unknown Tandem IDs and duplicate members", async () => {
+  it("rejects unknown Tandem IDs", async () => {
     const project = await createProject();
     state.userId = "captain-1";
     const unknown = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
       .send({ uid: "TANDEMZZZZZ", role: "VIEWER" });
     expect(unknown.status).toBe(400);
+  });
 
+  it("re-inviting an existing member adds the new role to their set", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
     const added = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "ARCHITECT" });
+      .send({ uid: tandemUid("user-2"), role: "SCRIPT" });
     expect(added.status).toBe(201);
-    const duplicate = await request(API)
+    expect(added.body.roles).toEqual(["SCRIPT"]);
+
+    // Same user invited again with another role — merged, not a conflict.
+    const merged = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "ARCHITECT" });
-    expect(duplicate.status).toBe(409);
+      .send({ uid: tandemUid("user-2"), role: "THUMBNAIL" });
+    expect(merged.status).toBe(200);
+    expect(merged.body.userId).toBe("user-2");
+    expect(merged.body.roles).toEqual(["SCRIPT", "THUMBNAIL"]);
+  });
+
+  it("lets the Captain add or remove roles on an existing member", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const added = await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+    expect(added.status).toBe(201);
+
+    // Give the member a second role.
+    const updated = await request(API)
+      .patch(`/api/video/projects/${project.id}/members/${added.body.id}`)
+      .send({ roles: ["VIDEO", "AUDIO"] });
+    expect(updated.status).toBe(200);
+    expect(updated.body.roles).toEqual(["VIDEO", "AUDIO"]);
+
+    // Take a role away.
+    const trimmed = await request(API)
+      .patch(`/api/video/projects/${project.id}/members/${added.body.id}`)
+      .send({ roles: ["AUDIO"] });
+    expect(trimmed.status).toBe(200);
+    expect(trimmed.body.roles).toEqual(["AUDIO"]);
+
+    // Non-Captain cannot change roles.
+    state.userId = "user-2";
+    expect(
+      (await request(API)
+        .patch(`/api/video/projects/${project.id}/members/${added.body.id}`)
+        .send({ roles: ["VIDEO"] })).status,
+    ).toBe(403);
+
+    // The Captain's own roles cannot be changed.
+    state.userId = "captain-1";
+    const captainMember = (await request(API).get(`/api/video/projects/${project.id}`)).body.members.find(
+      (m: any) => m.userId === "captain-1",
+    );
+    expect(
+      (await request(API)
+        .patch(`/api/video/projects/${project.id}/members/${captainMember.id}`)
+        .send({ roles: ["VIDEO"] })).status,
+    ).toBe(403);
+  });
+
+  it("lets the Captain remove a member from the project", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const added = await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+    expect(added.status).toBe(201);
+
+    // The removed member loses access immediately.
+    state.userId = "user-2";
+    expect((await request(API).get(`/api/video/projects/${project.id}`)).status).toBe(200);
+
+    state.userId = "captain-1";
+    const removed = await request(API).delete(
+      `/api/video/projects/${project.id}/members/${added.body.id}`,
+    );
+    expect(removed.status).toBe(204);
+
+    state.userId = "user-2";
+    expect((await request(API).get(`/api/video/projects/${project.id}`)).status).toBe(403);
+
+    // Non-Captain and Captain-self removals are rejected.
+    state.userId = "captain-1";
+    const captainMember = (await request(API).get(`/api/video/projects/${project.id}`)).body.members.find(
+      (m: any) => m.userId === "captain-1",
+    );
+    expect(
+      (await request(API).delete(`/api/video/projects/${project.id}/members/${captainMember.id}`)).status,
+    ).toBe(403);
   });
 });
 
@@ -443,7 +525,7 @@ describe("vault assets", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VISUAL_EDITOR" });
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
     state.userId = "user-2";
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/assets`)

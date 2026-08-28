@@ -1704,13 +1704,13 @@ export const CreateVideoProjectResponse = zod.object({
   "description": zod.string(),
   "status": zod.string(),
   "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
-  "myRole": zod.string().nullable(),
+  "myRoles": zod.array(zod.string()).describe('The viewer\'s roles in this project (e.g. [\"VIDEO\", \"THUMBNAIL\"]; always includes CAPTAIN for the owner)'),
   "members": zod.array(zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "userId": zod.string(),
   "name": zod.string().nullable().describe('Resolved Clerk display name'),
-  "role": zod.string(),
+  "roles": zod.array(zod.string()).describe('Every role this member holds in the project, e.g. [\"VIDEO\", \"THUMBNAIL\"]'),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
 })),
@@ -1923,13 +1923,13 @@ export const GetVideoProjectResponse = zod.object({
   "description": zod.string(),
   "status": zod.string(),
   "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
-  "myRole": zod.string().nullable(),
+  "myRoles": zod.array(zod.string()).describe('The viewer\'s roles in this project (e.g. [\"VIDEO\", \"THUMBNAIL\"]; always includes CAPTAIN for the owner)'),
   "members": zod.array(zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
   "userId": zod.string(),
   "name": zod.string().nullable().describe('Resolved Clerk display name'),
-  "role": zod.string(),
+  "roles": zod.array(zod.string()).describe('Every role this member holds in the project, e.g. [\"VIDEO\", \"THUMBNAIL\"]'),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
 })),
@@ -2009,7 +2009,7 @@ export const addVideoProjectMemberBodyUidMax = 20;
 
 export const AddVideoProjectMemberBody = zod.object({
   "uid": zod.string().min(1).max(addVideoProjectMemberBodyUidMax).describe('The invitee\'s unique Tandem ID, e.g. TANDEM6EUHY.'),
-  "role": zod.enum(['UPLOADER', 'ARCHITECT', 'VISUAL_EDITOR', 'SOUND_DESIGNER', 'MOTION_COLOR', 'THUMBNAIL_DESIGNER', 'VIEWER'])
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL', 'UPLOADER', 'VIEWER']).describe('The role to assign. Inviting a user who is already a member adds the role to their existing set.')
 }).describe('Invite a teammate by their unique Tandem ID (e.g. TANDEM6EUHY) — the handle shown on every user\'s profile.')
 
 export const AddVideoProjectMemberResponse = zod.object({
@@ -2017,10 +2017,57 @@ export const AddVideoProjectMemberResponse = zod.object({
   "projectId": zod.string(),
   "userId": zod.string(),
   "name": zod.string().nullable().describe('Resolved Clerk display name'),
-  "role": zod.string(),
+  "roles": zod.array(zod.string()).describe('Every role this member holds in the project, e.g. [\"VIDEO\", \"THUMBNAIL\"]'),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
 })
+
+
+/**
+ * Replaces the roles a member holds — grant more roles, or take them away. The Captain's own roles cannot be changed.
+ * @summary Update a member's roles (Captain only)
+ */
+
+
+
+
+export const UpdateVideoProjectMemberRolesParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "memberId": zod.coerce.string().min(1)
+})
+
+
+
+
+export const UpdateVideoProjectMemberRolesBody = zod.object({
+  "roles": zod.array(zod.string()).min(1)
+}).describe('The full set of roles a member should hold after the update.')
+
+export const UpdateVideoProjectMemberRolesResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "userId": zod.string(),
+  "name": zod.string().nullable().describe('Resolved Clerk display name'),
+  "roles": zod.array(zod.string()).describe('Every role this member holds in the project, e.g. [\"VIDEO\", \"THUMBNAIL\"]'),
+  "status": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * Removes the member's access, active download grants, and submissions. The Captain cannot be removed.
+ * @summary Remove a member from the project (Captain only)
+ */
+
+
+
+
+export const RemoveVideoProjectMemberParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "memberId": zod.coerce.string().min(1)
+})
+
+export const RemoveVideoProjectMemberResponse = zod.void()
 
 
 /**
@@ -3056,7 +3103,7 @@ export const QueueVideoThumbnailResponse = zod.object({
 
 
 /**
- * @summary Download a file once the Lock is released (audited)
+ * @summary Download a file once the Lock is released, or under an active role grant (audited)
  */
 
 
@@ -3155,19 +3202,19 @@ export const ListVideoGrantsParams = zod.object({
 export const ListVideoGrantsResponseItem = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "fileId": zod.string(),
+  "roles": zod.array(zod.string()).describe('The roles whose files the member may download, e.g. [\"VIDEO\", \"AUDIO\"]; [\"ALL\"] covers every file in the project.'),
   "memberId": zod.string(),
   "reason": zod.string(),
   "grantedById": zod.string(),
   "expiresAt": zod.coerce.date(),
   "revokedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
-})
+}).describe('A timed download grant covering every file version under one or more roles (or ALL roles), not a single file.')
 export const ListVideoGrantsResponse = zod.array(ListVideoGrantsResponseItem)
 
 
 /**
- * @summary Grant a member a temporary download (Captain)
+ * @summary Grant a member a temporary download by role (Captain)
  */
 
 
@@ -3187,7 +3234,7 @@ export const createVideoGrantBodyExpiresInHoursMax = 168;
 
 export const CreateVideoGrantBody = zod.object({
   "memberId": zod.string().min(1),
-  "fileId": zod.string().min(1),
+  "roles": zod.array(zod.string()).min(1).describe('The roles whose files the member may download — pick one or more of VIDEO, AUDIO, SCRIPT, THUMBNAIL, or [\"ALL\"] for every file.'),
   "reason": zod.string().max(createVideoGrantBodyReasonMax).optional(),
   "expiresInHours": zod.number().int().min(1).max(createVideoGrantBodyExpiresInHoursMax).default(createVideoGrantBodyExpiresInHoursDefault)
 })
@@ -3195,14 +3242,14 @@ export const CreateVideoGrantBody = zod.object({
 export const CreateVideoGrantResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "fileId": zod.string(),
+  "roles": zod.array(zod.string()).describe('The roles whose files the member may download, e.g. [\"VIDEO\", \"AUDIO\"]; [\"ALL\"] covers every file in the project.'),
   "memberId": zod.string(),
   "reason": zod.string(),
   "grantedById": zod.string(),
   "expiresAt": zod.coerce.date(),
   "revokedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
-})
+}).describe('A timed download grant covering every file version under one or more roles (or ALL roles), not a single file.')
 
 
 /**
@@ -3220,14 +3267,14 @@ export const RevokeVideoGrantParams = zod.object({
 export const RevokeVideoGrantResponse = zod.object({
   "id": zod.string(),
   "projectId": zod.string(),
-  "fileId": zod.string(),
+  "roles": zod.array(zod.string()).describe('The roles whose files the member may download, e.g. [\"VIDEO\", \"AUDIO\"]; [\"ALL\"] covers every file in the project.'),
   "memberId": zod.string(),
   "reason": zod.string(),
   "grantedById": zod.string(),
   "expiresAt": zod.coerce.date(),
   "revokedAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
-})
+}).describe('A timed download grant covering every file version under one or more roles (or ALL roles), not a single file.')
 
 
 /**

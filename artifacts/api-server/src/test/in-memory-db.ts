@@ -243,7 +243,8 @@ export const tandemVideoMembersTable = sqliteTable(
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
     userId: text("user_id").notNull(),
-    role: text("role").notNull().default("VIEWER"),
+    // JSON array of role strings, e.g. ["VIDEO", "THUMBNAIL"].
+    roles: text("roles", { mode: "json" }).notNull().default([]),
     status: text("status").notNull().default("ACTIVE"),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
@@ -391,7 +392,8 @@ export const tandemVideoReferencesTable = sqliteTable(
 export const tandemVideoGrantsTable = sqliteTable("tandem_video_grants", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
-  fileId: text("file_id").notNull(),
+  // JSON array of role strings, e.g. ["VIDEO", "AUDIO"] or ["ALL"].
+  roles: text("roles", { mode: "json" }).notNull().default([]),
   memberId: text("member_id").notNull(),
   reason: text("reason").notNull().default(""),
   grantedById: text("granted_by_id").notNull(),
@@ -609,7 +611,7 @@ export async function buildInMemoryDb() {
     );
     CREATE TABLE tandem_video_members (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
-      user_id TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'VIEWER',
+      user_id TEXT NOT NULL, roles TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'ACTIVE', created_at INTEGER NOT NULL,
       UNIQUE (project_id, user_id)
     );
@@ -699,7 +701,7 @@ export async function buildInMemoryDb() {
     );
     CREATE TABLE tandem_video_grants (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
-      file_id TEXT NOT NULL, member_id TEXT NOT NULL,
+      roles TEXT NOT NULL DEFAULT '[]', member_id TEXT NOT NULL,
       reason TEXT NOT NULL DEFAULT '', granted_by_id TEXT NOT NULL,
       expires_at INTEGER NOT NULL, revoked_at INTEGER, created_at INTEGER NOT NULL
     );

@@ -232,7 +232,7 @@ describe("timelines (Git-style versions)", () => {
 
   it("saves snapshots as versions and lists history newest first", async () => {
     const project = await createProject();
-    await addMember(project.id, "architect@example.com", "ARCHITECT");
+    await addMember(project.id, "architect@example.com", "VIDEO");
 
     state.userId = "architect-1";
     const first = await request(API)
@@ -274,9 +274,10 @@ describe("timelines (Git-style versions)", () => {
 
   it("only the leg role (or Captain) can save a timeline", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(project.id, "thumb@example.com", "THUMBNAIL");
 
-    state.userId = "editor-1";
+    // A member with a different role (THUMBNAIL) cannot touch the SELECTS leg.
+    state.userId = "thumb-1";
     const forbidden = await request(API)
       .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
       .send({ snapshot: { clips: [] } });
@@ -314,7 +315,7 @@ describe("timelines (Git-style versions)", () => {
 describe("thumbnail leg (5th leg)", () => {
   it("saves thumbnail documents (chosen design + title + style) as versions", async () => {
     const project = await createProject();
-    await addMember(project.id, "thumb@example.com", "THUMBNAIL_DESIGNER");
+    await addMember(project.id, "thumb@example.com", "THUMBNAIL");
 
     state.userId = "thumb-1";
     const first = await request(API)
@@ -335,7 +336,7 @@ describe("thumbnail leg (5th leg)", () => {
 
   it("only the Thumbnail Designer (or Captain) can edit the THUMBNAIL leg", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(project.id, "editor@example.com", "VIDEO");
 
     state.userId = "editor-1";
     const forbidden = await request(API)
@@ -358,7 +359,7 @@ describe("thumbnail leg (5th leg)", () => {
 
   it("submits a thumbnail pass for the Captain to review", async () => {
     const project = await createProject();
-    await addMember(project.id, "thumb@example.com", "THUMBNAIL_DESIGNER");
+    await addMember(project.id, "thumb@example.com", "THUMBNAIL");
 
     state.userId = "thumb-1";
     await request(API)
@@ -1118,7 +1119,7 @@ describe("checkout export bundle (EXPORT_BUNDLE job)", () => {
 describe("submissions (Captain review)", () => {
   it("submits the current snapshot, then the Captain approves", async () => {
     const project = await createProject();
-    await addMember(project.id, "architect@example.com", "ARCHITECT");
+    await addMember(project.id, "architect@example.com", "VIDEO");
 
     state.userId = "architect-1";
     const noSnapshot = await request(API)
@@ -1153,7 +1154,7 @@ describe("submissions (Captain review)", () => {
 
   it("only the Captain can approve or reject", async () => {
     const project = await createProject();
-    await addMember(project.id, "architect@example.com", "ARCHITECT");
+    await addMember(project.id, "architect@example.com", "VIDEO");
     state.userId = "architect-1";
     await request(API)
       .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
@@ -1210,7 +1211,7 @@ describe("timecode comments", () => {
 
   it("only the author or Captain can resolve", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(project.id, "editor@example.com", "VIDEO");
     state.userId = "captain-1";
     const created = await request(API)
       .post(`/api/video/projects/${project.id}/comments`)
@@ -1279,7 +1280,7 @@ describe("timecode comments", () => {
 describe("M2 — multi-cam sync (Visual Editor)", () => {
   it("queues a sync job (CUT role only) and the worker writes a sync pair", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(project.id, "editor@example.com", "VIDEO");
     const camA = await uploadAsset(project.id, "cam-a.mp4");
     const camB = await uploadAsset(project.id, "cam-b.mp4");
 
@@ -1312,7 +1313,7 @@ describe("M2 — multi-cam sync (Visual Editor)", () => {
   it("rejects self-sync and cross-project sync targets", async () => {
     const projectA = await createProject();
     const projectB = await createProject("captain-2", "Other Vlog");
-    await addMember(projectA.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(projectA.id, "editor@example.com", "VIDEO");
     const camA = await uploadAsset(projectA.id, "cam-a.mp4");
     state.userId = "captain-2";
     const otherCam = await uploadAsset(projectB.id, "other.mp4");
@@ -1341,7 +1342,7 @@ describe("M2 — multi-cam sync (Visual Editor)", () => {
 describe("M2 — renders (preview + picture-lock)", () => {
   it("queues a preview render from the CUT snapshot", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(project.id, "editor@example.com", "VIDEO");
     const camA = await uploadAsset(project.id, "cam-a.mp4");
 
     state.userId = "editor-1";
@@ -1379,7 +1380,7 @@ describe("M2 — renders (preview + picture-lock)", () => {
 
   it("auto-queues a picture-lock render when the CUT leg is submitted", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(project.id, "editor@example.com", "VIDEO");
     const camA = await uploadAsset(project.id, "cam-a.mp4");
 
     state.userId = "editor-1";
@@ -1402,14 +1403,15 @@ describe("M2 — renders (preview + picture-lock)", () => {
 
   it("only the leg role (or Captain) can queue a render", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(project.id, "editor@example.com", "VIDEO");
+    await addMember(project.id, "thumb@example.com", "THUMBNAIL");
     const camA = await uploadAsset(project.id, "cam-a.mp4");
     state.userId = "captain-1";
     await request(API)
       .put(`/api/video/projects/${project.id}/timelines/CUT`)
       .send({ snapshot: { clips: [{ id: "c1", assetId: camA.id, inMs: 0, outMs: 8000 }] } });
 
-    state.userId = "architect-1"; // wrong leg role
+    state.userId = "thumb-1"; // wrong leg role
     const forbidden = await request(API)
       .post(`/api/video/projects/${project.id}/timelines/CUT/render`)
       .send({ format: "PREVIEW" });

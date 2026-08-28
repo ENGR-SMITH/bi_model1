@@ -35,6 +35,8 @@ import {
   type PreviewVersion,
 } from '@/components/preview-shared';
 import { RoleOracle } from '@/components/role-oracle';
+import { RoleAccessDenied } from '@/components/role-access-denied';
+import { hasRole } from '@/lib/roles';
 import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
 import type { StudioLeg } from '@/components/role-oracle';
 
@@ -328,6 +330,12 @@ export default function RoleVideoPage() {
 
   const p = project.data;
 
+  // The Video studio only opens for members with the VIDEO role (or the
+  // Captain). The nav tab stays visible — this page explains why it is locked.
+  if (!hasRole(p.myRoles, 'VIDEO')) {
+    return <RoleAccessDenied role="Video" projectId={p.id} />;
+  }
+
   return (
     <RoleLayout
       versions={
@@ -358,7 +366,7 @@ export default function RoleVideoPage() {
       oracle={
         <RoleOracle
           leg="CUT"
-          roleName="Visual Editor"
+          roleName="Video Editor"
           context={oracleContext}
           placeholder="e.g. Where should the next cut land, and which take is strongest?"
         />

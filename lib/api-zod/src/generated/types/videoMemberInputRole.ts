@@ -6,15 +6,17 @@
  * OpenAPI spec version: 0.2.0
  */
 
+/**
+ * The role to assign. Inviting a user who is already a member adds the role to their existing set.
+ */
 export type VideoMemberInputRole = typeof VideoMemberInputRole[keyof typeof VideoMemberInputRole];
 
 
 export const VideoMemberInputRole = {
+  VIDEO: 'VIDEO',
+  AUDIO: 'AUDIO',
+  SCRIPT: 'SCRIPT',
+  THUMBNAIL: 'THUMBNAIL',
   UPLOADER: 'UPLOADER',
-  ARCHITECT: 'ARCHITECT',
-  VISUAL_EDITOR: 'VISUAL_EDITOR',
-  SOUND_DESIGNER: 'SOUND_DESIGNER',
-  MOTION_COLOR: 'MOTION_COLOR',
-  THUMBNAIL_DESIGNER: 'THUMBNAIL_DESIGNER',
   VIEWER: 'VIEWER',
 } as const;

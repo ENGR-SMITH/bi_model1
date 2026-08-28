@@ -23,6 +23,10 @@ import {
   AddVideoProjectMemberBody,
   AddVideoProjectMemberParams,
   AddVideoProjectMemberResponse,
+  RemoveVideoProjectMemberParams,
+  UpdateVideoProjectMemberRolesBody,
+  UpdateVideoProjectMemberRolesParams,
+  UpdateVideoProjectMemberRolesResponse,
   CreateVideoProjectBody,
   CreateVideoProjectResponse,
   DeleteVideoProjectParams,
@@ -162,7 +166,7 @@ router.post("/video/projects", async (req, res): Promise<void> => {
         id: memberId,
         projectId,
         userId,
-        role: "CAPTAIN",
+        roles: ["CAPTAIN"],
         status: "ACTIVE",
       })
       .returning();
@@ -174,7 +178,7 @@ router.post("/video/projects", async (req, res): Promise<void> => {
   res.status(201).json(
     CreateVideoProjectResponse.parse({
       ...project,
-      myRole: member.role,
+      myRoles: member.roles,
       members: [{ ...member, name: captainNames[member.userId] ?? null }],
       assets: [],
     }),
@@ -235,7 +239,7 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
   res.json(
     GetVideoProjectResponse.parse({
       ...project,
-      myRole: member.role,
+      myRoles: member.roles,
       members: members.map((row) => ({ ...row, name: memberNames[row.userId] ?? null })),
       assets,
     }),
@@ -532,6 +536,29 @@ router.post(
       return;
     }
 
+    // Inviting someone who is already a member adds the new role to their
+    // existing set — the Captain can hand out more roles without a separate
+    // edit step.
+    const existing = await requireMember(project.id, clerkUserId);
+    if (existing) {
+      const merged = existing.roles.includes(body.data.role)
+        ? existing.roles
+        : [...existing.roles, body.data.role];
+      const [updated] = await db
+        .update(tandemVideoMembersTable)
+        .set({ roles: merged })
+        .where(eq(tandemVideoMembersTable.id, existing.id))
+        .returning();
+      const updatedNames = await resolveUserNames([clerkUserId]);
+      res.status(200).json(
+        AddVideoProjectMemberResponse.parse({
+          ...updated,
+          name: updatedNames[clerkUserId] ?? null,
+        }),
+      );
+      return;
+    }
+
     try {
       const [member] = await db
         .insert(tandemVideoMembersTable)
@@ -539,7 +566,7 @@ router.post(
           id: randomUUID(),
           projectId: project.id,
           userId: clerkUserId,
-          role: body.data.role,
+          roles: [body.data.role],
           status: "ACTIVE",
         })
         .returning();
@@ -553,6 +580,147 @@ router.post(
     } catch {
       res.status(409).json({ error: "That user is already a member" });
     }
+  },
+);
+
+// PATCH /video/projects/:projectId/members/:memberId — replace a member's
+// roles (Captain only). Grants more roles or takes them away in one call.
+router.patch(
+  "/video/projects/:projectId/members/:memberId",
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = UpdateVideoProjectMemberRolesParams.safeParse(req.params);
+    const body = UpdateVideoProjectMemberRolesBody.safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({ error: "Invalid member roles request" });
+      return;
+    }
+
+    const [project] = await db
+      .select()
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (project.ownerId !== userId) {
+      res.status(403).json({ error: "Only the Captain can change member roles" });
+      return;
+    }
+
+    const [member] = await db
+      .select()
+      .from(tandemVideoMembersTable)
+      .where(
+        and(
+          eq(tandemVideoMembersTable.id, params.data.memberId),
+          eq(tandemVideoMembersTable.projectId, params.data.projectId),
+        ),
+      )
+      .limit(1);
+    if (!member) {
+      res.status(404).json({ error: "Member not found" });
+      return;
+    }
+    if (member.roles.includes("CAPTAIN")) {
+      res.status(403).json({ error: "The Captain's roles cannot be changed" });
+      return;
+    }
+
+    const roles = [...new Set(body.data.roles)];
+    if (roles.includes("CAPTAIN")) {
+      res.status(400).json({ error: "CAPTAIN cannot be assigned to another member" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(tandemVideoMembersTable)
+      .set({ roles })
+      .where(eq(tandemVideoMembersTable.id, member.id))
+      .returning();
+    const updatedNames = await resolveUserNames([member.userId]);
+
+    res.json(
+      UpdateVideoProjectMemberRolesResponse.parse({
+        ...updated,
+        name: updatedNames[member.userId] ?? null,
+      }),
+    );
+  },
+);
+
+// DELETE /video/projects/:projectId/members/:memberId — remove a member and
+// their active grants (Captain only).
+router.delete(
+  "/video/projects/:projectId/members/:memberId",
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = RemoveVideoProjectMemberParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid member id" });
+      return;
+    }
+
+    const [project] = await db
+      .select()
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (project.ownerId !== userId) {
+      res.status(403).json({ error: "Only the Captain can remove members" });
+      return;
+    }
+
+    const [member] = await db
+      .select()
+      .from(tandemVideoMembersTable)
+      .where(
+        and(
+          eq(tandemVideoMembersTable.id, params.data.memberId),
+          eq(tandemVideoMembersTable.projectId, params.data.projectId),
+        ),
+      )
+      .limit(1);
+    if (!member) {
+      res.status(404).json({ error: "Member not found" });
+      return;
+    }
+    if (member.roles.includes("CAPTAIN")) {
+      res.status(403).json({ error: "The Captain cannot be removed" });
+      return;
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(tandemVideoGrantsTable)
+        .where(
+          and(
+            eq(tandemVideoGrantsTable.projectId, params.data.projectId),
+            eq(tandemVideoGrantsTable.memberId, member.userId),
+          ),
+        );
+      await tx
+        .delete(tandemVideoMembersTable)
+        .where(eq(tandemVideoMembersTable.id, member.id));
+    });
+
+    res.status(204).end();
   },
 );
 
