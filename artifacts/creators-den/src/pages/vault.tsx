@@ -36,6 +36,7 @@ import {
 import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { isAudioKind, proxyUrlFor } from '@/components/asset-preview';
+import { MemberAvatar } from '@/components/member-avatar';
 
 const LEG_META = {
   SELECTS: { label: 'Selects', role: 'Story Architect', icon: Film },
@@ -184,8 +185,10 @@ function InviteForm({ projectId }: { projectId: string }) {
   );
 }
 
-function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string; myRole: string; members: Array<{ id: string; userId: string; role: string }>; assets: Array<{ id: string; fileName: string }> }) {
+function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string; myRole: string; members: Array<{ id: string; userId: string; role: string; name?: string | null }>; assets: Array<{ id: string; fileName: string }> }) {
   const queryClient = useQueryClient();
+  // Grant rows are Captain-only, so member names are always resolvable here.
+  const memberNameById = new Map(members.map((member) => [member.userId, member.name ?? member.userId.slice(0, 8)]));
   const grants = useListVideoGrants(projectId, {
     query: { queryKey: getListVideoGrantsQueryKey(projectId), enabled: myRole === 'CAPTAIN' },
   });
@@ -240,7 +243,7 @@ function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string
         <select value={memberId} onChange={(event) => setMemberId(event.target.value)} data-testid="grant-select-member">
           <option value="">Teammate…</option>
           {members.filter((m) => m.role !== 'CAPTAIN').map((m) => (
-            <option key={m.id} value={m.userId}>{m.userId}</option>
+            <option key={m.id} value={m.userId}>{m.name ?? m.userId.slice(0, 8)}</option>
           ))}
         </select>
         <select value={fileId} onChange={(event) => setFileId(event.target.value)} data-testid="grant-select-file">
@@ -270,8 +273,9 @@ function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string
             const active = !grant.revokedAt && new Date(grant.expiresAt) > new Date();
             return (
               <div key={grant.id} className="list-row" data-testid={`grant-${grant.id}`}>
+                <MemberAvatar userId={grant.memberId} name={memberNameById.get(grant.memberId) ?? null} size={28} />
                 <span>
-                  <b>{grant.memberId.slice(0, 8)} · {grant.reason || 'download access'}</b>
+                  <b>{memberNameById.get(grant.memberId) ?? grant.memberId.slice(0, 8)} · {grant.reason || 'download access'}</b>
                   <small>{active ? `expires ${new Date(grant.expiresAt).toLocaleDateString()}` : grant.revokedAt ? 'revoked' : 'expired'}</small>
                 </span>
                 {active && (
@@ -445,22 +449,27 @@ export default function ContentCreatorsProjectPage() {
           {p.description && <p>{p.description}</p>}
           <div className="cd-metarow">
             <span className="den-tag accent"><LockKeyhole size={10} /> {p.status.replaceAll('_', ' ')}</span>
-            <span className="flex items-center">
-              {p.members.slice(0, 5).map((member, index) => (
-                <span
-                  key={member.id}
-                  className={`cd-avatar ${index > 0 ? 'stack' : ''}`}
-                  title={`${member.name ?? member.userId} · ${ROLE_LABELS[member.role] ?? member.role}`}
-                  style={member.role === 'CAPTAIN' ? { background: 'hsl(var(--accent) / .28)' } : undefined}
-                >
-                  {(member.name ?? member.userId).slice(0, 2).toUpperCase()}
-                </span>
-              ))}
-            </span>
             <span className="cd-metatext">
               <b>{p.assets.length} asset{p.assets.length === 1 ? '' : 's'} · {p.members.length} member{p.members.length === 1 ? '' : 's'}</b>
               <small>you are the {ROLE_LABELS[myRole] ?? myRole}</small>
             </span>
+          </div>
+          {/* The whole crew — real avatars + role, moved up from the chat. */}
+          <div className="cd-roster" data-testid="vault-roster">
+            {p.members.map((member) => (
+              <span
+                key={member.id}
+                className="cd-roster-pill"
+                title={`${member.name ?? member.userId} · ${ROLE_LABELS[member.role] ?? member.role}`}
+                data-testid={`roster-member-${member.userId}`}
+              >
+                <MemberAvatar userId={member.userId} name={member.name} size={24} />
+                <span className="cd-roster-name">{member.name ?? member.userId.slice(0, 8)}</span>
+                <span className={`den-tag ${member.role === 'CAPTAIN' ? 'danger' : 'accent'}`}>
+                  {ROLE_LABELS[member.role] ?? member.role}
+                </span>
+              </span>
+            ))}
           </div>
         </div>
       </div>
@@ -476,15 +485,10 @@ export default function ContentCreatorsProjectPage() {
           <div className="den-stack">
             {p.members.map((member) => (
               <div key={member.id} className="list-row" data-testid={`card-member-${member.userId}`}>
-                <span className="person-dot" style={{ background: member.role === 'CAPTAIN' ? 'hsl(var(--accent))' : 'hsl(164 33% 45%)' }}>
-                  {(member.name ?? member.userId).slice(0, 2).toUpperCase()}
-                </span>
+                <MemberAvatar userId={member.userId} name={member.name} size={28} />
                 <span>
                   <b>{member.name ?? member.userId}</b>
-                  <small>
-                    {ROLE_LABELS[member.role] ?? member.role}
-                    {member.name ? ` · ${member.userId}` : ''}
-                  </small>
+                  <small>{ROLE_LABELS[member.role] ?? member.role}</small>
                 </span>
                 {member.role === 'CAPTAIN' && <span className="den-tag danger">Captain</span>}
               </div>

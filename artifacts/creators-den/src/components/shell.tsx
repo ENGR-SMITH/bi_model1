@@ -11,6 +11,7 @@ import {
   Image,
   LogOut,
   Mic2,
+  Package,
   Palette,
   Scissors,
   Search,
@@ -259,6 +260,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                   { href: `/projects/${projectId}/role/audio`, number: '02', label: 'Audio', icon: <Mic2 size={15} />, testId: 'nav-role-audio' },
                   { href: `/projects/${projectId}/role/script`, number: '03', label: 'Script', icon: <FileText size={15} />, testId: 'nav-role-script' },
                   { href: `/projects/${projectId}/role/thumbnail`, number: '04', label: 'Thumbnail', icon: <Image size={15} />, testId: 'nav-role-thumbnail' },
+                  { href: `/projects/${projectId}/preview/finish`, number: '05', label: 'Finish', icon: <Package size={15} />, testId: 'nav-role-finish' },
                 ].map((item) => (
                   <Link
                     key={item.label}
