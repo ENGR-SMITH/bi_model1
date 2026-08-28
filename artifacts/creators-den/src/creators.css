@@ -3533,6 +3533,61 @@ select optgroup {
 .den-chat-compose .icon-btn:hover { background: hsl(var(--accent) / .85); }
 .den-chat-compose .icon-btn:disabled { opacity: .45; cursor: not-allowed; }
 
+/* Voice note recording chip — takes over the composer while the mic is live:
+   a pulsing red dot, the elapsed timer, and the stop button. */
+.den-chat-record {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--destructive) / .5);
+  background: hsl(var(--destructive) / .1);
+}
+.den-chat-record-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: hsl(var(--destructive));
+  box-shadow: 0 0 0 0 hsl(var(--destructive) / .6);
+  animation: denRecordPulse 1.2s ease-out infinite;
+  flex: 0 0 auto;
+}
+@keyframes denRecordPulse {
+  0% { box-shadow: 0 0 0 0 hsl(var(--destructive) / .55); }
+  70% { box-shadow: 0 0 0 9px hsl(var(--destructive) / 0); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0); }
+}
+.den-chat-record b { font: 700 10px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--destructive)); }
+.den-chat-record-timer { font: 500 12px var(--app-font-mono); color: hsl(var(--foreground)); }
+.den-chat-record .icon-btn {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border: 1px solid hsl(var(--destructive) / .55);
+  background: transparent;
+  color: hsl(var(--destructive));
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.den-chat-record .icon-btn:hover { background: hsl(var(--destructive) / .18); }
+
+/* Voice note message — the audio player sits inside the speech bubble. */
+.den-chat-voice { display: flex; flex-direction: column; gap: 6px; }
+.den-chat-voice audio {
+  display: block;
+  width: 100%;
+  max-width: 230px;
+  height: 34px;
+  border-radius: 999px;
+  background: hsl(var(--background) / .4);
+}
+.den-chat-msg:not(.mine) .den-chat-voice audio { background: hsl(var(--background)); }
+
 /* ---------------------------------------------------------------------------
    Finish — the export desk (latest-only download cards, grant-aware).
 --------------------------------------------------------------------------- */
