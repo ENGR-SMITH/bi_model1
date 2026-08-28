@@ -42,13 +42,35 @@ const router: IRouter = Router();
 // to RELEASED and files become downloadable (every download is audited).
 // ---------------------------------------------------------------------------
 
+// Each leg's studio is owned by one of the four content roles. FINISH actions
+// (exports, thumbnail queue, lock approval) are Captain-only.
 const LEG_ROLES: Record<string, string> = {
-  SELECTS: "ARCHITECT",
-  CUT: "VISUAL_EDITOR",
-  SOUND: "SOUND_DESIGNER",
-  FINISH: "MOTION_COLOR",
-  THUMBNAIL: "THUMBNAIL_DESIGNER",
+  SELECTS: "VIDEO",
+  CUT: "VIDEO",
+  SOUND: "AUDIO",
+  FINISH: "CAPTAIN",
+  THUMBNAIL: "THUMBNAIL",
 } as const;
+
+// The vault kind a file belongs to maps to the role that owns it — used to
+// decide which role grants unlock a download.
+const ROLE_KINDS: Record<string, string[]> = {
+  VIDEO: ["RAW_VIDEO", "SCREEN_REC", "B_ROLL", "REFERENCE"],
+  AUDIO: ["RAW_AUDIO", "VO_PICKUP"],
+  THUMBNAIL: ["THUMBNAIL_DESIGN", "GRAPHIC"],
+  // Scripts live in the browser (the script desk), not the vault — the SCRIPT
+  // role owns no physical files today, so its grants unlock nothing until
+  // script files exist.
+  SCRIPT: [],
+};
+
+/** The owning role of a vault asset kind, or null when no role owns it. */
+function roleForKind(kind: string): string | null {
+  for (const [role, kinds] of Object.entries(ROLE_KINDS)) {
+    if (kinds.includes(kind)) return role;
+  }
+  return null;
+}
 
 async function requireMember(
   projectId: string,
@@ -75,8 +97,8 @@ async function requireLegEditor(
 ): Promise<TandemVideoMember | null> {
   const member = await requireMember(projectId, userId);
   if (!member) return null;
-  if (member.role === "CAPTAIN") return member;
-  return member.role === LEG_ROLES[leg] ? member : null;
+  if (member.roles.includes("CAPTAIN")) return member;
+  return member.roles.includes(LEG_ROLES[leg]) ? member : null;
 }
 
 // POST /video/projects/:projectId/audio — queue an audio pass for the SOUND
@@ -273,31 +295,9 @@ router.get(
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    if (project.status !== "RELEASED") {
-      // M4: a temporary grant from the Captain bypasses the Lock while active.
-      const [grant] = await db
-        .select()
-        .from(tandemVideoGrantsTable)
-        .where(
-          and(
-            eq(tandemVideoGrantsTable.projectId, project.id),
-            eq(tandemVideoGrantsTable.fileId, params.data.fileId),
-            eq(tandemVideoGrantsTable.memberId, userId),
-            isNull(tandemVideoGrantsTable.revokedAt),
-            gt(tandemVideoGrantsTable.expiresAt, new Date()),
-          ),
-        )
-        .limit(1);
-      if (!grant) {
-        res.status(403).json({
-          error: "The Lock is still on — downloads open once the Captain approves the final master",
-        });
-        return;
-      }
-    }
 
-    // The fileId may be an AssetFile row (proxy/export/thumbnail) or a raw
-    // asset id (the locked original). Resolve either.
+    // Resolve the file first: the Lock/grant check needs the asset kind to
+    // know which role's files this download belongs to.
     const [file] = await db
       .select()
       .from(tandemVideoAssetFilesTable)
@@ -327,6 +327,34 @@ router.get(
     if (!asset || asset.projectId !== params.data.projectId) {
       res.status(404).json({ error: "File not found" });
       return;
+    }
+
+    if (project.status !== "RELEASED") {
+      // M4: a temporary grant from the Captain bypasses the Lock while active.
+      // Grants are role-scoped: they unlock every file version under the
+      // granted roles (["ALL"] covers every file in the project).
+      const fileRole = roleForKind(asset.kind);
+      const grants = await db
+        .select()
+        .from(tandemVideoGrantsTable)
+        .where(
+          and(
+            eq(tandemVideoGrantsTable.projectId, project.id),
+            eq(tandemVideoGrantsTable.memberId, userId),
+            isNull(tandemVideoGrantsTable.revokedAt),
+            gt(tandemVideoGrantsTable.expiresAt, new Date()),
+          ),
+        );
+      const allowed = grants.some((grant) =>
+        grant.roles.includes("ALL") ||
+        (fileRole !== null && grant.roles.includes(fileRole)),
+      );
+      if (!allowed) {
+        res.status(403).json({
+          error: "The Lock is still on — downloads open once the Captain approves the final master",
+        });
+        return;
+      }
     }
 
     const storageKey = file?.storageKey ?? asset.storageKey;

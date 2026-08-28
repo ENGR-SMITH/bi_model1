@@ -15,7 +15,8 @@ export interface VideoMember {
      * @nullable
      */
   name: string | null;
-  role: string;
+  /** Every role this member holds in the project, e.g. ["VIDEO", "THUMBNAIL"] */
+  roles: string[];
   status: string;
   createdAt: Date;
 }

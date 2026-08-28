@@ -55,6 +55,8 @@ import {
   wrapScriptRange,
 } from '@/lib/script-comments';
 import { ScriptCommentsPanel } from '@/components/script-comments';
+import { RoleAccessDenied } from '@/components/role-access-denied';
+import { hasRole } from '@/lib/roles';
 
 const stripHtml = (value: string): string =>
   value.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
@@ -526,6 +528,13 @@ export default function RoleScriptPage() {
   }
 
   const p = project.data;
+
+  // The Script desk only opens for members with the SCRIPT role (or the
+  // Captain). The nav tab stays visible — this page explains why it is locked.
+  if (!hasRole(p.myRoles, 'SCRIPT')) {
+    return <RoleAccessDenied role="Script" projectId={p.id} />;
+  }
+
   const processedMedia = p.assets.filter((asset) => asset.status === 'PROCESSED' && MEDIA_KINDS.has(asset.kind));
 
   return (

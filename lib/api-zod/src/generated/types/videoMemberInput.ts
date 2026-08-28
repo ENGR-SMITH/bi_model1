@@ -17,5 +17,6 @@ export interface VideoMemberInput {
      * @maxLength 20
      */
   uid: string;
+  /** The role to assign. Inviting a user who is already a member adds the role to their existing set. */
   role: VideoMemberInputRole;
 }

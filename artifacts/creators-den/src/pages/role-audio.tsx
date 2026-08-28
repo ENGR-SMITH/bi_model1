@@ -37,6 +37,8 @@ import {
   type PreviewVersion,
 } from '@/components/preview-shared';
 import { RoleOracle } from '@/components/role-oracle';
+import { RoleAccessDenied } from '@/components/role-access-denied';
+import { hasRole } from '@/lib/roles';
 import type { StudioLeg } from '@/components/role-oracle';
 
 const AUDIO_KINDS = new Set(['RAW_AUDIO', 'VO_PICKUP']);
@@ -321,6 +323,12 @@ export default function RoleAudioPage() {
 
   const p = project.data;
 
+  // The Audio studio only opens for members with the AUDIO role (or the
+  // Captain). The nav tab stays visible — this page explains why it is locked.
+  if (!hasRole(p.myRoles, 'AUDIO')) {
+    return <RoleAccessDenied role="Audio" projectId={p.id} />;
+  }
+
   return (
     <RoleLayout
       versions={
@@ -351,7 +359,7 @@ export default function RoleAudioPage() {
       oracle={
         <RoleOracle
           leg="SOUND"
-          roleName="Sound Designer"
+          roleName="Audio Editor"
           context={oracleContext}
           placeholder="e.g. Where should the score duck under the dialogue?"
         />

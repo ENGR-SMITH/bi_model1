@@ -121,18 +121,18 @@ afterEach(() => {
 });
 
 describe("M4 — viral reference import", () => {
-  it("queues pacing analysis (Architect role) and the worker writes a reference", async () => {
+  it("queues pacing analysis (Video role) and the worker writes a reference", async () => {
     const project = await createProject();
-    await addMember(project.id, "architect@example.com", "ARCHITECT");
+    await addMember(project.id, "editor@example.com", "VIDEO");
     const reference = await uploadAsset(project.id, "viral-tutorial.mp4", "REFERENCE");
 
-    state.userId = "editor-1"; // wrong role
+    state.userId = "sound-1"; // wrong role
     const forbidden = await request(API).post(
       `/api/video/projects/${project.id}/assets/${reference.id}/reference-analyze`,
     );
     expect(forbidden.status).toBe(403);
 
-    state.userId = "architect-1";
+    state.userId = "editor-1";
     const queued = await request(API).post(
       `/api/video/projects/${project.id}/assets/${reference.id}/reference-analyze`,
     );
@@ -164,47 +164,56 @@ describe("M4 — viral reference import", () => {
 });
 
 describe("M4 — download grants", () => {
-  it("a Captain grant unlocks the locked download for the member, and revoke locks it again", async () => {
+  it("a role grant unlocks every file version under that role, and revoke locks it again", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
-    const asset = await uploadAsset(project.id);
+    await addMember(project.id, "editor@example.com", "VIDEO");
+    await addMember(project.id, "sound@example.com", "AUDIO");
+    const video = await uploadAsset(project.id, "interview.mp4", "RAW_VIDEO");
+    const audio = await uploadAsset(project.id, "stem.wav", "RAW_AUDIO");
     await runWorkerCycle();
 
-    const detail = await request(API).get(`/api/video/projects/${project.id}/assets/${asset.id}`);
-    const proxy = detail.body.files.find((file: any) => file.kind === "PROXY");
+    const videoDetail = await request(API).get(`/api/video/projects/${project.id}/assets/${video.id}`);
+    const videoProxy = videoDetail.body.files.find((file: any) => file.kind === "PROXY");
+    const audioDetail = await request(API).get(`/api/video/projects/${project.id}/assets/${audio.id}`);
+    const audioProxy = audioDetail.body.files.find((file: any) => file.kind === "PROXY");
 
     // Blocked without a grant.
     state.userId = "editor-1";
     expect(
-      (await request(API).get(`/api/video/projects/${project.id}/files/${proxy.id}/download`)).status,
+      (await request(API).get(`/api/video/projects/${project.id}/files/${videoProxy.id}/download`)).status,
     ).toBe(403);
 
     // Non-Captain cannot create grants.
     state.userId = "editor-1";
     const forbidden = await request(API)
       .post(`/api/video/projects/${project.id}/grants`)
-      .send({ memberId: "editor-1", fileId: proxy.id, reason: "DAW repair", expiresInHours: 24 });
+      .send({ memberId: "editor-1", roles: ["VIDEO"], reason: "DAW repair", expiresInHours: 24 });
     expect(forbidden.status).toBe(403);
 
-    // Captain grants the editor the proxy file.
+    // Captain grants the editor the VIDEO role (all video file versions).
     state.userId = "captain-1";
     const created = await request(API)
       .post(`/api/video/projects/${project.id}/grants`)
-      .send({ memberId: "editor-1", fileId: proxy.id, reason: "DAW repair", expiresInHours: 24 });
+      .send({ memberId: "editor-1", roles: ["VIDEO"], reason: "DAW repair", expiresInHours: 24 });
     expect(created.status).toBe(201);
     expect(created.body.memberId).toBe("editor-1");
+    expect(created.body.roles).toEqual(["VIDEO"]);
     expect(created.body.expiresAt).toBeTruthy();
 
-    // The grant opens the download for the member (still locked for others).
+    // The grant opens every video-kind download for the member…
     state.userId = "editor-1";
-    const downloaded = await request(API).get(
-      `/api/video/projects/${project.id}/files/${proxy.id}/download`,
-    );
-    expect(downloaded.status).toBe(200);
+    expect(
+      (await request(API).get(`/api/video/projects/${project.id}/files/${videoProxy.id}/download`)).status,
+    ).toBe(200);
+    // …but not the audio file (still locked for the audio role).
+    expect(
+      (await request(API).get(`/api/video/projects/${project.id}/files/${audioProxy.id}/download`)).status,
+    ).toBe(403);
 
+    // Unrelated members stay locked.
     state.userId = "sound-1";
     expect(
-      (await request(API).get(`/api/video/projects/${project.id}/files/${proxy.id}/download`)).status,
+      (await request(API).get(`/api/video/projects/${project.id}/files/${videoProxy.id}/download`)).status,
     ).toBe(403);
 
     // Captain revokes → locked again.
@@ -217,19 +226,52 @@ describe("M4 — download grants", () => {
 
     state.userId = "editor-1";
     expect(
-      (await request(API).get(`/api/video/projects/${project.id}/files/${proxy.id}/download`)).status,
+      (await request(API).get(`/api/video/projects/${project.id}/files/${videoProxy.id}/download`)).status,
     ).toBe(403);
   });
 
-  it("rejects grants for non-members and requires the Captain to list grants", async () => {
+  it("an ALL-roles grant covers every file in the project", async () => {
+    const project = await createProject();
+    await addMember(project.id, "editor@example.com", "VIDEO");
+    const video = await uploadAsset(project.id, "interview.mp4", "RAW_VIDEO");
+    const audio = await uploadAsset(project.id, "stem.wav", "RAW_AUDIO");
+    await runWorkerCycle();
+
+    const videoDetail = await request(API).get(`/api/video/projects/${project.id}/assets/${video.id}`);
+    const videoProxy = videoDetail.body.files.find((file: any) => file.kind === "PROXY");
+    const audioDetail = await request(API).get(`/api/video/projects/${project.id}/assets/${audio.id}`);
+    const audioProxy = audioDetail.body.files.find((file: any) => file.kind === "PROXY");
+
+    state.userId = "captain-1";
+    const created = await request(API)
+      .post(`/api/video/projects/${project.id}/grants`)
+      .send({ memberId: "editor-1", roles: ["ALL"] });
+    expect(created.status).toBe(201);
+    expect(created.body.roles).toEqual(["ALL"]);
+
+    state.userId = "editor-1";
+    expect(
+      (await request(API).get(`/api/video/projects/${project.id}/files/${videoProxy.id}/download`)).status,
+    ).toBe(200);
+    expect(
+      (await request(API).get(`/api/video/projects/${project.id}/files/${audioProxy.id}/download`)).status,
+    ).toBe(200);
+  });
+
+  it("rejects grants for non-members, empty roles, and non-Captains listing", async () => {
     const project = await createProject();
     const asset = await uploadAsset(project.id);
 
     state.userId = "captain-1";
     const badMember = await request(API)
       .post(`/api/video/projects/${project.id}/grants`)
-      .send({ memberId: "stranger-1", fileId: asset.id });
+      .send({ memberId: "stranger-1", roles: ["VIDEO"] });
     expect(badMember.status).toBe(400);
+
+    const emptyRoles = await request(API)
+      .post(`/api/video/projects/${project.id}/grants`)
+      .send({ memberId: "captain-1", roles: [] });
+    expect(emptyRoles.status).toBe(400);
 
     state.userId = "editor-1";
     expect((await request(API).get(`/api/video/projects/${project.id}/grants`)).status).toBe(403);
@@ -239,10 +281,10 @@ describe("M4 — download grants", () => {
 describe("M4 — notifications", () => {
   it("notifies the Captain on submission and the submitter on decision", async () => {
     const project = await createProject();
-    await addMember(project.id, "architect@example.com", "ARCHITECT");
+    await addMember(project.id, "editor@example.com", "VIDEO");
 
-    // Submit as the architect → Captain gets notified.
-    state.userId = "architect-1";
+    // Submit as the video editor → Captain gets notified.
+    state.userId = "editor-1";
     await request(API)
       .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
       .send({ snapshot: { clips: [{ id: "c1", assetId: "a1" }] } });
@@ -261,12 +303,12 @@ describe("M4 — notifications", () => {
       `/api/video/projects/${project.id}/submissions/${submitted.body.id}/approve`,
     );
 
-    state.userId = "architect-1";
-    const architectNotes = await request(API).get("/api/video/notifications");
-    expect(architectNotes.body.some((n: any) => n.category === "video_approved")).toBe(true);
+    state.userId = "editor-1";
+    const editorNotes = await request(API).get("/api/video/notifications");
+    expect(editorNotes.body.some((n: any) => n.category === "video_approved")).toBe(true);
 
     // Mark one read.
-    const unread = architectNotes.body.find((n: any) => !n.readAt);
+    const unread = editorNotes.body.find((n: any) => !n.readAt);
     const marked = await request(API).post(`/api/video/notifications/${unread.id}/read`);
     expect(marked.status).toBe(200);
     expect(marked.body.readAt).toBeTruthy();
@@ -274,12 +316,10 @@ describe("M4 — notifications", () => {
 
   it("notifies every member when the FINISH leg is approved (lock release)", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
-    state.clerkEmailToUser["color@example.com"] = "color-1";
-    await addMember(project.id, "color@example.com", "MOTION_COLOR");
+    await addMember(project.id, "editor@example.com", "VIDEO");
     const asset = await uploadAsset(project.id);
 
-    state.userId = "color-1";
+    state.userId = "captain-1";
     await request(API)
       .put(`/api/video/projects/${project.id}/timelines/FINISH`)
       .send({ snapshot: { clips: [{ id: "c1", assetId: asset.id }] } });
@@ -304,13 +344,13 @@ describe("M4 — notifications", () => {
 
   it("notifies the member when a grant is created and revoked", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(project.id, "editor@example.com", "VIDEO");
     const asset = await uploadAsset(project.id);
 
     state.userId = "captain-1";
     const created = await request(API)
       .post(`/api/video/projects/${project.id}/grants`)
-      .send({ memberId: "editor-1", fileId: asset.id, reason: "DaVinci repair" });
+      .send({ memberId: "editor-1", roles: ["VIDEO"], reason: "DaVinci repair" });
     expect(created.status).toBe(201);
 
     state.userId = "editor-1";
@@ -327,12 +367,12 @@ describe("M4 — notifications", () => {
 
   it("returns 404 when marking someone else's notification read", async () => {
     const project = await createProject();
-    await addMember(project.id, "editor@example.com", "VISUAL_EDITOR");
+    await addMember(project.id, "editor@example.com", "VIDEO");
 
     state.userId = "editor-1";
     await request(API)
       .post(`/api/video/projects/${project.id}/grants`)
-      .send({ memberId: "editor-1", fileId: "x", reason: "" });
+      .send({ memberId: "editor-1", roles: ["VIDEO"], reason: "" });
     // no grant exists — grant creation failed, so just check the 401 path
     const notes = await request(API).get("/api/video/notifications");
     expect(notes.status).toBe(200);
@@ -347,6 +387,6 @@ describe("authorization on M4 routes", () => {
     expect((await request(API).post("/api/video/projects/x/assets/y/reference-analyze")).status).toBe(401);
     expect((await request(API).get("/api/video/projects/x/assets/y/reference")).status).toBe(401);
     expect((await request(API).get("/api/video/projects/x/grants")).status).toBe(401);
-    expect((await request(API).post("/api/video/projects/x/grants").send({ memberId: "m", fileId: "f" })).status).toBe(401);
+    expect((await request(API).post("/api/video/projects/x/grants").send({ memberId: "m", roles: ["VIDEO"] })).status).toBe(401);
   });
 });

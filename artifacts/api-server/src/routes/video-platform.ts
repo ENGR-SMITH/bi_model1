@@ -41,10 +41,10 @@ const router: IRouter = Router();
 // ---------------------------------------------------------------------------
 
 const LEG_ROLES: Record<string, string> = {
-  SELECTS: "ARCHITECT",
-  CUT: "VISUAL_EDITOR",
-  SOUND: "SOUND_DESIGNER",
-  FINISH: "MOTION_COLOR",
+  SELECTS: "VIDEO",
+  CUT: "VIDEO",
+  SOUND: "AUDIO",
+  FINISH: "CAPTAIN",
 } as const;
 
 async function requireMember(
@@ -116,8 +116,8 @@ router.post(
     }
 
     const member = await requireMember(params.data.projectId, userId);
-    if (!member || (member.role !== "CAPTAIN" && member.role !== LEG_ROLES.SELECTS)) {
-      res.status(403).json({ error: "Only the Story Architect (or the Captain) can analyze a reference" });
+    if (!member || (!member.roles.includes("CAPTAIN") && !member.roles.includes(LEG_ROLES.SELECTS))) {
+      res.status(403).json({ error: "Only the Video editor (or the Captain) can analyze a reference" });
       return;
     }
 
@@ -235,21 +235,21 @@ router.post(
       return;
     }
 
-    // The member must belong to the project and the file must resolve to it.
+    // The member must belong to the project.
     const member = await requireMember(params.data.projectId, body.data.memberId);
     if (!member) {
       res.status(400).json({ error: "That user is not a member of this project" });
       return;
     }
 
-    const [asset] = await db
-      .select()
-      .from(tandemVideoAssetsTable)
-      .where(eq(tandemVideoAssetsTable.id, body.data.fileId))
-      .limit(1);
-    if (asset && asset.projectId !== params.data.projectId) {
-      res.status(400).json({ error: "The file must belong to this project" });
+    // Grants are role-scoped: at least one role, or ["ALL"] for every file.
+    const roles = [...new Set(body.data.roles)];
+    if (roles.length === 0) {
+      res.status(400).json({ error: "Pick at least one role to grant" });
       return;
+    }
+    if (roles.includes("ALL") && roles.length > 1) {
+      roles.splice(0, roles.length, "ALL");
     }
 
     const hours = Math.min(168, Math.max(1, body.data.expiresInHours ?? 24));
@@ -258,7 +258,7 @@ router.post(
       .values({
         id: randomUUID(),
         projectId: params.data.projectId,
-        fileId: body.data.fileId,
+        roles,
         memberId: body.data.memberId,
         reason: body.data.reason ?? "",
         grantedById: userId,
