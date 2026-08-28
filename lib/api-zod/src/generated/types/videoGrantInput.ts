@@ -9,8 +9,11 @@
 export interface VideoGrantInput {
   /** @minLength 1 */
   memberId: string;
-  /** @minLength 1 */
-  fileId: string;
+  /**
+     * The roles whose files the member may download — pick one or more of VIDEO, AUDIO, SCRIPT, THUMBNAIL, or ["ALL"] for every file.
+     * @minItems 1
+     */
+  roles: string[];
   /** @maxLength 500 */
   reason?: string;
   /**

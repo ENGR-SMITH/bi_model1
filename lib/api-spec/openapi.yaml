@@ -1690,6 +1690,67 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Already a member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/members/{memberId}:
+    patch:
+      operationId: updateVideoProjectMemberRoles
+      tags: [content-creators]
+      summary: Update a member's roles (Captain only)
+      description: Replaces the roles a member holds — grant more roles, or take them away. The Captain's own roles cannot be changed.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoMemberId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoMemberRolesInput" }
+      responses:
+        "200":
+          description: Updated member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoMember" }
+        "400":
+          description: Invalid roles
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed (not the Captain, or the member is the Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Member not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: removeVideoProjectMember
+      tags: [content-creators]
+      summary: Remove a member from the project (Captain only)
+      description: Removes the member's access, active download grants, and submissions. The Captain cannot be removed.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - { $ref: "#/components/parameters/VideoMemberId" }
+      responses:
+        "204":
+          description: Member removed
+        "403":
+          description: Not allowed (not the Captain, or the member is the Captain)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Member not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/projects/{projectId}/assets:
     get:
       operationId: listVideoAssets
@@ -2595,7 +2656,7 @@ paths:
     get:
       operationId: downloadVideoFile
       tags: [content-creators]
-      summary: Download a file once the Lock is released (audited)
+      summary: Download a file once the Lock is released, or under an active role grant (audited)
       parameters:
         - { $ref: "#/components/parameters/VideoProjectId" }
         - { $ref: "#/components/parameters/VideoFileId" }
@@ -2701,7 +2762,7 @@ paths:
     post:
       operationId: createVideoGrant
       tags: [content-creators]
-      summary: Grant a member a temporary download (Captain)
+      summary: Grant a member a temporary download by role (Captain)
       parameters:
         - { $ref: "#/components/parameters/VideoProjectId" }
       requestBody:
@@ -2880,6 +2941,11 @@ components:
       schema: { type: string, minLength: 1 }
     VideoFileId:
       name: fileId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1 }
+    VideoMemberId:
+      name: memberId
       in: path
       required: true
       schema: { type: string, minLength: 1 }
@@ -3733,7 +3799,10 @@ components:
           type: string
           enum: [PUBLIC, PRIVATE]
           description: Whether the project appears on the owner's public profile
-        myRole: { type: ["string", "null"] }
+        myRoles:
+          type: array
+          items: { type: string }
+          description: The viewer's roles in this project (e.g. ["VIDEO", "THUMBNAIL"]; always includes CAPTAIN for the owner)
         members:
           type: array
           items: { $ref: "#/components/schemas/VideoMember" }
@@ -3742,7 +3811,7 @@ components:
           items: { $ref: "#/components/schemas/VideoAsset" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, ownerId, name, description, status, visibility, myRole, members, assets, createdAt, updatedAt]
+      required: [id, ownerId, name, description, status, visibility, myRoles, members, assets, createdAt, updatedAt]
     VideoMember:
       type: object
       properties:
@@ -3750,10 +3819,13 @@ components:
         projectId: { type: string }
         userId: { type: string }
         name: { type: ["string", "null"], description: Resolved Clerk display name, when available (falls back to the raw id client-side) }
-        role: { type: string }
+        roles:
+          type: array
+          items: { type: string }
+          description: Every role this member holds in the project, e.g. ["VIDEO", "THUMBNAIL"]
         status: { type: string }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, userId, name, role, status, createdAt]
+      required: [id, projectId, userId, name, roles, status, createdAt]
     VideoMemberInput:
       type: object
       description: Invite a teammate by their unique Tandem ID (e.g. TANDEM6EUHY) — the handle shown on every user's profile.
@@ -3765,8 +3837,18 @@ components:
           description: The invitee's unique Tandem ID, e.g. TANDEM6EUHY.
         role:
           type: string
-          enum: [UPLOADER, ARCHITECT, VISUAL_EDITOR, SOUND_DESIGNER, MOTION_COLOR, THUMBNAIL_DESIGNER, VIEWER]
+          enum: [VIDEO, AUDIO, SCRIPT, THUMBNAIL, UPLOADER, VIEWER]
+          description: The role to assign. Inviting a user who is already a member adds the role to their existing set.
       required: [uid, role]
+    VideoMemberRolesInput:
+      type: object
+      description: The full set of roles a member should hold after the update.
+      properties:
+        roles:
+          type: array
+          minItems: 1
+          items: { type: string }
+      required: [roles]
     VideoAsset:
       type: object
       properties:
@@ -4157,25 +4239,33 @@ components:
       required: [id, assetId, status, pacing, error, createdAt, updatedAt]
     VideoGrant:
       type: object
+      description: A timed download grant covering every file version under one or more roles (or ALL roles), not a single file.
       properties:
         id: { type: string }
         projectId: { type: string }
-        fileId: { type: string }
+        roles:
+          type: array
+          items: { type: string }
+          description: The roles whose files the member may download, e.g. ["VIDEO", "AUDIO"]; ["ALL"] covers every file in the project.
         memberId: { type: string }
         reason: { type: string }
         grantedById: { type: string }
         expiresAt: { type: string, format: date-time }
         revokedAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, fileId, memberId, reason, grantedById, expiresAt, revokedAt, createdAt]
+      required: [id, projectId, roles, memberId, reason, grantedById, expiresAt, revokedAt, createdAt]
     VideoGrantInput:
       type: object
       properties:
         memberId: { type: string, minLength: 1 }
-        fileId: { type: string, minLength: 1 }
+        roles:
+          type: array
+          minItems: 1
+          items: { type: string }
+          description: The roles whose files the member may download — pick one or more of VIDEO, AUDIO, SCRIPT, THUMBNAIL, or ["ALL"] for every file.
         reason: { type: string, maxLength: 500 }
         expiresInHours: { type: integer, minimum: 1, maximum: 168, default: 24 }
-      required: [memberId, fileId]
+      required: [memberId, roles]
     VideoNotification:
       type: object
       properties:

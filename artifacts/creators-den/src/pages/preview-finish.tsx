@@ -37,6 +37,7 @@ import { SectionEyebrow } from '@/components/shell';
 import { MemberAvatar } from '@/components/member-avatar';
 import { proxyUrlFor } from '@/components/asset-preview';
 import { buildZip } from '@/lib/zip';
+import { ROLE_LABELS, roleForKind } from '@/lib/roles';
 import type { VideoMember } from '@workspace/api-client-react';
 
 const VIDEO_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE']);
@@ -52,17 +53,6 @@ const KIND_LABELS: Record<string, string> = {
   VO_PICKUP: 'Pickup voiceover',
   GRAPHIC: 'Graphic',
   THUMBNAIL_DESIGN: 'Thumbnail design',
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  CAPTAIN: 'Captain',
-  UPLOADER: 'Uploader',
-  ARCHITECT: 'Story Architect',
-  VISUAL_EDITOR: 'Visual Editor',
-  SOUND_DESIGNER: 'Sound Designer',
-  MOTION_COLOR: 'Motion & Color',
-  THUMBNAIL_DESIGNER: 'Thumbnail Designer',
-  VIEWER: 'Viewer',
 };
 
 function formatBytes(bytes: number): string {
@@ -211,9 +201,9 @@ export default function FinishPreviewPage() {
   const { projectId } = useParams<{ projectId: string }>();
   useProjectRealtime(projectId, null);
   const project = useGetVideoProject(projectId);
-  const myRole = project.data?.myRole ?? 'VIEWER';
+  const myRoles = project.data?.myRoles ?? [];
   const grants = useListVideoGrants(projectId, {
-    query: { queryKey: getListVideoGrantsQueryKey(projectId), enabled: myRole === 'CAPTAIN' },
+    query: { queryKey: getListVideoGrantsQueryKey(projectId), enabled: myRoles.includes('CAPTAIN') },
   });
 
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -221,7 +211,7 @@ export default function FinishPreviewPage() {
 
   const assets = (project.data?.assets ?? []) as ExportAsset[];
   const released = project.data?.status === 'RELEASED';
-  const isCaptain = myRole === 'CAPTAIN';
+  const isCaptain = myRoles.includes('CAPTAIN');
 
   // The newest asset of each kind — the only ones this page ever exposes.
   const latestOf = (kinds: Set<string>): ExportAsset | null =>
@@ -239,14 +229,18 @@ export default function FinishPreviewPage() {
     [members],
   );
 
-  // Captain view: active grants for one file → the members who hold them.
-  const grantHoldersFor = (fileId: string | null): VideoMember[] => {
-    if (!isCaptain || !fileId) return [];
-    const active = (grants.data ?? []).filter(
-      (g) => g.fileId === fileId && !g.revokedAt && new Date(g.expiresAt) > new Date(),
-    );
+  // Captain view: active grants that unlock this file (by role or ALL) → the
+  // members who hold them.
+  const grantHoldersFor = (asset: { id: string; kind: string } | null): VideoMember[] => {
+    if (!isCaptain || !asset) return [];
+    const fileRole = roleForKind(asset.kind);
+    const active = (grants.data ?? []).filter((grant) => {
+      if (grant.revokedAt || new Date(grant.expiresAt) <= new Date()) return false;
+      const grantRoles = grant.roles ?? [];
+      return grantRoles.includes('ALL') || (fileRole !== null && grantRoles.includes(fileRole));
+    });
     return active
-      .map((g) => membersById.get(g.memberId))
+      .map((grant) => membersById.get(grant.memberId))
       .filter((m): m is VideoMember => Boolean(m));
   };
 
@@ -310,7 +304,7 @@ export default function FinishPreviewPage() {
               projectName: project.data?.name ?? '',
               status: project.data?.status ?? '',
               generatedAt: new Date().toISOString(),
-              exportedBy: myRole,
+              exportedBy: myRoles,
               lock: released ? 'released' : 'locked',
               entries: items.map((item) => ({
                 kind: item.name,
@@ -324,12 +318,20 @@ export default function FinishPreviewPage() {
               })),
               script: script ? { name: script.name, characters: stripHtml(script.html).length, words: words(script.html) } : null,
               access: released
-                ? members.map((m) => ({ userId: m.userId, name: m.name, role: m.role }))
+                ? members.map((m) => ({ userId: m.userId, name: m.name, roles: m.roles }))
                 : items.flatMap((item) =>
-                    grantHoldersFor(item.fileId).map((m) => ({
+                    grantHoldersFor({
+                      id: item.fileId,
+                      kind:
+                        item.name === 'video'
+                          ? 'RAW_VIDEO'
+                          : item.name === 'image'
+                            ? 'THUMBNAIL_DESIGN'
+                            : 'RAW_AUDIO',
+                    }).map((m) => ({
                       userId: m.userId,
                       name: m.name,
-                      role: m.role,
+                      roles: m.roles,
                       file: item.fileName,
                     })),
                   ),
@@ -408,7 +410,7 @@ export default function FinishPreviewPage() {
           ) : (
             <p className="finish-card-meta">{hint}</p>
           )}
-          <AccessStrip members={members} holders={grantHoldersFor(asset?.id ?? null)} released={released} />
+          <AccessStrip members={members} holders={grantHoldersFor(asset ?? null)} released={released} />
           <button
             type="button"
             className="primary-btn finish-card-btn"
@@ -525,9 +527,9 @@ export default function FinishPreviewPage() {
             <AccessStrip
               members={members}
               holders={isCaptain ? Array.from(new Map(zipEntries.flatMap((e) => {
-                const assetId =
-                  e.label === 'Video' ? latestVideo?.id : e.label === 'Image' ? latestImage?.id : e.label === 'Audio' ? latestAudio?.id : null;
-                return grantHoldersFor(assetId ?? null);
+                const asset =
+                  e.label === 'Video' ? latestVideo : e.label === 'Image' ? latestImage : e.label === 'Audio' ? latestAudio : null;
+                return grantHoldersFor(asset);
               }).map((member) => [member.userId, member])).values()) : []}
               released={released}
             />

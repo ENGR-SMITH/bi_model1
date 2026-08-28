@@ -134,9 +134,9 @@ async def main() -> int:
             any("processed" in c.lower() for c in cards),
         )
 
-        # Invite Zoe (ARCHITECT) — Captain-only form.
+        # Invite Zoe (VIDEO role) — Captain-only form.
         await ada.fill('[data-testid="input-invite-email"]', ZOE_EMAIL)
-        await ada.select_option('[data-testid="select-invite-role"]', "ARCHITECT")
+        await ada.select_option('[data-testid="select-invite-role"]', "VIDEO")
         await ada.click('[data-testid="button-invite-member"]')
         member_ok = False
         for _ in range(30):

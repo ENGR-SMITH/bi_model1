@@ -213,13 +213,15 @@ export const tandemVideoReferencesTable = pgTable(
   }),
 );
 
-// Selective temporary downloads (M4). The Captain grants a member access to a
-// specific file with a reason + expiry; the grant bypasses the Lock while it's
-// active. Revoking is instant and logged alongside the download audit trail.
+// Selective temporary downloads (M4). The Captain grants a member access to
+// every file version under one or more roles (or ALL roles) with a reason +
+// expiry; the grant bypasses the Lock while it's active. Revoking is instant
+// and logged alongside the download audit trail.
 export const tandemVideoGrantsTable = pgTable("tandem_video_grants", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
-  fileId: text("file_id").notNull(),
+  // JSON array of role strings, e.g. ["VIDEO", "AUDIO"] or ["ALL"].
+  roles: jsonb("roles").$type<string[]>().notNull().default([]),
   memberId: text("member_id").notNull(),
   reason: text("reason").notNull().default(""),
   grantedById: text("granted_by_id").notNull(),

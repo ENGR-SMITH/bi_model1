@@ -110,7 +110,7 @@ export function ReviewPanel({
     );
   };
 
-  const isCaptain = project.data?.myRole === 'CAPTAIN';
+  const isCaptain = project.data?.myRoles?.includes('CAPTAIN') ?? false;
   const decisionError = (approve.error ?? reject.error) as { response?: { data?: { error?: string } } } | null;
 
   const onSeek = (ms: number) => {

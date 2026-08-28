@@ -31,20 +31,30 @@ import {
   useListVideoGrants,
   useListVideoSubmissions,
   useRejectVideoSubmission,
+  useRemoveVideoProjectMember,
   useRevokeVideoGrant,
+  useUpdateVideoProjectMemberRoles,
 } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { isAudioKind, proxyUrlFor } from '@/components/asset-preview';
 import { MemberAvatar } from '@/components/member-avatar';
 import { isTandemUid, normalizeTandemUid, tandemUid } from '@/lib/tandem-uid';
+import {
+  ALL_ROLES,
+  CONTENT_ROLES,
+  GRANT_ROLES,
+  ROLE_LABELS,
+  isCaptain,
+  rolesLabel,
+} from '@/lib/roles';
 
 const LEG_META = {
-  SELECTS: { label: 'Selects', role: 'Story Architect', icon: Film },
-  CUT: { label: 'Cut', role: 'Visual Editor', icon: Scissors },
-  SOUND: { label: 'Sound', role: 'Sound Designer', icon: Mic2 },
-  FINISH: { label: 'Finish', role: 'Motion & Color', icon: Palette },
-  THUMBNAIL: { label: 'Thumbnail', role: 'Thumbnail Designer', icon: Image },
+  SELECTS: { label: 'Selects', role: 'Video', icon: Film },
+  CUT: { label: 'Cut', role: 'Video', icon: Scissors },
+  SOUND: { label: 'Sound', role: 'Audio', icon: Mic2 },
+  FINISH: { label: 'Finish', role: 'Captain', icon: Palette },
+  THUMBNAIL: { label: 'Thumbnail', role: 'Thumbnail', icon: Image },
 } as const;
 
 const KIND_LABELS: Record<string, string> = {
@@ -62,18 +72,7 @@ const KIND_LABELS: Record<string, string> = {
 const KIND_ORDER = ['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'RAW_AUDIO', 'VO_PICKUP', 'REFERENCE', 'GRAPHIC', 'THUMBNAIL_DESIGN'] as const;
 const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
 
-const ROLE_LABELS: Record<string, string> = {
-  CAPTAIN: 'Captain',
-  UPLOADER: 'Uploader',
-  ARCHITECT: 'Story Architect',
-  VISUAL_EDITOR: 'Visual Editor',
-  SOUND_DESIGNER: 'Sound Designer',
-  MOTION_COLOR: 'Motion & Color',
-  THUMBNAIL_DESIGNER: 'Thumbnail Designer',
-  VIEWER: 'Viewer',
-};
-
-const INVITE_ROLES = ['UPLOADER', 'ARCHITECT', 'VISUAL_EDITOR', 'SOUND_DESIGNER', 'MOTION_COLOR', 'THUMBNAIL_DESIGNER', 'VIEWER'] as const;
+const INVITE_ROLES = CONTENT_ROLES;
 
 type AssetSummary = { id: string; fileName: string; kind: string; status: string; sizeBytes: number; version: number; durationMs: number | null; contentHash?: string | null };
 
@@ -135,7 +134,7 @@ function InviteForm({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const invite = useAddVideoProjectMember();
   const [uid, setUid] = useState('');
-  const [role, setRole] = useState<(typeof INVITE_ROLES)[number]>('ARCHITECT');
+  const [role, setRole] = useState<(typeof INVITE_ROLES)[number]>('VIDEO');
 
   const normalized = normalizeTandemUid(uid);
   const valid = isTandemUid(normalized);
@@ -199,32 +198,169 @@ function InviteForm({ projectId }: { projectId: string }) {
   );
 }
 
-function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string; myRole: string; members: Array<{ id: string; userId: string; role: string; name?: string | null }>; assets: Array<{ id: string; fileName: string }> }) {
+// One member row in the vault's Members & roles card. The Captain can edit a
+// member's role set (add or remove roles) and remove them from the project.
+function MemberRow({
+  projectId,
+  member,
+  canManage,
+}: {
+  projectId: string;
+  member: { id: string; userId: string; roles: string[]; name?: string | null };
+  canManage: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const updateRoles = useUpdateVideoProjectMemberRoles();
+  const removeMember = useRemoveVideoProjectMember();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<string[]>(member.roles ?? []);
+  const [confirming, setConfirming] = useState(false);
+
+  const startEdit = () => {
+    setDraft(member.roles ?? []);
+    setEditing(true);
+  };
+
+  const toggleDraft = (role: string) => {
+    setDraft((current) =>
+      current.includes(role) ? current.filter((r) => r !== role) : [...current, role],
+    );
+  };
+
+  const save = () => {
+    const roles = draft.length > 0 ? draft : ['VIEWER'];
+    updateRoles.mutate(
+      { projectId, memberId: member.id, data: { roles } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+          setEditing(false);
+        },
+      },
+    );
+  };
+
+  const remove = () => {
+    removeMember.mutate(
+      { projectId, memberId: member.id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+        },
+      },
+    );
+  };
+
+  const error = (updateRoles.error ?? removeMember.error) as { response?: { data?: { error?: string } } } | null;
+
+  return (
+    <div className="list-row" data-testid={`card-member-${member.userId}`}>
+      <MemberAvatar userId={member.userId} name={member.name} size={28} />
+      <span className="min-w-0 flex-1">
+        <b>{member.name ?? member.userId}</b>
+        <small className="flex flex-wrap items-center gap-1.5">
+          {(member.roles ?? []).includes('CAPTAIN') ? (
+            <span className="den-tag danger">Captain</span>
+          ) : (
+            (member.roles ?? []).map((role) => (
+              <span key={role} className="den-tag accent" data-testid={`role-${role.toLowerCase()}`}>
+                {ROLE_LABELS[role] ?? role}
+              </span>
+            ))
+          )}
+          <span className="mono-label" title="Unique Tandem ID — share it to invite this member">
+            {tandemUid(member.userId)}
+          </span>
+        </small>
+        {error && (
+          <small className="text-danger" role="alert">
+            {error?.response?.data?.error || 'That could not be saved.'}
+          </small>
+        )}
+      </span>
+
+      {editing && canManage ? (
+        <span className="flex flex-col items-end gap-2">
+          <span className="member-role-editor" data-testid={`member-roles-editor-${member.userId}`}>
+            {CONTENT_ROLES.map((role) => (
+              <label key={role} className="member-role-check">
+                <input
+                  type="checkbox"
+                  checked={draft.includes(role)}
+                  onChange={() => toggleDraft(role)}
+                  data-testid={`member-role-toggle-${role.toLowerCase()}`}
+                />
+                {ROLE_LABELS[role]}
+              </label>
+            ))}
+          </span>
+          <span className="flex gap-2">
+            <button type="button" className="secondary-btn" onClick={save} disabled={updateRoles.isPending} data-testid={`button-save-member-roles-${member.userId}`}>
+              {updateRoles.isPending ? 'Saving…' : 'Save roles'}
+            </button>
+            <button type="button" className="secondary-btn" onClick={() => setEditing(false)}>Cancel</button>
+          </span>
+        </span>
+      ) : canManage ? (
+        <span className="flex gap-2 items-center">
+          <button type="button" className="secondary-btn" onClick={startEdit} title="Edit roles" data-testid={`button-edit-member-${member.userId}`}>
+            <UserPlus size={13} /> Roles
+          </button>
+          {confirming ? (
+            <span className="flex gap-2 items-center">
+              <button type="button" className="secondary-btn" onClick={remove} disabled={removeMember.isPending} data-testid={`button-confirm-remove-${member.userId}`}>
+                {removeMember.isPending ? 'Removing…' : 'Confirm'}
+              </button>
+              <button type="button" className="secondary-btn" onClick={() => setConfirming(false)}>Keep</button>
+            </span>
+          ) : (
+            <button type="button" className="danger-icon" title="Remove from project" onClick={() => setConfirming(true)} data-testid={`button-remove-member-${member.userId}`}>
+              <X size={14} />
+            </button>
+          )}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function GrantsPanel({ projectId, myRoles, members }: { projectId: string; myRoles: string[]; members: Array<{ id: string; userId: string; roles: string[]; name?: string | null }> }) {
   const queryClient = useQueryClient();
   // Grant rows are Captain-only, so member names are always resolvable here.
   const memberNameById = new Map(members.map((member) => [member.userId, member.name ?? member.userId.slice(0, 8)]));
   const grants = useListVideoGrants(projectId, {
-    query: { queryKey: getListVideoGrantsQueryKey(projectId), enabled: myRole === 'CAPTAIN' },
+    query: { queryKey: getListVideoGrantsQueryKey(projectId), enabled: isCaptain(myRoles) },
   });
   const create = useCreateVideoGrant();
   const revoke = useRevokeVideoGrant();
   const [memberId, setMemberId] = useState('');
-  const [fileId, setFileId] = useState('');
+  // Selected roles: either ["ALL"] or a subset of the four content roles.
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [reason, setReason] = useState('');
   const [hours, setHours] = useState(24);
 
-  if (myRole !== 'CAPTAIN') return null;
+  if (!isCaptain(myRoles)) return null;
+
+  const toggleRole = (role: string) => {
+    setSelectedRoles((current) => {
+      if (role === ALL_ROLES) return current.includes(ALL_ROLES) ? [] : [ALL_ROLES];
+      const withoutAll = current.filter((r) => r !== ALL_ROLES);
+      return withoutAll.includes(role)
+        ? withoutAll.filter((r) => r !== role)
+        : [...withoutAll, role];
+    });
+  };
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!memberId || !fileId) return;
+    if (!memberId || selectedRoles.length === 0) return;
     create.mutate(
-      { projectId, data: { memberId, fileId, reason: reason.trim() || undefined, expiresInHours: hours } },
+      { projectId, data: { memberId, roles: selectedRoles, reason: reason.trim() || undefined, expiresInHours: hours } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVideoGrantsQueryKey(projectId) });
           setMemberId('');
-          setFileId('');
+          setSelectedRoles([]);
           setReason('');
         },
       },
@@ -244,7 +380,6 @@ function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string
 
   const createError = create.error as { response?: { data?: { error?: string } } } | null;
   const activeGrants = (grants.data ?? []).filter((g) => !g.revokedAt && new Date(g.expiresAt) > new Date());
-  const fileNameById = new Map(assets.map((a) => [a.id, a.fileName]));
   const hoursLeft = (expiresAt: string) => Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 3_600_000));
 
   return (
@@ -254,30 +389,45 @@ function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string
         {activeGrants.length > 0 && <span className="den-tag teal">{activeGrants.length} active</span>}
       </div>
       <p className="setting-copy">
-        Grant a teammate a timed download of a specific file — say, an audio stem for an external DAW repair. Revoke anytime; every download is still audited.
+        Grant a teammate a timed download of every file version under a role — say, all video files for an external
+        edit pass. Pick one role, several roles, or all roles; revoke anytime; every download is still audited.
       </p>
       <form className="grant-form mt-3" onSubmit={submit} data-testid="form-grant">
         <label className="grant-field">
           <span className="mono-label">Teammate</span>
           <select value={memberId} onChange={(event) => setMemberId(event.target.value)} data-testid="grant-select-member">
             <option value="">Choose a teammate…</option>
-            {members.filter((m) => m.role !== 'CAPTAIN').map((m) => (
+            {members.filter((m) => !(m.roles ?? []).includes('CAPTAIN')).map((m) => (
               <option key={m.id} value={m.userId}>{m.name ?? m.userId.slice(0, 8)}</option>
             ))}
           </select>
         </label>
-        <label className="grant-field">
-          <span className="mono-label">File</span>
-          <select value={fileId} onChange={(event) => setFileId(event.target.value)} data-testid="grant-select-file">
-            <option value="">Choose a file…</option>
-            {assets.map((a) => (
-              <option key={a.id} value={a.id}>{a.fileName}</option>
-            ))}
-          </select>
+        <label className="grant-field grant-field-wide">
+          <span className="mono-label">Files by role</span>
+          <div className="grant-roles" data-testid="grant-select-roles">
+            {GRANT_ROLES.map((role) => {
+              const selected = selectedRoles.includes(role);
+              return (
+                <button
+                  key={role}
+                  type="button"
+                  className={`grant-role-chip ${selected ? 'selected' : ''}`}
+                  onClick={() => toggleRole(role)}
+                  aria-pressed={selected}
+                  data-testid={`grant-role-${role.toLowerCase()}`}
+                >
+                  {role === ALL_ROLES ? 'All roles' : ROLE_LABELS[role]}
+                </button>
+              );
+            })}
+          </div>
+          {selectedRoles.length === 0 && (
+            <span className="grant-roles-hint">Pick at least one role — “All roles” covers every file.</span>
+          )}
         </label>
         <label className="grant-field grant-field-wide">
           <span className="mono-label">Reason <i className="grant-optional">optional</i></span>
-          <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. DAW repair" maxLength={500} data-testid="grant-reason" />
+          <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. external edit pass" maxLength={500} data-testid="grant-reason" />
         </label>
         <div className="grant-actions">
           <label className="grant-field grant-hours">
@@ -287,7 +437,7 @@ function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string
               <span>hours</span>
             </span>
           </label>
-          <button type="submit" disabled={create.isPending || !memberId || !fileId} className="secondary-btn grant-submit" data-testid="button-create-grant">
+          <button type="submit" disabled={create.isPending || !memberId || selectedRoles.length === 0} className="secondary-btn grant-submit" data-testid="button-create-grant">
             <Download size={13} />
             {create.isPending ? 'Granting…' : 'Grant download'}
           </button>
@@ -304,13 +454,16 @@ function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string
           {(grants.data ?? []).map((grant) => {
             const active = !grant.revokedAt && new Date(grant.expiresAt) > new Date();
             const memberName = memberNameById.get(grant.memberId) ?? grant.memberId.slice(0, 8);
-            const fileName = fileNameById.get(grant.fileId) ?? grant.fileId.slice(0, 8);
+            const grantRoles = grant.roles ?? [];
+            const scope = grantRoles.includes(ALL_ROLES)
+              ? 'All roles · every file'
+              : grantRoles.map((role) => ROLE_LABELS[role] ?? role).join(', ');
             return (
               <div key={grant.id} className="grant-row" data-testid={`grant-${grant.id}`}>
                 <MemberAvatar userId={grant.memberId} name={memberName} size={30} />
                 <div className="grant-row-main">
                   <b>{memberName}</b>
-                  <span className="grant-row-file" title={fileName}>{fileName}</span>
+                  <span className="grant-row-file" title={scope}>{scope}</span>
                   {grant.reason && <span className="grant-row-reason">“{grant.reason}”</span>}
                 </div>
                 <div className="grant-row-end">
@@ -337,12 +490,12 @@ function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string
   );
 }
 
-function DownloadAuditPanel({ projectId, myRole }: { projectId: string; myRole: string }) {
+function DownloadAuditPanel({ projectId, myRoles }: { projectId: string; myRoles: string[] }) {
   const downloads = useListVideoDownloads(projectId, {
-    query: { queryKey: getListVideoDownloadsQueryKey(projectId), enabled: myRole === 'CAPTAIN' },
+    query: { queryKey: getListVideoDownloadsQueryKey(projectId), enabled: isCaptain(myRoles) },
   });
 
-  if (myRole !== 'CAPTAIN' || !downloads.data || downloads.data.length === 0) return null;
+  if (!isCaptain(myRoles) || !downloads.data || downloads.data.length === 0) return null;
 
   return (
     <div className="paper-card" data-testid="panel-download-audit">
@@ -363,7 +516,7 @@ function DownloadAuditPanel({ projectId, myRole }: { projectId: string; myRole: 
   );
 }
 
-function SubmissionsPanel({ projectId, myRole }: { projectId: string; myRole: string }) {
+function SubmissionsPanel({ projectId, myRoles }: { projectId: string; myRoles: string[] }) {
   const queryClient = useQueryClient();
   const submissions = useListVideoSubmissions(projectId);
   const approve = useApproveVideoSubmission();
@@ -383,7 +536,7 @@ function SubmissionsPanel({ projectId, myRole }: { projectId: string; myRole: st
 
   const rows = submissions.data ?? [];
   const pending = rows.filter((s) => s.status === 'SUBMITTED');
-  const isCaptain = myRole === 'CAPTAIN';
+  const isCaptain = myRoles.includes('CAPTAIN');
 
   if (rows.length === 0) return null;
 
@@ -471,7 +624,8 @@ export default function ContentCreatorsProjectPage() {
   }
 
   const p = project.data;
-  const myRole = p.myRole ?? 'VIEWER';
+  const myRoles = p.myRoles ?? [];
+  const captain = isCaptain(myRoles);
 
   // Group assets into rails by kind, in a stable display order.
   const seen = new Set<string>();
@@ -493,22 +647,22 @@ export default function ContentCreatorsProjectPage() {
             <span className="den-tag accent"><LockKeyhole size={10} /> {p.status.replaceAll('_', ' ')}</span>
             <span className="cd-metatext">
               <b>{p.assets.length} asset{p.assets.length === 1 ? '' : 's'} · {p.members.length} member{p.members.length === 1 ? '' : 's'}</b>
-              <small>you are the {ROLE_LABELS[myRole] ?? myRole}</small>
+              <small>you are the {rolesLabel(myRoles)}</small>
             </span>
           </div>
-          {/* The whole crew — real avatars + role, moved up from the chat. */}
+          {/* The whole crew — real avatars + roles, moved up from the chat. */}
           <div className="cd-roster" data-testid="vault-roster">
             {p.members.map((member) => (
               <span
                 key={member.id}
                 className="cd-roster-pill"
-                title={`${member.name ?? member.userId} · ${ROLE_LABELS[member.role] ?? member.role}`}
+                title={`${member.name ?? member.userId} · ${rolesLabel(member.roles)}`}
                 data-testid={`roster-member-${member.userId}`}
               >
                 <MemberAvatar userId={member.userId} name={member.name} size={24} />
                 <span className="cd-roster-name">{member.name ?? member.userId.slice(0, 8)}</span>
-                <span className={`den-tag ${member.role === 'CAPTAIN' ? 'danger' : 'accent'}`}>
-                  {ROLE_LABELS[member.role] ?? member.role}
+                <span className={`den-tag ${(member.roles ?? []).includes('CAPTAIN') ? 'danger' : 'accent'}`}>
+                  {rolesLabel(member.roles)}
                 </span>
               </span>
             ))}
@@ -526,36 +680,29 @@ export default function ContentCreatorsProjectPage() {
           </div>
           <div className="den-stack">
             {p.members.map((member) => (
-              <div key={member.id} className="list-row" data-testid={`card-member-${member.userId}`}>
-                <MemberAvatar userId={member.userId} name={member.name} size={28} />
-                <span className="min-w-0">
-                  <b>{member.name ?? member.userId}</b>
-                  <small>
-                    {ROLE_LABELS[member.role] ?? member.role}
-                    <span className="mono-label ml-2" title="Unique Tandem ID — share it to invite this member">
-                      {tandemUid(member.userId)}
-                    </span>
-                  </small>
-                </span>
-                {member.role === 'CAPTAIN' && <span className="den-tag danger">Captain</span>}
-              </div>
+              <MemberRow
+                key={member.id}
+                projectId={p.id}
+                member={member}
+                canManage={captain && !(member.roles ?? []).includes('CAPTAIN')}
+              />
             ))}
           </div>
 
-          {myRole === 'CAPTAIN' ? (
+          {captain ? (
             <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
               <span className="eyebrow"><UserPlus size={12} /> Invite a teammate</span>
-              <p className="setting-copy mt-1">Assign the five stages — Architect, Visual Editor, Sound Designer, Motion &amp; Color, Thumbnail — or add an uploader. Invite with their unique Tandem ID (shown on their profile).</p>
+              <p className="setting-copy mt-1">Assign one of the four roles — Video, Audio, Script, or Thumbnail. Inviting someone who is already a member adds the role to their set; you can edit or remove roles below. Invite with their unique Tandem ID (shown on their profile).</p>
               <InviteForm projectId={p.id} />
             </div>
           ) : (
             <p className="den-footnote mt-3">
               <Sparkles size={13} />
-              Only the Captain can invite teammates. When a stage is assigned to you, its studio opens from the tabs above.
+              Only the Captain can invite teammates, change roles, or remove people. When a role is assigned to you, its studio opens from the tabs above.
             </p>
           )}
         </div>
-        <GrantsPanel projectId={p.id} myRole={myRole} members={p.members} assets={p.assets} />
+        <GrantsPanel projectId={p.id} myRoles={myRoles} members={p.members} />
       </div>
 
       <div className="cd-watch">
@@ -589,8 +736,8 @@ export default function ContentCreatorsProjectPage() {
         </div>
 
         <div className="cd-watch-rail">
-          <SubmissionsPanel projectId={p.id} myRole={myRole} />
-          <DownloadAuditPanel projectId={p.id} myRole={myRole} />
+          <SubmissionsPanel projectId={p.id} myRoles={myRoles} />
+          <DownloadAuditPanel projectId={p.id} myRoles={myRoles} />
         </div>
       </div>
 

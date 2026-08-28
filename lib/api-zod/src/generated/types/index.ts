@@ -111,6 +111,7 @@ export * from './videoJobResult';
 export * from './videoMember';
 export * from './videoMemberInput';
 export * from './videoMemberInputRole';
+export * from './videoMemberRolesInput';
 export * from './videoNotification';
 export * from './videoProject';
 export * from './videoProjectDetail';

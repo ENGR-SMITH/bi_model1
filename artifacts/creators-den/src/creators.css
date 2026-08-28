@@ -1002,6 +1002,7 @@ select optgroup {
 .snake-legend-dot { width: 9px; height: 9px; border-radius: 3px; box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .12); }
 .snake-legend-dot.is-version { background: hsl(var(--accent)); box-shadow: inset 0 0 0 1px hsl(var(--accent) / .5), 0 0 8px hsl(var(--accent) / .5); }
 .snake-legend-dot.is-upload { background: hsl(212 90% 62%); box-shadow: inset 0 0 0 1px hsl(212 90% 62% / .5), 0 0 8px hsl(212 90% 62% / .5); }
+.snake-legend-dot.is-upload-later { background: hsl(var(--destructive)); box-shadow: inset 0 0 0 1px hsl(var(--destructive) / .5), 0 0 8px hsl(var(--destructive) / .5); }
 
 /* The board: a stack of rows, newest first. --snake-vgap is the runway the
    vertical ladder arrows climb, so .snake and .snake-arrow-v share it; each row
@@ -1042,13 +1043,31 @@ select optgroup {
 }
 .snake-card.is-lone { max-width: 540px; justify-self: center; }
 
-/* Vault upload — cool blue with a dashed border: clearly "not a role version". */
+/* Vault upload — cool blue with a dashed border: clearly "not a role version".
+   The first upload of each file type keeps this design; later uploads of that
+   kind in the same role switch to the red .is-upload-later treatment below. */
 .snake-card.is-upload {
   border-style: dashed;
   border-color: hsl(212 80% 60% / .42);
   background: linear-gradient(180deg, hsl(212 42% 12.5%), hsl(213 34% 9%));
 }
 .snake-card.is-upload:hover { border-color: hsl(212 80% 62% / .6); }
+
+/* Later upload of the same file type — red "another take" design: same dashed
+   vault shape, but the red role tone so the original stays unmistakable. */
+.snake-card.is-upload-later {
+  border-color: hsl(var(--destructive) / .45);
+  background: linear-gradient(180deg, hsl(0 55% 13%), hsl(0 42% 9%));
+}
+.snake-card.is-upload-later:hover { border-color: hsl(var(--destructive) / .6); }
+.snake-card.is-upload-later .snake-card-kind { color: hsl(var(--destructive) / .72); }
+.snake-card.is-upload-later .snake-card-meta { border-top-color: hsl(var(--destructive) / .26); }
+.snake-card.is-upload-later .snake-card-id:hover { color: hsl(var(--destructive) / .8); }
+.snake-card.is-upload-later .snake-tag-upload {
+  color: hsl(var(--destructive) / .88);
+  background: hsl(var(--destructive) / .14);
+  box-shadow: inset 0 0 0 1px hsl(var(--destructive) / .34);
+}
 
 .snake-card-head { display: flex; align-items: center; gap: var(--sp-2); }
 .snake-card-ver { font: 700 16px var(--app-font-serif); letter-spacing: -.02em; color: hsl(var(--foreground)); }
@@ -1760,7 +1779,7 @@ select optgroup {
 /* ---- Landing card grid (VIDEO / AUDIO / SCRIPT / THUMBNAIL) ------------ */
 .pv-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 22px;
 }
 .pv-card {
@@ -3820,3 +3839,115 @@ select optgroup {
 .profile-uid-value svg { flex: 0 0 auto; opacity: .75; }
 .profile-uid-value .profile-uid-copied { color: hsl(164 33% 55%); opacity: 1; }
 .profile-uid-hint { text-transform: none !important; letter-spacing: 0 !important; font-size: 10px !important; }
+
+/* ---------------------------------------------------------------------------
+   Vault — grant role chips + member role editor.
+--------------------------------------------------------------------------- */
+.grant-roles { display: flex; flex-wrap: wrap; gap: 6px; }
+.grant-role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--card) / .8);
+  color: hsl(var(--muted-foreground));
+  font: 600 11px var(--app-font-sans);
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s, transform .12s;
+}
+.grant-role-chip:hover { border-color: hsl(var(--accent) / .6); color: hsl(var(--foreground)); transform: translateY(-1px); }
+.grant-role-chip.selected {
+  border-color: hsl(var(--accent));
+  background: hsl(var(--accent) / .14);
+  color: hsl(var(--accent));
+}
+.grant-roles-hint { display: block; margin-top: 6px; font-size: 10px; color: hsl(var(--muted-foreground) / .8); }
+
+.member-role-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--card) / .6);
+}
+.member-role-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font: 600 10px var(--app-font-sans);
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  user-select: none;
+}
+.member-role-check input { accent-color: hsl(var(--accent)); margin: 0; }
+.member-role-check:has(input:checked) { background: hsl(var(--accent) / .12); color: hsl(var(--accent)); }
+.text-danger { color: hsl(0 72% 55%); }
+
+/* ---------------------------------------------------------------------------
+   Role access denied — two long red film strips crossed in an X.
+--------------------------------------------------------------------------- */
+.role-denied-page {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 62vh;
+  position: relative;
+  overflow: hidden;
+}
+.film-cross {
+  position: absolute;
+  inset: -12%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+  opacity: .5;
+}
+.film-strip {
+  position: absolute;
+  width: 220vw;
+  height: 64px;
+  background: hsl(0 72% 48%);
+  border-radius: 6px;
+  box-shadow: 0 8px 30px hsl(0 60% 30% / .45), 0 2px 10px hsl(0 60% 20% / .5);
+}
+.film-strip::before,
+.film-strip::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 9px;
+  background: repeating-linear-gradient(
+    90deg,
+    hsl(0 72% 34%) 0 10px,
+    hsl(0 0% 96%) 10px 18px
+  );
+  border-top: 2px solid hsl(0 72% 30%);
+  border-bottom: 2px solid hsl(0 72% 30%);
+}
+.film-strip::before { top: 4px; }
+.film-strip::after { bottom: 4px; }
+.film-strip-a { transform: rotate(38deg); }
+.film-strip-b { transform: rotate(-38deg); }
+.film-cross-icon {
+  position: absolute;
+  z-index: 1;
+  color: hsl(0 0% 96%);
+  filter: drop-shadow(0 4px 10px hsl(0 60% 25% / .6));
+  opacity: .95;
+}
+.role-denied-page > *:not(.film-cross) { position: relative; z-index: 1; }
+.role-denied-page .page-guide { margin-bottom: 14px; }
+.role-denied-page h1 { color: hsl(0 72% 45%); }
+@media (prefers-reduced-motion: reduce) {
+  .film-strip { animation: none !important; }
+}

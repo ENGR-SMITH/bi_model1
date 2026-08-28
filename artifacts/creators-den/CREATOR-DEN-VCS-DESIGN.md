@@ -250,18 +250,21 @@ Existing `timecodeMs` + `assetId` stay; `timecodeMs` is null for static-image
 ### Extend roles & legs
 
 ```ts
-// roles
+// roles — the four content roles a member can hold (one or several at once)
 tandemVideoRoleSchema = z.enum([
-  "CAPTAIN", "UPLOADER", "ARCHITECT", "VISUAL_EDITOR",
-  "SOUND_DESIGNER", "MOTION_COLOR", "THUMBNAIL_DESIGNER", "VIEWER",
+  "CAPTAIN", "VIDEO", "AUDIO", "SCRIPT", "THUMBNAIL",
+  "UPLOADER", "VIEWER",
 ]);
 
-// legs
+// legs — owned by the four roles (FINISH is Captain-only)
 VIDEO_LEGS = ["SELECTS", "CUT", "SOUND", "FINISH", "THUMBNAIL"];
 ```
 
-Also add `THUMBNAIL_DESIGNER` to the invite list (`INVITE_ROLES` in
-`vault.tsx`) and the relay shell tabs (`RELAY_LEGS` in `shell.tsx`).
+A member stores its roles in an array (`members.roles`); the invite dropdown
+(`INVITE_ROLES` in `vault.tsx`) offers the four content roles, and the relay
+shell tabs (`RELAY_LEGS` in `shell.tsx`) label them Video / Audio / Captain /
+Thumbnail. Temporary download grants are role-scoped too (`grants.roles`, with
+`["ALL"]` covering every file).
 
 ### New asset/job kinds
 

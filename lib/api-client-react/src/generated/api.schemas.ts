@@ -958,7 +958,8 @@ export interface VideoMember {
      * @nullable
      */
   name: string | null;
-  role: string;
+  /** Every role this member holds in the project, e.g. ["VIDEO", "THUMBNAIL"] */
+  roles: string[];
   status: string;
   createdAt: string;
 }
@@ -988,24 +989,26 @@ export interface VideoProjectDetail {
   status: string;
   /** Whether the project appears on the owner's public profile */
   visibility: VideoProjectDetailVisibility;
-  /** @nullable */
-  myRole: string | null;
+  /** The viewer's roles in this project (e.g. ["VIDEO", "THUMBNAIL"]; always includes CAPTAIN for the owner) */
+  myRoles: string[];
   members: VideoMember[];
   assets: VideoAsset[];
   createdAt: string;
   updatedAt: string;
 }
 
+/**
+ * The role to assign. Inviting a user who is already a member adds the role to their existing set.
+ */
 export type VideoMemberInputRole = typeof VideoMemberInputRole[keyof typeof VideoMemberInputRole];
 
 
 export const VideoMemberInputRole = {
+  VIDEO: 'VIDEO',
+  AUDIO: 'AUDIO',
+  SCRIPT: 'SCRIPT',
+  THUMBNAIL: 'THUMBNAIL',
   UPLOADER: 'UPLOADER',
-  ARCHITECT: 'ARCHITECT',
-  VISUAL_EDITOR: 'VISUAL_EDITOR',
-  SOUND_DESIGNER: 'SOUND_DESIGNER',
-  MOTION_COLOR: 'MOTION_COLOR',
-  THUMBNAIL_DESIGNER: 'THUMBNAIL_DESIGNER',
   VIEWER: 'VIEWER',
 } as const;
 
@@ -1019,7 +1022,16 @@ export interface VideoMemberInput {
      * @maxLength 20
      */
   uid: string;
+  /** The role to assign. Inviting a user who is already a member adds the role to their existing set. */
   role: VideoMemberInputRole;
+}
+
+/**
+ * The full set of roles a member should hold after the update.
+ */
+export interface VideoMemberRolesInput {
+  /** @minItems 1 */
+  roles: string[];
 }
 
 export type VideoAssetUploadInputKind = typeof VideoAssetUploadInputKind[keyof typeof VideoAssetUploadInputKind];
@@ -1541,10 +1553,14 @@ export interface VideoReference {
   updatedAt: string;
 }
 
+/**
+ * A timed download grant covering every file version under one or more roles (or ALL roles), not a single file.
+ */
 export interface VideoGrant {
   id: string;
   projectId: string;
-  fileId: string;
+  /** The roles whose files the member may download, e.g. ["VIDEO", "AUDIO"]; ["ALL"] covers every file in the project. */
+  roles: string[];
   memberId: string;
   reason: string;
   grantedById: string;
@@ -1557,8 +1573,11 @@ export interface VideoGrant {
 export interface VideoGrantInput {
   /** @minLength 1 */
   memberId: string;
-  /** @minLength 1 */
-  fileId: string;
+  /**
+     * The roles whose files the member may download — pick one or more of VIDEO, AUDIO, SCRIPT, THUMBNAIL, or ["ALL"] for every file.
+     * @minItems 1
+     */
+  roles: string[];
   /** @maxLength 500 */
   reason?: string;
   /**

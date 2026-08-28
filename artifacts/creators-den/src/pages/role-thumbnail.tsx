@@ -32,6 +32,8 @@ import {
   type PreviewVersion,
 } from '@/components/preview-shared';
 import { RoleOracle } from '@/components/role-oracle';
+import { RoleAccessDenied } from '@/components/role-access-denied';
+import { hasRole } from '@/lib/roles';
 
 const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
 const IMAGE_UPLOAD_KINDS = ['THUMBNAIL_DESIGN', 'GRAPHIC'].map((value) => ({ value, label: VAULT_KIND_LABELS[value] }));
@@ -232,6 +234,14 @@ export default function RoleThumbnailPage() {
   }
 
   const p = project.data;
+
+  // The Thumbnail studio only opens for members with the THUMBNAIL role (or
+  // the Captain). The nav tab stays visible — this page explains why it is
+  // locked.
+  if (!hasRole(p.myRoles, 'THUMBNAIL')) {
+    return <RoleAccessDenied role="Thumbnail" projectId={p.id} />;
+  }
+
   const snap = (selectedDetail.data?.snapshot ?? null) as { designs?: Array<{ assetId: string }> } | null;
   const design = Array.isArray(snap?.designs) ? snap!.designs![0] : null;
   // Scope the notes rail to the design shown — the version's chosen design, or

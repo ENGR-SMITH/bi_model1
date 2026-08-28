@@ -134,7 +134,7 @@ afterEach(() => {
 describe("M3 — audio passes (Sound Designer)", () => {
   it("queues an audio pass for the SOUND role and the worker runs it", async () => {
     const project = await createProject();
-    await addMember(project.id, "sound@example.com", "SOUND_DESIGNER");
+    await addMember(project.id, "sound@example.com", "AUDIO");
     const asset = await uploadAsset(project.id);
 
     state.userId = "editor-1"; // wrong leg role
@@ -161,18 +161,18 @@ describe("M3 — audio passes (Sound Designer)", () => {
 });
 
 describe("M3 — exports + thumbnail (Motion & Color)", () => {
-  it("queues one export job per format for the FINISH role", async () => {
+  it("queues one export job per format — Captain only", async () => {
     const project = await createProject();
-    await addMember(project.id, "color@example.com", "MOTION_COLOR");
+    await addMember(project.id, "sound@example.com", "AUDIO");
     const asset = await uploadAsset(project.id);
 
-    state.userId = "sound-1"; // wrong leg role
+    state.userId = "sound-1"; // not the Captain
     const forbidden = await request(API)
       .post(`/api/video/projects/${project.id}/exports`)
       .send({ formats: ["16:9"] });
     expect(forbidden.status).toBe(403);
 
-    state.userId = "color-1";
+    state.userId = "captain-1";
     const queued = await request(API)
       .post(`/api/video/projects/${project.id}/exports`)
       .send({ formats: ["16:9", "9:16", "1:1"] });
@@ -188,12 +188,19 @@ describe("M3 — exports + thumbnail (Motion & Color)", () => {
     expect(exports.every((job: any) => job.status === "SUCCEEDED")).toBe(true);
   });
 
-  it("queues a thumbnail extraction pinned to a frame", async () => {
+  it("queues a thumbnail extraction pinned to a frame — Captain only", async () => {
     const project = await createProject();
-    await addMember(project.id, "color@example.com", "MOTION_COLOR");
+    await addMember(project.id, "color@example.com", "THUMBNAIL");
     const asset = await uploadAsset(project.id);
 
     state.userId = "color-1";
+    expect(
+      (await request(API)
+        .post(`/api/video/projects/${project.id}/thumbnail`)
+        .send({ assetId: asset.id, timeMs: 134000 })).status,
+    ).toBe(403);
+
+    state.userId = "captain-1";
     const queued = await request(API)
       .post(`/api/video/projects/${project.id}/thumbnail`)
       .send({ assetId: asset.id, timeMs: 134000 });
@@ -227,8 +234,7 @@ describe("M3 — the Lock release", () => {
 
   it("approving the FINISH leg releases the lock and audits downloads", async () => {
     const project = await createProject();
-    await addMember(project.id, "color@example.com", "MOTION_COLOR");
-    await addMember(project.id, "sound@example.com", "SOUND_DESIGNER");
+    await addMember(project.id, "sound@example.com", "AUDIO");
     const asset = await uploadAsset(project.id);
     await runWorkerCycle();
 
@@ -240,10 +246,10 @@ describe("M3 — the Lock release", () => {
       (await request(API).get(`/api/video/projects/${project.id}/files/${proxy.id}/download`)).status,
     ).toBe(403);
 
-    // Full relay: sound + finish submit, Captain approves finish.
+    // Full relay: sound submits, Captain submits + approves the FINISH leg.
     const sound = await submitLeg(project.id, "SOUND", "sound-1", asset.id);
     expect(sound.status).toBe("SUBMITTED");
-    const finish = await submitLeg(project.id, "FINISH", "color-1", asset.id);
+    const finish = await submitLeg(project.id, "FINISH", "captain-1", asset.id);
     expect(finish.status).toBe("SUBMITTED");
 
     state.userId = "captain-1";
@@ -275,7 +281,7 @@ describe("M3 — the Lock release", () => {
 
   it("only the Captain can read the download audit trail", async () => {
     const project = await createProject();
-    await addMember(project.id, "sound@example.com", "SOUND_DESIGNER");
+    await addMember(project.id, "sound@example.com", "AUDIO");
     state.userId = "sound-1";
     expect((await request(API).get(`/api/video/projects/${project.id}/downloads`)).status).toBe(403);
     state.userId = null;

@@ -27,11 +27,11 @@ export function SectionEyebrow({ children }: { children: ReactNode }) {
 }
 
 export const RELAY_LEGS = [
-  { slug: 'selects', leg: 'SELECTS', number: '01', label: 'Selects', role: 'Story Architect', icon: Film },
-  { slug: 'cut', leg: 'CUT', number: '02', label: 'Cut', role: 'Visual Editor', icon: Scissors },
-  { slug: 'sound', leg: 'SOUND', number: '03', label: 'Sound', role: 'Sound Designer', icon: Mic2 },
-  { slug: 'finish', leg: 'FINISH', number: '04', label: 'Finish', role: 'Motion & Color', icon: Palette },
-  { slug: 'thumbnail', leg: 'THUMBNAIL', number: '05', label: 'Thumbnail', role: 'Thumbnail Designer', icon: Image },
+  { slug: 'selects', leg: 'SELECTS', number: '01', label: 'Selects', role: 'Video', icon: Film },
+  { slug: 'cut', leg: 'CUT', number: '02', label: 'Cut', role: 'Video', icon: Scissors },
+  { slug: 'sound', leg: 'SOUND', number: '03', label: 'Sound', role: 'Audio', icon: Mic2 },
+  { slug: 'finish', leg: 'FINISH', number: '04', label: 'Finish', role: 'Captain', icon: Palette },
+  { slug: 'thumbnail', leg: 'THUMBNAIL', number: '05', label: 'Thumbnail', role: 'Thumbnail', icon: Image },
 ] as const;
 
 // The account tile IS the profile link: the user's real account image (or

@@ -120,12 +120,14 @@ const router: IRouter = Router();
 // writes require the matching leg role (or the Captain).
 // ---------------------------------------------------------------------------
 
+// Each leg's studio is owned by one of the four content roles. FINISH actions
+// (exports, lock approval) are Captain-only.
 const LEG_ROLES: Record<string, string> = {
-  SELECTS: "ARCHITECT",
-  CUT: "VISUAL_EDITOR",
-  SOUND: "SOUND_DESIGNER",
-  FINISH: "MOTION_COLOR",
-  THUMBNAIL: "THUMBNAIL_DESIGNER",
+  SELECTS: "VIDEO",
+  CUT: "VIDEO",
+  SOUND: "AUDIO",
+  FINISH: "CAPTAIN",
+  THUMBNAIL: "THUMBNAIL",
 } as const;
 
 async function requireMember(
@@ -153,8 +155,8 @@ async function requireLegEditor(
 ): Promise<TandemVideoMember | null> {
   const member = await requireMember(projectId, userId);
   if (!member) return null;
-  if (member.role === "CAPTAIN") return member;
-  return member.role === LEG_ROLES[leg] ? member : null;
+  if (member.roles.includes("CAPTAIN")) return member;
+  return member.roles.includes(LEG_ROLES[leg]) ? member : null;
 }
 
 async function buildTimelineResponse(projectId: string, leg: string) {
@@ -1164,7 +1166,7 @@ router.patch(
     }
 
     const isAuthor = comment.authorId === userId;
-    const isCaptain = member.role === "CAPTAIN";
+    const isCaptain = member.roles.includes("CAPTAIN");
     if (!isAuthor && !isCaptain) {
       res.status(403).json({ error: "Only the author or the Captain can resolve this comment" });
       return;

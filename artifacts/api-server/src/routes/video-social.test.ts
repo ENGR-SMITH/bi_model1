@@ -141,7 +141,7 @@ describe("explore — creators", () => {
     state.userId = "captain-1";
     await request(API)
       .post(`/api/video/projects/${owned.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "ARCHITECT" });
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
 
     state.userId = "captain-1";
     const res = await request(API).get("/api/video/explore/creators");

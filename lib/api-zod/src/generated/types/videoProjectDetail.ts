@@ -17,8 +17,8 @@ export interface VideoProjectDetail {
   status: string;
   /** Whether the project appears on the owner's public profile */
   visibility: VideoProjectDetailVisibility;
-  /** @nullable */
-  myRole: string | null;
+  /** The viewer's roles in this project (e.g. ["VIDEO", "THUMBNAIL"]; always includes CAPTAIN for the owner) */
+  myRoles: string[];
   members: VideoMember[];
   assets: VideoAsset[];
   createdAt: Date;
