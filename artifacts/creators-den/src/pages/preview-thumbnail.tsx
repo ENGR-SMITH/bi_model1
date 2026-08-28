@@ -122,18 +122,34 @@ export default function ThumbnailPreviewPage() {
   const thumbVersions = useListVideoTimelineVersions(projectId, 'THUMBNAIL');
   const thumbTimeline = useGetVideoTimeline(projectId, 'THUMBNAIL');
 
-  // Raw THUMBNAIL version rows feed the split-screen diff (selected vs its
-  // immediate predecessor).
+  // Every comparable item in the timeline: saved THUMBNAIL versions AND the
+  // vault's design images. A version compares against its older version; a
+  // file compares against the older file — so the diff-map works even when
+  // only raw images/audio/video were uploaded (no versions saved yet).
   const diffVersions = useMemo<PreviewDiffSelection[]>(
-    () =>
-      (thumbVersions.data ?? []).map((v) => ({
+    () => [
+      ...(thumbVersions.data ?? []).map((v) => ({
+        key: `version-${v.id}`,
         id: v.id,
         leg: 'THUMBNAIL' as const,
+        kind: 'version' as const,
         version: v.version,
         parentVersionId: v.parentVersionId ?? null,
+        createdAt: v.createdAt,
       })),
+      ...(project.data?.assets ?? [])
+        .filter((a) => IMAGE_KINDS.has(a.kind))
+        .map((a) => ({
+          key: `asset-${a.id}`,
+          id: a.id,
+          leg: 'THUMBNAIL' as const,
+          kind: 'asset' as const,
+          createdAt: a.createdAt,
+          label: a.fileName,
+        })),
+    ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [thumbVersions.data],
+    [thumbVersions.data, project.data?.assets],
   );
 
   const versions = useMemo<PreviewVersion[]>(
@@ -172,11 +188,14 @@ export default function ThumbnailPreviewPage() {
   // While a vault file is being previewed there is no active version.
   const activeVersion = vaultAssetId ? null : selected;
 
-  // The selected version as a diff selection, plus whether it actually has an
-  // older predecessor to diff against (oldest / lone → no diff-map).
-  const activeSelection: PreviewDiffSelection | null = activeVersion
-    ? { id: activeVersion.id, leg: 'THUMBNAIL', version: activeVersion.version }
-    : null;
+  // The selected timeline item as a diff selection — a version OR a vault
+  // file — plus whether it has an older same-kind predecessor to diff against.
+  const activeSelection: PreviewDiffSelection | null =
+    (vaultAssetId
+      ? diffVersions.find((s) => s.key === `asset-${vaultAssetId}`)
+      : activeVersion
+        ? diffVersions.find((s) => s.key === `version-${activeVersion.id}`)
+        : null) ?? null;
   const hasDiff = Boolean(activeSelection && predecessorOf(diffVersions, activeSelection));
 
   // If the selected version suddenly has no older version to compare (e.g. the

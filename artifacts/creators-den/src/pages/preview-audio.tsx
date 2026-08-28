@@ -181,18 +181,34 @@ export default function AudioPreviewPage() {
   const soundVersions = useListVideoTimelineVersions(projectId, 'SOUND');
   const soundTimeline = useGetVideoTimeline(projectId, 'SOUND');
 
-  // Raw SOUND version rows feed the split-screen diff (selected vs its
-  // immediate predecessor).
+  // Every comparable item in the timeline: saved SOUND versions AND the
+  // vault's audio files. A version compares against its older version; a file
+  // compares against the older file — so the diff-map works even when only
+  // raw audio was uploaded (no versions saved yet).
   const diffVersions = useMemo<PreviewDiffSelection[]>(
-    () =>
-      (soundVersions.data ?? []).map((v) => ({
+    () => [
+      ...(soundVersions.data ?? []).map((v) => ({
+        key: `version-${v.id}`,
         id: v.id,
         leg: 'SOUND' as const,
+        kind: 'version' as const,
         version: v.version,
         parentVersionId: v.parentVersionId ?? null,
+        createdAt: v.createdAt,
       })),
+      ...(project.data?.assets ?? [])
+        .filter((a) => AUDIO_KINDS.has(a.kind))
+        .map((a) => ({
+          key: `asset-${a.id}`,
+          id: a.id,
+          leg: 'SOUND' as const,
+          kind: 'asset' as const,
+          createdAt: a.createdAt,
+          label: a.fileName,
+        })),
+    ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [soundVersions.data],
+    [soundVersions.data, project.data?.assets],
   );
 
   const versions = useMemo<PreviewVersion[]>(
@@ -232,10 +248,14 @@ export default function AudioPreviewPage() {
   const activeVersion = vaultAssetId ? null : selected;
 
   // The selected version as a diff selection, plus whether it actually has an
-  // older predecessor to diff against (oldest / lone → no diff-map).
-  const activeSelection: PreviewDiffSelection | null = activeVersion
-    ? { id: activeVersion.id, leg: activeVersion.leg as PreviewDiffSelection['leg'], version: activeVersion.version }
-    : null;
+  // older predecessor to diff against (oldest / lone → no diff-map). The
+  // selected item can be a version OR a vault audio file.
+  const activeSelection: PreviewDiffSelection | null =
+    (vaultAssetId
+      ? diffVersions.find((s) => s.key === `asset-${vaultAssetId}`)
+      : activeVersion
+        ? diffVersions.find((s) => s.key === `version-${activeVersion.id}`)
+        : null) ?? null;
   const hasDiff = Boolean(activeSelection && predecessorOf(diffVersions, activeSelection));
 
   // If the selected version suddenly has no older version to compare (e.g. the
