@@ -236,7 +236,8 @@ export default function FinishPreviewPage() {
     const fileRole = roleForKind(asset.kind);
     const active = (grants.data ?? []).filter((grant) => {
       if (grant.revokedAt || new Date(grant.expiresAt) <= new Date()) return false;
-      return grant.roles.includes('ALL') || (fileRole !== null && grant.roles.includes(fileRole));
+      const grantRoles = grant.roles ?? [];
+      return grantRoles.includes('ALL') || (fileRole !== null && grantRoles.includes(fileRole));
     });
     return active
       .map((grant) => membersById.get(grant.memberId))

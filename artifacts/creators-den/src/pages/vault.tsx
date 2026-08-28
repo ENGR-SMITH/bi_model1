@@ -213,11 +213,11 @@ function MemberRow({
   const updateRoles = useUpdateVideoProjectMemberRoles();
   const removeMember = useRemoveVideoProjectMember();
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<string[]>(member.roles);
+  const [draft, setDraft] = useState<string[]>(member.roles ?? []);
   const [confirming, setConfirming] = useState(false);
 
   const startEdit = () => {
-    setDraft(member.roles);
+    setDraft(member.roles ?? []);
     setEditing(true);
   };
 
@@ -259,10 +259,10 @@ function MemberRow({
       <span className="min-w-0 flex-1">
         <b>{member.name ?? member.userId}</b>
         <small className="flex flex-wrap items-center gap-1.5">
-          {member.roles.includes('CAPTAIN') ? (
+          {(member.roles ?? []).includes('CAPTAIN') ? (
             <span className="den-tag danger">Captain</span>
           ) : (
-            member.roles.map((role) => (
+            (member.roles ?? []).map((role) => (
               <span key={role} className="den-tag accent" data-testid={`role-${role.toLowerCase()}`}>
                 {ROLE_LABELS[role] ?? role}
               </span>
@@ -397,7 +397,7 @@ function GrantsPanel({ projectId, myRoles, members }: { projectId: string; myRol
           <span className="mono-label">Teammate</span>
           <select value={memberId} onChange={(event) => setMemberId(event.target.value)} data-testid="grant-select-member">
             <option value="">Choose a teammate…</option>
-            {members.filter((m) => !m.roles.includes('CAPTAIN')).map((m) => (
+            {members.filter((m) => !(m.roles ?? []).includes('CAPTAIN')).map((m) => (
               <option key={m.id} value={m.userId}>{m.name ?? m.userId.slice(0, 8)}</option>
             ))}
           </select>
@@ -454,9 +454,10 @@ function GrantsPanel({ projectId, myRoles, members }: { projectId: string; myRol
           {(grants.data ?? []).map((grant) => {
             const active = !grant.revokedAt && new Date(grant.expiresAt) > new Date();
             const memberName = memberNameById.get(grant.memberId) ?? grant.memberId.slice(0, 8);
-            const scope = grant.roles.includes(ALL_ROLES)
+            const grantRoles = grant.roles ?? [];
+            const scope = grantRoles.includes(ALL_ROLES)
               ? 'All roles · every file'
-              : grant.roles.map((role) => ROLE_LABELS[role] ?? role).join(', ');
+              : grantRoles.map((role) => ROLE_LABELS[role] ?? role).join(', ');
             return (
               <div key={grant.id} className="grant-row" data-testid={`grant-${grant.id}`}>
                 <MemberAvatar userId={grant.memberId} name={memberName} size={30} />
@@ -660,7 +661,7 @@ export default function ContentCreatorsProjectPage() {
               >
                 <MemberAvatar userId={member.userId} name={member.name} size={24} />
                 <span className="cd-roster-name">{member.name ?? member.userId.slice(0, 8)}</span>
-                <span className={`den-tag ${member.roles.includes('CAPTAIN') ? 'danger' : 'accent'}`}>
+                <span className={`den-tag ${(member.roles ?? []).includes('CAPTAIN') ? 'danger' : 'accent'}`}>
                   {rolesLabel(member.roles)}
                 </span>
               </span>
@@ -683,7 +684,7 @@ export default function ContentCreatorsProjectPage() {
                 key={member.id}
                 projectId={p.id}
                 member={member}
-                canManage={captain && !member.roles.includes('CAPTAIN')}
+                canManage={captain && !(member.roles ?? []).includes('CAPTAIN')}
               />
             ))}
           </div>
