@@ -12,7 +12,6 @@ import {
   Film,
   Image as ImageIcon,
   Mic2,
-  Package,
   Type,
 } from 'lucide-react';
 import { Link, useParams } from 'wouter';
@@ -162,16 +161,6 @@ export default function PreviewPage() {
       ) : (
         <span className="pv-card-media-icon"><ImageIcon size={30} /></span>
       ),
-    },
-    {
-      id: 'finish',
-      href: `/projects/${p.id}/preview/finish`,
-      title: 'Finish',
-      eyebrow: 'The export',
-      icon: <Package size={22} />,
-      count: `${assets.length} latest only`,
-      description: 'The latest video, image, audio, and script — or the whole project as one ZIP, gated by the Captain grants.',
-      preview: <span className="pv-card-media-icon"><Package size={30} /></span>,
     },
   ];
 

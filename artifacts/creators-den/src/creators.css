@@ -1002,6 +1002,7 @@ select optgroup {
 .snake-legend-dot { width: 9px; height: 9px; border-radius: 3px; box-shadow: inset 0 0 0 1px hsl(0 0% 100% / .12); }
 .snake-legend-dot.is-version { background: hsl(var(--accent)); box-shadow: inset 0 0 0 1px hsl(var(--accent) / .5), 0 0 8px hsl(var(--accent) / .5); }
 .snake-legend-dot.is-upload { background: hsl(212 90% 62%); box-shadow: inset 0 0 0 1px hsl(212 90% 62% / .5), 0 0 8px hsl(212 90% 62% / .5); }
+.snake-legend-dot.is-upload-later { background: hsl(var(--destructive)); box-shadow: inset 0 0 0 1px hsl(var(--destructive) / .5), 0 0 8px hsl(var(--destructive) / .5); }
 
 /* The board: a stack of rows, newest first. --snake-vgap is the runway the
    vertical ladder arrows climb, so .snake and .snake-arrow-v share it; each row
@@ -1042,13 +1043,31 @@ select optgroup {
 }
 .snake-card.is-lone { max-width: 540px; justify-self: center; }
 
-/* Vault upload — cool blue with a dashed border: clearly "not a role version". */
+/* Vault upload — cool blue with a dashed border: clearly "not a role version".
+   The first upload of each file type keeps this design; later uploads of that
+   kind in the same role switch to the red .is-upload-later treatment below. */
 .snake-card.is-upload {
   border-style: dashed;
   border-color: hsl(212 80% 60% / .42);
   background: linear-gradient(180deg, hsl(212 42% 12.5%), hsl(213 34% 9%));
 }
 .snake-card.is-upload:hover { border-color: hsl(212 80% 62% / .6); }
+
+/* Later upload of the same file type — red "another take" design: same dashed
+   vault shape, but the red role tone so the original stays unmistakable. */
+.snake-card.is-upload-later {
+  border-color: hsl(var(--destructive) / .45);
+  background: linear-gradient(180deg, hsl(0 55% 13%), hsl(0 42% 9%));
+}
+.snake-card.is-upload-later:hover { border-color: hsl(var(--destructive) / .6); }
+.snake-card.is-upload-later .snake-card-kind { color: hsl(var(--destructive) / .72); }
+.snake-card.is-upload-later .snake-card-meta { border-top-color: hsl(var(--destructive) / .26); }
+.snake-card.is-upload-later .snake-card-id:hover { color: hsl(var(--destructive) / .8); }
+.snake-card.is-upload-later .snake-tag-upload {
+  color: hsl(var(--destructive) / .88);
+  background: hsl(var(--destructive) / .14);
+  box-shadow: inset 0 0 0 1px hsl(var(--destructive) / .34);
+}
 
 .snake-card-head { display: flex; align-items: center; gap: var(--sp-2); }
 .snake-card-ver { font: 700 16px var(--app-font-serif); letter-spacing: -.02em; color: hsl(var(--foreground)); }
@@ -1760,7 +1779,7 @@ select optgroup {
 /* ---- Landing card grid (VIDEO / AUDIO / SCRIPT / THUMBNAIL) ------------ */
 .pv-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 22px;
 }
 .pv-card {

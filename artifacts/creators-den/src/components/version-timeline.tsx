@@ -6,7 +6,9 @@
 // out as a boustrophedon "snake-and-ladder" — cards zig-zag across two columns,
 // newest on top, with arrows tracing the chronological chain from one node to
 // the next. Versions read warm (role-toned spine); vault uploads read in a cool
-// blue with a dashed border, so the two kinds are unmistakable. The role filter
+// blue with a dashed border, so the two kinds are unmistakable — the first
+// upload of each file type keeps that blue, and every later upload of the same
+// kind in that role switches to the red "another take" style. The role filter
 // is shared with the ledger and lives in the parent (activity.tsx); `leg ===
 // 'all'` merges everything.
 //
@@ -79,7 +81,11 @@ const TONE_SPINE: Record<string, string> = {
 
 // Vault uploads are a different KIND of node than role versions, so they read in
 // a distinct cool blue instead of the warm role tones — see .is-upload in CSS.
+// The FIRST upload of a file type keeps this blue vault design; every later
+// upload of that kind in the same role switches to the red "another take"
+// style (.is-upload-later) so the original stays unmistakable.
 const UPLOAD_SPINE = '212 90% 62%';
+const UPLOAD_LATER_SPINE = 'var(--destructive)';
 
 // A vault asset's kind maps to the relay leg it feeds, so the role filter can
 // surface "everything relevant to Sound" (its versions + its audio uploads).
@@ -268,6 +274,19 @@ export function VersionTimeline({
     [project.data?.assets],
   );
 
+  // The first upload of each file type keeps the cool blue vault design; later
+  // uploads of that kind read in red. id of the earliest upload per asset kind.
+  const firstUploadIdByKind = useMemo(() => {
+    const earliest = new Map<string, { id: string; createdAt: string }>();
+    for (const asset of project.data?.assets ?? []) {
+      const current = earliest.get(asset.kind);
+      if (!current || new Date(asset.createdAt).getTime() < new Date(current.createdAt).getTime()) {
+        earliest.set(asset.kind, { id: asset.id, createdAt: asset.createdAt });
+      }
+    }
+    return new Map([...earliest].map(([kind, entry]) => [kind, entry.id]));
+  }, [project.data?.assets]);
+
   const merged = useMemo<TLNode[]>(() => [...versions, ...uploads], [versions, uploads]);
 
   // version id → version number, so each card can show `from v<parent>` — the
@@ -316,9 +335,15 @@ export function VersionTimeline({
     const isHead = keyOf(node) === headKey;
     const isSynced = keyOf(node) === activeKey;
     const author = memberNameById.get(node.authorId) ?? node.authorId.slice(0, 8);
+    // The first upload of the file type wears the blue vault design; every
+    // later upload of that kind in the same role switches to red.
+    const isFirstUpload =
+      node.kind === 'upload' && firstUploadIdByKind.get(node.assetKind ?? '') === node.id;
     const spine =
       node.kind === 'upload'
-        ? UPLOAD_SPINE
+        ? isFirstUpload
+          ? UPLOAD_SPINE
+          : UPLOAD_LATER_SPINE
         : TONE_SPINE[LEG_TONES[node.leg ?? ''] ?? 'muted'] ?? TONE_SPINE.muted;
 
     const style: Record<string, string> = { '--spine': spine };
@@ -348,6 +373,7 @@ export function VersionTimeline({
       isSynced && 'is-synced',
       opts.lone && opts.col == null && 'is-lone',
       node.kind === 'upload' && 'is-upload',
+      node.kind === 'upload' && !isFirstUpload && 'is-upload-later',
     ]
       .filter(Boolean)
       .join(' ');
