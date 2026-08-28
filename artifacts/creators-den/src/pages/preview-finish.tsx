@@ -16,9 +16,9 @@ import {
   AlertTriangle,
   ArrowLeft,
   Check,
+  Clapperboard,
   Download,
   FileText,
-  Film,
   Image as ImageIcon,
   LockKeyhole,
   Mic2,
@@ -28,6 +28,7 @@ import {
 import { Link, useParams } from 'wouter';
 import {
   downloadVideoFile,
+  downloadVideoFinishMaster,
   getListVideoGrantsQueryKey,
   useGetVideoProject,
   useListVideoGrants,
@@ -244,6 +245,32 @@ export default function FinishPreviewPage() {
       .filter((m): m is VideoMember => Boolean(m));
   };
 
+  // The combined master needs BOTH the video and the audio unlocked, so the
+  // Captain-facing holders are the members with active grants for both roles.
+  const masterGrantHolders = (): VideoMember[] => {
+    if (!isCaptain) return [];
+    const active = (grants.data ?? []).filter(
+      (grant) => !grant.revokedAt && new Date(grant.expiresAt) > new Date(),
+    );
+    const unlocks = (role: string) =>
+      active.some((grant) => {
+        const roles = grant.roles ?? [];
+        return roles.includes('ALL') || roles.includes(role);
+      });
+    const coverVideo = latestVideo !== null;
+    const coverAudio = latestAudio !== null;
+    if (coverVideo && coverAudio && (!unlocks('VIDEO') || !unlocks('AUDIO'))) return [];
+    if (coverVideo && !unlocks('VIDEO')) return [];
+    if (coverAudio && !unlocks('AUDIO')) return [];
+    // Members granted the relevant roles (or ALL).
+    return members.filter((member) =>
+      active.some((grant) =>
+        grant.memberId === member.userId &&
+        (grant.roles ?? []).some((r) => r === 'ALL' || (coverVideo && r === 'VIDEO') || (coverAudio && r === 'AUDIO')),
+      ),
+    );
+  };
+
   const downloadAsset = async (assetId: string, fileName: string) => {
     setBusyId(`asset-${assetId}`);
     setError(null);
@@ -263,6 +290,27 @@ export default function FinishPreviewPage() {
     setError(null);
     try {
       saveBlob(new Blob([script.html], { type: 'text/html;charset=utf-8' }), script.name);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // The FINISH master — the latest video + the latest audio muxed into ONE
+  // synced file (built server-side, waveform-synced). This replaces the two
+  // separate latest-video / latest-audio downloads.
+  const downloadMaster = async () => {
+    if (!latestVideo && !latestAudio) return;
+    setBusyId('master');
+    setError(null);
+    try {
+      const blob = await downloadVideoFinishMaster(projectId ?? '');
+      const ext = latestAudio && !latestVideo ? (latestAudio.fileName.match(/\.\w+$/) ?? ['.m4a'])[0] : '.mp4';
+      const base = latestVideo ? latestVideo.fileName.replace(/\.\w+$/, '') : latestAudio?.fileName.replace(/\.\w+$/, '') ?? 'master';
+      const audioStem = latestAudio ? `${latestAudio.fileName.replace(/\.\w+$/, '')}` : null;
+      const name = latestVideo && latestAudio ? `${base}-with-${audioStem}.mp4` : `${base}${ext}`;
+      saveBlob(blob, name);
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setBusyId(null);
     }
@@ -441,7 +489,8 @@ export default function FinishPreviewPage() {
           <SectionEyebrow>Finish · export</SectionEyebrow>
           <h1>The export desk.</h1>
           <p>
-            The latest video, image, audio, and script — plus the whole project as one ZIP.
+            The FINISH master — the latest video muxed together with the latest audio, synced
+            as one file — plus the latest image and script, and the whole project as one ZIP.
             Only the most recent asset of each kind is ever handed out, and downloads obey
             the Captain's grants until the Lock is released.
           </p>
@@ -455,9 +504,56 @@ export default function FinishPreviewPage() {
       </div>
 
       <div className="finish-grid" data-testid="finish-grid">
-        {mediaCard('Video', <Film size={26} />, latestVideo, 'No video in the vault yet.', 'gold')}
+        {/* Master — the latest video MUXED with the latest audio, synced
+            server-side, handed out as ONE file instead of two separate
+            downloads. */}
+        <div className="finish-card accent-gold" data-testid="finish-card-master">
+          <div className="finish-card-thumb">
+            {latestVideo ? (
+              <video src={`${proxyUrlFor(p.id, latestVideo.id)}#t=0.5`} muted playsInline preload="metadata" />
+            ) : (
+              <span className="finish-card-thumb-icon"><Clapperboard size={26} /></span>
+            )}
+            <span className="finish-card-badge">Master</span>
+          </div>
+          <div className="finish-card-body">
+            <div className="finish-card-title">
+              <span className="eyebrow">Master · video + audio</span>
+              <span className="finish-card-name" title={latestVideo?.fileName ?? latestAudio?.fileName ?? ''}>
+                {latestVideo ? latestVideo.fileName : latestAudio ? latestAudio.fileName : 'No media in the vault yet.'}
+              </span>
+            </div>
+            {latestVideo || latestAudio ? (
+              <>
+                <p className="finish-card-meta">
+                  {latestVideo ? `${KIND_LABELS[latestVideo.kind] ?? 'Video'} v${latestVideo.version} · ${timeAgo(latestVideo.createdAt)}` : null}
+                  {latestVideo && latestAudio ? ' + ' : null}
+                  {latestAudio ? `${KIND_LABELS[latestAudio.kind] ?? 'Audio'} v${latestAudio.version} · ${timeAgo(latestAudio.createdAt)}` : null}
+                </p>
+                <p className="finish-card-sync">
+                  {latestVideo && latestAudio
+                    ? 'Latest video + latest audio muxed & waveform-synced into one file.'
+                    : 'No separate audio in the vault yet — the master is the latest video.'}
+                </p>
+              </>
+            ) : (
+              <p className="finish-card-meta">No media in the vault yet.</p>
+            )}
+            <AccessStrip members={members} holders={masterGrantHolders()} released={released} />
+            <button
+              type="button"
+              className="primary-btn finish-card-btn"
+              onClick={() => void downloadMaster()}
+              disabled={(!latestVideo && !latestAudio) || busyId === 'master'}
+              data-testid="finish-download-master"
+            >
+              <Download size={13} />
+              {busyId === 'master' ? 'Preparing…' : latestVideo && latestAudio ? 'Download master (video + audio)' : 'Download master'}
+            </button>
+          </div>
+        </div>
+
         {mediaCard('Image', <ImageIcon size={26} />, latestImage, 'No design in the vault yet.', 'accent')}
-        {mediaCard('Audio', <Mic2 size={26} />, latestAudio, 'No audio in the vault yet.', 'teal')}
 
         {/* Script — the latest script saved in this browser (the script desk autosaves there). */}
         <div className="finish-card accent-muted" data-testid="finish-card-script">

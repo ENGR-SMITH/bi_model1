@@ -8,11 +8,14 @@ import {
   tandemVideoJobsTable,
   tandemVideoMembersTable,
   tandemVideoProjectsTable,
+  tandemVideoSyncsTable,
+  type TandemVideoAsset,
   type TandemVideoMember,
 } from "@workspace/db";
 import { gt, isNull } from "drizzle-orm";
 import {
   DownloadVideoFileParams,
+  DownloadVideoFinishMasterParams,
   ListVideoDownloadsParams,
   ListVideoDownloadsResponse,
   QueueAudioPassBody,
@@ -25,12 +28,13 @@ import {
   QueueVideoThumbnailParams,
   QueueVideoThumbnailResponse,
 } from "@workspace/api-zod";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { uploadDir } from "../video/worker";
+import { getFFmpegPath, uploadDir } from "../video/worker";
 import { logger } from "../lib/logger";
 import { emitJobProgress } from "../realtime";
 
@@ -381,6 +385,296 @@ router.get(
     const downloadName = path.basename(storageKey);
     res.setHeader("Content-Disposition", `attachment; filename="${downloadName}"`);
     res.sendFile(filePath);
+  },
+);
+
+// The vault kinds that make up a FINISH master: video (the picture) and
+// audio (the separate sound track, e.g. dual-system sound or the VO pickup).
+const VIDEO_KINDS = ["RAW_VIDEO", "SCREEN_REC", "B_ROLL", "REFERENCE"];
+const AUDIO_KINDS = ["RAW_AUDIO", "VO_PICKUP"];
+
+/** The newest asset of the project (by upload time) matching one of the kinds. */
+async function latestAssetOfKind(
+  projectId: string,
+  kinds: string[],
+): Promise<TandemVideoAsset | null> {
+  const [asset] = await db
+    .select()
+    .from(tandemVideoAssetsTable)
+    .where(
+      and(
+        eq(tandemVideoAssetsTable.projectId, projectId),
+        or(...kinds.map((k) => eq(tandemVideoAssetsTable.kind, k))),
+      ),
+    )
+    .orderBy(desc(tandemVideoAssetsTable.createdAt))
+    .limit(1);
+  return asset ?? null;
+}
+
+/** True when the member is unlocked for every role this master touches. */
+async function memberCanDownloadMaster(
+  project: { id: string; status: string },
+  member: TandemVideoMember,
+  roles: string[],
+): Promise<boolean> {
+  if (project.status === "RELEASED") return true;
+  if (roles.length === 0) return true;
+  const grants = await db
+    .select()
+    .from(tandemVideoGrantsTable)
+    .where(
+      and(
+        eq(tandemVideoGrantsTable.projectId, project.id),
+        eq(tandemVideoGrantsTable.memberId, member.userId),
+        isNull(tandemVideoGrantsTable.revokedAt),
+        gt(tandemVideoGrantsTable.expiresAt, new Date()),
+      ),
+    );
+  if (grants.length === 0) return false;
+  return roles.every((role) =>
+    grants.some((grant) => {
+      const grantRoles = grant.roles ?? [];
+      return grantRoles.includes("ALL") || grantRoles.includes(role);
+    }),
+  );
+}
+
+/**
+ * Builds a single synced "master" media file: the latest video with the latest
+ * audio muxed in as its soundtrack. Any waveform-synced offset recorded for the
+ * pair (video ↔ audio) is honored so the sound lines up with the picture.
+ *
+ * Returns the on-disk path of the finished file plus the name to hand the user.
+ * When ffmpeg is unavailable (demo mode) and the video already carries its own
+ * audio track, the video file is returned unchanged so a real master still
+ * comes through.
+ */
+async function buildFinishMaster(
+  projectId: string,
+): Promise<{
+  filePath: string;
+  fileName: string;
+  audioOnly: boolean;
+} | null> {
+  const video = await latestAssetOfKind(projectId, VIDEO_KINDS);
+  const audio = await latestAssetOfKind(projectId, AUDIO_KINDS);
+
+  // Nothing to export at all (or only media with no downloadable bytes).
+  if (video && audio) {
+    const videoPath = path.join(uploadDir(), video.storageKey);
+    const audioPath = path.join(uploadDir(), audio.storageKey);
+    if (!fs.existsSync(videoPath) || !fs.existsSync(audioPath)) return null;
+
+    const ffmpeg = getFFmpegPath();
+    if (!ffmpeg) {
+      // Demo mode: we can't mux without ffmpeg, so hand back the latest video
+      // alone (it usually carries in-camera audio); the recipient can pair the
+      // separate audio file from the vault directly.
+      return {
+        filePath: videoPath,
+        fileName: `${video.fileName.replace(/\.[^.]+$/, "")}-master.mp4`,
+        audioOnly: false,
+      };
+    }
+
+    // A recorded sync offset (M2) tells us how far the audio leads the video;
+    // we push the sound track later by that amount so they align. The stored
+    // offset is "target leads primary" (positive ⇒ target leads), so we derive
+    // "audio leads video" from whether the audio is the sync's target.
+    const [sync] = await db
+      .select()
+      .from(tandemVideoSyncsTable)
+      .where(
+        and(
+          eq(tandemVideoSyncsTable.projectId, projectId),
+          or(
+            and(
+              eq(tandemVideoSyncsTable.primaryAssetId, video.id),
+              eq(tandemVideoSyncsTable.targetAssetId, audio.id),
+            ),
+            and(
+              eq(tandemVideoSyncsTable.primaryAssetId, audio.id),
+              eq(tandemVideoSyncsTable.targetAssetId, video.id),
+            ),
+          ),
+        ),
+      )
+      .limit(1);
+    const audioLeadsMs =
+      sync == null ? 0 : sync.targetAssetId === audio.id ? sync.offsetMs : -sync.offsetMs;
+
+    const outDir = path.join(uploadDir(), "finish");
+    fs.mkdirSync(outDir, { recursive: true });
+    const outKey = `finish/${projectId}-master-${Date.now()}.mp4`;
+    const outPath = path.join(uploadDir(), outKey);
+    const audioDelaySec = Math.max(0, audioLeadsMs / 1000);
+
+    const args: string[] = ["-y"];
+    if (audioDelaySec > 0) {
+      args.push("-itsoffset", audioDelaySec.toFixed(3));
+    }
+    args.push("-i", audioPath, "-i", videoPath);
+
+    // Video: copy the compressed frames untouched. Audio: transcode to AAC so
+    // the track is universally playable in an MP4 container. faststart marks
+    // the moov box up front so the result streams in any browser.
+    const encode = spawnSync(
+      ffmpeg,
+      [
+        ...args,
+        "-map",
+        "1:v:0",
+        "-map",
+        "0:a:0",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-shortest",
+        "-movflags",
+        "+faststart",
+        outPath,
+      ],
+      { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 60 * 60 * 1000 },
+    );
+    // If the picture carries no separable audio stream ffmpeg may refuse to
+    // copy — fall back to re-encoding the audio rather than failing the export.
+    let finalPath = outPath;
+    if (encode.status !== 0) {
+      const retry = spawnSync(
+        ffmpeg,
+        [
+          ...args,
+          "-map",
+          "1:v:0",
+          "-map",
+          "0:a:0",
+          "-c:v",
+          "copy",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "192k",
+          // Pad the (shorter) sound track so the master keeps full length.
+          "-af",
+          "apad",
+          "-shortest",
+          "-movflags",
+          "+faststart",
+          outPath,
+        ],
+        { encoding: "utf8", stdio: ["ignore", "ignore", "pipe"], timeout: 60 * 60 * 1000 },
+      );
+      if (retry.status !== 0) {
+        const stderr = String(retry.stderr ?? "").trim();
+        logger.warn(
+          { projectId, stderr: stderr.slice(-800) },
+          "Finish master mux failed; falling back to the raw video file",
+        );
+        finalPath = videoPath;
+      }
+    }
+    const name = `${video.fileName.replace(/\.[^.]+$/, "")}-with-${audio.fileName.replace(/\.[^.]+$/, "")}.mp4`;
+    return { filePath: finalPath, fileName: name, audioOnly: false };
+  }
+
+  if (video) {
+    const videoPath = path.join(uploadDir(), video.storageKey);
+    if (!fs.existsSync(videoPath)) return null;
+    return {
+      filePath: videoPath,
+      fileName: video.fileName,
+      audioOnly: false,
+    };
+  }
+
+  if (audio) {
+    const audioPath = path.join(uploadDir(), audio.storageKey);
+    if (!fs.existsSync(audioPath)) return null;
+    return {
+      filePath: audioPath,
+      fileName: audio.fileName,
+      audioOnly: true,
+    };
+  }
+
+  return null;
+}
+
+// GET /video/projects/:projectId/finish/master — the synced video+audio master.
+// Instead of handing out the latest video and latest audio as two separate
+// downloads, the finish desk delivers ONE file: the picture with the separate
+// sound muxed in, waveform-synced. Same Lock/grant gate and audit trail as any
+// raw file download.
+router.get(
+  "/video/projects/:projectId/finish/master",
+  async (req: Request, res: Response): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = DownloadVideoFinishMasterParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid project id" });
+      return;
+    }
+
+    const member = await requireMember(params.data.projectId, userId);
+    if (!member) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    const [project] = await db
+      .select()
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+
+    const master = await buildFinishMaster(project.id);
+    if (!master) {
+      res.status(400).json({ error: "Nothing to export yet — the vault has no processed media." });
+      return;
+    }
+
+    // Unlock requires suitable grants for the roles this master touches.
+    const roles =
+      (await latestAssetOfKind(project.id, VIDEO_KINDS)) &&
+      (await latestAssetOfKind(project.id, AUDIO_KINDS))
+        ? ["VIDEO", "AUDIO"]
+        : master.audioOnly
+          ? ["AUDIO"]
+          : ["VIDEO"];
+    if (!(await memberCanDownloadMaster(project, member, roles))) {
+      res.status(403).json({
+        error: "The Lock is still on — downloads open once the Captain approves the final master",
+      });
+      return;
+    }
+
+    // Audit the download so the Captain can see who took the finished master.
+    await db.insert(tandemVideoDownloadsTable).values({
+      id: randomUUID(),
+      projectId: project.id,
+      fileId: `finish-master-${project.id}`,
+      fileName: master.fileName,
+      memberId: userId,
+    });
+    logger.info({ projectId: project.id, memberId: userId }, "Finish master downloaded");
+
+    res.setHeader("Content-Type", master.audioOnly ? "audio/mpeg" : "video/mp4");
+    const downloadName = path.basename(master.fileName);
+    res.setHeader("Content-Disposition", `attachment; filename="${downloadName}"`);
+    res.sendFile(master.filePath);
   },
 );
 

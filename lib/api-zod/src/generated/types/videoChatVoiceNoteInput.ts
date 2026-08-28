@@ -6,9 +6,12 @@
  * OpenAPI spec version: 0.2.0
  */
 
+/**
+ * Multipart upload of a voice note into the project crew room
+ */
 export interface VideoChatVoiceNoteInput {
   /** The recorded voice note (WebM/Opus or MP4 audio blob) */
-  audio: File;
+  audio: Blob;
   /** Recorded duration in milliseconds */
   durationMs?: number;
   /** Original file name for the voice note */
