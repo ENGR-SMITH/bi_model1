@@ -20,6 +20,7 @@ import {
   useListVideoChatMessages,
   useSendVideoChatMessage,
 } from '@workspace/api-client-react';
+import { MemberAvatar } from '@/components/member-avatar';
 
 function seenKey(projectId: string): string {
   return `creators-den-chat-seen-${projectId}`;
@@ -141,7 +142,12 @@ export function ProjectChat({ projectId }: { projectId: string }) {
       {open ? (
         <div className="den-chat-panel" data-testid="chat-panel">
           <div className="den-chat-head">
-            <span className="den-chat-head-mark"><MessageSquare size={15} /></span>
+            <span className="den-chat-head-avatars">
+              {members.slice(0, 5).map((member) => (
+                <MemberAvatar key={member.userId} userId={member.userId} name={member.name} size={24} />
+              ))}
+              {members.length > 5 && <span className="den-chat-avatar den-chat-more">+{members.length - 5}</span>}
+            </span>
             <div>
               <b>Crew room</b>
               <small>{project.data?.name} · {members.length} {members.length === 1 ? 'member' : 'members'}</small>
@@ -202,7 +208,12 @@ export function ProjectChat({ projectId }: { projectId: string }) {
         </div>
       ) : (
         <button type="button" className="den-chat-fab" onClick={openPanel} aria-label="Open crew chat" data-testid="chat-fab">
-          <MessageSquare size={15} />
+          <span className="den-chat-fab-avatars">
+            {members.slice(0, 3).map((member) => (
+              <MemberAvatar key={member.userId} userId={member.userId} name={member.name} size={26} />
+            ))}
+            {members.length === 0 && <span className="den-chat-avatar"><MessageSquare size={13} /></span>}
+          </span>
           <span>Crew chat</span>
           {unread > 0 && (
             <span className="den-chat-badge" data-testid="chat-unread">{unread > 99 ? '99+' : unread}</span>

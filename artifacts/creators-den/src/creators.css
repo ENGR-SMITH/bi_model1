@@ -3691,8 +3691,7 @@ select optgroup {
   color: hsl(var(--accent));
   background: hsl(var(--accent) / .12);
 }
-.den-chat-fab .den-chat-avatar { display: none; }
-.den-chat-fab svg { color: hsl(var(--accent)); }
+.den-chat-fab svg:not(.den-chat-avatar svg) { color: hsl(var(--accent)); }
 .den-chat-error {
   margin: auto;
   text-align: center;
@@ -3713,3 +3712,111 @@ select optgroup {
   font: 10px var(--app-font-mono);
   color: hsl(var(--destructive));
 }
+
+/* ---------------------------------------------------------------------------
+   Vault — Temporary download grants (beautified form + grant rows).
+--------------------------------------------------------------------------- */
+.grant-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.grant-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.grant-field-wide { grid-column: 1 / -1; }
+.grant-field .mono-label { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.grant-field select,
+.grant-field input {
+  width: 100%;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--secondary) / .4);
+  color: hsl(var(--foreground));
+  font: 12px var(--app-font-sans);
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.grant-field select:focus,
+.grant-field input:focus {
+  border-color: hsl(var(--accent) / .6);
+  box-shadow: 0 0 0 3px hsl(var(--accent) / .08);
+}
+.grant-optional { font: 9px var(--app-font-mono); text-transform: none; letter-spacing: 0; color: hsl(var(--muted-foreground) / .7); font-style: normal; }
+.grant-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.grant-hours { flex: 0 0 150px; }
+.grant-hours-row { display: flex; align-items: center; gap: 6px; }
+.grant-hours-row input { width: 64px; }
+.grant-hours-row span { font: 10px var(--app-font-mono); color: hsl(var(--muted-foreground)); }
+.grant-submit { margin-left: auto; }
+.grant-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.grant-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--secondary) / .25);
+}
+.grant-row-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.grant-row-main b { font: 700 12px var(--app-font-sans); color: hsl(var(--foreground)); }
+.grant-row-file {
+  font: 10px var(--app-font-mono);
+  color: hsl(var(--muted-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grant-row-reason {
+  font: 500 11px var(--app-font-sans);
+  color: hsl(var(--foreground) / .72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.grant-row-end { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.grant-row-end .den-tag { font-size: 8px; }
+
+/* ---------------------------------------------------------------------------
+   Profile — the unique Tandem ID pill with copy.
+--------------------------------------------------------------------------- */
+.profile-uid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+.profile-uid .mono-label { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.profile-uid-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border: 1px solid hsl(var(--accent) / .4);
+  border-radius: 999px;
+  background: hsl(var(--accent) / .1);
+  color: hsl(var(--accent));
+  font: 700 12px var(--app-font-mono);
+  letter-spacing: .06em;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, transform .12s;
+}
+.profile-uid-value:hover { border-color: hsl(var(--accent)); background: hsl(var(--accent) / .18); transform: translateY(-1px); }
+.profile-uid-value svg { flex: 0 0 auto; opacity: .75; }
+.profile-uid-value .profile-uid-copied { color: hsl(164 33% 55%); opacity: 1; }
+.profile-uid-hint { text-transform: none !important; letter-spacing: 0 !important; font-size: 10px !important; }

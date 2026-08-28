@@ -23,7 +23,26 @@ vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: state.userId }),
   clerkClient: {
     users: {
-      getUserList: async (params: { emailAddress?: string[]; userId?: string[] }) => {
+      getUserList: async (params: { limit?: number; offset?: number; emailAddress?: string[]; userId?: string[] }) => {
+        const all = () => {
+          const rows = Object.entries(state.clerkIdToName).map(([id, name]) => {
+            const [first, ...rest] = name.split(" ");
+            return {
+              id,
+              firstName: first || null,
+              lastName: rest.join(" ") || null,
+              username: null,
+              emailAddresses: [],
+            };
+          });
+          const known = new Set(Object.keys(state.clerkIdToName));
+          for (const id of Object.values(state.clerkEmailToUser)) {
+            if (id && !known.has(id)) {
+              rows.push({ id, firstName: null, lastName: null, username: null, emailAddresses: [] });
+            }
+          }
+          return rows;
+        };
         if (params.userId) {
           return {
             data: params.userId.map((id) => {
@@ -38,9 +57,14 @@ vi.mock("@clerk/express", () => ({
             }),
           };
         }
-        const email = params.emailAddress?.[0] ?? "";
-        const id = state.clerkEmailToUser[email] ?? null;
-        return { data: id ? [{ id }] : [] };
+        if (params.emailAddress) {
+          const id = state.clerkEmailToUser[params.emailAddress[0] ?? ""] ?? null;
+          return { data: id ? all().filter((u) => u.id === id) : [] };
+        }
+        const users = all();
+        const offset = params.offset ?? 0;
+        const limit = params.limit ?? users.length;
+        return { data: users.slice(offset, offset + limit) };
       },
     },
   },
@@ -60,6 +84,7 @@ import { formatEdlTimecode, parseEdlTimecode, parseTimelineEdl, resolveEdlEvents
 import { runWorkerCycle } from "../video/worker";
 import { listZipEntries, readZipEntry } from "../video/zip";
 import { clearUserNameCache } from "../lib/user-names";
+import { tandemUid } from "../lib/tandem-uid";
 
 function createApp(): Express {
   const app = express();
@@ -119,7 +144,7 @@ async function addMember(projectId: string, email: string, role: string) {
   state.userId = "captain-1";
   const res = await request(API)
     .post(`/api/video/projects/${projectId}/members`)
-    .send({ email, role });
+    .send({ uid: tandemUid(state.clerkEmailToUser[email] ?? ""), role });
   expect(res.status).toBe(201);
 }
 

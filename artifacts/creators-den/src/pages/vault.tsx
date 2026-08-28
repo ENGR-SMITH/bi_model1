@@ -37,6 +37,7 @@ import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { isAudioKind, proxyUrlFor } from '@/components/asset-preview';
 import { MemberAvatar } from '@/components/member-avatar';
+import { isTandemUid, normalizeTandemUid, tandemUid } from '@/lib/tandem-uid';
 
 const LEG_META = {
   SELECTS: { label: 'Selects', role: 'Story Architect', icon: Film },
@@ -133,18 +134,22 @@ function PosterCard({ projectId, asset, deduplicated }: { projectId: string; ass
 function InviteForm({ projectId }: { projectId: string }) {
   const queryClient = useQueryClient();
   const invite = useAddVideoProjectMember();
-  const [email, setEmail] = useState('');
+  const [uid, setUid] = useState('');
   const [role, setRole] = useState<(typeof INVITE_ROLES)[number]>('ARCHITECT');
+
+  const normalized = normalizeTandemUid(uid);
+  const valid = isTandemUid(normalized);
+  const touched = uid.trim().length > 0;
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!email.trim()) return;
+    if (!valid) return;
     invite.mutate(
-      { projectId, data: { email: email.trim(), role } },
+      { projectId, data: { uid: normalized, role } },
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
-          setEmail('');
+          setUid('');
         },
       },
     );
@@ -154,14 +159,23 @@ function InviteForm({ projectId }: { projectId: string }) {
 
   return (
     <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto]" onSubmit={submit} data-testid="form-invite-member">
-      <input
-        value={email}
-        onChange={(event) => setEmail(event.target.value)}
-        type="email"
-        placeholder="teammate@example.com"
-        required
-        data-testid="input-invite-email"
-      />
+      <div className="min-w-0">
+        <input
+          value={uid}
+          onChange={(event) => setUid(event.target.value.toUpperCase())}
+          placeholder="TANDEM6EUHY"
+          spellCheck={false}
+          autoCapitalize="characters"
+          className="font-mono uppercase tracking-wider"
+          aria-label="Teammate's unique Tandem ID"
+          data-testid="input-invite-uid"
+        />
+        {touched && !valid && (
+          <p className="setting-copy !text-[11px] mt-1" role="alert">
+            A Tandem ID looks like <span className="mono-label">TANDEM6EUHY</span> — find it on the teammate's profile.
+          </p>
+        )}
+      </div>
       <select value={role} onChange={(event) => setRole(event.target.value as (typeof INVITE_ROLES)[number])} data-testid="select-invite-role">
         {INVITE_ROLES.map((value) => (
           <option key={value} value={value}>{ROLE_LABELS[value]}</option>
@@ -169,7 +183,7 @@ function InviteForm({ projectId }: { projectId: string }) {
       </select>
       <button
         type="submit"
-        disabled={invite.isPending || !email.trim()}
+        disabled={invite.isPending || !valid}
         className="secondary-btn"
         data-testid="button-invite-member"
       >
@@ -230,34 +244,52 @@ function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string
 
   const createError = create.error as { response?: { data?: { error?: string } } } | null;
   const activeGrants = (grants.data ?? []).filter((g) => !g.revokedAt && new Date(g.expiresAt) > new Date());
+  const fileNameById = new Map(assets.map((a) => [a.id, a.fileName]));
+  const hoursLeft = (expiresAt: string) => Math.max(0, Math.ceil((new Date(expiresAt).getTime() - Date.now()) / 3_600_000));
 
   return (
     <div className="paper-card accent-card" data-testid="panel-grants">
       <div className="inline-heading">
         <span className="eyebrow"><Download size={13} /> Temporary download grants</span>
+        {activeGrants.length > 0 && <span className="den-tag teal">{activeGrants.length} active</span>}
       </div>
       <p className="setting-copy">
         Grant a teammate a timed download of a specific file — say, an audio stem for an external DAW repair. Revoke anytime; every download is still audited.
       </p>
-      <form className="mt-3 grid gap-2 sm:grid-cols-2" onSubmit={submit} data-testid="form-grant">
-        <select value={memberId} onChange={(event) => setMemberId(event.target.value)} data-testid="grant-select-member">
-          <option value="">Teammate…</option>
-          {members.filter((m) => m.role !== 'CAPTAIN').map((m) => (
-            <option key={m.id} value={m.userId}>{m.name ?? m.userId.slice(0, 8)}</option>
-          ))}
-        </select>
-        <select value={fileId} onChange={(event) => setFileId(event.target.value)} data-testid="grant-select-file">
-          <option value="">File…</option>
-          {assets.map((a) => (
-            <option key={a.id} value={a.id}>{a.fileName}</option>
-          ))}
-        </select>
-        <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Reason — e.g. DAW repair" maxLength={500} data-testid="grant-reason" />
-        <div className="flex items-center gap-2">
-          <input value={hours} onChange={(event) => setHours(Number(event.target.value) || 24)} type="number" min={1} max={168} title="Hours until expiry" className="w-20" data-testid="grant-hours" />
-          <button type="submit" disabled={create.isPending || !memberId || !fileId} className="secondary-btn" data-testid="button-create-grant">
+      <form className="grant-form mt-3" onSubmit={submit} data-testid="form-grant">
+        <label className="grant-field">
+          <span className="mono-label">Teammate</span>
+          <select value={memberId} onChange={(event) => setMemberId(event.target.value)} data-testid="grant-select-member">
+            <option value="">Choose a teammate…</option>
+            {members.filter((m) => m.role !== 'CAPTAIN').map((m) => (
+              <option key={m.id} value={m.userId}>{m.name ?? m.userId.slice(0, 8)}</option>
+            ))}
+          </select>
+        </label>
+        <label className="grant-field">
+          <span className="mono-label">File</span>
+          <select value={fileId} onChange={(event) => setFileId(event.target.value)} data-testid="grant-select-file">
+            <option value="">Choose a file…</option>
+            {assets.map((a) => (
+              <option key={a.id} value={a.id}>{a.fileName}</option>
+            ))}
+          </select>
+        </label>
+        <label className="grant-field grant-field-wide">
+          <span className="mono-label">Reason <i className="grant-optional">optional</i></span>
+          <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. DAW repair" maxLength={500} data-testid="grant-reason" />
+        </label>
+        <div className="grant-actions">
+          <label className="grant-field grant-hours">
+            <span className="mono-label">Expires in</span>
+            <span className="grant-hours-row">
+              <input value={hours} onChange={(event) => setHours(Number(event.target.value) || 24)} type="number" min={1} max={168} title="Hours until expiry" data-testid="grant-hours" />
+              <span>hours</span>
+            </span>
+          </label>
+          <button type="submit" disabled={create.isPending || !memberId || !fileId} className="secondary-btn grant-submit" data-testid="button-create-grant">
             <Download size={13} />
-            {create.isPending ? 'Granting…' : 'Grant'}
+            {create.isPending ? 'Granting…' : 'Grant download'}
           </button>
         </div>
       </form>
@@ -268,21 +300,31 @@ function GrantsPanel({ projectId, myRole, members, assets }: { projectId: string
       )}
 
       {(grants.data ?? []).length > 0 && (
-        <div className="den-stack mt-3">
+        <div className="grant-list mt-3">
           {(grants.data ?? []).map((grant) => {
             const active = !grant.revokedAt && new Date(grant.expiresAt) > new Date();
+            const memberName = memberNameById.get(grant.memberId) ?? grant.memberId.slice(0, 8);
+            const fileName = fileNameById.get(grant.fileId) ?? grant.fileId.slice(0, 8);
             return (
-              <div key={grant.id} className="list-row" data-testid={`grant-${grant.id}`}>
-                <MemberAvatar userId={grant.memberId} name={memberNameById.get(grant.memberId) ?? null} size={28} />
-                <span>
-                  <b>{memberNameById.get(grant.memberId) ?? grant.memberId.slice(0, 8)} · {grant.reason || 'download access'}</b>
-                  <small>{active ? `expires ${new Date(grant.expiresAt).toLocaleDateString()}` : grant.revokedAt ? 'revoked' : 'expired'}</small>
-                </span>
-                {active && (
-                  <button type="button" onClick={() => onRevoke(grant.id)} disabled={revoke.isPending} className="danger-icon" title="Revoke" data-testid={`button-revoke-${grant.id}`}>
-                    <X size={15} />
-                  </button>
-                )}
+              <div key={grant.id} className="grant-row" data-testid={`grant-${grant.id}`}>
+                <MemberAvatar userId={grant.memberId} name={memberName} size={30} />
+                <div className="grant-row-main">
+                  <b>{memberName}</b>
+                  <span className="grant-row-file" title={fileName}>{fileName}</span>
+                  {grant.reason && <span className="grant-row-reason">“{grant.reason}”</span>}
+                </div>
+                <div className="grant-row-end">
+                  {active ? (
+                    <span className="den-tag teal">{hoursLeft(grant.expiresAt)}h left</span>
+                  ) : (
+                    <span className="den-tag muted">{grant.revokedAt ? 'revoked' : 'expired'}</span>
+                  )}
+                  {active && (
+                    <button type="button" onClick={() => onRevoke(grant.id)} disabled={revoke.isPending} className="danger-icon" title="Revoke" data-testid={`button-revoke-${grant.id}`}>
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -486,9 +528,14 @@ export default function ContentCreatorsProjectPage() {
             {p.members.map((member) => (
               <div key={member.id} className="list-row" data-testid={`card-member-${member.userId}`}>
                 <MemberAvatar userId={member.userId} name={member.name} size={28} />
-                <span>
+                <span className="min-w-0">
                   <b>{member.name ?? member.userId}</b>
-                  <small>{ROLE_LABELS[member.role] ?? member.role}</small>
+                  <small>
+                    {ROLE_LABELS[member.role] ?? member.role}
+                    <span className="mono-label ml-2" title="Unique Tandem ID — share it to invite this member">
+                      {tandemUid(member.userId)}
+                    </span>
+                  </small>
                 </span>
                 {member.role === 'CAPTAIN' && <span className="den-tag danger">Captain</span>}
               </div>
@@ -498,7 +545,7 @@ export default function ContentCreatorsProjectPage() {
           {myRole === 'CAPTAIN' ? (
             <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
               <span className="eyebrow"><UserPlus size={12} /> Invite a teammate</span>
-              <p className="setting-copy mt-1">Assign the five stages — Architect, Visual Editor, Sound Designer, Motion &amp; Color, Thumbnail — or add an uploader.</p>
+              <p className="setting-copy mt-1">Assign the five stages — Architect, Visual Editor, Sound Designer, Motion &amp; Color, Thumbnail — or add an uploader. Invite with their unique Tandem ID (shown on their profile).</p>
               <InviteForm projectId={p.id} />
             </div>
           ) : (

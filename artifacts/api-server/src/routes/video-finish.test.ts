@@ -4,6 +4,7 @@ import request from "supertest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { tandemUid } from "../lib/tandem-uid";
 
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "video-finish-test-"));
 process.env.TANDEM_MEDIA_DEMO = "1";
@@ -19,10 +20,16 @@ vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: state.userId }),
   clerkClient: {
     users: {
-      getUserList: async ({ emailAddress }: { emailAddress: string[] }) => {
-        const email = emailAddress[0];
-        const id = state.clerkEmailToUser[email] ?? null;
-        return { data: id ? [{ id }] : [] };
+      getUserList: async (params: { limit?: number; offset?: number; emailAddress?: string[]; userId?: string[] }) => {
+        if (params.userId) return { data: params.userId.map((id) => ({ id })) };
+        if (params.emailAddress) {
+          const id = state.clerkEmailToUser[params.emailAddress[0]] ?? null;
+          return { data: id ? [{ id }] : [] };
+        }
+        const users = Object.values(state.clerkEmailToUser).map((id) => ({ id }));
+        const offset = params.offset ?? 0;
+        const limit = params.limit ?? users.length;
+        return { data: users.slice(offset, offset + limit) };
       },
     },
   },
@@ -93,7 +100,7 @@ async function addMember(projectId: string, email: string, role: string) {
   state.userId = "captain-1";
   const res = await request(API)
     .post(`/api/video/projects/${projectId}/members`)
-    .send({ email, role });
+    .send({ uid: tandemUid(state.clerkEmailToUser[email] ?? ""), role });
   expect(res.status).toBe(201);
 }
 

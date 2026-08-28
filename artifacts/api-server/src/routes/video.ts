@@ -47,6 +47,7 @@ import { upload } from "../video/upload";
 import { createAssetFromUpload } from "../video/content-address";
 import { recordVideoActivity } from "../video/activity";
 import { resolveUserNames } from "../lib/user-names";
+import { normalizeTandemUid, tandemUid } from "../lib/tandem-uid";
 
 const router: IRouter = Router();
 
@@ -469,7 +470,10 @@ router.get(
   },
 );
 
-// POST /video/projects/:projectId/members — invite by email, Captain only.
+// POST /video/projects/:projectId/members — invite by unique Tandem ID
+// (e.g. TANDEM6EUHY), Captain only. The ID is derived from the user's Clerk
+// id, so it is resolved here by walking the Clerk user list and matching
+// computed IDs.
 router.post(
   "/video/projects/:projectId/members",
   async (req: Request, res): Promise<void> => {
@@ -500,19 +504,31 @@ router.post(
       return;
     }
 
+    const targetUid = normalizeTandemUid(body.data.uid);
     let clerkUserId: string | null = null;
     try {
-      const users = await clerkClient.users.getUserList({
-        emailAddress: [body.data.email],
-      });
-      clerkUserId = users.data[0]?.id ?? null;
+      // The derived ID is not searchable in Clerk, so walk the user list in
+      // pages and compare computed IDs (safe cap for a small team product).
+      const PAGE = 100;
+      const MAX_SCAN = 2000;
+      let offset = 0;
+      while (offset < MAX_SCAN) {
+        const users = await clerkClient.users.getUserList({ limit: PAGE, offset });
+        if (users.data.length === 0) break;
+        const hit = users.data.find((user) => tandemUid(user.id) === targetUid);
+        if (hit) {
+          clerkUserId = hit.id;
+          break;
+        }
+        offset += users.data.length;
+      }
     } catch {
       clerkUserId = null;
     }
     if (!clerkUserId) {
       res
         .status(400)
-        .json({ error: "No Tandem account found for that email address" });
+        .json({ error: "No Tandem account found with that ID — ask them to check the ID on their profile" });
       return;
     }
 

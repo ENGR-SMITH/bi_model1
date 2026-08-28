@@ -3756,12 +3756,17 @@ components:
       required: [id, projectId, userId, name, role, status, createdAt]
     VideoMemberInput:
       type: object
+      description: Invite a teammate by their unique Tandem ID (e.g. TANDEM6EUHY) — the handle shown on every user's profile.
       properties:
-        email: { type: string, format: email }
+        uid:
+          type: string
+          minLength: 1
+          maxLength: 20
+          description: The invitee's unique Tandem ID, e.g. TANDEM6EUHY.
         role:
           type: string
           enum: [UPLOADER, ARCHITECT, VISUAL_EDITOR, SOUND_DESIGNER, MOTION_COLOR, THUMBNAIL_DESIGNER, VIEWER]
-      required: [email, role]
+      required: [uid, role]
     VideoAsset:
       type: object
       properties:

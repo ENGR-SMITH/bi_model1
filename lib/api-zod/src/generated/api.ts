@@ -2003,10 +2003,14 @@ export const AddVideoProjectMemberParams = zod.object({
   "projectId": zod.coerce.string().min(1)
 })
 
+export const addVideoProjectMemberBodyUidMax = 20;
+
+
+
 export const AddVideoProjectMemberBody = zod.object({
-  "email": zod.string().email(),
+  "uid": zod.string().min(1).max(addVideoProjectMemberBodyUidMax).describe('The invitee\'s unique Tandem ID, e.g. TANDEM6EUHY.'),
   "role": zod.enum(['UPLOADER', 'ARCHITECT', 'VISUAL_EDITOR', 'SOUND_DESIGNER', 'MOTION_COLOR', 'THUMBNAIL_DESIGNER', 'VIEWER'])
-})
+}).describe('Invite a teammate by their unique Tandem ID (e.g. TANDEM6EUHY) — the handle shown on every user\'s profile.')
 
 export const AddVideoProjectMemberResponse = zod.object({
   "id": zod.string(),
