@@ -73,6 +73,21 @@ const ALLOWED_ASSET_KINDS = [
   "THUMBNAIL_DESIGN",
 ] as const;
 
+// A vault asset's kind feeds the same relay leg the timeline uses, so activity
+// events for uploads carry the leg (SELECTS/CUT/SOUND/FINISH/THUMBNAIL) and the
+// ledger can deep-link them to the right preview page (mirrors the frontend's
+// ASSET_LEG map in version-timeline.tsx).
+const ASSET_LEG: Record<string, string> = {
+  RAW_VIDEO: "SELECTS",
+  SCREEN_REC: "SELECTS",
+  REFERENCE: "SELECTS",
+  B_ROLL: "CUT",
+  RAW_AUDIO: "SOUND",
+  VO_PICKUP: "SOUND",
+  GRAPHIC: "FINISH",
+  THUMBNAIL_DESIGN: "THUMBNAIL",
+};
+
 async function requireMember(
   projectId: string,
   userId: string,
@@ -815,6 +830,7 @@ router.post(
     await recordVideoActivity({
       projectId: params.data.projectId,
       eventType: "asset_uploaded",
+      leg: ASSET_LEG[rawKind] ?? null,
       summary: `${asset.fileName} uploaded to the vault${deduplicated ? " — already in vault, reused" : ""}`,
       actorId: userId,
       resourceId: asset.id,

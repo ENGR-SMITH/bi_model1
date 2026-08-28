@@ -724,7 +724,8 @@ describe("activity feed + version genealogy", () => {
     expect(saved.actorId).toBe("captain-1");
     // Actor ids resolve to Clerk display names (falling back to short ids).
     expect(saved.actorName).toBe("Ada Captain");
-    // Leg-scoped events carry their leg; vault-wide events (uploads) carry none.
+    // Leg-scoped events carry their leg; uploads carry the leg their asset
+    // kind feeds (RAW_VIDEO → SELECTS) so the ledger can deep-link them.
     expect(saved.leg).toBe("CUT");
     const importEvent = feed.body.find((event: any) => event.eventType === "version_imported");
     expect(importEvent.summary).toContain("Imported CUT v1 from EDL");
@@ -732,7 +733,7 @@ describe("activity feed + version genealogy", () => {
     expect(importEvent.actorName).toBe("Ada Captain");
     expect(importEvent.leg).toBe("CUT");
     const uploaded = feed.body.find((event: any) => event.eventType === "asset_uploaded");
-    expect(uploaded.leg).toBeNull();
+    expect(uploaded.leg).toBe("SELECTS");
 
     // The Captain's decision lands on the feed.
     const submissions = await request(API).get(`/api/video/projects/${project.id}/submissions`);
