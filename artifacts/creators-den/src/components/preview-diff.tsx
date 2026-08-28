@@ -19,6 +19,7 @@
 import { Component, type ReactNode } from 'react';
 import { DiffMap } from '@/components/diff-map';
 import { AudioDiffMap } from '@/components/audio-diff-map';
+import type { DiffSettings } from '@/components/preview-shared';
 import {
   getGetVideoTimelineVersionQueryKey,
   useGetVideoTimelineVersion,
@@ -148,6 +149,8 @@ export function PreviewDiff({
   versions,
   selected,
   fallbackAssetIds = [],
+  settings,
+  onSettingsChange,
 }: {
   projectId: string;
   leg: StudioLeg;
@@ -157,7 +160,15 @@ export function PreviewDiff({
    * snapshot carries no explicit clip/design — mirrors how the canvas already
    * falls back to a vault asset. */
   fallbackAssetIds?: string[];
+  /** Diff-map settings owned by the page (driven by the settings dropdown). */
+  settings?: DiffSettings;
+  onSettingsChange?: (settings: DiffSettings) => void;
 }) {
+  // Handlers bridging the controlled diff components back to the page state.
+  const changeSensitivity = (sensitivity: number) =>
+    onSettingsChange?.({ sensitivity, levelMatch: settings?.levelMatch ?? true });
+  const changeLevelMatch = (levelMatch: boolean) =>
+    onSettingsChange?.({ sensitivity: settings?.sensitivity ?? 6, levelMatch });
   const base = selected ?? null;
   const predecessor = predecessorOf(versions, base);
   // Non-empty leg fallbacks (the query is disabled when base/predecessor are
@@ -214,6 +225,10 @@ export function PreviewDiff({
               olderAssetId={olderAssetId}
               newerLabel={newerLabel}
               olderLabel={olderLabel}
+              sensitivity={settings?.sensitivity}
+              onSensitivityChange={changeSensitivity}
+              levelMatch={settings?.levelMatch}
+              onLevelMatchChange={changeLevelMatch}
             />
           ) : leg === 'THUMBNAIL' ? (
             <DiffMap
@@ -223,6 +238,8 @@ export function PreviewDiff({
               olderAssetId={olderAssetId}
               newerLabel={newerLabel}
               olderLabel={olderLabel}
+              sensitivity={settings?.sensitivity}
+              onSensitivityChange={changeSensitivity}
             />
           ) : (
             <DiffMap
@@ -232,6 +249,8 @@ export function PreviewDiff({
               olderAssetId={olderAssetId}
               newerLabel={newerLabel}
               olderLabel={olderLabel}
+              sensitivity={settings?.sensitivity}
+              onSensitivityChange={changeSensitivity}
             />
           )}
         </DiffBoundary>
@@ -300,6 +319,8 @@ export function PreviewDiff({
             olderAssetId={olderAssetId}
             newerLabel={`${leg} v${own.data.version}`}
             olderLabel={`v${prev.data.version}`}
+            sensitivity={settings?.sensitivity}
+            onSensitivityChange={changeSensitivity}
           />
         </DiffBoundary>
       </div>
@@ -317,6 +338,8 @@ export function PreviewDiff({
             olderAssetId={olderAssetId}
             newerLabel={`THUMBNAIL v${own.data.version}`}
             olderLabel={`v${prev.data.version}`}
+            sensitivity={settings?.sensitivity}
+            onSensitivityChange={changeSensitivity}
           />
         </DiffBoundary>
       </div>
@@ -333,6 +356,10 @@ export function PreviewDiff({
           olderAssetId={olderAssetId}
           newerLabel={`SOUND v${own.data.version}`}
           olderLabel={`v${prev.data.version}`}
+          sensitivity={settings?.sensitivity}
+          onSensitivityChange={changeSensitivity}
+          levelMatch={settings?.levelMatch}
+          onLevelMatchChange={changeLevelMatch}
         />
       </DiffBoundary>
     </div>

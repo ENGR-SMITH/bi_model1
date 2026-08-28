@@ -27,6 +27,7 @@ import { AssetPlayer, EmptyPlayer, pollWhileProcessing, proxyUrlFor } from '@/co
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { formatTimecode } from '@/components/timeline';
 import {
+  DEFAULT_DIFF_SETTINGS,
   FullscreenButton,
   PreviewCanvasColumn,
   PreviewLayout,
@@ -34,6 +35,7 @@ import {
   VAULT_KIND_LABELS,
   VersionCarousel,
   type CarouselItem,
+  type DiffSettings,
   type PreviewVersion,
   type PreviewView,
 } from '@/components/preview-shared';
@@ -232,6 +234,8 @@ export default function VideoPreviewPage() {
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
   // Preview / split-screen diff-map toggle for the big-canvas column.
   const [view, setView] = useState<PreviewView>('preview');
+  // Diff-map settings, driven by the settings dropdown beside the toggle.
+  const [diffSettings, setDiffSettings] = useState<DiffSettings>(DEFAULT_DIFF_SETTINGS);
 
   // Default to the newest version once the list arrives (unless a vault file
   // has been picked from the timeline row).
@@ -335,6 +339,9 @@ export default function VideoPreviewPage() {
           onViewChange={setView}
           hasDiff={hasDiff}
           eyebrow={<span className="eyebrow">Big canvas</span>}
+          settings={diffSettings}
+          onSettingsChange={setDiffSettings}
+          settingsKind="pixel"
           preview={
             <VideoCanvas
               projectId={p.id}
@@ -353,6 +360,8 @@ export default function VideoPreviewPage() {
               versions={diffVersions}
               selected={activeSelection}
               fallbackAssetIds={(p.assets ?? []).filter((a) => VIDEO_KINDS.has(a.kind)).map((a) => a.id)}
+              settings={diffSettings}
+              onSettingsChange={setDiffSettings}
             />
           }
         />

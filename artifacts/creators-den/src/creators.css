@@ -1846,11 +1846,11 @@ select optgroup {
 .pv-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   /* topnav (107) + presence strip (30) + this page's own vertical padding */
-  height: calc(100dvh - 107px - 30px - 40px);
+  height: calc(100dvh - 107px - 30px - 24px);
   min-height: 460px;
-  padding: 22px clamp(20px, 3vw, 40px) 18px;
+  padding: 12px clamp(10px, 1.6vw, 22px) 12px;
   overflow: hidden;
 }
 .pv-top {
@@ -1858,8 +1858,8 @@ select optgroup {
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: 3fr 2fr; /* 60% / 40% */
-  gap: 16px;
+  grid-template-columns: 4fr 1fr; /* 80% / 20% — canvas column vs comment wall */
+  gap: 12px;
 }
 .pv-canvas-col {
   min-width: 0;
@@ -2000,6 +2000,69 @@ select optgroup {
   box-shadow: 0 0 6px hsl(var(--accent) / .8);
 }
 
+/* Column header actions (toggle + settings gear) sit together on the right. */
+.pv-canvas-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Diff-map settings dropdown — gear button + popover panel. */
+.pv-diff-settings {
+  position: relative;
+}
+.pv-diff-settings-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 232px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+}
+.pv-setting-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: hsl(var(--muted-foreground));
+  font: 600 11px var(--app-font-sans);
+  white-space: nowrap;
+}
+.pv-setting-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: hsl(var(--accent));
+}
+.pv-setting-row b {
+  min-width: 30px;
+  text-align: right;
+  color: hsl(var(--accent));
+  font: 10px var(--app-font-mono);
+}
+.pv-setting-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 7px;
+  background: hsl(var(--secondary) / .35);
+  color: hsl(var(--muted-foreground));
+  font: 600 11px var(--app-font-sans);
+  cursor: pointer;
+}
+.pv-setting-toggle.on {
+  background: hsl(var(--accent) / .14);
+  border-color: hsl(var(--accent) / .5);
+  color: hsl(var(--accent));
+}
+
 /* When switched to diff mode, the diff surface fills the whole canvas column
    (like the media card does in preview mode) instead of the 48%-height
    sub-panel used when shown below the canvas. */
@@ -2043,7 +2106,19 @@ select optgroup {
 .df-pane { position: relative; min-width: 0; min-height: 0; background: #080d12; overflow: hidden; }
 .df-pane-media { width: 100%; height: 100%; object-fit: contain; display: block; background: #080d12; }
 .df-pane-map { background: #080d12; }
-.df-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.df-canvas {
+  /* Contain-fit inside the right pane, centered — matches how the left pane
+     letterboxes its media instead of stretching it. */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+}
 .df-pane-label { position: absolute; z-index: 2; top: 10px; left: 10px; padding: 4px 6px; color: #dce8eb; background: rgba(8, 15, 21, .82); border: 1px solid rgba(157, 204, 221, .22); border-radius: 3px; font: 10px var(--app-font-mono); letter-spacing: .08em; }
 .df-pane-label.df-right { left: auto; right: 10px; color: #ffb0b4; border-color: rgba(241, 92, 104, .3); }
 .df-hidden { position: absolute; left: -99999px; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
@@ -2053,13 +2128,13 @@ select optgroup {
 .df-chip.red { background: #f16672; }
 .df-mode { color: #b6eafa; border-left: 1px solid #36505b; padding-left: 9px; }
 .df-mismatch { position: absolute; top: 10px; left: 10px; display: flex; align-items: center; gap: 6px; padding: 4px 8px; color: #e5b78f; background: rgba(28, 18, 12, .9); border: 1px solid #5a3f2c; border-radius: 3px; font: 9px var(--app-font-mono); }
-.df-transport { display: grid; grid-template-columns: auto minmax(90px, 1fr) auto auto; align-items: center; gap: 12px; padding: 9px 12px; background: #0e1922; border-top: 1px solid #253541; }
+.df-transport { display: flex; align-items: center; gap: 12px; padding: 9px 12px; background: #0e1922; border-top: 1px solid #253541; }
 .df-buttons { display: flex; align-items: center; gap: 5px; }
 .df-buttons button { width: 29px; height: 28px; display: grid; place-items: center; border: 1px solid #2c414d; border-radius: 4px; background: #15232d; color: #a6bac3; }
 .df-buttons button:hover { color: #e8f5f7; border-color: #54b9d7; background: #1b3442; }
 .df-buttons .df-play { width: 34px; color: #06151d; background: #8dddf9; border-color: #8dddf9; }
 .df-buttons .df-play:hover { background: #b9ecff; }
-.df-seek { width: 100%; height: 4px; appearance: none; background: #243b47; border-radius: 4px; outline: none; accent-color: #42c4f2; }
+.df-seek { flex: 1; min-width: 0; height: 4px; appearance: none; background: #243b47; border-radius: 4px; outline: none; accent-color: #42c4f2; }
 .df-seek::-webkit-slider-thumb { appearance: none; width: 11px; height: 11px; border-radius: 50%; background: #9be7ff; border: 2px solid #143c4c; }
 .df-time { color: #c2d2d8; font: 11px var(--app-font-mono); white-space: nowrap; }
 .df-sens { display: flex; align-items: center; gap: 7px; color: #a6b7bd; font-size: 11px; }
@@ -2082,9 +2157,38 @@ select optgroup {
 .df-audio-spectral { height: 220px; background: #0a1218; }
 .df-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border: 1px solid #38515e; border-radius: 4px; background: #172731; color: #a6b7bd; font-size: 10px; }
 .df-toggle.on { background: #1a5c71; border-color: #45bddd; color: #c2f2ff; }
+
+/* Centered PLAY button — floats at the middle of the split surface (between
+   the Preview pane and the Diff map pane), replacing the small transport
+   play button. */
+.df-play-overlay {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 12, 17, .78);
+  border: 1px solid rgba(141, 221, 249, .55);
+  color: #dff6ff;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+  transition: background .15s, color .15s, transform .15s;
+}
+.df-play-overlay:hover {
+  background: rgba(20, 45, 58, .92);
+  color: #9be7ff;
+  transform: translate(-50%, -50%) scale(1.07);
+}
+
 @media (max-width: 700px) {
   .df-split { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 1 / 1.1; }
-  .df-transport { grid-template-columns: 1fr; }
+  .df-transport { flex-wrap: wrap; }
 }
 
 /* Notes wall fills the right column and scrolls internally. */
