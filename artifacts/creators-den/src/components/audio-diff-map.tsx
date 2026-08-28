@@ -278,7 +278,7 @@ export function AudioDiffMap({
                 onSeek={seek}
               />
             ) : (
-              <div className="df-wave-empty">Awaiting reviewed audio</div>
+              <div className="df-wave-empty">Loading audio…</div>
             )}
             {/* Only the newest version is annotatable — pins drop on its lane. */}
             <AnnotationCanvas
@@ -307,7 +307,7 @@ export function AudioDiffMap({
                 onSeek={seek}
               />
             ) : (
-              <div className="df-wave-empty">Awaiting older audio</div>
+              <div className="df-wave-empty">Loading older audio…</div>
             )}
           </div>
           <div className="df-wave-row df-wave-diff">

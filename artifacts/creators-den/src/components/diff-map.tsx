@@ -142,6 +142,9 @@ export function DiffMap({
   const [wipePos, setWipePos] = useState(0.8);
   const [mismatch, setMismatch] = useState(false);
   const [ready, setReady] = useState(false);
+  // The older (reference) media loads independently — track its readiness so
+  // the diff redraws the moment it arrives instead of staying blank on open.
+  const [olderReady, setOlderReady] = useState(false);
 
   const newerVideoRef = useRef<HTMLVideoElement>(null);
   const olderVideoRef = useRef<HTMLVideoElement>(null);
@@ -158,11 +161,17 @@ export function DiffMap({
 
   const isImage = kind === 'image';
 
-  // Determine duration + readiness once media metadata loads.
+  // Determine duration + readiness once media metadata loads. The older
+  // (reference) media may arrive after the newer one — `olderReady` flips from
+  // its own load events so the diff redraws once both sides are available.
   useEffect(() => {
     setReady(false);
+    setOlderReady(false);
     if (isImage) {
-      if (newerImgRef.current?.complete && olderImgRef.current?.complete) setReady(true);
+      if (newerImgRef.current?.complete && olderImgRef.current?.complete) {
+        setReady(true);
+        setOlderReady(true);
+      }
       return;
     }
     const v = newerVideoRef.current;
@@ -270,18 +279,19 @@ export function DiffMap({
       });
     }, 70);
     return () => window.clearTimeout(timer);
-  }, [playhead, duration, ready, isImage, playing]);
+  }, [playhead, duration, ready, olderReady, isImage, playing]);
 
-  // Image: draw once ready, and on sensitivity/wipe changes.
+  // Image: draw once ready (and once the older still arrives), and on
+  // sensitivity/wipe changes.
   useEffect(() => {
     if (isImage) drawRef.current();
-  }, [sensitivity, wipePos, ready, isImage, newerAssetId, olderAssetId]);
+  }, [sensitivity, wipePos, ready, olderReady, isImage, newerAssetId, olderAssetId]);
 
   // Redraw instantly on wipe / sensitivity drags without seeking.
   useEffect(() => {
     if (!ready) return;
     drawRef.current();
-  }, [wipePos, sensitivity, ready]);
+  }, [wipePos, sensitivity, ready, olderReady]);
 
   // Dual-video sync + redraw on timeupdate.
   useEffect(() => {
@@ -346,10 +356,10 @@ export function DiffMap({
     <section className="df-surf" ref={surfRef} data-testid="diff-map">
       <div className="df-stage">
         {!isImage && (
-          <video ref={olderVideoRef} src={olderUrl} muted playsInline preload="auto" className="df-hidden" data-testid="df-video-older" />
+          <video ref={olderVideoRef} src={olderUrl} muted playsInline preload="auto" className="df-hidden" onLoadedMetadata={() => setOlderReady(true)} onCanPlay={() => setOlderReady(true)} data-testid="df-video-older" />
         )}
         {isImage && (
-          <img ref={olderImgRef} src={olderUrl} alt="" className="df-hidden" onLoad={() => setReady(true)} data-testid="df-img-older" />
+          <img ref={olderImgRef} src={olderUrl} alt="" className="df-hidden" onLoad={() => { setReady(true); setOlderReady(true); }} data-testid="df-img-older" />
         )}
         <div className="df-split">
           {/* Left pane — the reviewed (newest) media, annotatable. */}
