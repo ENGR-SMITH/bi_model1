@@ -1760,7 +1760,7 @@ select optgroup {
 /* ---- Landing card grid (VIDEO / AUDIO / SCRIPT / THUMBNAIL) ------------ */
 .pv-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 22px;
 }
 .pv-card {
@@ -3505,3 +3505,211 @@ select optgroup {
 }
 .den-chat-compose .icon-btn:hover { background: hsl(var(--accent) / .85); }
 .den-chat-compose .icon-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---------------------------------------------------------------------------
+   Finish — the export desk (latest-only download cards, grant-aware).
+--------------------------------------------------------------------------- */
+.finish-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+}
+.finish-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-xs);
+}
+.finish-card-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(120% 120% at 20% 0%, hsl(var(--secondary) / .8), transparent),
+    linear-gradient(180deg, hsl(0 0% 12%), hsl(0 0% 9%));
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.finish-card-thumb img,
+.finish-card-thumb video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.finish-card-thumb-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: hsl(var(--foreground) / .07);
+  color: hsl(var(--muted-foreground));
+}
+.finish-card-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font: 700 8px var(--app-font-mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: hsl(var(--foreground));
+  background: hsl(0 0% 0% / .55);
+  border: 1px solid hsl(var(--border));
+}
+.finish-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  padding: 12px 14px 14px;
+}
+.finish-card-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.finish-card-name {
+  font: 700 14px var(--app-font-sans);
+  color: hsl(var(--foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.finish-card-meta { margin: 0; font: 11px var(--app-font-mono); color: hsl(var(--muted-foreground)); line-height: 1.5; }
+.finish-card-btn { margin-top: auto; justify-content: center; }
+.finish-card-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Who can download — avatar row + one-line note. */
+.finish-access {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  margin-top: 2px;
+}
+.finish-access-avatars { display: flex; align-items: center; flex: 0 0 auto; }
+.finish-access-avatars .den-chat-avatar { border: 2px solid hsl(var(--card)); margin-right: -6px; }
+.finish-access-avatars .den-chat-avatar:last-child { margin-right: 0; }
+.finish-access-avatars .finish-access-more { font-size: 9px; }
+.finish-access-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font: 10px var(--app-font-mono);
+  color: hsl(var(--muted-foreground));
+  line-height: 1.4;
+}
+.finish-access-note svg { flex: 0 0 auto; color: hsl(164 33% 45%); }
+.finish-access-note svg.lucide-lock-keyhole { color: hsl(var(--muted-foreground)); }
+
+/* Whole-project ZIP card — the entry list. */
+.finish-zip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.finish-zip-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 11px var(--app-font-mono);
+  color: hsl(var(--muted-foreground));
+}
+.finish-zip-list li > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: hsl(var(--foreground) / .07);
+}
+.finish-zip-list li > span:first-child svg { width: 10px; height: 10px; }
+.finish-zip-list li > span:first-child.ok { color: hsl(164 33% 45%); }
+.finish-zip-list li > span:first-child:not(.ok) { color: hsl(var(--muted-foreground)); }
+.finish-zip-list b { font-weight: 700; color: hsl(var(--foreground)); }
+.finish-zip-file { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.finish-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: hsl(var(--destructive));
+}
+.finish-error svg { flex: 0 0 auto; margin-top: 1px; }
+
+/* Accent tint per card kind. */
+.finish-card.accent-gold { border-top: 3px solid hsl(38 70% 55% / .6); }
+.finish-card.accent-accent { border-top: 3px solid hsl(var(--accent) / .6); }
+.finish-card.accent-teal { border-top: 3px solid hsl(164 33% 45% / .6); }
+.finish-card.accent-muted { border-top: 3px solid hsl(var(--muted-foreground) / .4); }
+.finish-card.accent-primary { border-top: 3px solid hsl(var(--primary) / .6); }
+
+/* ---------------------------------------------------------------------------
+   Vault — the crew roster (avatars + roles, moved from the chat).
+--------------------------------------------------------------------------- */
+.cd-roster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid hsl(var(--border) / .6);
+}
+.cd-roster-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px 5px 5px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(0 0% 0% / .22);
+  font: 600 11px var(--app-font-sans);
+  color: hsl(var(--foreground));
+  white-space: nowrap;
+}
+.cd-roster-pill .den-chat-avatar { width: 24px; height: 24px; font-size: 10px; }
+.cd-roster-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.cd-roster-pill .den-tag { font-size: 8px; padding: 2px 7px; }
+
+/* ---------------------------------------------------------------------------
+   Crew room — roster removed; icon FAB + inline errors.
+--------------------------------------------------------------------------- */
+.den-chat-head-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  color: hsl(var(--accent));
+  background: hsl(var(--accent) / .12);
+}
+.den-chat-fab .den-chat-avatar { display: none; }
+.den-chat-fab svg { color: hsl(var(--accent)); }
+.den-chat-error {
+  margin: auto;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.den-chat-error p { margin: 0; }
+.den-chat-send-error {
+  margin: 0;
+  padding: 7px 14px;
+  border-top: 1px solid hsl(var(--border));
+  font: 10px var(--app-font-mono);
+  color: hsl(var(--destructive));
+}

@@ -11,6 +11,7 @@ import VideoPreviewPage from '@/pages/preview-video';
 import AudioPreviewPage from '@/pages/preview-audio';
 import ThumbnailPreviewPage from '@/pages/preview-thumbnail';
 import ScriptPreviewPage from '@/pages/preview-script';
+import FinishPreviewPage from '@/pages/preview-finish';
 import RoleVideoPage from '@/pages/role-video';
 import RoleAudioPage from '@/pages/role-audio';
 import RoleThumbnailPage from '@/pages/role-thumbnail';
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/projects/:projectId/preview/audio" component={AudioPreviewPage} />
           <Route path="/projects/:projectId/preview/thumbnail" component={ThumbnailPreviewPage} />
           <Route path="/projects/:projectId/preview/script" component={ScriptPreviewPage} />
+          <Route path="/projects/:projectId/preview/finish" component={FinishPreviewPage} />
           <Route path="/projects/:projectId/role/video" component={RoleVideoPage} />
           <Route path="/projects/:projectId/role/audio" component={RoleAudioPage} />
           <Route path="/projects/:projectId/role/thumbnail" component={RoleThumbnailPage} />

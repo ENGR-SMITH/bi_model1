@@ -1,23 +1,21 @@
 // ---------------------------------------------------------------------------
 // ProjectChat — the crew room: a floating, draggable chat widget between
-// everyone working on a project (the same idea as the Author Den's floating
-// chat, but project-wide instead of a private 1:1 thread).
+// everyone working on a project.
 //
-// The FAB shows the project's member avatars with an unread badge; clicking
-// it opens the panel: a member roster (avatar + name of every person on the
-// project), the message thread, and a composer. The panel is draggable by
-// its header, messages stream in over the realtime socket, and the unread
-// badge counts messages that arrived since the panel was last opened.
+// The FAB shows the unread badge; clicking it opens the panel: the message
+// thread and a composer. Messages stream in over the realtime socket AND a
+// short poll, so the room keeps working even when the socket is down; send
+// failures and load errors are surfaced inline instead of failing silently.
+// (The member roster with avatars + roles lives on the vault's repository
+// card now — see vault.tsx — not here.)
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Send, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { MessageSquare, RefreshCw, Send, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import {
-  getGetUserProfileQueryKey,
   getListVideoChatMessagesQueryKey,
-  useGetUserProfile,
   useGetVideoProject,
   useListVideoChatMessages,
   useSendVideoChatMessage,
@@ -27,29 +25,12 @@ function seenKey(projectId: string): string {
   return `creators-den-chat-seen-${projectId}`;
 }
 
-// One profile query per member gives their real avatar photo when the
-// account has one; otherwise a stable colored initial circle.
-function MemberAvatar({ userId, name, size = 26 }: { userId: string; name?: string | null; size?: number }) {
-  const profile = useGetUserProfile(userId, {
-    query: { queryKey: getGetUserProfileQueryKey(userId), enabled: Boolean(userId) },
-  });
-  const label = (name || '?').slice(0, 1).toUpperCase();
-  const hue = [...(name || userId || '?')].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
-  return (
-    <span className="den-chat-avatar" style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }} title={name ?? undefined}>
-      {profile.data?.imageUrl ? <img src={profile.data.imageUrl} alt="" /> : (
-        <span className="den-chat-avatar-initial" style={{ background: `hsl(${hue} 40% 42%)`, color: '#fff' }}>{label}</span>
-      )}
-    </span>
-  );
-}
-
 export function ProjectChat({ projectId }: { projectId: string }) {
   const { user } = useUser();
   const queryClient = useQueryClient();
   const project = useGetVideoProject(projectId);
   const messages = useListVideoChatMessages(projectId, {
-    query: { queryKey: getListVideoChatMessagesQueryKey(projectId), refetchInterval: 10000 },
+    query: { queryKey: getListVideoChatMessagesQueryKey(projectId), refetchInterval: 5000 },
   });
   const send = useSendVideoChatMessage();
 
@@ -63,10 +44,7 @@ export function ProjectChat({ projectId }: { projectId: string }) {
   const dragRef = useRef<{ sx: number; sy: number; lx: number; ly: number } | null>(null);
 
   const members = project.data?.members ?? [];
-  const memberNameById = useMemo(
-    () => new Map(members.map((member) => [member.userId, member.name ?? member.userId.slice(0, 8)])),
-    [members],
-  );
+  const memberNameById = new Map(members.map((member) => [member.userId, member.name ?? member.userId.slice(0, 8)]));
 
   // Keep the newest message in view while the panel is open.
   useEffect(() => {
@@ -98,6 +76,13 @@ export function ProjectChat({ projectId }: { projectId: string }) {
     setUnread(index === -1 ? rows.length : rows.length - 1 - index);
   }, [messages.data, open, projectId]);
 
+  // Opening the panel always refetches, so late messages appear immediately
+  // even if the socket never delivered them.
+  const openPanel = () => {
+    setOpen(true);
+    void queryClient.invalidateQueries({ queryKey: getListVideoChatMessagesQueryKey(projectId) });
+  };
+
   // ---- Dragging (grab the panel header; interactive elements are exempt) ----
   const onDragMove = (event: globalThis.PointerEvent) => {
     const drag = dragRef.current;
@@ -116,7 +101,7 @@ export function ProjectChat({ projectId }: { projectId: string }) {
     document.removeEventListener('pointerup', onDragEnd);
   };
   const onDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest('button, input, textarea, a, .den-chat-messages, .den-chat-members')) return;
+    if ((event.target as HTMLElement).closest('button, input, textarea, a, .den-chat-messages')) return;
     const shell = shellRef.current;
     if (!shell) return;
     dragRef.current = {
@@ -156,12 +141,7 @@ export function ProjectChat({ projectId }: { projectId: string }) {
       {open ? (
         <div className="den-chat-panel" data-testid="chat-panel">
           <div className="den-chat-head">
-            <span className="den-chat-head-avatars">
-              {members.slice(0, 4).map((member) => (
-                <MemberAvatar key={member.userId} userId={member.userId} name={member.name} size={24} />
-              ))}
-              {members.length > 4 && <span className="den-chat-avatar den-chat-more">+{members.length - 4}</span>}
-            </span>
+            <span className="den-chat-head-mark"><MessageSquare size={15} /></span>
             <div>
               <b>Crew room</b>
               <small>{project.data?.name} · {members.length} {members.length === 1 ? 'member' : 'members'}</small>
@@ -171,31 +151,28 @@ export function ProjectChat({ projectId }: { projectId: string }) {
             </button>
           </div>
 
-          {/* The whole crew — avatar + name for everyone on the project. */}
-          <div className="den-chat-members" data-testid="chat-members">
-            {members.map((member) => (
-              <span key={member.userId} className="den-chat-member" title={member.role ?? undefined}>
-                <MemberAvatar userId={member.userId} name={member.name} size={22} />
-                <span>{member.name ?? member.userId.slice(0, 8)}</span>
-                {member.role && <span className="den-tag accent">{member.role.replace(/_/g, ' ')}</span>}
-              </span>
-            ))}
-          </div>
-
           <div ref={listRef} className="den-chat-messages" data-testid="chat-messages">
-            {(messages.data ?? []).length === 0 && (
+            {messages.isError ? (
+              <div className="den-chat-error" role="alert" data-testid="chat-load-error">
+                <p>Could not load the crew room. The socket may be down —</p>
+                <button type="button" className="text-btn" onClick={() => void messages.refetch()} data-testid="chat-retry">
+                  <RefreshCw size={12} /> Retry
+                </button>
+              </div>
+            ) : (messages.data ?? []).length === 0 ? (
               <p className="den-chat-empty">No messages yet — say hello to the crew.</p>
+            ) : (
+              (messages.data ?? []).map((message) => {
+                const mine = message.authorId === user?.id;
+                return (
+                  <div key={message.id} className={`den-chat-msg ${mine ? 'mine' : ''}`} data-testid={`chat-msg-${message.id}`}>
+                    {!mine && <b className="den-chat-msg-author">{memberNameById.get(message.authorId) ?? message.authorId.slice(0, 8)}</b>}
+                    <p>{message.body}</p>
+                    <time>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+                  </div>
+                );
+              })
             )}
-            {(messages.data ?? []).map((message) => {
-              const mine = message.authorId === user?.id;
-              return (
-                <div key={message.id} className={`den-chat-msg ${mine ? 'mine' : ''}`} data-testid={`chat-msg-${message.id}`}>
-                  {!mine && <b className="den-chat-msg-author">{memberNameById.get(message.authorId) ?? message.authorId.slice(0, 8)}</b>}
-                  <p>{message.body}</p>
-                  <time>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
-                </div>
-              );
-            })}
           </div>
 
           <div className="den-chat-compose">
@@ -210,21 +187,22 @@ export function ProjectChat({ projectId }: { projectId: string }) {
               }}
               placeholder="Message the crew…"
               maxLength={2000}
+              disabled={messages.isError}
               data-testid="chat-input"
             />
-            <button type="button" className="icon-btn" onClick={submit} disabled={!text.trim() || send.isPending} aria-label="Send message" data-testid="chat-send">
+            <button type="button" className="icon-btn" onClick={submit} disabled={!text.trim() || send.isPending || messages.isError} aria-label="Send message" data-testid="chat-send">
               <Send size={15} />
             </button>
           </div>
+          {send.isError && (
+            <p className="den-chat-send-error" role="alert" data-testid="chat-send-error">
+              The message could not be sent — try again.
+            </p>
+          )}
         </div>
       ) : (
-        <button type="button" className="den-chat-fab" onClick={() => setOpen(true)} aria-label="Open crew chat" data-testid="chat-fab">
-          <span className="den-chat-fab-avatars">
-            {members.slice(0, 3).map((member) => (
-              <MemberAvatar key={member.userId} userId={member.userId} name={member.name} size={26} />
-            ))}
-            {members.length === 0 && <span className="den-chat-avatar">C</span>}
-          </span>
+        <button type="button" className="den-chat-fab" onClick={openPanel} aria-label="Open crew chat" data-testid="chat-fab">
+          <MessageSquare size={15} />
           <span>Crew chat</span>
           {unread > 0 && (
             <span className="den-chat-badge" data-testid="chat-unread">{unread > 99 ? '99+' : unread}</span>
