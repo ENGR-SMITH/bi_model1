@@ -156,8 +156,19 @@ export function PreviewDiff({
   });
 
   // No older version exists (oldest / lone version) — per design the column
-  // keeps showing only the single canvas.
-  if (!base || !predecessor) return null;
+  // keeps showing only the single canvas. In diff view we explain this
+  // instead of silently returning nothing, so the toggle never looks broken.
+  if (!base || !predecessor) {
+    return (
+      <div className="preview-diff-panel preview-diff-note" data-testid="preview-diff">
+        <p>
+          <b>v{base?.version ?? 0}</b> is the {base ? 'oldest' : 'only'} version of{' '}
+          {leg} — there's nothing older to compare it against. Pick a newer
+          version in the timeline to see the split-screen diff map.
+        </p>
+      </div>
+    );
+  }
 
   const ownError = own.error ? String((own.error as { message?: string })?.message ?? own.error) : null;
   const prevError = prev.error ? String((prev.error as { message?: string })?.message ?? prev.error) : null;

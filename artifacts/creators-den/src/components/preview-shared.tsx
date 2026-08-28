@@ -76,9 +76,10 @@ export function PreviewLayout({ canvas, rail, versions }: { canvas: ReactNode; r
 // ---------------------------------------------------------------------------
 // PreviewViewToggle — the top-of-column control that switches the big-canvas
 // column between the plain media preview and the split-screen diff map (the
-// version-control comparison surface). "Diff map" is dimmed / non-switchable
-// when the selected version has no older version to compare against (oldest /
-// lone version), so the column stays on the single preview in that case.
+// version-control comparison surface). The "Diff map" option is always
+// switchable; a small glowing dot marks when a comparison is actually
+// available. When there is no older version, PreviewDiff renders a clear
+// notice instead, so the toggle is never confusingly grayed out.
 // ---------------------------------------------------------------------------
 
 export type PreviewView = 'preview' | 'diff';
@@ -90,7 +91,7 @@ export function PreviewViewToggle({
 }: {
   view: PreviewView;
   onChange: (view: PreviewView) => void;
-  /** False when the selected version has no older version to compare with. */
+  /** Whether a comparison (an older version) is currently available. */
   hasDiff: boolean;
 }) {
   const segments: Array<{ value: PreviewView; label: string; title: string; glow?: boolean }> = [
@@ -100,7 +101,6 @@ export function PreviewViewToggle({
   return (
     <div className="pv-view-toggle" role="tablist" aria-label="Canvas view" data-testid="preview-view-toggle">
       {segments.map((segment) => {
-        const disabled = segment.value === 'diff' && !hasDiff;
         const active = view === segment.value;
         return (
           <button
@@ -108,8 +108,7 @@ export function PreviewViewToggle({
             type="button"
             role="tab"
             aria-selected={active}
-            disabled={disabled}
-            className={['pv-view-toggle-btn', active ? 'active' : '', disabled ? 'disabled' : ''].filter(Boolean).join(' ')}
+            className={['pv-view-toggle-btn', active ? 'active' : ''].filter(Boolean).join(' ')}
             onClick={() => onChange(segment.value)}
             title={segment.title}
             data-testid={active ? `preview-view-${segment.value}-active` : `preview-view-${segment.value}`}
@@ -127,7 +126,8 @@ export function PreviewViewToggle({
 // PreviewCanvasColumn — the top-of-column header holding the canvas eyebrow +
 // the PreviewViewToggle, then the column content switched on `view`. In
 // "diff" mode the split-screen diff surface fills the column in place of the
-// single media preview.
+// single media preview; PreviewDiff decides what to show (the diff, or a
+// clear notice when there's nothing older to compare).
 // ---------------------------------------------------------------------------
 
 export function PreviewCanvasColumn({
@@ -148,7 +148,7 @@ export function PreviewCanvasColumn({
   /** The split-screen diff surface (or a notice when nothing to compare). */
   diff: ReactNode;
 }) {
-  const showDiff = hasDiff && view === 'diff';
+  const showDiff = view === 'diff';
   return (
     <>
       <div className="pv-canvas-head">
