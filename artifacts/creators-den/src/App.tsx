@@ -4,11 +4,6 @@ import { CreatorsShell, SectionEyebrow } from '@/components/shell';
 import RoomPage from '@/pages/room';
 import VaultPage from '@/pages/vault';
 import ActivityPage from '@/pages/activity';
-import SelectsPage from '@/pages/selects';
-import CutPage from '@/pages/cut';
-import SoundPage from '@/pages/sound';
-import FinishPage from '@/pages/finish';
-import ThumbnailPage from '@/pages/thumbnail';
 import ProfilePage from '@/pages/profile';
 import ExplorePage from '@/pages/explore';
 import PreviewPage from '@/pages/preview';
@@ -44,11 +39,6 @@ export default function App() {
           <Route path="/explore" component={ExplorePage} />
           <Route path="/projects/:projectId" component={VaultPage} />
           <Route path="/projects/:projectId/activity" component={ActivityPage} />
-          <Route path="/projects/:projectId/selects" component={SelectsPage} />
-          <Route path="/projects/:projectId/cut" component={CutPage} />
-          <Route path="/projects/:projectId/sound" component={SoundPage} />
-          <Route path="/projects/:projectId/finish" component={FinishPage} />
-          <Route path="/projects/:projectId/thumbnail" component={ThumbnailPage} />
           <Route path="/projects/:projectId/preview" component={PreviewPage} />
           <Route path="/projects/:projectId/preview/video" component={VideoPreviewPage} />
           <Route path="/projects/:projectId/preview/audio" component={AudioPreviewPage} />

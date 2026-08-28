@@ -22,7 +22,6 @@ import {
   getGetVideoProjectQueryKey,
   getListVideoDownloadsQueryKey,
   getListVideoGrantsQueryKey,
-  getListVideoJobsQueryKey,
   getListVideoSubmissionsQueryKey,
   useAddVideoProjectMember,
   useApproveVideoSubmission,
@@ -30,7 +29,6 @@ import {
   useGetVideoProject,
   useListVideoDownloads,
   useListVideoGrants,
-  useListVideoJobs,
   useListVideoSubmissions,
   useRejectVideoSubmission,
   useRevokeVideoGrant,
@@ -183,38 +181,6 @@ function InviteForm({ projectId }: { projectId: string }) {
         </p>
       )}
     </form>
-  );
-}
-
-function JobProgressStrip({ projectId }: { projectId: string }) {
-  const jobs = useListVideoJobs(projectId);
-  const active = (jobs.data ?? []).filter((job) => ['QUEUED', 'RUNNING'].includes(job.status));
-  const recent = (jobs.data ?? []).slice(0, 6);
-
-  if (!jobs.data || jobs.data.length === 0) return null;
-
-  return (
-    <div className="paper-card" data-testid="panel-job-progress">
-      <div className="inline-heading">
-        <span className="eyebrow"><Sparkles size={13} /> Processing</span>
-        {active.length > 0 ? (
-          <span className="den-tag gold">{active.length} running</span>
-        ) : (
-          <span className="den-tag teal">idle</span>
-        )}
-      </div>
-      <div className="den-stack">
-        {recent.map((job) => (
-          <div key={job.id} className="list-row" data-testid={`job-${job.id}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${job.status === 'SUCCEEDED' ? 'bg-[#286254]' : job.status === 'FAILED' ? 'bg-[#a33d31]' : 'animate-pulse bg-[#f0c85c]'}`} />
-            <span>
-              <b>{job.type.replaceAll('_', ' ')}</b>
-              <small>{job.status.toLowerCase()}</small>
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -499,6 +465,48 @@ export default function ContentCreatorsProjectPage() {
         </div>
       </div>
 
+      {/* Members & roles + temporary download grants sit right under the vault
+          card — the repo overview first, then the people and access controls. */}
+      <div className="grid gap-4 lg:grid-cols-2 mb-6" data-testid="vault-top-cards">
+        <div className="paper-card">
+          <div className="inline-heading">
+            <span className="eyebrow"><UserPlus size={13} /> Members &amp; roles</span>
+            <span className="mono-label">{p.members.length}</span>
+          </div>
+          <div className="den-stack">
+            {p.members.map((member) => (
+              <div key={member.id} className="list-row" data-testid={`card-member-${member.userId}`}>
+                <span className="person-dot" style={{ background: member.role === 'CAPTAIN' ? 'hsl(var(--accent))' : 'hsl(164 33% 45%)' }}>
+                  {(member.name ?? member.userId).slice(0, 2).toUpperCase()}
+                </span>
+                <span>
+                  <b>{member.name ?? member.userId}</b>
+                  <small>
+                    {ROLE_LABELS[member.role] ?? member.role}
+                    {member.name ? ` · ${member.userId}` : ''}
+                  </small>
+                </span>
+                {member.role === 'CAPTAIN' && <span className="den-tag danger">Captain</span>}
+              </div>
+            ))}
+          </div>
+
+          {myRole === 'CAPTAIN' ? (
+            <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
+              <span className="eyebrow"><UserPlus size={12} /> Invite a teammate</span>
+              <p className="setting-copy mt-1">Assign the five stages — Architect, Visual Editor, Sound Designer, Motion &amp; Color, Thumbnail — or add an uploader.</p>
+              <InviteForm projectId={p.id} />
+            </div>
+          ) : (
+            <p className="den-footnote mt-3">
+              <Sparkles size={13} />
+              Only the Captain can invite teammates. When a stage is assigned to you, its studio opens from the tabs above.
+            </p>
+          )}
+        </div>
+        <GrantsPanel projectId={p.id} myRole={myRole} members={p.members} assets={p.assets} />
+      </div>
+
       <div className="cd-watch">
         <div className="cd-watch-main">
           {assets.length === 0 && (
@@ -527,49 +535,10 @@ export default function ContentCreatorsProjectPage() {
               </div>
             </div>
           ))}
-
-          <div className="paper-card">
-            <div className="inline-heading">
-              <span className="eyebrow"><UserPlus size={13} /> Members &amp; roles</span>
-              <span className="mono-label">{p.members.length}</span>
-            </div>
-            <div className="den-stack">
-              {p.members.map((member) => (
-                <div key={member.id} className="list-row" data-testid={`card-member-${member.userId}`}>
-                  <span className="person-dot" style={{ background: member.role === 'CAPTAIN' ? 'hsl(var(--accent))' : 'hsl(164 33% 45%)' }}>
-                    {(member.name ?? member.userId).slice(0, 2).toUpperCase()}
-                  </span>
-                  <span>
-                    <b>{member.name ?? member.userId}</b>
-                    <small>
-                      {ROLE_LABELS[member.role] ?? member.role}
-                      {member.name ? ` · ${member.userId}` : ''}
-                    </small>
-                  </span>
-                  {member.role === 'CAPTAIN' && <span className="den-tag danger">Captain</span>}
-                </div>
-              ))}
-            </div>
-
-            {myRole === 'CAPTAIN' ? (
-              <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
-                <span className="eyebrow"><UserPlus size={12} /> Invite a teammate</span>
-                <p className="setting-copy mt-1">Assign the five stages — Architect, Visual Editor, Sound Designer, Motion &amp; Color, Thumbnail — or add an uploader.</p>
-                <InviteForm projectId={p.id} />
-              </div>
-            ) : (
-              <p className="den-footnote mt-3">
-                <Sparkles size={13} />
-                Only the Captain can invite teammates. When a stage is assigned to you, its studio opens from the tabs above.
-              </p>
-            )}
-          </div>
         </div>
 
         <div className="cd-watch-rail">
           <SubmissionsPanel projectId={p.id} myRole={myRole} />
-          <JobProgressStrip projectId={p.id} />
-          <GrantsPanel projectId={p.id} myRole={myRole} members={p.members} assets={p.assets} />
           <DownloadAuditPanel projectId={p.id} myRole={myRole} />
         </div>
       </div>
