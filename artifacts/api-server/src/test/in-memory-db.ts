@@ -373,6 +373,17 @@ export const tandemVideoCommentsTable = sqliteTable("tandem_video_comments", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
+export const tandemVideoChatMessagesTable = sqliteTable("tandem_video_chat_messages", {
+  id: text("id").primaryKey(),
+  projectId: text("project_id").notNull(),
+  authorId: text("author_id").notNull(),
+  body: text("body").notNull(),
+  audioUrl: text("audio_url"),
+  audioName: text("audio_name"),
+  audioDurationMs: integer("audio_duration_ms"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const tandemVideoReferencesTable = sqliteTable(
   "tandem_video_references",
   {
@@ -711,6 +722,12 @@ export async function buildInMemoryDb() {
       deep_link TEXT NOT NULL, resource_id TEXT, read_at INTEGER,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE tandem_video_chat_messages (
+      id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
+      author_id TEXT NOT NULL, body TEXT NOT NULL,
+      audio_url TEXT, audio_name TEXT, audio_duration_ms INTEGER,
+      created_at INTEGER NOT NULL
+    );
   `);
   const db = drizzle(database);
 
@@ -768,6 +785,7 @@ export async function buildInMemoryDb() {
     tandemVideoReferencesTable,
     tandemVideoGrantsTable,
     tandemVideoNotificationsTable,
+    tandemVideoChatMessagesTable,
   };
   return { db, tables, exports: { db, ...tables } };
 }

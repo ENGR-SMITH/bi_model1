@@ -68,6 +68,7 @@ import type {
   VideoAudioPassInput,
   VideoChatMessage,
   VideoChatMessageInput,
+  VideoChatVoiceNoteInput,
   VideoCheckoutBundleStatus,
   VideoCheckoutExportInput,
   VideoCheckoutExportResponse,
@@ -8389,6 +8390,98 @@ export const useSendVideoChatMessage = <TError = ErrorType<ErrorResponse>,
       > => {
       return useMutation(getSendVideoChatMessageMutationOptions(options));
     }
+
+
+
+
+export const getSendVideoChatVoiceNoteUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/chat/voice`
+}
+
+/**
+ * @summary Send a voice note to the project's crew room
+ */
+export const sendVideoChatVoiceNote = async (projectId: string,
+    videoChatVoiceNoteInput: VideoChatVoiceNoteInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoChatMessage> => {
+    const formData = new FormData();
+formData.append(`audio`, videoChatVoiceNoteInput.audio);
+if (videoChatVoiceNoteInput.durationMs !== undefined) formData.append(`durationMs`, String(videoChatVoiceNoteInput.durationMs));
+if (videoChatVoiceNoteInput.name !== undefined) formData.append(`name`, videoChatVoiceNoteInput.name);
+
+  return customFetch<VideoChatMessage>(getSendVideoChatVoiceNoteUrl(projectId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+
+
+
+export const getSendVideoChatVoiceNoteMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendVideoChatVoiceNote>>, TError,{projectId: string;data: BodyType<VideoChatVoiceNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendVideoChatVoiceNote>>, TError,{projectId: string;data: BodyType<VideoChatVoiceNoteInput>}, TContext> => {
+
+const mutationKey = ['sendVideoChatVoiceNote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendVideoChatVoiceNote>>, {projectId: string;data: BodyType<VideoChatVoiceNoteInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  sendVideoChatVoiceNote(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendVideoChatVoiceNoteMutationResult = NonNullable<Awaited<ReturnType<typeof sendVideoChatVoiceNote>>>
+    export type SendVideoChatVoiceNoteMutationBody = BodyType<VideoChatVoiceNoteInput>
+    export type SendVideoChatVoiceNoteMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Send a voice note to the project's crew room
+ */
+export const useSendVideoChatVoiceNote = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendVideoChatVoiceNote>>, TError,{projectId: string;data: BodyType<VideoChatVoiceNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendVideoChatVoiceNote>>,
+        TError,
+        {projectId: string;data: BodyType<VideoChatVoiceNoteInput>},
+        TContext
+      > => {
+      return useMutation(getSendVideoChatVoiceNoteMutationOptions(options));
+    }
+
+
+/**
+ * @summary Stream a voice note audio file from the crew room
+ */
+export const getVideoChatAudioUrl = (projectId: string,
+    fileId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/chat/audio/${fileId}`
+}
 
 export const getListVideoJobsUrl = (projectId: string,) => {
 

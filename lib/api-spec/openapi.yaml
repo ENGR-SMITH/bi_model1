@@ -2465,6 +2465,61 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/chat/voice:
+    post:
+      operationId: sendVideoChatVoiceNote
+      tags: [content-creators]
+      summary: Send a voice note to the project's crew room
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/VideoChatVoiceNoteInput" }
+      responses:
+        "201":
+          description: Sent voice message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoChatMessage" }
+        "400":
+          description: Invalid voice note
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/chat/audio/{fileId}:
+    get:
+      operationId: getVideoChatAudio
+      tags: [content-creators]
+      summary: Stream a voice note audio file from the crew room
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The voice note audio bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Audio file not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/projects/{projectId}/jobs:
     get:
       operationId: listVideoJobs
@@ -4109,13 +4164,31 @@ components:
         projectId: { type: string }
         authorId: { type: string }
         body: { type: string }
+        audioUrl: { type: ["string", "null"] }
+        audioName: { type: ["string", "null"] }
+        audioDurationMs: { type: ["integer", "null"] }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, authorId, body, createdAt]
+      required: [id, projectId, authorId, body, audioUrl, audioName, audioDurationMs, createdAt]
     VideoChatMessageInput:
       type: object
       properties:
         body: { type: string, minLength: 1, maxLength: 2000 }
       required: [body]
+    VideoChatVoiceNoteInput:
+      type: object
+      properties:
+        audio:
+          type: string
+          format: binary
+          description: The recorded voice note (WebM/Opus or MP4 audio blob)
+        durationMs:
+          type: integer
+          description: Recorded duration in milliseconds
+        name:
+          type: string
+          description: Original file name for the voice note
+      required: [audio]
+      description: Multipart upload of a voice note into the project crew room
     VideoComment:
       type: object
       properties:

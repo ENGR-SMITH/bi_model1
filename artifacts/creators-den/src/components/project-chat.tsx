@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, useState } from 'react';
-import { MessageSquare, RefreshCw, Send, X } from 'lucide-react';
+import { AudioLines, MessageSquare, Mic, RefreshCw, Send, Square, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import {
@@ -19,8 +19,15 @@ import {
   useGetVideoProject,
   useListVideoChatMessages,
   useSendVideoChatMessage,
+  useSendVideoChatVoiceNote,
 } from '@workspace/api-client-react';
 import { MemberAvatar } from '@/components/member-avatar';
+
+function formatDuration(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
 
 function seenKey(projectId: string): string {
   return `creators-den-chat-seen-${projectId}`;
@@ -34,10 +41,20 @@ export function ProjectChat({ projectId }: { projectId: string }) {
     query: { queryKey: getListVideoChatMessagesQueryKey(projectId), refetchInterval: 5000 },
   });
   const send = useSendVideoChatMessage();
+  const sendVoice = useSendVideoChatVoiceNote();
 
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [unread, setUnread] = useState(0);
+  // Voice note recorder: a live MediaRecorder session + a ticking timer.
+  const [recording, setRecording] = useState(false);
+  const [recordSeconds, setRecordSeconds] = useState(0);
+  const [voiceError, setVoiceError] = useState('');
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const recordSecondsRef = useRef(0);
+  const recordTimerRef = useRef<number | null>(null);
   // Drag state: the whole widget (FAB + panel) moves by grabbing the header.
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -77,6 +94,72 @@ export function ProjectChat({ projectId }: { projectId: string }) {
     setUnread(index === -1 ? rows.length : rows.length - 1 - index);
   }, [messages.data, open, projectId]);
 
+  // Stop any in-flight recording when the panel closes or the component unmounts.
+  useEffect(() => {
+    return () => {
+      recorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      if (recordTimerRef.current !== null) window.clearInterval(recordTimerRef.current);
+    };
+  }, []);
+
+  const startRecording = async () => {
+    setVoiceError('');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        recorderRef.current = null;
+        if (blob.size === 0) {
+          setVoiceError('The recording came back empty — try again.');
+          return;
+        }
+        const durationMs = Math.max(1, Math.round(recordSecondsRef.current * 1000));
+        const ext = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+        const name = `voice-note-${Date.now()}.${ext}`;
+        const file = new File([blob], name, { type: mimeType });
+        sendVoice.mutate(
+          { projectId, data: { audio: file, durationMs, name } },
+          {
+            onSuccess: () => {
+              void queryClient.invalidateQueries({ queryKey: getListVideoChatMessagesQueryKey(projectId) });
+            },
+          },
+        );
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setRecording(true);
+      setRecordSeconds(0);
+      recordSecondsRef.current = 0;
+      recordTimerRef.current = window.setInterval(() => {
+        setRecordSeconds((seconds) => {
+          recordSecondsRef.current = seconds + 1;
+          return seconds + 1;
+        });
+      }, 1000);
+    } catch {
+      setVoiceError('Microphone access was denied — allow the mic to record voice notes.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (recorderRef.current && recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+    recorderRef.current = null;
+    setRecording(false);
+    if (recordTimerRef.current !== null) window.clearInterval(recordTimerRef.current);
+    recordTimerRef.current = null;
+  };
+
   // Opening the panel always refetches, so late messages appear immediately
   // even if the socket never delivered them.
   const openPanel = () => {
@@ -96,10 +179,21 @@ export function ProjectChat({ projectId }: { projectId: string }) {
       y: Math.min(Math.max(8, drag.ly + event.clientY - drag.sy), maxY),
     });
   };
-  const onDragEnd = () => {
+  // Release docks the chat to whichever side of the screen is nearer — left or
+  // right, at any height — so the room always rests against an edge.
+  const onDragEnd = (event: globalThis.PointerEvent) => {
+    const drag = dragRef.current;
+    const shell = shellRef.current;
     dragRef.current = null;
     document.removeEventListener('pointermove', onDragMove);
     document.removeEventListener('pointerup', onDragEnd);
+    if (!drag || !shell) return;
+    const maxX = Math.max(0, window.innerWidth - shell.offsetWidth - 8);
+    const maxY = Math.max(0, window.innerHeight - shell.offsetHeight - 8);
+    const x = Math.min(Math.max(8, drag.lx + event.clientX - drag.sx), maxX);
+    const y = Math.min(Math.max(8, drag.ly + event.clientY - drag.sy), maxY);
+    const snapLeft = x + shell.offsetWidth / 2 < window.innerWidth / 2;
+    setPos({ x: snapLeft ? 8 : maxX, y });
   };
   const onDragStart = (event: React.PointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('button, input, textarea, a, .den-chat-messages')) return;
@@ -173,7 +267,17 @@ export function ProjectChat({ projectId }: { projectId: string }) {
                 return (
                   <div key={message.id} className={`den-chat-msg ${mine ? 'mine' : ''}`} data-testid={`chat-msg-${message.id}`}>
                     {!mine && <b className="den-chat-msg-author">{memberNameById.get(message.authorId) ?? message.authorId.slice(0, 8)}</b>}
-                    <p>{message.body}</p>
+                    {message.audioUrl ? (
+                      <div className="den-chat-voice" data-testid="chat-voice-note">
+                        <audio controls preload="metadata" src={message.audioUrl}>
+                          <source src={message.audioUrl} />
+                          Your browser does not support audio playback.
+                        </audio>
+                        {message.body && <p>{message.body}</p>}
+                      </div>
+                    ) : (
+                      <p>{message.body}</p>
+                    )}
                     <time>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
                   </div>
                 );
@@ -182,27 +286,56 @@ export function ProjectChat({ projectId }: { projectId: string }) {
           </div>
 
           <div className="den-chat-compose">
-            <input
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault();
-                  submit();
-                }
-              }}
-              placeholder="Message the crew…"
-              maxLength={2000}
-              disabled={messages.isError}
-              data-testid="chat-input"
-            />
-            <button type="button" className="icon-btn" onClick={submit} disabled={!text.trim() || send.isPending || messages.isError} aria-label="Send message" data-testid="chat-send">
-              <Send size={15} />
-            </button>
+            {recording ? (
+              <span className="den-chat-record" data-testid="chat-record">
+                <span className="den-chat-record-dot" aria-hidden />
+                <b>Recording</b>
+                <span className="den-chat-record-timer">{formatDuration(recordSeconds)}</span>
+                <button type="button" className="icon-btn" onClick={stopRecording} aria-label="Stop recording" data-testid="chat-record-stop">
+                  <Square size={13} />
+                </button>
+              </span>
+            ) : (
+              <>
+                <input
+                  value={text}
+                  onChange={(event) => setText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      submit();
+                    }
+                  }}
+                  placeholder="Message the crew…"
+                  maxLength={2000}
+                  disabled={messages.isError || sendVoice.isPending}
+                  data-testid="chat-input"
+                />
+                <button
+                  type="button"
+                  className="icon-btn chat-mic-btn"
+                  onClick={() => void startRecording()}
+                  disabled={messages.isError || sendVoice.isPending}
+                  aria-label="Record a voice note"
+                  title="Record a voice note"
+                  data-testid="chat-mic"
+                >
+                  {sendVoice.isPending ? <AudioLines size={14} className="spin" /> : <Mic size={14} />}
+                </button>
+                <button type="button" className="icon-btn" onClick={submit} disabled={!text.trim() || send.isPending || messages.isError} aria-label="Send message" data-testid="chat-send">
+                  <Send size={15} />
+                </button>
+              </>
+            )}
           </div>
-          {send.isError && (
+          {(send.isError || sendVoice.isError) && !voiceError && (
             <p className="den-chat-send-error" role="alert" data-testid="chat-send-error">
-              The message could not be sent — try again.
+              The {sendVoice.isError ? 'voice note' : 'message'} could not be sent — try again.
+            </p>
+          )}
+          {voiceError && (
+            <p className="den-chat-send-error" role="alert" data-testid="chat-voice-error">
+              {voiceError}
             </p>
           )}
         </div>

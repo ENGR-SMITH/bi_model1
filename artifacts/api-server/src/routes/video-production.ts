@@ -32,6 +32,10 @@ import {
   SendVideoChatMessageBody,
   SendVideoChatMessageParams,
   SendVideoChatMessageResponse,
+  SendVideoChatVoiceNoteBody,
+  SendVideoChatVoiceNoteParams,
+  SendVideoChatVoiceNoteResponse,
+  GetVideoChatAudioParams,
   CreateVideoSubmissionBody,
   CreateVideoSubmissionParams,
   CreateVideoSubmissionResponse,
@@ -1251,6 +1255,99 @@ router.post(
     emitToProject(params.data.projectId, "chat.new", message);
 
     res.status(201).json(SendVideoChatMessageResponse.parse(message));
+  },
+);
+
+// POST /video/projects/:projectId/chat/voice — send a voice note to the crew
+// room. Multipart: the recorded audio blob lands on disk (same upload dir as
+// the vault) and the message carries the served URL + duration. The body is
+// empty for voice notes — the audio IS the message.
+router.post(
+  "/video/projects/:projectId/chat/voice",
+  upload.single("audio"),
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = SendVideoChatVoiceNoteParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid project id" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    if (!req.file) {
+      res.status(400).json({ error: "A recorded voice note is required" });
+      return;
+    }
+
+    const durationMs = Number(req.body.durationMs);
+    const audioUrl = `/api/video/projects/${params.data.projectId}/chat/audio/${req.file.filename}`;
+
+    const [message] = await db
+      .insert(tandemVideoChatMessagesTable)
+      .values({
+        id: randomUUID(),
+        projectId: params.data.projectId,
+        authorId: userId,
+        body: "",
+        audioUrl,
+        audioName: typeof req.body.name === "string" && req.body.name.trim() ? req.body.name.trim().slice(0, 200) : req.file.originalname.slice(0, 200),
+        audioDurationMs: Number.isFinite(durationMs) && durationMs > 0 ? Math.round(durationMs) : null,
+      })
+      .returning();
+
+    // Realtime: the voice message lands on every open project socket.
+    emitToProject(params.data.projectId, "chat.new", message);
+
+    res.status(201).json(SendVideoChatVoiceNoteResponse.parse(message));
+  },
+);
+
+// GET /video/projects/:projectId/chat/audio/:fileId — stream a crew room voice
+// note. Members only; the file lives in the shared upload dir under its uuid
+// filename (same ephemeral-disk model as vault media).
+router.get(
+  "/video/projects/:projectId/chat/audio/:fileId",
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoChatAudioParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid audio file id" });
+      return;
+    }
+
+    if (!(await requireMember(params.data.projectId, userId))) {
+      res.status(403).json({ error: "You are not a member of this project" });
+      return;
+    }
+
+    // Only allow plain uploaded filenames (uuid + short extension) — never
+    // path segments — so a crafted fileId can't escape the upload dir.
+    if (!/^[a-f0-9-]{36}(\.[a-z0-9]{1,12})?$/i.test(params.data.fileId)) {
+      res.status(404).json({ error: "Audio file not found" });
+      return;
+    }
+
+    const filePath = path.join(uploadDir(), params.data.fileId);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: "Audio file not found" });
+      return;
+    }
+
+    res.sendFile(filePath);
   },
 );
 

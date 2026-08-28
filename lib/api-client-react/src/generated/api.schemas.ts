@@ -1367,6 +1367,9 @@ export interface VideoChatMessage {
   projectId: string;
   authorId: string;
   body: string;
+  audioUrl: string | null;
+  audioName: string | null;
+  audioDurationMs: number | null;
   createdAt: string;
 }
 
@@ -1376,6 +1379,15 @@ export interface VideoChatMessageInput {
      * @maxLength 2000
      */
   body: string;
+}
+
+export interface VideoChatVoiceNoteInput {
+  /** The recorded voice note (WebM/Opus or MP4 audio blob) */
+  audio: File;
+  /** Recorded duration in milliseconds */
+  durationMs?: number;
+  /** Original file name for the voice note */
+  name?: string;
 }
 
 /**

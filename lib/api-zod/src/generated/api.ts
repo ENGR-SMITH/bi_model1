@@ -2851,6 +2851,9 @@ export const ListVideoChatMessagesResponseItem = zod.object({
   "projectId": zod.string(),
   "authorId": zod.string(),
   "body": zod.string(),
+  "audioUrl": zod.string().nullable(),
+  "audioName": zod.string().nullable(),
+  "audioDurationMs": zod.number().int().nullable(),
   "createdAt": zod.coerce.date()
 })
 export const ListVideoChatMessagesResponse = zod.array(ListVideoChatMessagesResponseItem)
@@ -2879,7 +2882,50 @@ export const SendVideoChatMessageResponse = zod.object({
   "projectId": zod.string(),
   "authorId": zod.string(),
   "body": zod.string(),
+  "audioUrl": zod.string().nullable(),
+  "audioName": zod.string().nullable(),
+  "audioDurationMs": zod.number().int().nullable(),
   "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Send a voice note to the project's crew room
+ */
+
+
+
+export const SendVideoChatVoiceNoteParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const SendVideoChatVoiceNoteBody = zod.object({
+  "audio": zod.instanceof(File),
+  "durationMs": zod.number().int().optional(),
+  "name": zod.string().optional()
+}).describe('Multipart upload of a voice note into the project crew room')
+
+export const SendVideoChatVoiceNoteResponse = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "authorId": zod.string(),
+  "body": zod.string(),
+  "audioUrl": zod.string().nullable(),
+  "audioName": zod.string().nullable(),
+  "audioDurationMs": zod.number().int().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Stream a voice note audio file from the crew room
+ */
+
+
+
+export const GetVideoChatAudioParams = zod.object({
+  "projectId": zod.coerce.string().min(1),
+  "fileId": zod.coerce.string().min(1)
 })
 
 

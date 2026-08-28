@@ -102,6 +102,7 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
+  await state.db.delete(t.tandemVideoChatMessagesTable);
   await state.db.delete(t.tandemVideoNotificationsTable);
   await state.db.delete(t.tandemVideoGrantsTable);
   await state.db.delete(t.tandemVideoReferencesTable);
@@ -1438,5 +1439,68 @@ describe("authorization on M1 routes", () => {
     expect((await request(API).get(`/api/video/projects/${project.id}/timelines/SELECTS`)).status).toBe(403);
     expect((await request(API).get(`/api/video/projects/${project.id}/comments`)).status).toBe(403);
     expect((await request(API).get(`/api/video/projects/${project.id}/jobs`)).status).toBe(403);
+  });
+});
+
+describe("crew room chat (text + voice notes)", () => {
+  it("sends and lists text messages", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const sent = await request(API).post(`/api/video/projects/${project.id}/chat`).send({ body: "Rolling the cameras tonight" });
+    expect(sent.status).toBe(201);
+    expect(sent.body.body).toBe("Rolling the cameras tonight");
+    expect(sent.body.audioUrl).toBeNull();
+    expect(sent.body.audioDurationMs).toBeNull();
+
+    const list = await request(API).get(`/api/video/projects/${project.id}/chat`);
+    expect(list.status).toBe(200);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].body).toBe("Rolling the cameras tonight");
+    expect(list.body[0].audioUrl).toBeNull();
+  });
+
+  it("uploads a voice note, stores it on disk, and streams it back to members", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const bytes = Buffer.from("fake opus voice bytes");
+    const sent = await request(API)
+      .post(`/api/video/projects/${project.id}/chat/voice`)
+      .field("durationMs", "4200")
+      .field("name", "voice-note-1.webm")
+      .attach("audio", bytes, "voice-note-1.webm");
+    expect(sent.status).toBe(201);
+    expect(sent.body.body).toBe("");
+    expect(sent.body.audioUrl).toContain(`/api/video/projects/${project.id}/chat/audio/`);
+    expect(sent.body.audioDurationMs).toBe(4200);
+    expect(sent.body.audioName).toBe("voice-note-1.webm");
+
+    // The file landed on disk and is streamable to any member.
+    const fileId = sent.body.audioUrl.split("/").pop();
+    const onDisk = fs.existsSync(path.join(process.env.VIDEO_UPLOAD_DIR!, fileId));
+    expect(onDisk).toBe(true);
+    const stream = await request(API).get(`/api/video/projects/${project.id}/chat/audio/${fileId}`);
+    expect(stream.status).toBe(200);
+    expect(stream.body).toEqual(bytes);
+
+    // It appears in the crew room thread with the audio fields populated.
+    const list = await request(API).get(`/api/video/projects/${project.id}/chat`);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].audioUrl).toBe(sent.body.audioUrl);
+    expect(list.body[0].audioDurationMs).toBe(4200);
+  });
+
+  it("rejects voice notes from non-members and bad audio ids", async () => {
+    const project = await createProject();
+    state.userId = "stranger-1";
+    const forbidden = await request(API)
+      .post(`/api/video/projects/${project.id}/chat/voice`)
+      .attach("audio", Buffer.from("x"), "voice.webm");
+    expect(forbidden.status).toBe(403);
+
+    state.userId = "captain-1";
+    const traversal = await request(API).get(`/api/video/projects/${project.id}/chat/audio/..%2F..%2Fetc%2Fpasswd`);
+    expect([400, 404]).toContain(traversal.status);
+    const missing = await request(API).get(`/api/video/projects/${project.id}/chat/audio/00000000-0000-0000-0000-000000000000`);
+    expect(missing.status).toBe(404);
   });
 });
