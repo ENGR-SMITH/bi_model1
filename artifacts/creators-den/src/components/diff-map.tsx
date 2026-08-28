@@ -248,7 +248,11 @@ export function DiffMap({
   const drawRef = useRef(draw);
   drawRef.current = draw;
 
-  // Video: recompute the diff on playhead moves (debounced).
+  // Video: recompute the diff on playhead moves (debounced). While playing,
+  // both videos are already locked in sync by the timeupdate handler, so
+  // seeking them again on every tick is what stutters playback — only the
+  // frame is redrawn. When paused/scrubbing, seek both to the exact frame
+  // first so the drawn frames are never stale.
   useEffect(() => {
     if (!ready || isImage) return;
     const seq = (computeSeqRef.current += 1);
@@ -256,13 +260,17 @@ export function DiffMap({
     const older = olderVideoRef.current;
     if (!newer || !older) return;
     const timer = window.setTimeout(() => {
+      if (playing) {
+        drawRef.current();
+        return;
+      }
       void seekBoth(older, newer, Math.min(playhead, duration)).then(() => {
         if (seq !== computeSeqRef.current) return;
         drawRef.current();
       });
     }, 70);
     return () => window.clearTimeout(timer);
-  }, [playhead, duration, ready, isImage]);
+  }, [playhead, duration, ready, isImage, playing]);
 
   // Image: draw once ready, and on sensitivity/wipe changes.
   useEffect(() => {
@@ -341,11 +349,12 @@ export function DiffMap({
           <video ref={olderVideoRef} src={olderUrl} muted playsInline preload="auto" className="df-hidden" data-testid="df-video-older" />
         )}
         {isImage && (
-          <img ref={olderImgRef} src={olderUrl} alt="" className="df-hidden" data-testid="df-img-older" />
+          <img ref={olderImgRef} src={olderUrl} alt="" className="df-hidden" onLoad={() => setReady(true)} data-testid="df-img-older" />
         )}
         <div className="df-split">
           {/* Left pane — the reviewed (newest) media, annotatable. */}
           <div className="df-pane" ref={newestPaneRef}>
+            <span className="df-pane-label" data-testid="df-pane-label-newest">NEWEST</span>
             {isImage ? (
               <img ref={newerImgRef} src={newerUrl} alt={newerLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-newer" />
             ) : (
@@ -371,6 +380,7 @@ export function DiffMap({
           </div>
           {/* Right pane — the diff-map (older reference + wipe reveal). */}
           <div className="df-pane df-pane-map">
+            <span className="df-pane-label df-right" data-testid="df-pane-label-older">OLDER</span>
             <canvas
               ref={canvasRef}
               className="df-canvas"
