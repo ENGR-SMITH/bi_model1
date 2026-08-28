@@ -11,5 +11,8 @@ export interface VideoChatMessage {
   projectId: string;
   authorId: string;
   body: string;
+  audioUrl: string | null;
+  audioName: string | null;
+  audioDurationMs: number | null;
   createdAt: Date;
 }

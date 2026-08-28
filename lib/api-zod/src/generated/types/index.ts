@@ -81,6 +81,7 @@ export * from './videoAudioPassInput';
 export * from './videoAudioPassInputAction';
 export * from './videoChatMessage';
 export * from './videoChatMessageInput';
+export * from './videoChatVoiceNoteInput';
 export * from './videoCheckoutBundleStatus';
 export * from './videoCheckoutExportInput';
 export * from './videoCheckoutExportResponse';
