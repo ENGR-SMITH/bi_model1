@@ -14,7 +14,7 @@
 // playhead; the diff-map redraws on every `timeupdate`.
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
   AlertTriangle,
   ChevronLeft,
@@ -27,6 +27,7 @@ import {
 import { drawContain, renderDiffImage } from '@/lib/frame-diff';
 import { proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
+import { FullscreenButton } from '@/components/preview-shared';
 import type { StudioLeg } from '@/components/role-oracle';
 
 const READY_ENOUGH = 2;
@@ -104,6 +105,7 @@ export function DiffMap({
   kind,
   leg,
   timelineVersionId,
+  annotationHeaderRef,
   olderLabel = 'Older',
   newerLabel = 'Reviewing',
   sensitivity: sensitivityProp,
@@ -119,6 +121,8 @@ export function DiffMap({
    * to it (and to `timelineVersionId` when the selection is a version). */
   leg: StudioLeg;
   timelineVersionId?: string | null;
+  /** The column-header annotation slot — the annotate pencil portals here. */
+  annotationHeaderRef?: RefObject<HTMLDivElement | null>;
   olderLabel?: string;
   newerLabel?: string;
   /** Controlled diff sensitivity (4-60) — owned by the preview page so the
@@ -145,6 +149,7 @@ export function DiffMap({
   const olderImgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rightPaneRef = useRef<HTMLDivElement>(null);
+  const surfRef = useRef<HTMLElement>(null);
   const draggingRef = useRef(false);
   const computeSeqRef = useRef(0);
 
@@ -330,7 +335,7 @@ export function DiffMap({
   const progress = duration > 0 ? (playhead / duration) * 100 : 0;
 
   return (
-    <section className="df-surf" data-testid="diff-map">
+    <section className="df-surf" ref={surfRef} data-testid="diff-map">
       <div className="df-stage">
         {!isImage && (
           <video ref={olderVideoRef} src={olderUrl} muted playsInline preload="auto" className="df-hidden" data-testid="df-video-older" />
@@ -392,12 +397,14 @@ export function DiffMap({
               playheadMs={isImage ? null : Math.round(playhead * 1000)}
               onSeek={(ms) => void seek(ms / 1000)}
               timelineVersionId={timelineVersionId}
+              headerRef={annotationHeaderRef}
               surfaceRef={rightPaneRef}
               timecodeReveal={!isImage}
               glowPins
             />
           </div>
         </div>
+        <FullscreenButton targetRef={surfRef} className="df-fs" />
         {!isImage && (
           <button
             type="button"

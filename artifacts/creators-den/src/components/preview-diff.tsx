@@ -16,7 +16,7 @@
 // chain (`parentVersionId`, falling back to the previous sequential version).
 // ---------------------------------------------------------------------------
 
-import { Component, type ReactNode } from 'react';
+import { Component, type ReactNode, type RefObject } from 'react';
 import { DiffMap } from '@/components/diff-map';
 import { AudioDiffMap } from '@/components/audio-diff-map';
 import type { DiffSettings } from '@/components/preview-shared';
@@ -151,6 +151,7 @@ export function PreviewDiff({
   fallbackAssetIds = [],
   settings,
   onSettingsChange,
+  annotationHeaderRef,
 }: {
   projectId: string;
   leg: StudioLeg;
@@ -163,6 +164,9 @@ export function PreviewDiff({
   /** Diff-map settings owned by the page (driven by the settings dropdown). */
   settings?: DiffSettings;
   onSettingsChange?: (settings: DiffSettings) => void;
+  /** The column-header annotation slot — the diff map's annotate pencil
+   * portals here, identical to the preview surface's. */
+  annotationHeaderRef?: RefObject<HTMLDivElement | null>;
 }) {
   // Handlers bridging the controlled diff components back to the page state.
   const changeSensitivity = (sensitivity: number) =>
@@ -231,6 +235,7 @@ export function PreviewDiff({
               onSensitivityChange={changeSensitivity}
               levelMatch={settings?.levelMatch}
               onLevelMatchChange={changeLevelMatch}
+              annotationHeaderRef={annotationHeaderRef}
             />
           ) : leg === 'THUMBNAIL' ? (
             <DiffMap
@@ -244,6 +249,7 @@ export function PreviewDiff({
               timelineVersionId={base.kind === 'version' ? base.id : null}
               sensitivity={settings?.sensitivity}
               onSensitivityChange={changeSensitivity}
+              annotationHeaderRef={annotationHeaderRef}
             />
           ) : (
             <DiffMap
@@ -257,6 +263,7 @@ export function PreviewDiff({
               timelineVersionId={base.kind === 'version' ? base.id : null}
               sensitivity={settings?.sensitivity}
               onSensitivityChange={changeSensitivity}
+              annotationHeaderRef={annotationHeaderRef}
             />
           )}
         </DiffBoundary>
@@ -329,6 +336,7 @@ export function PreviewDiff({
             timelineVersionId={base.id}
             sensitivity={settings?.sensitivity}
             onSensitivityChange={changeSensitivity}
+            annotationHeaderRef={annotationHeaderRef}
           />
         </DiffBoundary>
       </div>
@@ -350,6 +358,7 @@ export function PreviewDiff({
             timelineVersionId={base.id}
             sensitivity={settings?.sensitivity}
             onSensitivityChange={changeSensitivity}
+            annotationHeaderRef={annotationHeaderRef}
           />
         </DiffBoundary>
       </div>
@@ -372,6 +381,7 @@ export function PreviewDiff({
           onSensitivityChange={changeSensitivity}
           levelMatch={settings?.levelMatch}
           onLevelMatchChange={changeLevelMatch}
+          annotationHeaderRef={annotationHeaderRef}
         />
       </DiffBoundary>
     </div>

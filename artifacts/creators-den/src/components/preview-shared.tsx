@@ -264,6 +264,7 @@ export function PreviewCanvasColumn({
   settings,
   onSettingsChange,
   settingsKind = 'pixel',
+  annotationHeaderRef,
 }: {
   view: PreviewView;
   onViewChange: (view: PreviewView) => void;
@@ -278,19 +279,26 @@ export function PreviewCanvasColumn({
   settings?: DiffSettings;
   onSettingsChange?: (settings: DiffSettings) => void;
   settingsKind?: 'audio' | 'pixel';
+  /** The column-header annotation slot — the annotate pencil portals here,
+   * centered between the canvas label and the view toggle. Both the preview
+   * surface and the diff map render their pencil into it. */
+  annotationHeaderRef?: RefObject<HTMLDivElement | null>;
 }) {
   const showDiff = hasDiff && view === 'diff';
   return (
     <>
       <div className="pv-canvas-head">
         {eyebrow}
-        {hasDiff && (
+        <div className="pv-canvas-annotation-slot" ref={annotationHeaderRef} />
+        {hasDiff ? (
           <div className="pv-canvas-head-actions">
             <PreviewViewToggle view={view} onChange={onViewChange} hasDiff={hasDiff} />
             {settings && onSettingsChange && (
               <PreviewSettingsMenu kind={settingsKind} settings={settings} onChange={onSettingsChange} />
             )}
           </div>
+        ) : (
+          <span aria-hidden />
         )}
       </div>
       {showDiff ? <div className="pv-canvas-col-full">{diff}</div> : preview}
@@ -699,7 +707,7 @@ export function RoleUploadCard({
 // FullscreenButton
 // ---------------------------------------------------------------------------
 
-export function FullscreenButton({ targetRef, label = 'Full screen' }: { targetRef: RefObject<HTMLElement | null>; label?: string }) {
+export function FullscreenButton({ targetRef, label = 'Full screen', className = '' }: { targetRef: RefObject<HTMLElement | null>; label?: string; className?: string }) {
   const [active, setActive] = useState(false);
 
   useEffect(() => {
@@ -720,7 +728,7 @@ export function FullscreenButton({ targetRef, label = 'Full screen' }: { targetR
   return (
     <button
       type="button"
-      className="pv-fs"
+      className={`pv-fs ${className}`.trim()}
       onClick={toggle}
       onPointerDown={(event) => event.stopPropagation()}
       title={active ? 'Exit full screen' : 'Expand the media to full screen'}

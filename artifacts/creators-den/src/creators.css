@@ -1944,16 +1944,35 @@ select optgroup {
   overflow-y: auto;
 }
 
-/* Column header — eyebrow on the left, the preview / diff-map toggle on the
-   right. Sits above whichever surface fills the column (media card or diff). */
+/* Column header — eyebrow on the left, the annotate pencil centered, and the
+   preview / diff-map toggle + settings on the right. Sits above whichever
+   surface fills the column (media card or diff). */
 .pv-canvas-head {
   flex: 0 0 auto;
   min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The centered annotation slot — the annotate pencil (shared by the preview
+   surface and the diff map) portals into here. */
+.pv-canvas-annotation-slot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 24px;
+}
+
+/* Full-screen button inside the diff surface — top-right of the stage so it
+   never covers the transport or the wipe legend. */
+.df-fs {
+  top: 10px;
+  right: 10px;
+  bottom: auto;
+  z-index: 6;
 }
 
 /* Segmented view toggle (Preview / Diff map) at the top of the canvas column. */
