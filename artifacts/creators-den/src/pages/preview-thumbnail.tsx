@@ -23,6 +23,7 @@ import { EmptyPlayer, ImageStage, proxyUrlFor } from '@/components/asset-preview
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
 import {
+  DEFAULT_DIFF_SETTINGS,
   FullscreenButton,
   PreviewCanvasColumn,
   PreviewLayout,
@@ -30,6 +31,7 @@ import {
   VAULT_KIND_LABELS,
   VersionCarousel,
   type CarouselItem,
+  type DiffSettings,
   type PreviewVersion,
   type PreviewView,
 } from '@/components/preview-shared';
@@ -172,6 +174,8 @@ export default function ThumbnailPreviewPage() {
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
   // Preview / split-screen diff-map toggle for the big-canvas column.
   const [view, setView] = useState<PreviewView>('preview');
+  // Diff-map settings, driven by the settings dropdown beside the toggle.
+  const [diffSettings, setDiffSettings] = useState<DiffSettings>(DEFAULT_DIFF_SETTINGS);
 
   useEffect(() => {
     if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
@@ -275,6 +279,9 @@ export default function ThumbnailPreviewPage() {
           onViewChange={setView}
           hasDiff={hasDiff}
           eyebrow={<span className="eyebrow">Big canvas</span>}
+          settings={diffSettings}
+          onSettingsChange={setDiffSettings}
+          settingsKind="pixel"
           preview={
             <ThumbnailCanvas
               projectId={p.id}
@@ -292,6 +299,8 @@ export default function ThumbnailPreviewPage() {
               versions={diffVersions}
               selected={activeSelection}
               fallbackAssetIds={(p.assets ?? []).filter((a) => IMAGE_KINDS.has(a.kind)).map((a) => a.id)}
+              settings={diffSettings}
+              onSettingsChange={setDiffSettings}
             />
           }
         />

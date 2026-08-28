@@ -54,17 +54,38 @@ export function AudioDiffMap({
   newerAssetId,
   olderLabel = 'Older',
   newerLabel = 'Reviewing',
+  sensitivity: sensitivityProp,
+  onSensitivityChange,
+  levelMatch: levelMatchProp,
+  onLevelMatchChange,
 }: {
   projectId: string;
   olderAssetId: string;
   newerAssetId: string;
   olderLabel?: string;
   newerLabel?: string;
+  /** Controlled spectral slack (dB) — owned by the preview page so the
+   * column's settings dropdown can drive it. */
+  sensitivity?: number;
+  onSensitivityChange?: (sensitivity: number) => void;
+  /** Controlled auto level-match toggle. */
+  levelMatch?: boolean;
+  onLevelMatchChange?: (levelMatch: boolean) => void;
 }) {
   const [playhead, setPlayhead] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [sensitivity, setSensitivity] = useState(6);
-  const [levelMatch, setLevelMatch] = useState(true);
+  const [sensitivityState, setSensitivityState] = useState(6);
+  const sensitivity = sensitivityProp ?? sensitivityState;
+  const setSensitivity = (next: number) => {
+    setSensitivityState(next);
+    onSensitivityChange?.(next);
+  };
+  const [levelMatchState, setLevelMatchState] = useState(true);
+  const levelMatch = levelMatchProp ?? levelMatchState;
+  const setLevelMatch = (next: boolean) => {
+    setLevelMatchState(next);
+    onLevelMatchChange?.(next);
+  };
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -298,6 +319,16 @@ export function AudioDiffMap({
           <span><i className="df-chip red" />Removed</span>
           <span><i className="df-chip grey" />Common</span>
         </div>
+        <button
+          type="button"
+          className="df-play-overlay"
+          onClick={togglePlay}
+          aria-label={playing ? 'Pause' : 'Play'}
+          title={playing ? 'Pause' : 'Play'}
+          data-testid="df-audio-play-overlay"
+        >
+          {playing ? <Pause size={22} /> : <Play size={22} fill="currentColor" />}
+        </button>
       </div>
 
       {analysis && analysis.windows.length > 0 && (
@@ -307,21 +338,8 @@ export function AudioDiffMap({
       )}
 
       <div className="df-transport">
-        <div className="df-buttons">
-          <button type="button" className="df-play" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause' : 'Play'}>
-            {playing ? <Pause size={15} /> : <Play size={15} fill="currentColor" />}
-          </button>
-        </div>
         <input type="range" min="0" max={duration || 1} step="0.001" value={Math.min(playhead, duration || 1)} onChange={(event) => seek(Number(event.target.value))} aria-label="Playback position" className="df-seek" data-testid="df-audio-seek" />
         <span className="df-time">{formatAudioTime(playhead)} / {formatAudioTime(duration)}</span>
-        <label className="df-sens">
-          <span>dB</span>
-          <input type="range" min="2" max="12" step="0.5" value={sensitivity} onChange={(event) => setSensitivity(Number(event.target.value))} data-testid="df-audio-sensitivity" />
-          <b>{sensitivity.toFixed(1)}</b>
-        </label>
-        <button type="button" className={`df-toggle ${levelMatch ? 'on' : ''}`} role="switch" aria-checked={levelMatch} onClick={() => setLevelMatch(!levelMatch)} title="Auto level match" data-testid="df-audio-levelmatch">
-          <span>Lvl match</span>
-        </button>
       </div>
 
       <div className="df-foot">

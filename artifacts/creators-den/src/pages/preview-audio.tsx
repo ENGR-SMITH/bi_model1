@@ -27,6 +27,7 @@ import { EmptyPlayer, pollWhileProcessing, proxyUrlFor } from '@/components/asse
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
 import {
+  DEFAULT_AUDIO_DIFF_SETTINGS,
   FullscreenButton,
   PreviewCanvasColumn,
   PreviewLayout,
@@ -35,6 +36,7 @@ import {
   VersionCarousel,
   WaveformPlayer,
   type CarouselItem,
+  type DiffSettings,
   type PreviewVersion,
   type PreviewView,
 } from '@/components/preview-shared';
@@ -231,6 +233,8 @@ export default function AudioPreviewPage() {
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
   // Preview / split-screen diff-map toggle for the big-canvas column.
   const [view, setView] = useState<PreviewView>('preview');
+  // Diff-map settings, driven by the settings dropdown beside the toggle.
+  const [diffSettings, setDiffSettings] = useState<DiffSettings>(DEFAULT_AUDIO_DIFF_SETTINGS);
 
   useEffect(() => {
     if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
@@ -332,6 +336,9 @@ export default function AudioPreviewPage() {
           onViewChange={setView}
           hasDiff={hasDiff}
           eyebrow={<span className="eyebrow">Big canvas</span>}
+          settings={diffSettings}
+          onSettingsChange={setDiffSettings}
+          settingsKind="audio"
           preview={
             <AudioCanvas
               projectId={p.id}
@@ -350,6 +357,8 @@ export default function AudioPreviewPage() {
               versions={diffVersions}
               selected={activeSelection}
               fallbackAssetIds={(p.assets ?? []).filter((a) => AUDIO_KINDS.has(a.kind)).map((a) => a.id)}
+              settings={diffSettings}
+              onSettingsChange={setDiffSettings}
             />
           }
         />

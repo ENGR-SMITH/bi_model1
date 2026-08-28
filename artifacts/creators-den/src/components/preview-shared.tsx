@@ -29,6 +29,7 @@ import {
   MessageSquare,
   Mic2,
   Minimize,
+  Settings2,
   Upload,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -123,11 +124,134 @@ export function PreviewViewToggle({
 }
 
 // ---------------------------------------------------------------------------
+// DiffSettings — the diff-map settings a preview page owns so the settings
+// dropdown (beside the Diff map toggle) and the diff surfaces share one state.
+// ---------------------------------------------------------------------------
+
+export interface DiffSettings {
+  /** Pixel-diff threshold (video / image) or spectral slack dB (audio). */
+  sensitivity: number;
+  /** Auto level-match (audio only). */
+  levelMatch: boolean;
+}
+
+export const DEFAULT_DIFF_SETTINGS: DiffSettings = {
+  sensitivity: 24,
+  levelMatch: true,
+};
+
+/** Audio defaults — spectral slack lives in a different range (2-12 dB). */
+export const DEFAULT_AUDIO_DIFF_SETTINGS: DiffSettings = {
+  sensitivity: 6,
+  levelMatch: true,
+};
+
+// ---------------------------------------------------------------------------
+// PreviewSettingsMenu — the settings dropdown beside the Diff map toggle.
+// Holds every diff-map setting for the current page: pixel sensitivity for
+// video / thumbnail, plus spectral dB slack and auto level-match for audio.
+// ---------------------------------------------------------------------------
+
+export function PreviewSettingsMenu({
+  kind,
+  settings,
+  onChange,
+}: {
+  /** Which controls to show — spectral for audio, pixel threshold otherwise. */
+  kind: 'audio' | 'pixel';
+  settings: DiffSettings;
+  onChange: (settings: DiffSettings) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click / Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="pv-diff-settings" ref={ref}>
+      <button
+        type="button"
+        className={['pv-view-toggle-btn', open ? 'active' : ''].filter(Boolean).join(' ')}
+        onClick={() => setOpen((value) => !value)}
+        aria-label="Diff map settings"
+        aria-expanded={open}
+        title="Diff map settings"
+        data-testid="preview-diff-settings-toggle"
+      >
+        <Settings2 size={13} />
+      </button>
+      {open && (
+        <div className="pv-diff-settings-pop" role="menu" data-testid="preview-diff-settings">
+          {kind === 'audio' ? (
+            <>
+              <label className="pv-setting-row">
+                <span>Diff sensitivity (dB)</span>
+                <input
+                  type="range"
+                  min="2"
+                  max="12"
+                  step="0.5"
+                  value={settings.sensitivity}
+                  onChange={(event) => onChange({ ...settings, sensitivity: Number(event.target.value) })}
+                  data-testid="preview-diff-sensitivity"
+                />
+                <b>{settings.sensitivity.toFixed(1)}</b>
+              </label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={settings.levelMatch}
+                className={`pv-setting-toggle ${settings.levelMatch ? 'on' : ''}`}
+                onClick={() => onChange({ ...settings, levelMatch: !settings.levelMatch })}
+                title="Auto level-match the two versions before comparing"
+                data-testid="preview-diff-levelmatch"
+              >
+                Auto level match
+              </button>
+            </>
+          ) : (
+            <label className="pv-setting-row">
+              <span>Diff sensitivity</span>
+              <input
+                type="range"
+                min="4"
+                max="60"
+                value={settings.sensitivity}
+                onChange={(event) => onChange({ ...settings, sensitivity: Number(event.target.value) })}
+                data-testid="preview-diff-sensitivity"
+              />
+              <b>{settings.sensitivity}</b>
+            </label>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // PreviewCanvasColumn — the top-of-column header holding the canvas eyebrow +
-// the PreviewViewToggle, then the column content switched on `view`. In
-// "diff" mode the split-screen diff surface fills the column in place of the
-// single media preview; PreviewDiff decides what to show (the diff, or a
-// clear notice when there's nothing older to compare).
+// the PreviewViewToggle (and its settings dropdown), then the column content
+// switched on `view`. In "diff" mode the split-screen diff surface fills the
+// column in place of the single media preview; PreviewDiff decides what to
+// show (the diff, or a clear notice when there's nothing older to compare).
+// When the selected item has no older version to compare, the whole toggle +
+// settings row is hidden so the column just shows the plain preview.
 // ---------------------------------------------------------------------------
 
 export function PreviewCanvasColumn({
@@ -137,6 +261,9 @@ export function PreviewCanvasColumn({
   eyebrow,
   preview,
   diff,
+  settings,
+  onSettingsChange,
+  settingsKind = 'pixel',
 }: {
   view: PreviewView;
   onViewChange: (view: PreviewView) => void;
@@ -147,13 +274,24 @@ export function PreviewCanvasColumn({
   preview: ReactNode;
   /** The split-screen diff surface (or a notice when nothing to compare). */
   diff: ReactNode;
+  /** Diff settings for the dropdown (and to hand down to PreviewDiff). */
+  settings?: DiffSettings;
+  onSettingsChange?: (settings: DiffSettings) => void;
+  settingsKind?: 'audio' | 'pixel';
 }) {
-  const showDiff = view === 'diff';
+  const showDiff = hasDiff && view === 'diff';
   return (
     <>
       <div className="pv-canvas-head">
         {eyebrow}
-        <PreviewViewToggle view={view} onChange={onViewChange} hasDiff={hasDiff} />
+        {hasDiff && (
+          <div className="pv-canvas-head-actions">
+            <PreviewViewToggle view={view} onChange={onViewChange} hasDiff={hasDiff} />
+            {settings && onSettingsChange && (
+              <PreviewSettingsMenu kind={settingsKind} settings={settings} onChange={onSettingsChange} />
+            )}
+          </div>
+        )}
       </div>
       {showDiff ? <div className="pv-canvas-col-full">{diff}</div> : preview}
     </>

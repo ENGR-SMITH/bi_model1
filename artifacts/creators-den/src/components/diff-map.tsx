@@ -104,6 +104,8 @@ export function DiffMap({
   kind,
   olderLabel = 'Older',
   newerLabel = 'Reviewing',
+  sensitivity: sensitivityProp,
+  onSensitivityChange,
 }: {
   projectId: string;
   /** The older version's asset proxy (reference frame). */
@@ -113,11 +115,20 @@ export function DiffMap({
   kind: 'video' | 'image';
   olderLabel?: string;
   newerLabel?: string;
+  /** Controlled diff sensitivity (4-60) — owned by the preview page so the
+   * column's settings dropdown can drive it. */
+  sensitivity?: number;
+  onSensitivityChange?: (sensitivity: number) => void;
 }) {
   const [playhead, setPlayhead] = useState(0);
   const [duration, setDuration] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [sensitivity, setSensitivity] = useState(24);
+  const [sensitivityState, setSensitivityState] = useState(24);
+  const sensitivity = sensitivityProp ?? sensitivityState;
+  const setSensitivity = (next: number) => {
+    setSensitivityState(next);
+    onSensitivityChange?.(next);
+  };
   const [wipePos, setWipePos] = useState(0.8);
   const [mismatch, setMismatch] = useState(false);
   const [ready, setReady] = useState(false);
@@ -381,21 +392,29 @@ export function DiffMap({
             </div>
           </div>
         </div>
+        {!isImage && (
+          <button
+            type="button"
+            className="df-play-overlay"
+            onClick={() => void togglePlay()}
+            aria-label={playing ? 'Pause' : 'Play'}
+            title={playing ? 'Pause' : 'Play'}
+            data-testid="df-play-overlay"
+          >
+            {playing ? <Pause size={22} /> : <Play size={22} fill="currentColor" />}
+          </button>
+        )}
       </div>
 
       {isImage ? (
         <div className="df-foot">
           <span>{olderLabel} vs {newerLabel} — pixel difference map</span>
-          <span>Sensitivity {sensitivity}</span>
         </div>
       ) : (
         <div className="df-transport">
           <div className="df-buttons">
             <button type="button" onClick={() => seek(0)} aria-label="Beginning" title="Beginning"><SkipBack size={13} /></button>
             <button type="button" onClick={() => step(-1)} aria-label="Previous frame" title="Previous frame"><ChevronLeft size={15} /></button>
-            <button type="button" className="df-play" onClick={() => void togglePlay()} aria-label={playing ? 'Pause' : 'Play'} title={playing ? 'Pause' : 'Play'}>
-              {playing ? <Pause size={15} /> : <Play size={15} fill="currentColor" />}
-            </button>
             <button type="button" onClick={() => step(1)} aria-label="Next frame" title="Next frame"><ChevronRight size={15} /></button>
             <button type="button" onClick={() => seek(duration)} aria-label="End" title="End"><SkipForward size={13} /></button>
           </div>
@@ -411,11 +430,6 @@ export function DiffMap({
             data-testid="df-seek"
           />
           <span className="df-time">{formatClock(playhead)} / {formatClock(duration)}</span>
-          <label className="df-sens">
-            <span>Sensitivity</span>
-            <input type="range" min="4" max="60" value={sensitivity} onChange={(event) => setSensitivity(Number(event.target.value))} data-testid="df-sensitivity" />
-            <b>{sensitivity}</b>
-          </label>
         </div>
       )}
     </section>
