@@ -112,6 +112,7 @@ export function AudioDiffMap({
   const seqRef = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const newerLaneRef = useRef<HTMLDivElement>(null);
+  const olderLaneRef = useRef<HTMLDivElement>(null);
   const surfRef = useRef<HTMLElement>(null);
 
   const olderUrl = proxyUrlFor(projectId, olderAssetId);
@@ -265,7 +266,7 @@ export function AudioDiffMap({
       <div className="df-audio-stage" ref={stageRef}>
         <div className="df-audio-rows">
           <div className="df-wave-row" ref={newerLaneRef}>
-            <span className="df-pane-label" data-testid="df-audio-label-newer">NEWEST</span>
+            <span className="df-pane-label" data-testid="df-audio-label-oldest">OLDEST</span>
             {newerPcm ? (
               <WaveformLane
                 samples={fadeIn(newerPcm.samples, 0.01, ANALYSIS_RATE)}
@@ -280,21 +281,9 @@ export function AudioDiffMap({
             ) : (
               <div className="df-wave-empty">Loading audio…</div>
             )}
-            {/* Only the newest version is annotatable — pins drop on its lane. */}
-            <AnnotationCanvas
-              projectId={projectId}
-              leg={leg}
-              assetId={newerAssetId}
-              playheadMs={Math.round(playhead * 1000)}
-              onSeek={(ms) => seek(ms / 1000)}
-              timelineVersionId={timelineVersionId}
-              headerRef={annotationHeaderRef}
-              surfaceRef={newerLaneRef}
-              dropLine
-            />
           </div>
-          <div className="df-wave-row">
-            <span className="df-pane-label df-right" data-testid="df-audio-label-older">OLDER</span>
+          <div className="df-wave-row" ref={olderLaneRef}>
+            <span className="df-pane-label df-right" data-testid="df-audio-label-newest">NEWEST</span>
             {olderPcm ? (
               <WaveformLane
                 samples={fadeIn(olderPcm.samples, 0.01, ANALYSIS_RATE)}
@@ -309,6 +298,18 @@ export function AudioDiffMap({
             ) : (
               <div className="df-wave-empty">Loading older audio…</div>
             )}
+            {/* Only the newest version is annotatable — pins drop on its lane. */}
+            <AnnotationCanvas
+              projectId={projectId}
+              leg={leg}
+              assetId={newerAssetId}
+              playheadMs={Math.round(playhead * 1000)}
+              onSeek={(ms) => seek(ms / 1000)}
+              timelineVersionId={timelineVersionId}
+              headerRef={annotationHeaderRef}
+              surfaceRef={olderLaneRef}
+              dropLine
+            />
           </div>
           <div className="df-wave-row df-wave-diff">
             <span className="df-pane-label df-diff-label">Δ</span>
