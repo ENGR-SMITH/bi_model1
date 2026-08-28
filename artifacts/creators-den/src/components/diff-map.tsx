@@ -3,10 +3,11 @@
 // video-version-comparison app). Shows the visual difference map between two
 // media versions in the preview first column.
 //
-// Layout mirrors the source app: the version being reviewed ("V · reviewed")
-// plays on the left; the right pane is a live difference map — a darkened V1
-// with blue (new / brighter in the compared version) and red (removed / darker)
-// dots. A draggable wipe divider reveals the compared version underneath.
+// Layout: the older reference media sits on the left; the right pane is the
+// live difference map — a darkened older version with blue (new / brighter in
+// the compared version) and red (removed / darker) dots, and a draggable wipe
+// divider that reveals the newer version underneath. The right (newest) side
+// is the only annotatable one.
 //
 // Frames come from the project's proxy streams (same-origin, so canvas pixel
 // readback works), drawn with `drawContain` so differing aspect ratios still
@@ -152,6 +153,7 @@ export function DiffMap({
   const olderImgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const newestPaneRef = useRef<HTMLDivElement>(null);
+  const mapPaneRef = useRef<HTMLDivElement>(null);
   const surfRef = useRef<HTMLElement>(null);
   const draggingRef = useRef(false);
   const computeSeqRef = useRef(0);
@@ -362,9 +364,9 @@ export function DiffMap({
           <img ref={olderImgRef} src={olderUrl} alt="" className="df-hidden" onLoad={() => { setReady(true); setOlderReady(true); }} data-testid="df-img-older" />
         )}
         <div className="df-split">
-          {/* Left pane — the reviewed (newest) media, annotatable. */}
+          {/* Left pane — the older reference media. */}
           <div className="df-pane" ref={newestPaneRef}>
-            <span className="df-pane-label" data-testid="df-pane-label-newest">NEWEST</span>
+            <span className="df-pane-label" data-testid="df-pane-label-oldest">OLDEST</span>
             {isImage ? (
               <img ref={newerImgRef} src={newerUrl} alt={newerLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-newer" />
             ) : (
@@ -374,23 +376,11 @@ export function DiffMap({
                 setReady(true);
               }} data-testid="df-pane-video" />
             )}
-            {/* Only the newest version is annotatable — pins drop here. */}
-            <AnnotationCanvas
-              projectId={projectId}
-              leg={leg}
-              assetId={newerAssetId}
-              playheadMs={isImage ? null : Math.round(playhead * 1000)}
-              onSeek={(ms) => void seek(ms / 1000)}
-              timelineVersionId={timelineVersionId}
-              headerRef={annotationHeaderRef}
-              surfaceRef={newestPaneRef}
-              timecodeReveal={!isImage}
-              glowPins
-            />
           </div>
-          {/* Right pane — the diff-map (older reference + wipe reveal). */}
-          <div className="df-pane df-pane-map">
-            <span className="df-pane-label df-right" data-testid="df-pane-label-older">OLDER</span>
+          {/* Right pane — the diff-map (reviewed media + wipe reveal), and the
+              only annotatable side (the newest version). */}
+          <div className="df-pane df-pane-map" ref={mapPaneRef}>
+            <span className="df-pane-label df-right" data-testid="df-pane-label-newest">NEWEST</span>
             <canvas
               ref={canvasRef}
               className="df-canvas"
@@ -422,6 +412,19 @@ export function DiffMap({
               <span><i className="df-chip red" />Removed / darker</span>
               <span className="df-mode">WIPE {Math.round(wipePos * 100)}% · {Math.round((1 - wipePos) * 100)}% OPEN</span>
             </div>
+            {/* Only the newest version is annotatable — pins drop here. */}
+            <AnnotationCanvas
+              projectId={projectId}
+              leg={leg}
+              assetId={newerAssetId}
+              playheadMs={isImage ? null : Math.round(playhead * 1000)}
+              onSeek={(ms) => void seek(ms / 1000)}
+              timelineVersionId={timelineVersionId}
+              headerRef={annotationHeaderRef}
+              surfaceRef={mapPaneRef}
+              timecodeReveal={!isImage}
+              glowPins
+            />
           </div>
         </div>
         <FullscreenButton targetRef={surfRef} className="df-fs" />
