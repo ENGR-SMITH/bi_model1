@@ -8391,9 +8391,6 @@ export const useSendVideoChatMessage = <TError = ErrorType<ErrorResponse>,
       return useMutation(getSendVideoChatMessageMutationOptions(options));
     }
 
-
-
-
 export const getSendVideoChatVoiceNoteUrl = (projectId: string,) => {
 
 
@@ -8409,8 +8406,12 @@ export const sendVideoChatVoiceNote = async (projectId: string,
     videoChatVoiceNoteInput: VideoChatVoiceNoteInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoChatMessage> => {
     const formData = new FormData();
 formData.append(`audio`, videoChatVoiceNoteInput.audio);
-if (videoChatVoiceNoteInput.durationMs !== undefined) formData.append(`durationMs`, String(videoChatVoiceNoteInput.durationMs));
-if (videoChatVoiceNoteInput.name !== undefined) formData.append(`name`, videoChatVoiceNoteInput.name);
+if(videoChatVoiceNoteInput.durationMs !== undefined) {
+ formData.append(`durationMs`, videoChatVoiceNoteInput.durationMs.toString())
+ }
+if(videoChatVoiceNoteInput.name !== undefined) {
+ formData.append(`name`, videoChatVoiceNoteInput.name);
+ }
 
   return customFetch<VideoChatMessage>(getSendVideoChatVoiceNoteUrl(projectId),
   {
@@ -8470,11 +8471,7 @@ export const useSendVideoChatVoiceNote = <TError = ErrorType<ErrorResponse>,
       return useMutation(getSendVideoChatVoiceNoteMutationOptions(options));
     }
 
-
-/**
- * @summary Stream a voice note audio file from the crew room
- */
-export const getVideoChatAudioUrl = (projectId: string,
+export const getGetVideoChatAudioUrl = (projectId: string,
     fileId: string,) => {
 
 
@@ -8482,6 +8479,79 @@ export const getVideoChatAudioUrl = (projectId: string,
 
   return `/api/video/projects/${projectId}/chat/audio/${fileId}`
 }
+
+/**
+ * @summary Stream a voice note audio file from the crew room
+ */
+export const getVideoChatAudio = async (projectId: string,
+    fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetVideoChatAudioUrl(projectId,fileId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVideoChatAudioQueryKey = (projectId: string,
+    fileId: string,) => {
+    return [
+    `/api/video/projects/${projectId}/chat/audio/${fileId}`
+    ] as const;
+    }
+
+
+export const getGetVideoChatAudioQueryOptions = <TData = Awaited<ReturnType<typeof getVideoChatAudio>>, TError = ErrorType<ErrorResponse>>(projectId: string,
+    fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoChatAudio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVideoChatAudioQueryKey(projectId,fileId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVideoChatAudio>>> = ({ signal }) => getVideoChatAudio(projectId,fileId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined && fileId !== null && fileId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVideoChatAudio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVideoChatAudioQueryResult = NonNullable<Awaited<ReturnType<typeof getVideoChatAudio>>>
+export type GetVideoChatAudioQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Stream a voice note audio file from the crew room
+ */
+
+export function useGetVideoChatAudio<TData = Awaited<ReturnType<typeof getVideoChatAudio>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string,
+    fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVideoChatAudio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVideoChatAudioQueryOptions(projectId,fileId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getListVideoJobsUrl = (projectId: string,) => {
 
@@ -9071,6 +9141,84 @@ export function useDownloadVideoFile<TData = Awaited<ReturnType<typeof downloadV
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getDownloadVideoFileQueryOptions(projectId,fileId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDownloadVideoFinishMasterUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/finish/master`
+}
+
+/**
+ * Builds and streams ONE finished master file instead of handing out the latest video and latest audio as separate downloads. The newest video asset and the newest audio asset are muxed together, honoring any recorded waveform sync offset so the sound lines up with the picture. Uses the same Lock/grant gate and audit trail as any raw file download.
+ * @summary Download the synced video+audio FINISH master (latest video muxed with the latest audio)
+ */
+export const downloadVideoFinishMaster = async (projectId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getDownloadVideoFinishMasterUrl(projectId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadVideoFinishMasterQueryKey = (projectId: string,) => {
+    return [
+    `/api/video/projects/${projectId}/finish/master`
+    ] as const;
+    }
+
+
+export const getDownloadVideoFinishMasterQueryOptions = <TData = Awaited<ReturnType<typeof downloadVideoFinishMaster>>, TError = ErrorType<ErrorResponse>>(projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadVideoFinishMaster>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadVideoFinishMasterQueryKey(projectId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadVideoFinishMaster>>> = ({ signal }) => downloadVideoFinishMaster(projectId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: projectId !== null && projectId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadVideoFinishMaster>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadVideoFinishMasterQueryResult = NonNullable<Awaited<ReturnType<typeof downloadVideoFinishMaster>>>
+export type DownloadVideoFinishMasterQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Download the synced video+audio FINISH master (latest video muxed with the latest audio)
+ */
+
+export function useDownloadVideoFinishMaster<TData = Awaited<ReturnType<typeof downloadVideoFinishMaster>>, TError = ErrorType<ErrorResponse>>(
+ projectId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadVideoFinishMaster>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadVideoFinishMasterQueryOptions(projectId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

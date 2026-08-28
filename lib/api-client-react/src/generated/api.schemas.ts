@@ -1367,8 +1367,11 @@ export interface VideoChatMessage {
   projectId: string;
   authorId: string;
   body: string;
+  /** @nullable */
   audioUrl: string | null;
+  /** @nullable */
   audioName: string | null;
+  /** @nullable */
   audioDurationMs: number | null;
   createdAt: string;
 }
@@ -1381,9 +1384,12 @@ export interface VideoChatMessageInput {
   body: string;
 }
 
+/**
+ * Multipart upload of a voice note into the project crew room
+ */
 export interface VideoChatVoiceNoteInput {
   /** The recorded voice note (WebM/Opus or MP4 audio blob) */
-  audio: File;
+  audio: Blob;
   /** Recorded duration in milliseconds */
   durationMs?: number;
   /** Original file name for the voice note */

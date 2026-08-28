@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, useState } from 'react';
-import { AudioLines, MessageSquare, Mic, RefreshCw, Send, Square, X } from 'lucide-react';
+import { AudioLines, MessageSquare, Mic, Pause, Play, RefreshCw, Send, Square, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import {
@@ -31,6 +31,84 @@ function formatDuration(totalSeconds: number): string {
 
 function seenKey(projectId: string): string {
   return `creators-den-chat-seen-${projectId}`;
+}
+
+// A proper voice-note message: a play button, a live-equalizer bar that fills
+// left→right as the note plays, and the elapsed/total time — instead of a bare
+// native <audio controls> fighting the bubble.
+function VoiceNoteBubble({
+  audioUrl,
+  durationMs,
+  mine,
+}: {
+  audioUrl: string;
+  durationMs: number | null;
+  mine: boolean;
+}) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState<number | null>(durationMs);
+
+  useEffect(() => {
+    return () => audioRef.current?.pause();
+  }, []);
+
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (playing) {
+      audio.pause();
+    } else {
+      void audio.play();
+    }
+  };
+
+  const BAR_COUNT = 28;
+  const showTime = currentTime > 0 && duration ? currentTime : duration;
+  const filledIndex = duration && currentTime > 0 ? Math.floor((currentTime / duration) * BAR_COUNT) : playing ? BAR_COUNT : 0;
+
+  return (
+    <div className={`den-voice ${mine ? 'mine' : ''}`} data-testid="chat-voice-note">
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        preload="none"
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onLoadedMetadata={(event) => {
+          if (Number.isFinite(event.currentTarget.duration)) setDuration(event.currentTarget.duration * 1000);
+        }}
+        onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime * 1000)}
+        onEnded={() => {
+          setPlaying(false);
+          setCurrentTime(0);
+        }}
+      />
+      <button
+        type="button"
+        className="den-voice-play"
+        onClick={toggle}
+        aria-label={playing ? 'Pause voice note' : 'Play voice note'}
+        data-testid="chat-voice-play"
+      >
+        {playing ? <Pause size={13} /> : <Play size={13} />}
+      </button>
+      <div className="den-voice-wave" aria-hidden>
+        {Array.from({ length: BAR_COUNT }).map((_, index) => {
+          const height = 0.35 + ((index * 37) % 55) / 100;
+          return (
+            <span
+              key={index}
+              className={index < filledIndex ? 'fill' : playing ? 'live' : 'idle'}
+              style={{ height: `${height * 100}%` }}
+            />
+          );
+        })}
+      </div>
+      <span className="den-voice-time">{formatDuration(Math.round((showTime ?? 0) / 1000))}</span>
+    </div>
+  );
 }
 
 export function ProjectChat({ projectId }: { projectId: string }) {
@@ -269,11 +347,12 @@ export function ProjectChat({ projectId }: { projectId: string }) {
                     {!mine && <b className="den-chat-msg-author">{memberNameById.get(message.authorId) ?? message.authorId.slice(0, 8)}</b>}
                     {message.audioUrl ? (
                       <div className="den-chat-voice" data-testid="chat-voice-note">
-                        <audio controls preload="metadata" src={message.audioUrl}>
-                          <source src={message.audioUrl} />
-                          Your browser does not support audio playback.
-                        </audio>
-                        {message.body && <p>{message.body}</p>}
+                        <VoiceNoteBubble
+                          audioUrl={message.audioUrl}
+                          durationMs={message.audioDurationMs}
+                          mine={mine}
+                        />
+                        {message.body && <p className="den-chat-voice-caption">{message.body}</p>}
                       </div>
                     ) : (
                       <p>{message.body}</p>

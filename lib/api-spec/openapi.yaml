@@ -2731,6 +2731,40 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/finish/master:
+    get:
+      operationId: downloadVideoFinishMaster
+      tags: [content-creators]
+      summary: Download the synced video+audio FINISH master (latest video muxed with the latest audio)
+      description: >
+        Builds and streams ONE finished master file instead of handing out the latest video
+        and latest audio as separate downloads. The newest video asset and the newest audio
+        asset are muxed together, honoring any recorded waveform sync offset so the sound
+        lines up with the picture. Uses the same Lock/grant gate and audit trail as any raw
+        file download.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      responses:
+        "200":
+          description: The combined video+audio master stream
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "400":
+          description: The vault has no processed media to export
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Lock is still on, or not a member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/projects/{projectId}/downloads:
     get:
       operationId: listVideoDownloads

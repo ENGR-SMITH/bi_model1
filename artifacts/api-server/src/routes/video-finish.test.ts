@@ -46,6 +46,7 @@ vi.mock("@workspace/db", async () => {
 import videoRouter from "./video";
 import videoProductionRouter from "./video-production";
 import videoFinishRouter from "./video-finish";
+import videoPlatformRouter from "./video-platform";
 import { runWorkerCycle } from "../video/worker";
 
 function createApp(): Express {
@@ -58,6 +59,7 @@ function createApp(): Express {
   app.use("/api", videoRouter);
   app.use("/api", videoProductionRouter);
   app.use("/api", videoFinishRouter);
+  app.use("/api", videoPlatformRouter);
   return app;
 }
 
@@ -104,10 +106,10 @@ async function addMember(projectId: string, email: string, role: string) {
   expect(res.status).toBe(201);
 }
 
-async function uploadAsset(projectId: string, fileName = "interview.mp4") {
+async function uploadAsset(projectId: string, fileName = "interview.mp4", kind = "RAW_VIDEO") {
   const res = await request(API)
     .post(`/api/video/projects/${projectId}/assets`)
-    .field("kind", "RAW_VIDEO")
+    .field("kind", kind)
     .attach("file", Buffer.from("fake video bytes"), fileName);
   expect(res.status).toBe(201);
   return res.body as any;
@@ -296,5 +298,90 @@ describe("authorization on M3 routes", () => {
     expect((await request(API).post("/api/video/projects/x/exports").send({ formats: ["16:9"] })).status).toBe(401);
     expect((await request(API).post("/api/video/projects/x/thumbnail").send({ assetId: "a", timeMs: 0 })).status).toBe(401);
     expect((await request(API).get("/api/video/projects/x/files/y/download")).status).toBe(401);
+    expect((await request(API).get("/api/video/projects/x/finish/master")).status).toBe(401);
+  });
+});
+
+describe("M3 — the synced video+audio FINISH master", () => {
+  it("requires grants for BOTH the video and audio roles while the lock is on", async () => {
+    const project = await createProject();
+    await addMember(project.id, "sound@example.com", "AUDIO");
+    await addMember(project.id, "editor@example.com", "VIDEO");
+    await uploadAsset(project.id, "latest-shot.mp4", "RAW_VIDEO");
+    await uploadAsset(project.id, "sync-lapel.wav", "RAW_AUDIO");
+
+    // Locked + no grant → refused.
+    state.userId = "editor-1";
+    expect((await request(API).get(`/api/video/projects/${project.id}/finish/master`)).status).toBe(403);
+
+    // A grant covering only the VIDEO role is not enough — the master combines
+    // video AND audio, so both must be unlocked by the Lock or the grants.
+    state.userId = "captain-1";
+    expect(
+      (
+        await request(API)
+          .post(`/api/video/projects/${project.id}/grants`)
+          .send({ memberId: "editor-1", roles: ["VIDEO"], expiresInHours: 24 })
+      ).status,
+    ).toBe(201);
+    state.userId = "editor-1";
+    expect((await request(API).get(`/api/video/projects/${project.id}/finish/master`)).status).toBe(403);
+
+    // Adding the AUDIO role opens the combined master.
+    state.userId = "captain-1";
+    expect(
+      (
+        await request(API)
+          .post(`/api/video/projects/${project.id}/grants`)
+          .send({ memberId: "editor-1", roles: ["AUDIO"], expiresInHours: 24 })
+      ).status,
+    ).toBe(201);
+    state.userId = "editor-1";
+    const master = await request(API).get(`/api/video/projects/${project.id}/finish/master`);
+    expect(master.status).toBe(200);
+    expect(master.headers["content-type"]).toContain("video/mp4");
+    expect(master.body).toBeInstanceOf(Buffer);
+    expect(master.body.length).toBeGreaterThan(0);
+  });
+
+  it("streams the combined master once the lock is released", async () => {
+    const project = await createProject();
+    await addMember(project.id, "sound@example.com", "AUDIO");
+    await uploadAsset(project.id, "latest-shot.mp4", "RAW_VIDEO");
+    await uploadAsset(project.id, "sync-lapel.wav", "RAW_AUDIO");
+    const asset = (await request(API).get(`/api/video/projects/${project.id}`)).body.assets.find(
+      (a: any) => a.kind === "RAW_VIDEO",
+    );
+    await runWorkerCycle();
+
+    // Approve the FINISH leg to release the lock.
+    const finish = await submitLeg(project.id, "FINISH", "captain-1", asset.id);
+    state.userId = "captain-1";
+    const approved = await request(API).post(
+      `/api/video/projects/${project.id}/submissions/${finish.id}/approve`,
+    );
+    expect(approved.status).toBe(200);
+
+    state.userId = "sound-1";
+    const master = await request(API).get(`/api/video/projects/${project.id}/finish/master`);
+    expect(master.status).toBe(200);
+    expect(master.headers["content-type"]).toContain("video/mp4");
+    expect(master.body).toBeInstanceOf(Buffer);
+    expect(master.body.length).toBeGreaterThan(0);
+
+    // Download is audited like any other file.
+    state.userId = "captain-1";
+    const trail = await request(API).get(`/api/video/projects/${project.id}/downloads`);
+    const finishRows = trail.body.filter((row: any) => row.fileName.includes("-master"));
+    expect(finishRows).toHaveLength(1);
+    expect(finishRows[0].memberId).toBe("sound-1");
+  });
+
+  it("returns a clear error when the vault has no media", async () => {
+    const project = await createProject();
+    state.userId = "captain-1";
+    const res = await request(API).get(`/api/video/projects/${project.id}/finish/master`);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("Nothing to export");
   });
 });

@@ -3576,17 +3576,81 @@ select optgroup {
 }
 .den-chat-record .icon-btn:hover { background: hsl(var(--destructive) / .18); }
 
-/* Voice note message — the audio player sits inside the speech bubble. */
-.den-chat-voice { display: flex; flex-direction: column; gap: 6px; }
-.den-chat-voice audio {
-  display: block;
-  width: 100%;
-  max-width: 230px;
-  height: 34px;
-  border-radius: 999px;
-  background: hsl(var(--background) / .4);
+/* Voice note message — a proper voice note: play button + equalizer bar +
+   elapsed/total time, instead of a bare native <audio controls> chip. */
+.den-chat-voice {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  max-width: 260px;
 }
-.den-chat-msg:not(.mine) .den-chat-voice audio { background: hsl(var(--background)); }
+.den-voice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px 8px 7px;
+  border-radius: 16px;
+  border-top-left-radius: 4px;
+  background: hsl(var(--background) / .5);
+  min-width: 0;
+}
+.den-chat-msg.mine .den-voice {
+  background: hsl(var(--accent) / .12);
+  border-top-left-radius: 16px;
+  border-top-right-radius: 4px;
+}
+.den-chat-msg:not(.mine) .den-voice { background: hsl(var(--background)); }
+.den-voice-play {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  cursor: pointer;
+}
+.den-voice-play:hover { filter: brightness(1.08); }
+.den-voice-play svg { width: 14px; height: 14px; }
+.den-voice-wave {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 2.5px;
+  overflow: hidden;
+}
+.den-voice-wave span {
+  flex: 1 0 auto;
+  min-width: 1.5px;
+  border-radius: 2px;
+  background: hsl(var(--muted-foreground) / .45);
+  transition: background .12s;
+}
+.den-voice-wave span.idle { background: hsl(var(--muted-foreground) / .35); }
+.den-voice-wave span.live {
+  background: hsl(var(--accent));
+  animation: denVoiceDance .5s ease-in-out infinite alternate;
+}
+.den-voice-wave span.fill { background: hsl(var(--accent)); }
+@keyframes denVoiceDance {
+  from { transform: scaleY(.55); }
+  to { transform: scaleY(1); }
+}
+.den-voice-time {
+  flex: 0 0 auto;
+  font: 600 11px var(--app-font-mono);
+  color: hsl(var(--muted-foreground));
+  font-variant-numeric: tabular-nums;
+}
+.den-chat-voice-caption {
+  margin: 0 2px;
+  color: inherit;
+}
 
 /* ---------------------------------------------------------------------------
    Finish — the export desk (latest-only download cards, grant-aware).
@@ -3687,6 +3751,23 @@ select optgroup {
 .finish-access-note svg.lucide-lock-keyhole { color: hsl(var(--muted-foreground)); }
 
 /* Whole-project ZIP card — the entry list. */
+.finish-card-sync {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font: 600 11px var(--app-font-sans);
+  color: hsl(38 70% 55%);
+}
+.finish-card-sync::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: hsl(38 70% 55%);
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
 .finish-zip-list {
   list-style: none;
   margin: 0;

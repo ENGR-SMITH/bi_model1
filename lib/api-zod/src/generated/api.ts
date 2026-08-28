@@ -2900,9 +2900,9 @@ export const SendVideoChatVoiceNoteParams = zod.object({
 })
 
 export const SendVideoChatVoiceNoteBody = zod.object({
-  "audio": zod.instanceof(File),
-  "durationMs": zod.number().int().optional(),
-  "name": zod.string().optional()
+  "audio": zod.instanceof(File).describe('The recorded voice note (WebM\/Opus or MP4 audio blob)'),
+  "durationMs": zod.number().int().optional().describe('Recorded duration in milliseconds'),
+  "name": zod.string().optional().describe('Original file name for the voice note')
 }).describe('Multipart upload of a voice note into the project crew room')
 
 export const SendVideoChatVoiceNoteResponse = zod.object({
@@ -2925,8 +2925,10 @@ export const SendVideoChatVoiceNoteResponse = zod.object({
 
 export const GetVideoChatAudioParams = zod.object({
   "projectId": zod.coerce.string().min(1),
-  "fileId": zod.coerce.string().min(1)
+  "fileId": zod.coerce.string()
 })
+
+export const GetVideoChatAudioResponse = zod.unknown()
 
 
 /**
@@ -3161,6 +3163,20 @@ export const DownloadVideoFileParams = zod.object({
 })
 
 export const DownloadVideoFileResponse = zod.unknown()
+
+
+/**
+ * Builds and streams ONE finished master file instead of handing out the latest video and latest audio as separate downloads. The newest video asset and the newest audio asset are muxed together, honoring any recorded waveform sync offset so the sound lines up with the picture. Uses the same Lock/grant gate and audit trail as any raw file download.
+ * @summary Download the synced video+audio FINISH master (latest video muxed with the latest audio)
+ */
+
+
+
+export const DownloadVideoFinishMasterParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+export const DownloadVideoFinishMasterResponse = zod.unknown()
 
 
 /**
