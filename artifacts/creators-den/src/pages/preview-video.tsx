@@ -251,12 +251,19 @@ export default function VideoPreviewPage() {
       setSelectedId((withDiff ?? versions[0]).id);
       return;
     }
-    // No saved versions yet — default to the newest vault video file so the
-    // diff still engages when only raw uploads exist.
-    const firstAsset = (project.data?.assets ?? []).find((a) => VIDEO_KINDS.has(a.kind));
+    // No saved versions yet — default to the newest vault video that has an
+    // older sibling (so the diff engages on open showing the recent media),
+    // falling back to the newest upload.
+    const mediaAssets = (project.data?.assets ?? []).filter((a) => VIDEO_KINDS.has(a.kind));
+    const byRecency = [...mediaAssets].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const withDiff = byRecency.find((a) => {
+      const item = diffVersions.find((s) => s.key === `asset-${a.id}`) ?? null;
+      return Boolean(predecessorOf(diffVersions, item));
+    });
+    const firstAsset = withDiff ?? byRecency[0];
     if (firstAsset) setVaultAssetId(firstAsset.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versions, selectedId, vaultAssetId, project.data?.assets]);
+  }, [versions, selectedId, vaultAssetId, project.data?.assets, diffVersions]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
   const selectedDetail = useGetVideoTimelineVersion(projectId, selected?.leg ?? '', selected?.id ?? '', {
@@ -317,6 +324,8 @@ export default function VideoPreviewPage() {
     }));
     const vaultItems: CarouselItem[] = (project.data?.assets ?? [])
       .filter((a) => VIDEO_KINDS.has(a.kind))
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((a) => ({
         key: `asset-${a.id}`,
         kind: 'asset',
@@ -393,7 +402,7 @@ export default function VideoPreviewPage() {
               leg={activeVersion?.leg ?? 'SELECTS'}
               versions={diffVersions}
               selected={activeSelection}
-              fallbackAssetIds={(p.assets ?? []).filter((a) => VIDEO_KINDS.has(a.kind)).map((a) => a.id)}
+              fallbackAssetIds={(p.assets ?? []).filter((a) => VIDEO_KINDS.has(a.kind)).slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((a) => a.id)}
               settings={diffSettings}
               onSettingsChange={setDiffSettings}
               annotationHeaderRef={annotationHeaderRef}
