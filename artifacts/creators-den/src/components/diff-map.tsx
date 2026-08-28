@@ -17,10 +17,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  ArrowLeftRight,
   ChevronLeft,
   ChevronRight,
-  GitCompareArrows,
   Pause,
   Play,
   SkipBack,
@@ -28,6 +26,8 @@ import {
 } from 'lucide-react';
 import { drawContain, renderDiffImage } from '@/lib/frame-diff';
 import { proxyUrlFor } from '@/components/asset-preview';
+import { AnnotationCanvas } from '@/components/annotation-canvas';
+import type { StudioLeg } from '@/components/role-oracle';
 
 const READY_ENOUGH = 2;
 
@@ -102,6 +102,8 @@ export function DiffMap({
   olderAssetId,
   newerAssetId,
   kind,
+  leg,
+  timelineVersionId,
   olderLabel = 'Older',
   newerLabel = 'Reviewing',
   sensitivity: sensitivityProp,
@@ -113,6 +115,10 @@ export function DiffMap({
   /** The newer version's asset proxy (the version under review). */
   newerAssetId: string;
   kind: 'video' | 'image';
+  /** Relay leg — annotations dropped on the reviewed (right) pane are scoped
+   * to it (and to `timelineVersionId` when the selection is a version). */
+  leg: StudioLeg;
+  timelineVersionId?: string | null;
   olderLabel?: string;
   newerLabel?: string;
   /** Controlled diff sensitivity (4-60) — owned by the preview page so the
@@ -138,6 +144,7 @@ export function DiffMap({
   const newerImgRef = useRef<HTMLImageElement>(null);
   const olderImgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rightPaneRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
   const computeSeqRef = useRef(0);
 
@@ -324,18 +331,6 @@ export function DiffMap({
 
   return (
     <section className="df-surf" data-testid="diff-map">
-      <div className="df-head">
-        <div className="df-title">
-          <GitCompareArrows size={14} /> VERSION DIFF MAP{' '}
-          <span className="df-sub">/{isImage ? 'STILLS' : 'FRAME'} SPLIT</span>
-        </div>
-        <div className="df-view-switch">
-          <span className="df-tag">{newerLabel} · {newerAssetId.slice(0, 8)}</span>
-          <ArrowLeftRight size={11} />
-          <span className="df-tag teal">{olderLabel} · {olderAssetId.slice(0, 8)}</span>
-        </div>
-      </div>
-
       <div className="df-stage">
         {!isImage && (
           <video ref={olderVideoRef} src={olderUrl} muted playsInline preload="auto" className="df-hidden" data-testid="df-video-older" />
@@ -344,21 +339,8 @@ export function DiffMap({
           <img ref={olderImgRef} src={olderUrl} alt="" className="df-hidden" data-testid="df-img-older" />
         )}
         <div className="df-split">
-          <div className="df-pane">
-            <span className="df-pane-label">{newerLabel}</span>
-            {isImage ? (
-              <img ref={newerImgRef} src={newerUrl} alt={newerLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-newer" />
-            ) : (
-              <video ref={newerVideoRef} src={newerUrl} muted={!playing} playsInline preload="auto" autoPlay={undefined} className="df-pane-media" onLoadedMetadata={() => {
-                const v = newerVideoRef.current;
-                if (v && Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration);
-                setReady(true);
-              }} data-testid="df-pane-video" />
-            )}
-          </div>
+          {/* Left pane — the diff-map (older reference + wipe reveal). */}
           <div className="df-pane df-pane-map">
-            <span className="df-pane-label">DIFF MAP</span>
-            <span className="df-pane-label df-right">{olderLabel} REVEAL</span>
             <canvas
               ref={canvasRef}
               className="df-canvas"
@@ -391,6 +373,30 @@ export function DiffMap({
               <span className="df-mode">WIPE {Math.round(wipePos * 100)}% · {Math.round((1 - wipePos) * 100)}% OPEN</span>
             </div>
           </div>
+          {/* Right pane — the reviewed (newest) media, annotatable. */}
+          <div className="df-pane" ref={rightPaneRef}>
+            {isImage ? (
+              <img ref={newerImgRef} src={newerUrl} alt={newerLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-newer" />
+            ) : (
+              <video ref={newerVideoRef} src={newerUrl} muted={!playing} playsInline preload="auto" autoPlay={undefined} className="df-pane-media" onLoadedMetadata={() => {
+                const v = newerVideoRef.current;
+                if (v && Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration);
+                setReady(true);
+              }} data-testid="df-pane-video" />
+            )}
+            {/* Only the newest version is annotatable — pins drop here. */}
+            <AnnotationCanvas
+              projectId={projectId}
+              leg={leg}
+              assetId={newerAssetId}
+              playheadMs={isImage ? null : Math.round(playhead * 1000)}
+              onSeek={(ms) => void seek(ms / 1000)}
+              timelineVersionId={timelineVersionId}
+              surfaceRef={rightPaneRef}
+              timecodeReveal={!isImage}
+              glowPins
+            />
+          </div>
         </div>
         {!isImage && (
           <button
@@ -406,11 +412,7 @@ export function DiffMap({
         )}
       </div>
 
-      {isImage ? (
-        <div className="df-foot">
-          <span>{olderLabel} vs {newerLabel} — pixel difference map</span>
-        </div>
-      ) : (
+      {!isImage && (
         <div className="df-transport">
           <div className="df-buttons">
             <button type="button" onClick={() => seek(0)} aria-label="Beginning" title="Beginning"><SkipBack size={13} /></button>

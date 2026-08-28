@@ -2078,14 +2078,16 @@ select optgroup {
   max-height: none;
 }
 
-/* Split-screen VCS diff panel — sits under the big canvas in the first
-   column. Keeps the canvas dominant and scrolls internally if the compare
-   surface is taller than the space left over. */
+/* Split-screen VCS diff panel — fills the canvas column in diff view. The
+   surface inside flexes to the available height so the media fits exactly
+   (contain) with no internal scrolling. */
 .preview-diff-panel {
-  flex: 1 1 auto;
-  min-height: 200px;
-  max-height: 48%;
-  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   border: 1px solid hsl(var(--border));
   border-radius: 10px;
   background: linear-gradient(180deg, hsl(var(--card)), hsl(var(--background)));
@@ -2093,7 +2095,7 @@ select optgroup {
 }
 
 /* ---- Split-screen pixel diff-map (the visual VCS surface) ---- */
-.df-surf { display: flex; flex-direction: column; border: 1px solid hsl(var(--border)); border-radius: 10px; background: #0a1017; overflow: hidden; box-shadow: var(--shadow-md); }
+.df-surf { display: flex; flex-direction: column; flex: 1; min-height: 0; border: 1px solid hsl(var(--border)); border-radius: 10px; background: #0a1017; overflow: hidden; box-shadow: var(--shadow-md); }
 .df-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 14px; background: hsl(var(--secondary) / .35); border-bottom: 1px solid hsl(var(--border)); }
 .df-title { display: flex; align-items: center; gap: 8px; color: hsl(var(--foreground)); font: 700 11px var(--app-font-sans); letter-spacing: .02em; }
 .df-title svg { color: hsl(var(--accent)); }
@@ -2101,8 +2103,8 @@ select optgroup {
 .df-view-switch { display: flex; align-items: center; gap: 7px; }
 .df-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 4px; color: hsl(var(--accent)); background: hsl(var(--accent) / .12); font: 9px var(--app-font-mono); }
 .df-tag.teal { color: hsl(164 33% 39%); background: hsl(164 33% 45% / .12); }
-.df-stage { position: relative; background: #060b10; }
-.df-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #29404c; width: 100%; aspect-ratio: 16 / 9; position: relative; }
+.df-stage { position: relative; background: #060b10; flex: 1; min-height: 0; }
+.df-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #29404c; width: 100%; height: 100%; position: relative; }
 .df-pane { position: relative; min-width: 0; min-height: 0; background: #080d12; overflow: hidden; }
 .df-pane-media { width: 100%; height: 100%; object-fit: contain; display: block; background: #080d12; }
 .df-pane-map { background: #080d12; }
@@ -2142,8 +2144,8 @@ select optgroup {
 .df-sens b { width: 22px; color: #74c9e3; font: 10px var(--app-font-mono); text-align: right; }
 .df-foot { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #0d171f; border-top: 1px solid #24333e; color: #657983; font: 10px var(--app-font-mono); }
 .df-error { display: flex; align-items: center; gap: 7px; padding: 8px 12px; color: #ffc9a8; background: rgba(52, 26, 16, .96); border-bottom: 1px solid #7a4a2e; font: 10px var(--app-font-mono); line-height: 1.5; }
-.df-audio-stage { position: relative; background: #080d12; overflow: hidden; }
-.df-audio-rows { display: grid; grid-template-rows: 1fr 1fr 34px; gap: 1px; background: #22333d; height: 260px; }
+.df-audio-stage { position: relative; background: #080d12; overflow: hidden; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.df-audio-rows { display: grid; grid-template-rows: 1fr 1fr 34px; gap: 1px; background: #22333d; flex: 1; min-height: 0; height: auto; }
 .df-wave-row { position: relative; min-height: 0; background: #0b141b; }
 .df-wave-diff { background: #0b141b; }
 .df-wave-empty { display: grid; place-items: center; height: 100%; color: #4c626c; font: 10px var(--app-font-mono); letter-spacing: .06em; background: repeating-linear-gradient(135deg, rgba(255,255,255,.012) 0, rgba(255,255,255,.012) 1px, transparent 1px, transparent 6px); }
@@ -2154,7 +2156,7 @@ select optgroup {
 .df-pulse { width: 6px; height: 6px; border-radius: 50%; background: #57cbed; animation: df-pulse 1.6s ease-in-out infinite; }
 @keyframes df-pulse { 0%, 100% { opacity: .38; transform: scale(.85); } 50% { opacity: 1; transform: scale(1); } }
 .df-fchip.grey { background: #7d8e97; }
-.df-audio-spectral { height: 220px; background: #0a1218; }
+.df-audio-spectral { flex: 0 0 30%; min-height: 120px; background: #0a1218; }
 .df-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border: 1px solid #38515e; border-radius: 4px; background: #172731; color: #a6b7bd; font-size: 10px; }
 .df-toggle.on { background: #1a5c71; border-color: #45bddd; color: #c2f2ff; }
 
@@ -2187,7 +2189,7 @@ select optgroup {
 }
 
 @media (max-width: 700px) {
-  .df-split { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; aspect-ratio: 1 / 1.1; }
+  .df-split { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; height: auto; aspect-ratio: 1 / 1.1; }
   .df-transport { flex-wrap: wrap; }
 }
 

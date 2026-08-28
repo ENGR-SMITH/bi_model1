@@ -11,10 +11,12 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, AudioLines, Pause, Play } from 'lucide-react';
+import { AlertTriangle, Pause, Play } from 'lucide-react';
 import { ANALYSIS_RATE, DEFAULT_FFT_SIZE, DEFAULT_HOP_SIZE, formatSeconds, resample, type AudioDiffOptions, type AudioDiffResult } from '@/audio/dsp';
 import { CLASS_LABELS, DiffStrip, SpectralMap, WaveformLane } from '@/audio/waveform-canvas';
 import { proxyUrlFor } from '@/components/asset-preview';
+import { AnnotationCanvas } from '@/components/annotation-canvas';
+import type { StudioLeg } from '@/components/role-oracle';
 
 let audioContext: AudioContext | null = null;
 
@@ -52,6 +54,8 @@ export function AudioDiffMap({
   projectId,
   olderAssetId,
   newerAssetId,
+  leg,
+  timelineVersionId,
   olderLabel = 'Older',
   newerLabel = 'Reviewing',
   sensitivity: sensitivityProp,
@@ -62,6 +66,10 @@ export function AudioDiffMap({
   projectId: string;
   olderAssetId: string;
   newerAssetId: string;
+  /** Relay leg — annotations dropped on the reviewed (newest) lane are
+   * scoped to it (and to `timelineVersionId` when the selection is a version). */
+  leg: StudioLeg;
+  timelineVersionId?: string | null;
   olderLabel?: string;
   newerLabel?: string;
   /** Controlled spectral slack (dB) — owned by the preview page so the
@@ -98,6 +106,8 @@ export function AudioDiffMap({
   const workerRef = useRef<Worker | null>(null);
   const analysisSeqRef = useRef(0);
   const seqRef = useRef(0);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const newerLaneRef = useRef<HTMLDivElement>(null);
 
   const olderUrl = proxyUrlFor(projectId, olderAssetId);
   const newerUrl = proxyUrlFor(projectId, newerAssetId);
@@ -241,26 +251,15 @@ export function AudioDiffMap({
 
   return (
     <section className="df-surf" data-testid="audio-diff-map">
-      <div className="df-head">
-        <div className="df-title">
-          <AudioLines size={14} /> AUDIO DIFF MAP <span className="df-sub">/SPECTRAL</span>
-        </div>
-        <div className="df-view-switch">
-          <span className="df-tag">{newerLabel} · {newerAssetId.slice(0, 8)}</span>
-          <span className="df-tag teal">{olderLabel} · {olderAssetId.slice(0, 8)}</span>
-        </div>
-      </div>
-
       {error && (
         <div className="df-error" data-testid="df-audio-error">
           <AlertTriangle size={12} /> {error}
         </div>
       )}
 
-      <div className="df-audio-stage">
+      <div className="df-audio-stage" ref={stageRef}>
         <div className="df-audio-rows">
-          <div className="df-wave-row">
-            <span className="df-pane-label">{newerLabel} · v2</span>
+          <div className="df-wave-row" ref={newerLaneRef}>
             {newerPcm ? (
               <WaveformLane
                 samples={fadeIn(newerPcm.samples, 0.01, ANALYSIS_RATE)}
@@ -275,9 +274,19 @@ export function AudioDiffMap({
             ) : (
               <div className="df-wave-empty">Awaiting reviewed audio</div>
             )}
+            {/* Only the newest version is annotatable — pins drop on its lane. */}
+            <AnnotationCanvas
+              projectId={projectId}
+              leg={leg}
+              assetId={newerAssetId}
+              playheadMs={Math.round(playhead * 1000)}
+              onSeek={(ms) => seek(ms / 1000)}
+              timelineVersionId={timelineVersionId}
+              surfaceRef={stageRef}
+              dropLine
+            />
           </div>
           <div className="df-wave-row">
-            <span className="df-pane-label version-two">{olderLabel} · v1</span>
             {olderPcm ? (
               <WaveformLane
                 samples={fadeIn(olderPcm.samples, 0.01, ANALYSIS_RATE)}

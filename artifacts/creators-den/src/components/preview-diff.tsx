@@ -225,6 +225,8 @@ export function PreviewDiff({
               olderAssetId={olderAssetId}
               newerLabel={newerLabel}
               olderLabel={olderLabel}
+              leg={leg}
+              timelineVersionId={base.kind === 'version' ? base.id : null}
               sensitivity={settings?.sensitivity}
               onSensitivityChange={changeSensitivity}
               levelMatch={settings?.levelMatch}
@@ -238,6 +240,8 @@ export function PreviewDiff({
               olderAssetId={olderAssetId}
               newerLabel={newerLabel}
               olderLabel={olderLabel}
+              leg={leg}
+              timelineVersionId={base.kind === 'version' ? base.id : null}
               sensitivity={settings?.sensitivity}
               onSensitivityChange={changeSensitivity}
             />
@@ -249,6 +253,8 @@ export function PreviewDiff({
               olderAssetId={olderAssetId}
               newerLabel={newerLabel}
               olderLabel={olderLabel}
+              leg={leg}
+              timelineVersionId={base.kind === 'version' ? base.id : null}
               sensitivity={settings?.sensitivity}
               onSensitivityChange={changeSensitivity}
             />
@@ -319,6 +325,8 @@ export function PreviewDiff({
             olderAssetId={olderAssetId}
             newerLabel={`${leg} v${own.data.version}`}
             olderLabel={`v${prev.data.version}`}
+            leg={leg}
+            timelineVersionId={base.id}
             sensitivity={settings?.sensitivity}
             onSensitivityChange={changeSensitivity}
           />
@@ -338,6 +346,8 @@ export function PreviewDiff({
             olderAssetId={olderAssetId}
             newerLabel={`THUMBNAIL v${own.data.version}`}
             olderLabel={`v${prev.data.version}`}
+            leg={leg}
+            timelineVersionId={base.id}
             sensitivity={settings?.sensitivity}
             onSensitivityChange={changeSensitivity}
           />
@@ -356,6 +366,8 @@ export function PreviewDiff({
           olderAssetId={olderAssetId}
           newerLabel={`SOUND v${own.data.version}`}
           olderLabel={`v${prev.data.version}`}
+          leg={leg}
+          timelineVersionId={base.id}
           sensitivity={settings?.sensitivity}
           onSensitivityChange={changeSensitivity}
           levelMatch={settings?.levelMatch}
