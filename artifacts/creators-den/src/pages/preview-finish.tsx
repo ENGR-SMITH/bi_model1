@@ -435,7 +435,7 @@ export default function FinishPreviewPage() {
   const anyMedia = Boolean(latestVideo || latestImage || latestAudio);
 
   return (
-    <div className="page pv-page">
+    <div className="page">
       <div className="page-header">
         <div>
           <SectionEyebrow>Finish · export</SectionEyebrow>

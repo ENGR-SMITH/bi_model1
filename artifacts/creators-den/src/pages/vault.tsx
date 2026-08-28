@@ -636,7 +636,7 @@ export default function ContentCreatorsProjectPage() {
     .filter((group) => group.items.length > 0);
 
   return (
-    <div className="page">
+    <div className="page vault-page">
       <div className="cd-billboard mb-6" data-testid="vault-billboard">
         <div className="cd-billboard-scrim" />
         <div className="cd-billboard-body">
