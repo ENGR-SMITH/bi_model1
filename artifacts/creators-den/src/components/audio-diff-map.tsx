@@ -10,12 +10,13 @@
 // Δ class strip, and a spectral map, all sharing one playhead.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { AlertTriangle, Pause, Play } from 'lucide-react';
 import { ANALYSIS_RATE, DEFAULT_FFT_SIZE, DEFAULT_HOP_SIZE, formatSeconds, resample, type AudioDiffOptions, type AudioDiffResult } from '@/audio/dsp';
 import { CLASS_LABELS, DiffStrip, SpectralMap, WaveformLane } from '@/audio/waveform-canvas';
 import { proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
+import { FullscreenButton } from '@/components/preview-shared';
 import type { StudioLeg } from '@/components/role-oracle';
 
 let audioContext: AudioContext | null = null;
@@ -56,6 +57,7 @@ export function AudioDiffMap({
   newerAssetId,
   leg,
   timelineVersionId,
+  annotationHeaderRef,
   olderLabel = 'Older',
   newerLabel = 'Reviewing',
   sensitivity: sensitivityProp,
@@ -70,6 +72,8 @@ export function AudioDiffMap({
    * scoped to it (and to `timelineVersionId` when the selection is a version). */
   leg: StudioLeg;
   timelineVersionId?: string | null;
+  /** The column-header annotation slot — the annotate pencil portals here. */
+  annotationHeaderRef?: RefObject<HTMLDivElement | null>;
   olderLabel?: string;
   newerLabel?: string;
   /** Controlled spectral slack (dB) — owned by the preview page so the
@@ -108,6 +112,7 @@ export function AudioDiffMap({
   const seqRef = useRef(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const newerLaneRef = useRef<HTMLDivElement>(null);
+  const surfRef = useRef<HTMLElement>(null);
 
   const olderUrl = proxyUrlFor(projectId, olderAssetId);
   const newerUrl = proxyUrlFor(projectId, newerAssetId);
@@ -250,7 +255,7 @@ export function AudioDiffMap({
   }, [analysis, playhead, duration]);
 
   return (
-    <section className="df-surf" data-testid="audio-diff-map">
+    <section className="df-surf" ref={surfRef} data-testid="audio-diff-map">
       {error && (
         <div className="df-error" data-testid="df-audio-error">
           <AlertTriangle size={12} /> {error}
@@ -282,6 +287,7 @@ export function AudioDiffMap({
               playheadMs={Math.round(playhead * 1000)}
               onSeek={(ms) => seek(ms / 1000)}
               timelineVersionId={timelineVersionId}
+              headerRef={annotationHeaderRef}
               surfaceRef={stageRef}
               dropLine
             />
@@ -328,6 +334,7 @@ export function AudioDiffMap({
           <span><i className="df-chip red" />Removed</span>
           <span><i className="df-chip grey" />Common</span>
         </div>
+        <FullscreenButton targetRef={surfRef} className="df-fs" />
         <button
           type="button"
           className="df-play-overlay"

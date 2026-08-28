@@ -8,7 +8,7 @@
 // Right column: the pin / comment wall.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ArrowLeft, Image as ImageIcon } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
@@ -48,15 +48,17 @@ function ThumbnailCanvas({
   version,
   assets,
   vaultAssetId,
+  annotationHeaderRef,
 }: {
   projectId: string;
   version: { id: string; version: number; snapshot: unknown } | null;
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
   /** Explicit vault asset to preview (picked from the timeline row). */
   vaultAssetId?: string | null;
+  /** The column-header annotation slot — the annotate pencil portals here. */
+  annotationHeaderRef: RefObject<HTMLDivElement | null>;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
-  const annotationHeaderRef = useRef<HTMLDivElement>(null);
 
   const snap = version ? ((version.snapshot ?? null) as {
     designs?: Array<{ id?: string; assetId: string; title?: string; style?: string }>;
@@ -84,7 +86,6 @@ function ThumbnailCanvas({
         <span className="eyebrow"><ImageIcon size={13} /> Big canvas{version ? ` · THUMBNAIL v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
           {!version && <span className="den-tag teal">vault preview</span>}
-          <div ref={annotationHeaderRef} className="annotation-header-slot" />
         </span>
       </div>
       <div className="pv-stage-player mt-2">
@@ -202,6 +203,21 @@ export default function ThumbnailPreviewPage() {
         : null) ?? null;
   const hasDiff = Boolean(activeSelection && predecessorOf(diffVersions, activeSelection));
 
+  // The annotate pencil ports into the column header, centered between the
+  // canvas label and the view toggle — shared by the preview and diff surfaces.
+  const annotationHeaderRef = useRef<HTMLDivElement>(null);
+
+  // Default the column to the diff map when the timeline has something to
+  // compare (2+ items), otherwise keep the plain preview.
+  const defaultedRef = useRef(false);
+  useEffect(() => {
+    if (defaultedRef.current) return;
+    if (diffVersions.length === 0) return; // still loading
+    defaultedRef.current = true;
+    setView(hasDiff ? 'diff' : 'preview');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasDiff, diffVersions.length]);
+
   // If the selected version suddenly has no older version to compare (e.g. the
   // oldest one is picked), fall the column back to the plain preview view.
   useEffect(() => {
@@ -279,6 +295,7 @@ export default function ThumbnailPreviewPage() {
           onViewChange={setView}
           hasDiff={hasDiff}
           eyebrow={<span className="eyebrow">Big canvas</span>}
+          annotationHeaderRef={annotationHeaderRef}
           settings={diffSettings}
           onSettingsChange={setDiffSettings}
           settingsKind="pixel"
@@ -288,6 +305,7 @@ export default function ThumbnailPreviewPage() {
               version={activeVersion ? { id: activeVersion.id, version: activeVersion.version, snapshot: selectedDetail.data?.snapshot ?? null } : null}
               assets={p.assets}
               vaultAssetId={vaultAssetId ?? undefined}
+              annotationHeaderRef={annotationHeaderRef}
             />
           }
           diff={
@@ -301,6 +319,7 @@ export default function ThumbnailPreviewPage() {
               fallbackAssetIds={(p.assets ?? []).filter((a) => IMAGE_KINDS.has(a.kind)).map((a) => a.id)}
               settings={diffSettings}
               onSettingsChange={setDiffSettings}
+              annotationHeaderRef={annotationHeaderRef}
             />
           }
         />
