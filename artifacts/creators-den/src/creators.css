@@ -1966,15 +1966,6 @@ select optgroup {
   min-height: 24px;
 }
 
-/* Full-screen button inside the diff surface — top-right of the stage so it
-   never covers the transport or the wipe legend. */
-.df-fs {
-  top: 10px;
-  right: 10px;
-  bottom: auto;
-  z-index: 6;
-}
-
 /* Segmented view toggle (Preview / Diff map) at the top of the canvas column. */
 .pv-view-toggle {
   display: inline-flex;
@@ -2246,6 +2237,18 @@ select optgroup {
   transition: border-color .15s, color .15s, background .15s;
 }
 .pv-fs:hover { border-color: hsl(var(--accent)); background: hsl(0 0% 0% / .72); color: hsl(var(--accent)); }
+
+/* Full-screen button inside the diff surface — top-right of the stage so it
+   never covers the transport or the wipe legend. Must come AFTER `.pv-fs`:
+   `.pv-fs` anchors the button to the bottom, and because it is later in the
+   file it would override `bottom: auto` here, leaving the button with both
+   `top` and `bottom` set — which stretches it to the full stage height. */
+.df-fs {
+  top: 10px;
+  right: 10px;
+  bottom: auto;
+  z-index: 6;
+}
 
 /* ---- Role pages: 10 / 50 / 40 columns, 68 / 32 rows ---- */
 /* The role pages keep a slim margin gap around the grid (the full-bleed

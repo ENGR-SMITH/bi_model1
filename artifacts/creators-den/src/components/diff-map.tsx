@@ -148,7 +148,7 @@ export function DiffMap({
   const newerImgRef = useRef<HTMLImageElement>(null);
   const olderImgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rightPaneRef = useRef<HTMLDivElement>(null);
+  const newestPaneRef = useRef<HTMLDivElement>(null);
   const surfRef = useRef<HTMLElement>(null);
   const draggingRef = useRef(false);
   const computeSeqRef = useRef(0);
@@ -344,7 +344,32 @@ export function DiffMap({
           <img ref={olderImgRef} src={olderUrl} alt="" className="df-hidden" data-testid="df-img-older" />
         )}
         <div className="df-split">
-          {/* Left pane — the diff-map (older reference + wipe reveal). */}
+          {/* Left pane — the reviewed (newest) media, annotatable. */}
+          <div className="df-pane" ref={newestPaneRef}>
+            {isImage ? (
+              <img ref={newerImgRef} src={newerUrl} alt={newerLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-newer" />
+            ) : (
+              <video ref={newerVideoRef} src={newerUrl} muted={!playing} playsInline preload="auto" autoPlay={undefined} className="df-pane-media" onLoadedMetadata={() => {
+                const v = newerVideoRef.current;
+                if (v && Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration);
+                setReady(true);
+              }} data-testid="df-pane-video" />
+            )}
+            {/* Only the newest version is annotatable — pins drop here. */}
+            <AnnotationCanvas
+              projectId={projectId}
+              leg={leg}
+              assetId={newerAssetId}
+              playheadMs={isImage ? null : Math.round(playhead * 1000)}
+              onSeek={(ms) => void seek(ms / 1000)}
+              timelineVersionId={timelineVersionId}
+              headerRef={annotationHeaderRef}
+              surfaceRef={newestPaneRef}
+              timecodeReveal={!isImage}
+              glowPins
+            />
+          </div>
+          {/* Right pane — the diff-map (older reference + wipe reveal). */}
           <div className="df-pane df-pane-map">
             <canvas
               ref={canvasRef}
@@ -377,31 +402,6 @@ export function DiffMap({
               <span><i className="df-chip red" />Removed / darker</span>
               <span className="df-mode">WIPE {Math.round(wipePos * 100)}% · {Math.round((1 - wipePos) * 100)}% OPEN</span>
             </div>
-          </div>
-          {/* Right pane — the reviewed (newest) media, annotatable. */}
-          <div className="df-pane" ref={rightPaneRef}>
-            {isImage ? (
-              <img ref={newerImgRef} src={newerUrl} alt={newerLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-newer" />
-            ) : (
-              <video ref={newerVideoRef} src={newerUrl} muted={!playing} playsInline preload="auto" autoPlay={undefined} className="df-pane-media" onLoadedMetadata={() => {
-                const v = newerVideoRef.current;
-                if (v && Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration);
-                setReady(true);
-              }} data-testid="df-pane-video" />
-            )}
-            {/* Only the newest version is annotatable — pins drop here. */}
-            <AnnotationCanvas
-              projectId={projectId}
-              leg={leg}
-              assetId={newerAssetId}
-              playheadMs={isImage ? null : Math.round(playhead * 1000)}
-              onSeek={(ms) => void seek(ms / 1000)}
-              timelineVersionId={timelineVersionId}
-              headerRef={annotationHeaderRef}
-              surfaceRef={rightPaneRef}
-              timecodeReveal={!isImage}
-              glowPins
-            />
           </div>
         </div>
         <FullscreenButton targetRef={surfRef} className="df-fs" />
