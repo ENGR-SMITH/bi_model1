@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { and, eq, gt, sql } from "drizzle-orm";
-import { db, tandemPromoCodesTable, tandemTicketsTable } from "@workspace/db";
+import { db, tandemPromoCodesTable, tandemSubscriptionsTable, tandemTicketsTable } from "@workspace/db";
 import {
   GetTicketStatusResponse,
   PurchaseTicketBody,
@@ -20,7 +20,7 @@ export const PASS_WEEKS = 3;
 export const TICKET_CATEGORIES = ["authors", "content-creators"] as const;
 export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
 
-function luhnValid(number: string): boolean {
+export function luhnValid(number: string): boolean {
   const digits = number.replace(/\s+/g, "");
   if (!/^\d{12,19}$/.test(digits)) return false;
   let sum = 0;
@@ -38,7 +38,7 @@ function luhnValid(number: string): boolean {
 }
 
 /** Expiry is "MM/YY" — must be in the future (through the end of the month). */
-function expiryValid(month: number, year: number): boolean {
+export function expiryValid(month: number, year: number): boolean {
   if (!Number.isInteger(month) || !Number.isInteger(year)) return false;
   if (month < 1 || month > 12) return false;
   if (year < 0 || year > 99) return false;
@@ -55,7 +55,7 @@ interface ResolvedPromo {
   label: string;
 }
 
-async function resolvePromo(raw: string | undefined, priceUsd: number): Promise<ResolvedPromo | null> {
+export async function resolvePromo(raw: string | undefined, priceUsd: number): Promise<ResolvedPromo | null> {
   if (!raw || !raw.trim()) return null;
   const code = raw.trim().toUpperCase();
   const [promo] = await db
@@ -234,6 +234,25 @@ router.post("/tickets/purchase", async (req: Request, res: Response): Promise<vo
       .set({ uses: sql`${tandemPromoCodesTable.uses} + 1` })
       .where(eq(tandemPromoCodesTable.code, promo.code));
   }
+
+  // Record the purchase as a subscription so the TANDEM Subscriptions page
+  // has a full history of every pass (type, price, status, expiry).
+  const baseStart = existing && existing.expiresAt.getTime() > Date.now() ? existing.expiresAt : new Date();
+  await db.insert(tandemSubscriptionsTable).values({
+    id: randomUUID(),
+    userId,
+    kind: "pass",
+    planId: category,
+    planLabel: category === "authors" ? "Author & Writer pass" : "Content Creators pass",
+    priceUsd: total,
+    status: "ACTIVE",
+    intervalLabel: `${PASS_WEEKS} weeks`,
+    periodStart: baseStart,
+    periodEnd: expiresAt,
+    source: "checkout",
+    promoCode: promo?.code ?? null,
+    cardLast4: card.number.replace(/\s+/g, "").slice(-4),
+  });
 
   res.status(201).json(
     PurchaseTicketResponse.parse({

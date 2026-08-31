@@ -1,17 +1,19 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { FileText, HardDrive, Loader2, Upload, X } from 'lucide-react';
+import { FileText, HardDrive, Loader2, Lock, Upload, X } from 'lucide-react';
 import {
   getGetAccountQuotaQueryKey,
   getGetUserCvQueryKey,
+  getSubscriptionPlansQueryKey,
   getUserCvFile,
   useDeleteUserCv,
   useGetAccountQuota,
   useGetUserCv,
-  usePurchaseAccountQuota,
+  usePurchaseSubscription,
+  useSubscriptionPlans,
   useUploadUserCv,
 } from '@workspace/api-client-react';
-import type { StoragePlan } from '@workspace/api-client-react';
+import type { SubscriptionCard } from '@workspace/api-client-react';
 
 // ---------------------------------------------------------------------------
 // Account panels — the workspace storage bar (2 GB free, buy-more plans) and
@@ -67,49 +69,105 @@ export function StorageBar() {
   );
 }
 
-// The buy-more plans modal — $20/200GB, $40/500GB, $60/1TB as specified. The
-// purchase applies server-side immediately (payment checkout hooks in later).
+// The buy-more space modal — $20/200GB, $40/500GB, $60/1TB as specified. The
+// in-app checkout now records a real subscription (billed through Clerk when
+// configured) and the bar updates the moment a plan is applied.
+function formatCardNumber(value: string): string {
+  return value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ').trim();
+}
+function formatExpiry(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 4);
+  return d.length <= 2 ? d : `${d.slice(0, 2)}/${d.slice(2)}`;
+}
+
 export function BuySpaceModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const quota = useGetAccountQuota();
-  const purchase = usePurchaseAccountQuota({
+  const plansQuery = useSubscriptionPlans();
+  const purchase = usePurchaseSubscription({
     mutation: {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getGetAccountQuotaQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
         onClose();
       },
     },
   });
 
-  const plans: StoragePlan[] = quota.data?.plans.storage ?? [];
+  const plans = (plansQuery.data?.plans ?? []).filter((p) => p.kind === 'storage');
+  const [selected, setSelected] = useState<string | null>(plans[0]?.planId ?? null);
+  const [card, setCard] = useState({ number: '', expiry: '', cvc: '' });
+  const [error, setError] = useState('');
+
+  const pay = () => {
+    if (!selected) return;
+    setError('');
+    const digits = card.number.replace(/\D/g, '');
+    const [month, year] = card.expiry.split('/');
+    if (digits.length < 12) { setError('Enter the full card number'); return; }
+    if (!month || !year || month.length !== 2 || year.length !== 2) { setError('Enter the card expiry as MM/YY'); return; }
+    if (!card.cvc) { setError('Enter the security code'); return; }
+    const cardPayload: SubscriptionCard = { number: digits, expiryMonth: Number(month), expiryYear: Number(year), cvc: card.cvc };
+    purchase.mutate({ data: { kind: 'storage', planId: selected, card: cardPayload } });
+  };
+
   return (
     <div className="modal-backdrop" onClick={purchase.isPending ? undefined : onClose}>
       <div className="modal small-modal plan-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
         <button type="button" className="modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
         <span className="eyebrow">WORKSPACE STORAGE</span>
         <h2>Buy more space.</h2>
-        <p>Extend the storage limit on your account. The bar above updates the moment a plan is applied.</p>
+        <p>Pick a plan, then pay right here — it&apos;s a real subscription on your account. The bar updates the moment it applies.</p>
         <div className="plan-grid" data-testid="plan-grid-storage">
           {plans.map((plan) => (
             <button
-              key={plan.id}
+              key={plan.planId}
               type="button"
-              className="plan-option"
-              onClick={() => purchase.mutate({ data: { kind: 'storage', planId: plan.id } })}
+              className={`plan-option ${selected === plan.planId ? 'is-selected' : ''}`}
+              onClick={() => setSelected(plan.planId)}
               disabled={purchase.isPending}
-              data-testid={`plan-${plan.id}`}
+              data-testid={`plan-${plan.planId}`}
             >
-              <b>{plan.label}</b>
-              <em>${plan.priceUsd}</em>
-              <small>{plan.id === 'tb1' ? 'For the long cuts' : plan.id === 'g500' ? 'Most popular' : 'A quick boost'}</small>
+              <b>{plan.planLabel}</b>
+              <em>${(plan.priceUsd / 100).toFixed(2)}</em>
+              <small>{plan.planId === 'tb1' ? 'For the long cuts' : plan.planId === 'g500' ? 'Most popular' : 'A quick boost'}</small>
             </button>
           ))}
         </div>
-        {purchase.isPending && (
-          <p className="plan-pending"><Loader2 size={13} className="spin" /> Applying plan…</p>
-        )}
+        <div className="buy-checkout">
+          <label className="buy-field">
+            <span>Card number</span>
+            <input value={card.number} onChange={(e) => setCard({ ...card, number: formatCardNumber(e.target.value) })} placeholder="4242 4242 4242 4242" inputMode="numeric" data-testid="buy-card-number" />
+          </label>
+          <div className="buy-field-row">
+            <label className="buy-field">
+              <span>Expiry</span>
+              <input value={card.expiry} onChange={(e) => setCard({ ...card, expiry: formatExpiry(e.target.value) })} placeholder="MM/YY" inputMode="numeric" data-testid="buy-card-expiry" />
+            </label>
+            <label className="buy-field">
+              <span>CVC</span>
+              <input value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="123" inputMode="numeric" data-testid="buy-card-cvc" />
+            </label>
+          </div>
+        </div>
+        {error && <p className="buy-error" role="alert">{error}</p>}
+        {purchase.isError && <p className="buy-error" role="alert">{
+          ((purchase.error as { response?: { data?: { error?: string } }; message?: string } | null)?.response?.data?.error
+            || (purchase.error as { message?: string } | null)?.message
+            || 'The payment could not be completed. Check your card and try again.')
+        }</p>}
+        <button
+          type="button"
+          className="primary-btn w-full mt-3"
+          onClick={pay}
+          disabled={purchase.isPending || !selected}
+          data-testid="btn-pay-space"
+        >
+          {purchase.isPending ? <Loader2 size={13} className="spin" /> : <Lock size={13} />}
+          {purchase.isPending ? 'Processing…' : `Pay for more space`}
+        </button>
         <p className="den-footnote mt-3">
-          Payment is processed through your Tandem account checkout.
+          You can also manage every plan on your{' '}
+          <a href="/subscriptions" className="link-btn" data-testid="link-tandem-subscriptions">TANDEM Subscriptions page</a>.
         </p>
       </div>
     </div>

@@ -4164,6 +4164,12 @@ select optgroup {
   color: #fff; font: 700 10px var(--app-font-sans);
   border: 2px solid hsl(var(--card));
 }
+/* The bell carries an explicit INBOX label under the icon. */
+.cd-topnav-bell-wrap { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; }
+.cd-topnav-bell-label {
+  font: 8px var(--app-font-mono); letter-spacing: .14em; text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
 
 /* ---- Review chip (secondary nav, Captain-only) --------------------------- */
 .cd-topnav-chip .cd-topnav-review {
@@ -4188,6 +4194,12 @@ select optgroup {
   border-radius: 999px;
   background: hsl(var(--sidebar-primary));
   color: #fff; font: 700 10px var(--app-font-sans);
+}
+/* The Review tab's pending badge, when Review lives on the project nav rail. */
+.cd-nav-badge {
+  position: static;
+  margin-left: 5px;
+  background: hsl(var(--destructive));
 }
 
 /* ---- Notifications page -------------------------------------------------- */
@@ -4292,4 +4304,12 @@ select optgroup {
 .plan-option b { font-size: 13px; }
 .plan-option em { font: italic 700 22px var(--app-font-serif); color: hsl(var(--accent)); }
 .plan-option small { color: hsl(var(--muted-foreground)); font-size: 9px; }
+.plan-option.is-selected { border-color: hsl(var(--accent)); background: hsl(var(--accent) / .1); box-shadow: inset 0 0 0 1px hsl(var(--accent) / .5); }
+.buy-checkout { margin-top: 13px; display: flex; flex-direction: column; gap: 9px; }
+.buy-field { display: flex; flex-direction: column; gap: 4px; }
+.buy-field > span { font: 9px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.buy-field input { border: 1px solid hsl(var(--border)); border-radius: 9px; padding: 10px 12px; font: inherit; font-size: 14px; background: hsl(var(--background) / .4); color: hsl(var(--foreground)); outline: none; }
+.buy-field input:focus { border-color: hsl(var(--accent)); box-shadow: 0 0 0 3px hsl(var(--accent) / .14); }
+.buy-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.buy-error { color: hsl(var(--destructive)); font-size: 12px; margin-top: 6px; }
 .plan-pending { display: flex; align-items: center; gap: 7px; color: hsl(var(--muted-foreground)); font-size: 11px; margin: 14px 0 0; }

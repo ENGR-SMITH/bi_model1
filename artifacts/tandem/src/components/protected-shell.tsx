@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   LogOut,
   Settings2,
+  Ticket,
   UserRound,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -18,12 +19,14 @@ const desktopNav = [
   { href: '/dashboard', label: 'Atrium', icon: LayoutGrid },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
+  { href: '/subscriptions', label: 'Subscriptions', icon: Ticket },
 ];
 
 const mobileNav = [
   { href: '/dashboard', label: 'Atrium', icon: LayoutGrid },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
+  { href: '/subscriptions', label: 'Subscriptions', icon: Ticket },
   { href: '/profile', label: 'Profile', icon: UserRound },
 ];
 
@@ -149,7 +152,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
         </div>
       </div>
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-[#d6cbb9] bg-[#fff4e6]/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-lg lg:hidden" aria-label="Mobile navigation">
-        <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
           {mobileNav.map((item) => {
             const Icon = item.icon;
             const active = location === item.href;

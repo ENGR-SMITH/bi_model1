@@ -259,14 +259,17 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           <ExploreSearch />
 
           <div className="cd-topnav-account">
-            <Link href="/notifications" className="cd-topnav-bell" aria-label="Notifications" title="Notifications" data-testid="nav-notifications">
-              <Bell size={16} />
-              {unreadCount > 0 && (
-                <span className="cd-topnav-bell-badge" data-testid="nav-notifications-badge">
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
-              )}
-            </Link>
+            <span className="cd-topnav-bell-wrap">
+              <Link href="/notifications" className="cd-topnav-bell" aria-label="Notifications" title="Notifications" data-testid="nav-notifications">
+                <Bell size={16} />
+                {unreadCount > 0 && (
+                  <span className="cd-topnav-bell-badge" data-testid="nav-notifications-badge">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </Link>
+              <span className="cd-topnav-bell-label">INBOX</span>
+            </span>
             <UserChip />
           </div>
         </div>
@@ -296,20 +299,6 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
               </div>
             </div>
-            {/* The Review desk chip — Captain-only, with a pending-count badge. */}
-            {isCaptain && (
-              <div className="cd-topnav-chip">
-                <Link href="/review" className="cd-topnav-review" title="Review submissions" data-testid="nav-review">
-                  <GitPullRequest size={13} />
-                  <span>Review</span>
-                  {pendingReviews > 0 && (
-                    <b className="cd-topnav-review-badge" data-testid="nav-review-badge">
-                      {pendingReviews}
-                    </b>
-                  )}
-                </Link>
-              </div>
-            )}
           </div>
 
           {projectId && (
@@ -317,6 +306,17 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
               <div className="cd-tab-group">
                 {/* A public (non-member) viewer only gets PREVIEW + TIMELINE. */}
                 {!readOnly && tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
+                {/* The Review desk moved onto the nav as a Captain-only tab,
+                    sitting right beside the Vault. */}
+                {!readOnly && isCaptain && (
+                  <Link href="/review" className={`cd-tab ${location === '/review' ? 'active' : ''}`} data-testid="nav-review">
+                    <GitPullRequest size={15} />
+                    <span>Review</span>
+                    {pendingReviews > 0 && (
+                      <b className="cd-topnav-review-badge cd-nav-badge" data-testid="nav-review-badge">{pendingReviews}</b>
+                    )}
+                  </Link>
+                )}
                 {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
                 {tab(`/projects/${projectId}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview', true)}
               </div>
