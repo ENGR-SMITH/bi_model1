@@ -1448,6 +1448,14 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
 .plan-option b { font-size: 13px; }
 .plan-option em { font: italic 700 22px var(--app-font-serif); color: hsl(var(--accent)); }
 .plan-option small { color: hsl(var(--muted-foreground)); font-size: 9px; }
+.plan-option.is-selected { border-color: hsl(var(--accent)); background: hsl(var(--accent) / .1); box-shadow: inset 0 0 0 1px hsl(var(--accent) / .5); }
+.buy-checkout { margin-top: 13px; display: flex; flex-direction: column; gap: 9px; }
+.buy-field { display: flex; flex-direction: column; gap: 4px; }
+.buy-field > span { font: 9px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
+.buy-field input { border: 1px solid hsl(var(--border)); border-radius: 9px; padding: 10px 12px; font: inherit; font-size: 14px; background: hsl(var(--background) / .4); color: hsl(var(--foreground)); outline: none; }
+.buy-field input:focus { border-color: hsl(var(--accent)); box-shadow: 0 0 0 3px hsl(var(--accent) / .14); }
+.buy-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.buy-error { color: hsl(var(--destructive)); font-size: 12px; margin-top: 6px; }
 .plan-pending { display: flex; align-items: center; gap: 7px; color: hsl(var(--muted-foreground)); font-size: 11px; margin: 14px 0 0; }
 .profile-footnote { color: hsl(var(--muted-foreground)); font-size: 11px; }
 .min-w-0 { min-width: 0; }

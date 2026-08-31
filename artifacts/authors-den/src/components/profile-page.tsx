@@ -1,18 +1,20 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUser } from "@clerk/react";
-import { FileText, FolderOpen, HardDrive, Loader2, Upload, X } from "lucide-react";
+import { FileText, FolderOpen, HardDrive, Loader2, Lock, Upload, X } from "lucide-react";
 import {
   getGetAccountQuotaQueryKey,
   getGetUserCvQueryKey,
+  getSubscriptionPlansQueryKey,
   getUserCvFile,
   useDeleteUserCv,
   useGetAccountQuota,
   useGetUserCv,
-  usePurchaseAccountQuota,
+  usePurchaseSubscription,
+  useSubscriptionPlans,
   useUploadUserCv,
 } from "@workspace/api-client-react";
-import type { ProjectPlan } from "@workspace/api-client-react";
+import type { SubscriptionCard } from "@workspace/api-client-react";
 
 // ---------------------------------------------------------------------------
 // Author Den profile — the account's project-count bar (5 free projects,
@@ -89,48 +91,106 @@ export function ProfilePage({ projectCount }: { projectCount: number }) {
 }
 
 // The buy-more projects modal — $5/10, $20/50, $50/200 as specified. The
-// purchase applies to the account server-side; the bar refreshes instantly.
-// Also rendered app-wide when a create/duplicate hits the limit.
+// in-app checkout records a real subscription (billed through Clerk when
+// configured); the bar refreshes instantly. Also rendered app-wide when a
+// create/duplicate hits the limit.
+function formatCardNumber(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 16).replace(/(\d{4})(?=\d)/g, "$1 ").trim();
+}
+function formatExpiry(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 4);
+  return d.length <= 2 ? d : `${d.slice(0, 2)}/${d.slice(2)}`;
+}
+
 export function BuyProjectsModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
-  const quota = useGetAccountQuota();
-  const purchase = usePurchaseAccountQuota({
+  const plansQuery = useSubscriptionPlans();
+  const purchase = usePurchaseSubscription({
     mutation: {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getGetAccountQuotaQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
         onClose();
       },
     },
   });
 
-  const plans: ProjectPlan[] = quota.data?.plans.projects ?? [];
+  const plans = (plansQuery.data?.plans ?? []).filter((p) => p.kind === "projects");
+  const [selected, setSelected] = useState<string | null>(plans[0]?.planId ?? null);
+  const [card, setCard] = useState({ number: "", expiry: "", cvc: "" });
+  const [error, setError] = useState("");
+
+  const pay = () => {
+    if (!selected) return;
+    setError("");
+    const digits = card.number.replace(/\D/g, "");
+    const [month, year] = card.expiry.split("/");
+    if (digits.length < 12) { setError("Enter the full card number"); return; }
+    if (!month || !year || month.length !== 2 || year.length !== 2) { setError("Enter the card expiry as MM/YY"); return; }
+    if (!card.cvc) { setError("Enter the security code"); return; }
+    const payload: SubscriptionCard = { number: digits, expiryMonth: Number(month), expiryYear: Number(year), cvc: card.cvc };
+    purchase.mutate({ data: { kind: "projects", planId: selected, card: payload } });
+  };
+
   return (
     <div className="modal-backdrop" onClick={purchase.isPending ? undefined : onClose}>
       <div className="modal small-modal plan-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
         <button type="button" className="modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
         <span className="eyebrow">WORK PROJECTS</span>
         <h2>Buy more projects.</h2>
-        <p>Extend the number of projects your account can hold. The bar above updates the moment a plan is applied.</p>
+        <p>Pick a plan, then pay right here — it&apos;s a real subscription on your account. The bar updates the moment it applies.</p>
         <div className="plan-grid" data-testid="plan-grid-projects">
           {plans.map((plan) => (
             <button
-              key={plan.id}
+              key={plan.planId}
               type="button"
-              className="plan-option"
-              onClick={() => purchase.mutate({ data: { kind: "projects", planId: plan.id } })}
+              className={`plan-option ${selected === plan.planId ? "is-selected" : ""}`}
+              onClick={() => setSelected(plan.planId)}
               disabled={purchase.isPending}
-              data-testid={`plan-${plan.id}`}
+              data-testid={`plan-${plan.planId}`}
             >
-              <b>+{plan.count} projects</b>
-              <em>${plan.priceUsd}</em>
-              <small>{plan.count === 10 ? "A quick boost" : plan.count === 50 ? "Most popular" : "For the prolific"}</small>
+              <b>+{plan.planId.replace("p", "")} projects</b>
+              <em>${(plan.priceUsd / 100).toFixed(2)}</em>
+              <small>{plan.planId === "p50" ? "Most popular" : plan.planId === "p10" ? "A quick boost" : "For the prolific"}</small>
             </button>
           ))}
         </div>
-        {purchase.isPending && (
-          <p className="plan-pending"><Loader2 size={13} className="spin" /> Applying plan…</p>
-        )}
-        <p className="profile-footnote mt-3">Payment is processed through your Tandem account checkout.</p>
+        <div className="buy-checkout">
+          <label className="buy-field">
+            <span>Card number</span>
+            <input value={card.number} onChange={(e) => setCard({ ...card, number: formatCardNumber(e.target.value) })} placeholder="4242 4242 4242 4242" inputMode="numeric" data-testid="buy-card-number" />
+          </label>
+          <div className="buy-field-row">
+            <label className="buy-field">
+              <span>Expiry</span>
+              <input value={card.expiry} onChange={(e) => setCard({ ...card, expiry: formatExpiry(e.target.value) })} placeholder="MM/YY" inputMode="numeric" data-testid="buy-card-expiry" />
+            </label>
+            <label className="buy-field">
+              <span>CVC</span>
+              <input value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="123" inputMode="numeric" data-testid="buy-card-cvc" />
+            </label>
+          </div>
+        </div>
+        {error && <p className="buy-error" role="alert">{error}</p>}
+        {purchase.isError && <p className="buy-error" role="alert">{
+          ((purchase.error as { response?: { data?: { error?: string } }; message?: string } | null)?.response?.data?.error
+            || (purchase.error as { message?: string } | null)?.message
+            || "The payment could not be completed. Check your card and try again.")
+        }</p>}
+        <button
+          type="button"
+          className="primary-btn w-full mt-3"
+          onClick={pay}
+          disabled={purchase.isPending || !selected}
+          data-testid="btn-pay-projects"
+        >
+          {purchase.isPending ? <Loader2 size={13} className="spin" /> : <Lock size={13} />}
+          {purchase.isPending ? "Processing…" : "Pay for more projects"}
+        </button>
+        <p className="profile-footnote mt-3">
+          You can also manage every plan on your{' '}
+          <a href="/subscriptions" className="link-btn" data-testid="link-tandem-subscriptions">TANDEM Subscriptions page</a>.
+        </p>
       </div>
     </div>
   );

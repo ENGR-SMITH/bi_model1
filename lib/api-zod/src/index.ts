@@ -6,3 +6,4 @@ export * from "./generated/api";
 export type { ListVideoActivityParams } from "./generated/types";
 export * from "./generated/types";
 export * from './generated/types';
+export * from './subscriptions';

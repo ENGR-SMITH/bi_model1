@@ -16,6 +16,7 @@ import ActivityPage from '@/pages/activity';
 import InboxPage from '@/pages/inbox';
 import ProfilePage from '@/pages/profile';
 import CollaborationPage from '@/pages/collaboration';
+import SubscriptionsPage from '@/pages/subscriptions';
 
 import { ProtectedRoute } from '@/components/protected-shell';
 import {
@@ -139,6 +140,7 @@ function RouterWithAuth() {
       <Route path="/activity" component={ActivityRoute} />
       <Route path="/inbox" component={InboxRoute} />
       <Route path="/profile" component={ProfileRoute} />
+      <Route path="/subscriptions" component={SubscriptionsRoute} />
       <Route path="/authors/pitch-board/new" component={CollaborationRoute} />
       <Route path="/authors/pitch-board" component={CollaborationRoute} />
       <Route path="/authors/pitch-board/seed/:seedId" component={CollaborationRoute} />
@@ -187,6 +189,10 @@ function ProfileRoute() {
 
 function CollaborationRoute() {
   return <ProtectedRoute><CollaborationPage /></ProtectedRoute>;
+}
+
+function SubscriptionsRoute() {
+  return <ProtectedRoute><SubscriptionsPage /></ProtectedRoute>;
 }
 
 export default App;

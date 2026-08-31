@@ -331,6 +331,29 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             Cards are validated securely; only the last four digits are stored. Test card: 4242 4242 4242 4242.
           </p>
         </div>
+
+        {/* Coupon detach footer — barcode + expiry, so the pass reads like a
+            printed coupon you tear off along the dashed line. */}
+        <div className="flex items-center gap-4 border-t-2 border-dashed border-[#d6cbb9] px-6 py-4">
+          <div className="flex flex-col items-center gap-1" aria-hidden>
+            <span className="h-8 w-5 -rotate-90 rounded-md border-2 border-dashed border-[#e55b4c]" />
+            <span className="font-mono-ui text-[8px] uppercase tracking-[0.18em] text-[#e55b4c]">Tear</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#77717a]">Tandem access pass · {weeks} weeks</p>
+            <div className="mt-2 flex h-8 items-end gap-[2px]">
+              {Array.from({ length: 26 }).map((_, i) => (
+                <span key={i} className="rounded-[1px] bg-[#292b45]" style={{ width: '2px', height: `${34 + ((i * 47) % 46)}%` }} />
+              ))}
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-[#77717a]">Valid until</p>
+            <p className="mt-1 font-display text-sm italic text-[#292b45]">
+              {new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

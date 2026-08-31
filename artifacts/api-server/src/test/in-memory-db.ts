@@ -457,6 +457,25 @@ export const tandemPromoCodesTable = sqliteTable("tandem_promo_codes", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
+export const tandemSubscriptionsTable = sqliteTable("tandem_subscriptions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  kind: text("kind").notNull(),
+  planId: text("plan_id").notNull(),
+  planLabel: text("plan_label").notNull(),
+  priceUsd: integer("price_usd").notNull(),
+  status: text("status").notNull().default("ACTIVE"),
+  intervalLabel: text("interval_label").notNull().default(""),
+  periodStart: integer("period_start", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  periodEnd: integer("period_end", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  source: text("source").notNull().default("checkout"),
+  clerkSubscriptionId: text("clerk_subscription_id"),
+  promoCode: text("promo_code"),
+  cardLast4: text("card_last_4"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const tandemUserCvsTable = sqliteTable("tandem_user_cvs", {
   userId: text("user_id").primaryKey(),
   fileName: text("file_name").notNull(),
@@ -779,6 +798,16 @@ export async function buildInMemoryDb() {
       uses INTEGER NOT NULL DEFAULT 0, expires_at INTEGER,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE tandem_subscriptions (
+      id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
+      kind TEXT NOT NULL, plan_id TEXT NOT NULL, plan_label TEXT NOT NULL,
+      price_usd INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE',
+      interval_label TEXT NOT NULL DEFAULT '',
+      period_start INTEGER NOT NULL, period_end INTEGER NOT NULL,
+      source TEXT NOT NULL DEFAULT 'checkout',
+      clerk_subscription_id TEXT, promo_code TEXT, card_last_4 TEXT,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
     CREATE TABLE tandem_account_quotas (
       user_id TEXT PRIMARY KEY NOT NULL,
       storage_limit_bytes INTEGER NOT NULL,
@@ -861,6 +890,7 @@ export async function buildInMemoryDb() {
     tandemUserCvsTable,
     tandemTicketsTable,
     tandemPromoCodesTable,
+    tandemSubscriptionsTable,
   };
   return { db, tables, exports: { db, ...tables } };
 }
