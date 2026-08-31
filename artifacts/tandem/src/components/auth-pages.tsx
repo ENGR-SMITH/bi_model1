@@ -29,24 +29,24 @@ export const clerkAppearance = {
   },
   elements: {
     rootBox: 'w-full flex justify-center',
-    cardBox: 'bg-[#fff4e6] border-2 border-[#d6cbb9] rounded-[1.5rem] w-[440px] max-w-full overflow-hidden shadow-[10px_12px_0_rgba(41,43,69,0.10)]',
+    cardBox: 'bg-[#111111] border-2 border-white/10 rounded-[1.5rem] w-[440px] max-w-full overflow-hidden shadow-[10px_12px_0_rgba(41,43,69,0.10)]',
     card: '!shadow-none !border-0 !bg-transparent !rounded-none',
     footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    headerTitle: 'text-[#292b45] font-extrabold tracking-[-0.05em]',
-    headerSubtitle: 'text-[#77717a]',
-    socialButtonsBlockButtonText: 'text-[#292b45] font-bold',
-    formFieldLabel: 'text-[#625f6d] font-bold',
-    footerActionLink: 'text-[#e55b4c] font-bold',
-    footerActionText: 'text-[#77717a]',
-    dividerText: 'text-[#77717a]',
+    headerTitle: 'text-white font-extrabold tracking-[-0.05em]',
+    headerSubtitle: 'text-zinc-500',
+    socialButtonsBlockButtonText: 'text-white font-bold',
+    formFieldLabel: 'text-zinc-400 font-bold',
+    footerActionLink: 'text-[#3b82f6] font-bold',
+    footerActionText: 'text-zinc-500',
+    dividerText: 'text-zinc-500',
     logoBox: 'hidden',
-    socialButtonsBlockButton: 'border-2 border-[#d6cbb9] bg-[#f7eddf] hover:bg-[#ebe0d0]',
-    formButtonPrimary: 'bg-[#292b45] text-[#fff4e6] hover:bg-[#3e8074] font-bold',
-    formFieldInput: 'border-2 border-[#d6cbb9] bg-[#f7eddf] text-[#292b45] focus:border-[#e55b4c]',
-    alert: 'border-2 border-[#e55b4c] bg-[#fbe4dc]',
+    socialButtonsBlockButton: 'border-2 border-white/10 bg-[#111111] hover:bg-[#111111]',
+    formButtonPrimary: 'bg-[#111111] text-[#fff4e6] hover:bg-[#3e8074] font-bold',
+    formFieldInput: 'border-2 border-white/10 bg-[#111111] text-white focus:border-[#3b82f6]',
+    alert: 'border-2 border-[#3b82f6] bg-[#fbe4dc]',
     alertText: 'text-[#8e342b]',
     formFieldSuccessText: 'text-[#3e8074]',
-    identityPreviewEditButton: 'text-[#e55b4c] font-bold',
+    identityPreviewEditButton: 'text-[#3b82f6] font-bold',
     dividerLine: 'bg-[#d6cbb9]',
     main: 'gap-5',
   },
@@ -57,21 +57,21 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
     <main className="paper-noise atrium-grid flex min-h-[100dvh] flex-col items-center px-5 py-7 sm:px-8 sm:py-10">
       <div className="flex w-full max-w-[1060px] items-center justify-between">
         <TandemLogo />
-        <Link href="/" className="focus-house inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold text-[#625f6d] hover:bg-[#ebe0d0]" data-testid="link-auth-back-home">
+        <Link href="/" className="focus-house inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold text-zinc-400 hover:bg-[#111111]" data-testid="link-auth-back-home">
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to the house
         </Link>
       </div>
       <div className="grid w-full max-w-[1060px] flex-1 items-center gap-10 py-12 lg:grid-cols-[.78fr_1fr] lg:gap-20">
         <div className="hidden lg:block">
-          <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#e55b4c]">A private door</p>
-          <h1 className="mt-6 max-w-[8ch] text-7xl font-extrabold leading-[.86] tracking-[-0.08em] text-[#292b45]">Come in, there&apos;s room.</h1>
-          <p className="mt-7 max-w-[20rem] text-sm leading-[1.8] text-[#625f6d]">Tandem is where unfinished ideas find the person who can change their shape.</p>
+          <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">A private door</p>
+          <h1 className="mt-6 max-w-[8ch] text-7xl font-extrabold leading-[.86] tracking-[-0.08em] text-white">Come in, there&apos;s room.</h1>
+          <p className="mt-7 max-w-[20rem] text-sm leading-[1.8] text-zinc-400">Tandem is where unfinished ideas find the person who can change their shape.</p>
           <div className="mt-10 h-2 w-20 rounded-full bg-[#f0c85c]" />
         </div>
         <div className="flex justify-center">{children}</div>
       </div>
-      <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#98909a]">Tandem / a house for creative connection</p>
+      <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-600">Tandem / a house for creative connection</p>
     </main>
   );
 }

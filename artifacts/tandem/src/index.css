@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 @layer theme, base, clerk, components, utilities;
 @import 'tailwindcss';
 @import '@clerk/themes/shadcn.css';
@@ -52,80 +52,88 @@
 }
 
 :root {
-  --background: 36 45% 92%;
-  --foreground: 228 31% 20%;
-  --border: 35 24% 77%;
-  --input: 35 24% 77%;
-  --ring: 9 72% 57%;
-  --card: 37 50% 95%;
-  --card-foreground: 228 31% 20%;
-  --card-border: 35 24% 77%;
-  --popover: 37 50% 95%;
-  --popover-foreground: 228 31% 20%;
-  --popover-border: 35 24% 77%;
-  --primary: 9 72% 57%;
-  --primary-foreground: 36 45% 92%;
-  --secondary: 169 27% 39%;
-  --secondary-foreground: 37 50% 95%;
-  --muted: 35 33% 86%;
-  --muted-foreground: 227 14% 42%;
-  --accent: 43 79% 62%;
-  --accent-foreground: 228 31% 20%;
-  --destructive: 2 63% 46%;
-  --destructive-foreground: 37 50% 95%;
-  --sidebar: 228 31% 20%;
-  --sidebar-foreground: 37 50% 95%;
-  --sidebar-border: 228 22% 30%;
-  --sidebar-primary: 9 72% 57%;
-  --sidebar-primary-foreground: 37 50% 95%;
-  --sidebar-accent: 228 22% 30%;
-  --sidebar-accent-foreground: 37 50% 95%;
-  --sidebar-ring: 9 72% 57%;
-  --app-font-sans: 'Manrope', sans-serif;
-  --app-font-serif: 'Newsreader', Georgia, serif;
-  --app-font-mono: 'DM Mono', monospace;
-  --radius: 1rem;
-  --elevate-1: rgba(228, 82, 65, 0.08);
-  --elevate-2: rgba(228, 82, 65, 0.15);
-  --house-cream: #f2e7d8;
-  --house-paper: #fff4e6;
-  --house-ink: #292b45;
-  --house-coral: #e55b4c;
-  --house-teal: #3e8074;
-  --house-gold: #f0c85c;
-  --house-line: #d6cbb9;
+  /* Premium dark theme — Resend/Framer inspired */
+  --background: 0 0% 4%;
+  --foreground: 0 0% 98%;
+  --border: 0 0% 100% / 0.08;
+  --input: 0 0% 100% / 0.08;
+  --ring: 217 91% 60%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 98%;
+  --card-border: 0 0% 100% / 0.08;
+  --popover: 0 0% 7%;
+  --popover-foreground: 0 0% 98%;
+  --popover-border: 0 0% 100% / 0.08;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 64%;
+  --accent: 217 91% 60%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --sidebar: 0 0% 6%;
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-border: 0 0% 100% / 0.08;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-ring: 217 91% 60%;
+  --app-font-sans: 'Inter', system-ui, sans-serif;
+  --app-font-serif: 'Inter', system-ui, sans-serif;
+  --app-font-mono: 'JetBrains Mono', monospace;
+  --radius: 0.75rem;
+  --elevate-1: rgba(59, 130, 246, 0.08);
+  --elevate-2: rgba(59, 130, 246, 0.15);
+  /* Tandem premium palette */
+  --tandem-bg: #0a0a0a;
+  --tandem-surface: #111111;
+  --tandem-surface-2: #161616;
+  --tandem-border: rgba(255, 255, 255, 0.08);
+  --tandem-border-strong: rgba(255, 255, 255, 0.14);
+  --tandem-text: #fafafa;
+  --tandem-text-muted: #a1a1aa;
+  --tandem-text-dim: #71717a;
+  --tandem-accent: #3b82f6;
+  --tandem-accent-soft: rgba(59, 130, 246, 0.12);
+  --tandem-accent-border: rgba(59, 130, 246, 0.35);
+  --tandem-success: #34d399;
+  --tandem-warning: #fbbf24;
 }
 
 .dark {
-  --background: 228 31% 14%;
-  --foreground: 37 50% 95%;
-  --border: 228 22% 30%;
-  --input: 228 22% 30%;
-  --ring: 43 79% 62%;
-  --card: 228 27% 18%;
-  --card-foreground: 37 50% 95%;
-  --card-border: 228 22% 30%;
-  --popover: 228 27% 18%;
-  --popover-foreground: 37 50% 95%;
-  --popover-border: 228 22% 30%;
-  --primary: 9 72% 60%;
-  --primary-foreground: 228 31% 14%;
-  --secondary: 169 27% 49%;
-  --secondary-foreground: 228 31% 14%;
-  --muted: 228 25% 23%;
-  --muted-foreground: 35 18% 70%;
-  --accent: 43 79% 62%;
-  --accent-foreground: 228 31% 14%;
-  --destructive: 2 63% 55%;
-  --destructive-foreground: 228 31% 14%;
-  --sidebar: 228 35% 10%;
-  --sidebar-foreground: 37 50% 95%;
-  --sidebar-border: 228 22% 23%;
-  --sidebar-primary: 9 72% 60%;
-  --sidebar-primary-foreground: 228 31% 14%;
-  --sidebar-accent: 228 25% 19%;
-  --sidebar-accent-foreground: 37 50% 95%;
-  --sidebar-ring: 43 79% 62%;
+  --background: 0 0% 4%;
+  --foreground: 0 0% 98%;
+  --border: 0 0% 100% / 0.08;
+  --input: 0 0% 100% / 0.08;
+  --ring: 217 91% 60%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 98%;
+  --card-border: 0 0% 100% / 0.08;
+  --popover: 0 0% 7%;
+  --popover-foreground: 0 0% 98%;
+  --popover-border: 0 0% 100% / 0.08;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 0 0% 10%;
+  --muted-foreground: 0 0% 64%;
+  --accent: 217 91% 60%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+  --sidebar: 0 0% 6%;
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-border: 0 0% 100% / 0.08;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 12%;
+  --sidebar-accent-foreground: 0 0% 98%;
+  --sidebar-ring: 217 91% 60%;
 }
 
 @layer base {
@@ -136,56 +144,83 @@
     min-width: 320px;
   }
   button, a { -webkit-tap-highlight-color: transparent; }
+  ::selection { background: rgba(59, 130, 246, 0.3); color: #fafafa; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #0a0a0a; }
+  ::-webkit-scrollbar-thumb { background: #262626; border-radius: 5px; border: 2px solid #0a0a0a; }
+  ::-webkit-scrollbar-thumb:hover { background: #404040; }
 }
 
 @layer utilities {
-  .font-display { font-family: var(--app-font-serif); }
+  .font-display { font-family: var(--app-font-sans); letter-spacing: -0.02em; }
   .font-mono-ui { font-family: var(--app-font-mono); }
-  .house-grid {
-    background-image: linear-gradient(rgba(74, 71, 91, 0.08) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(74, 71, 91, 0.08) 1px, transparent 1px);
-    background-size: 28px 28px;
+  .tandem-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
   }
-  .paper-noise { position: relative; }
-  .paper-noise::after {
-    content: '';
-    pointer-events: none;
-    position: fixed;
-    inset: 0;
-    opacity: 0.035;
-    z-index: 20;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.65'/%3E%3C/svg%3E");
+  .glow-accent {
+    box-shadow: 0 0 40px -8px rgba(59, 130, 246, 0.25);
   }
-  .door-shadow { box-shadow: 10px 12px 0 rgba(39, 43, 68, 0.12); }
-  .reveal { animation: reveal 700ms cubic-bezier(.2,.8,.2,1) both; }
+  .glow-accent-strong {
+    box-shadow: 0 0 60px -10px rgba(59, 130, 246, 0.4);
+  }
+  .card-surface {
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .card-surface-hover {
+    transition: border-color 200ms ease, background 200ms ease, transform 200ms ease;
+  }
+  .card-surface-hover:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .text-gradient {
+    background: linear-gradient(135deg, #fafafa 0%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .text-gradient-accent {
+    background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 50%, #8b5cf6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero-glow {
+    background: radial-gradient(ellipse 60% 50% at 50% -10%, rgba(59, 130, 246, 0.15), transparent);
+  }
+  .tandem-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .divider-line { border-color: rgba(255, 255, 255, 0.08); }
+  .soft-lift { transition: transform 220ms cubic-bezier(.2,.8,.2,1), border-color 220ms ease, background 220ms ease, box-shadow 220ms ease; }
+  .soft-lift:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.16); }
+  .focus-house:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+  .reveal { animation: reveal 600ms cubic-bezier(.2,.8,.2,1) both; }
   .reveal-1 { animation-delay: 80ms; }
   .reveal-2 { animation-delay: 160ms; }
   .reveal-3 { animation-delay: 240ms; }
   .reveal-4 { animation-delay: 320ms; }
-  .float-slow { animation: float 7s ease-in-out infinite; }
-  .float-slower { animation: float 9s ease-in-out 1s infinite; }
-  .atrium-grid {
-    background-color: #f2e7d8;
-    background-image:
-      linear-gradient(rgba(41, 43, 69, 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(41, 43, 69, 0.045) 1px, transparent 1px);
-    background-size: 36px 36px;
-  }
-  .soft-lift { transition: transform 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease, border-color 220ms ease; }
-  .soft-lift:hover { transform: translateY(-4px); box-shadow: 8px 10px 0 rgba(41, 43, 69, 0.11); }
-  .focus-house:focus-visible { outline: 3px solid #f0c85c; outline-offset: 3px; }
+  .glow-dot { box-shadow: 0 0 12px 2px rgba(59, 130, 246, 0.6); }
+  .badge-glow { box-shadow: 0 0 24px -6px rgba(59, 130, 246, 0.5); }
 }
 
 .cl-formFieldInput::placeholder {
-  color: #98909a;
+  color: #71717a;
   opacity: 1;
 }
 
 @keyframes reveal {
-  from { opacity: 0; transform: translateY(18px); }
+  from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-9px) rotate(1deg); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
