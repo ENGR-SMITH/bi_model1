@@ -151,8 +151,8 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
       year: 'numeric',
     });
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-[#292b45]/60 p-4 backdrop-blur-sm" data-testid="ticket-success">
-        <div className="relative w-full max-w-md rounded-3xl border-2 border-dashed border-[#8dc2ad] bg-[#fff4e6] p-7 text-[#292b45] shadow-[12px_14px_0_rgba(41,43,69,0.18)]">
+      <div className="fixed inset-0 z-50 grid place-items-center bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-success">
+        <div className="relative w-full max-w-md rounded-3xl border-2 border-dashed border-[#8dc2ad] bg-[#111111] p-7 text-white shadow-[12px_14px_0_rgba(41,43,69,0.18)]">
           <div className="flex items-center justify-between">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#e5f1e8] text-[#286254]">
               <PartyPopper className="h-6 w-6" />
@@ -162,16 +162,16 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <h2 className="mt-5 font-display text-3xl font-extrabold tracking-[-0.05em]">
             You're in, {name.split(' ')[0]}.
           </h2>
-          <p className="mt-3 text-sm leading-relaxed text-[#625f6d]">
-            Your {name} pass is active until <b className="text-[#292b45]">{expires}</b>
+          <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+            Your {name} pass is active until <b className="text-white">{expires}</b>
             {purchased.receipt.promoCode ? (
               <span className="mt-2 flex items-center gap-2 text-[#286254]">
                 <BadgeCheck className="h-4 w-4" /> Promo {purchased.receipt.promoCode} applied — {purchased.receipt.discount > 0 ? `you saved $${(purchased.receipt.discount / 100).toFixed(2)}` : 'the pass was free'}.
               </span>
             ) : null}
           </p>
-          <div className="mt-5 rounded-2xl border-2 border-dashed border-[#d6cbb9] bg-[#f7eddf] p-4">
-            <div className="flex items-center justify-between font-mono-ui text-[10px] uppercase tracking-[0.14em] text-[#77717a]">
+          <div className="mt-5 rounded-2xl border-2 border-dashed border-white/10 bg-[#111111] p-4">
+            <div className="flex items-center justify-between font-mono-ui text-[10px] uppercase tracking-[0.14em] text-zinc-500">
               <span>Card •••• {purchased.receipt.cardLast4}</span>
               <span>Total ${(purchased.receipt.total / 100).toFixed(2)}</span>
             </div>
@@ -179,14 +179,14 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <button
             type="button"
             onClick={onPurchased}
-            className="focus-house mt-6 w-full rounded-xl bg-[#292b45] py-3.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#3e8074]"
+            className="focus-house mt-6 w-full rounded-xl bg-[#111111] py-3.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#3e8074]"
             data-testid="button-enter-room"
           >
             Enter the room <Ticket className="ml-1 inline h-4 w-4 text-[#f0c85c]" />
           </button>
           <button
             type="button"
-            className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-[#77717a] hover:bg-[#d6cbb9]/40 hover:text-[#292b45]"
+            className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-zinc-500 hover:bg-[#d6cbb9]/40 hover:text-white"
             onClick={() => { setPurchased(null); onPurchased(); }}
             aria-label="Close"
           >
@@ -198,73 +198,73 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#292b45]/60 p-4 backdrop-blur-sm" data-testid="ticket-gate">
-      <div className="relative w-full max-w-md rounded-3xl border-2 border-dashed border-[#e1b956] bg-[#fff4e6] text-[#292b45] shadow-[12px_14px_0_rgba(41,43,69,0.18)]">
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-gate">
+      <div className="relative w-full max-w-md rounded-3xl border-2 border-dashed border-[#e1b956] bg-[#111111] text-white shadow-[12px_14px_0_rgba(41,43,69,0.18)]">
         {/* Coupon stub header */}
         <div className="rounded-t-[1.35rem] p-6 pb-5">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-[#292b45] bg-[#f0c85c] text-[#292b45] shadow-[3px_4px_0_rgba(41,43,69,0.12)]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-white/10 bg-[#f0c85c] text-white shadow-[3px_4px_0_rgba(41,43,69,0.12)]">
                 <Ticket className="h-5 w-5" />
               </span>
               <div>
-                <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#e55b4c]">Tandem access pass</p>
+                <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">Tandem access pass</p>
                 <h2 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.04em]">{name}</h2>
               </div>
             </div>
             <span className="font-display text-2xl font-extrabold tracking-[-0.04em]">{totalLabel}</span>
           </div>
-          <p className="mt-4 text-sm leading-relaxed text-[#625f6d]">
+          <p className="mt-4 text-sm leading-relaxed text-zinc-400">
             A ticket unlocks the whole {name.toLowerCase()} category — <b>{weeks} weeks</b> of access. Renew anytime; a renewal extends the pass.
           </p>
         </div>
 
         {/* Perforation */}
         <div className="relative flex items-center px-2">
-          <span className="absolute -left-2 h-4 w-4 rounded-full bg-[#292b45]/60" />
-          <div className="h-0 flex-1 border-t-2 border-dashed border-[#d6cbb9]" />
-          <span className="absolute -right-2 h-4 w-4 rounded-full bg-[#292b45]/60" />
+          <span className="absolute -left-2 h-4 w-4 rounded-full bg-[#111111]/60" />
+          <div className="h-0 flex-1 border-t-2 border-dashed border-white/10" />
+          <span className="absolute -right-2 h-4 w-4 rounded-full bg-[#111111]/60" />
         </div>
 
         {/* Payment body */}
         <div className="rounded-b-[1.35rem] p-6 pt-5">
           <label className="block">
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#77717a]">Card number</span>
+            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Card number</span>
             <div className="relative mt-2">
-              <CreditCard className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#98909a]" />
+              <CreditCard className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
               <input
                 value={cardNumber}
                 onChange={(event) => setCardNumber(formatCardNumber(event.target.value))}
                 placeholder="4242 4242 4242 4242"
                 inputMode="numeric"
                 autoComplete="cc-number"
-                className="focus-house w-full rounded-xl border-2 border-[#d6cbb9] bg-[#f7eddf] py-3 pl-11 pr-4 text-sm text-[#292b45] placeholder:text-[#98909a]"
+                className="focus-house w-full rounded-xl border-2 border-white/10 bg-[#111111] py-3 pl-11 pr-4 text-sm text-white placeholder:text-zinc-600"
                 data-testid="input-card-number"
               />
             </div>
           </label>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#77717a]">Expiry</span>
+              <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Expiry</span>
               <input
                 value={expiry}
                 onChange={(event) => setExpiry(formatExpiry(event.target.value))}
                 placeholder="MM/YY"
                 inputMode="numeric"
                 autoComplete="cc-exp"
-                className="focus-house mt-2 w-full rounded-xl border-2 border-[#d6cbb9] bg-[#f7eddf] py-3 px-4 text-sm text-[#292b45] placeholder:text-[#98909a]"
+                className="focus-house mt-2 w-full rounded-xl border-2 border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600"
                 data-testid="input-card-expiry"
               />
             </label>
             <label className="block">
-              <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#77717a]">CVC</span>
+              <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">CVC</span>
               <input
                 value={cvc}
                 onChange={(event) => setCvc(event.target.value.replace(/\D/g, '').slice(0, 4))}
                 placeholder="123"
                 inputMode="numeric"
                 autoComplete="cc-csc"
-                className="focus-house mt-2 w-full rounded-xl border-2 border-[#d6cbb9] bg-[#f7eddf] py-3 px-4 text-sm text-[#292b45] placeholder:text-[#98909a]"
+                className="focus-house mt-2 w-full rounded-xl border-2 border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600"
                 data-testid="input-card-cvc"
               />
             </label>
@@ -272,7 +272,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
 
           {/* Promo code */}
           <div className="mt-4">
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#77717a]">Promo code</span>
+            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Promo code</span>
             <div className="mt-2 flex gap-2">
               <input
                 value={promoInput}
@@ -282,14 +282,14 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
                   setPromoError('');
                 }}
                 placeholder="PROMOCODE"
-                className="focus-house min-w-0 flex-1 rounded-xl border-2 border-[#d6cbb9] bg-[#f7eddf] px-4 py-3 text-sm uppercase tracking-[0.1em] text-[#292b45] placeholder:text-[#98909a]"
+                className="focus-house min-w-0 flex-1 rounded-xl border-2 border-white/10 bg-[#111111] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600"
                 data-testid="input-promo"
               />
               <button
                 type="button"
                 onClick={applyPromo}
                 disabled={validatePromo.isPending}
-                className="focus-house rounded-xl border-2 border-[#292b45] bg-[#f7eddf] px-4 text-sm font-bold text-[#292b45] transition-colors hover:bg-[#e1b956] disabled:cursor-wait disabled:opacity-60"
+                className="focus-house rounded-xl border-2 border-white/10 bg-[#111111] px-4 text-sm font-bold text-white transition-colors hover:bg-[#e1b956] disabled:cursor-wait disabled:opacity-60"
                 data-testid="button-apply-promo"
               >
                 {validatePromo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
@@ -317,7 +317,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             type="button"
             onClick={pay}
             disabled={purchase.isPending}
-            className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#292b45] py-3.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#3e8074] disabled:cursor-wait disabled:opacity-60"
+            className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#111111] py-3.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#3e8074] disabled:cursor-wait disabled:opacity-60"
             data-testid="button-pay"
           >
             {purchase.isPending ? (
@@ -326,7 +326,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
               <><Lock className="h-4 w-4 text-[#f0c85c]" /> Pay {totalLabel} · {weeks} weeks</>
             )}
           </button>
-          <p className="mt-3 flex items-center gap-2 text-center text-[10px] leading-relaxed text-[#98909a]">
+          <p className="mt-3 flex items-center gap-2 text-center text-[10px] leading-relaxed text-zinc-600">
             <Lock className="h-3 w-3 shrink-0" />
             Cards are validated securely; only the last four digits are stored. Test card: 4242 4242 4242 4242.
           </p>
@@ -334,22 +334,22 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
 
         {/* Coupon detach footer — barcode + expiry, so the pass reads like a
             printed coupon you tear off along the dashed line. */}
-        <div className="flex items-center gap-4 border-t-2 border-dashed border-[#d6cbb9] px-6 py-4">
+        <div className="flex items-center gap-4 border-t-2 border-dashed border-white/10 px-6 py-4">
           <div className="flex flex-col items-center gap-1" aria-hidden>
-            <span className="h-8 w-5 -rotate-90 rounded-md border-2 border-dashed border-[#e55b4c]" />
-            <span className="font-mono-ui text-[8px] uppercase tracking-[0.18em] text-[#e55b4c]">Tear</span>
+            <span className="h-8 w-5 -rotate-90 rounded-md border-2 border-dashed border-[#3b82f6]" />
+            <span className="font-mono-ui text-[8px] uppercase tracking-[0.18em] text-[#3b82f6]">Tear</span>
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#77717a]">Tandem access pass · {weeks} weeks</p>
+            <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Tandem access pass · {weeks} weeks</p>
             <div className="mt-2 flex h-8 items-end gap-[2px]">
               {Array.from({ length: 26 }).map((_, i) => (
-                <span key={i} className="rounded-[1px] bg-[#292b45]" style={{ width: '2px', height: `${34 + ((i * 47) % 46)}%` }} />
+                <span key={i} className="rounded-[1px] bg-[#111111]" style={{ width: '2px', height: `${34 + ((i * 47) % 46)}%` }} />
               ))}
             </div>
           </div>
           <div className="text-right">
-            <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-[#77717a]">Valid until</p>
-            <p className="mt-1 font-display text-sm italic text-[#292b45]">
+            <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Valid until</p>
+            <p className="mt-1 font-display text-sm italic text-white">
               {new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
           </div>

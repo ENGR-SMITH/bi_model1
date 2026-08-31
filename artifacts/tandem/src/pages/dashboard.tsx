@@ -1,20 +1,18 @@
-import { ArrowUpRight, DoorOpen } from 'lucide-react';
+import { ArrowUpRight, Compass } from 'lucide-react';
 import { useUser } from '@clerk/react';
 import { Link } from 'wouter';
 import { SectionEyebrow } from '@/components/protected-shell';
 import { tandemCategories } from '@/data/categories';
 
-// Every door keeps its own house-palette color; the one open door (Authors) gets
-// a bold coral fill + lift so the grid has a clear focal point without going
-// muted and flat like the previous paper-only treatment.
-const openDoorClass = 'bg-[#e55b4c] border-[#c7473c] text-[#fff4e6]';
+// Premium dark theme — Resend/Framer inspired
+const openDoorClass = 'border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent';
 const doorClass: Record<string, string> = {
-  teal: 'bg-[#3e8074] border-[#2f675e] text-[#fff4e6]',
-  gold: 'bg-[#f0c85c] border-[#c49a38] text-[#292b45]',
-  ink: 'bg-[#292b45] border-[#1d1f34] text-[#fff4e6]',
-  plum: 'bg-[#5c6d8a] border-[#4a5870] text-[#fff4e6]',
-  blue: 'bg-[#657a9c] border-[#4e6486] text-[#fff4e6]',
-  coral: 'bg-[#e55b4c] border-[#c7473c] text-[#fff4e6]',
+  teal: 'card-surface border-[#3b82f6]/20',
+  gold: 'card-surface border-[#8b5cf6]/25',
+  ink: 'card-surface',
+  plum: 'card-surface border-[#8b5cf6]/20',
+  blue: 'card-surface border-[#3b82f6]/25',
+  coral: 'card-surface border-[#3b82f6]/30',
 };
 
 export default function Dashboard() {
@@ -23,13 +21,13 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-[1180px]">
-      <div className="reveal flex flex-col justify-between gap-5 border-b-2 border-[#d6cbb9] pb-9 md:flex-row md:items-end">
+      <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
         <div>
-          <SectionEyebrow>The private atrium / {tandemCategories.length} doors</SectionEyebrow>
-          <h1 className="mt-5 max-w-[12ch] text-6xl font-extrabold leading-[.86] tracking-[-0.08em] text-[#292b45] sm:text-8xl">Welcome, {name}.</h1>
+          <SectionEyebrow>The private platform / {tandemCategories.length} rooms</SectionEyebrow>
+          <h1 className="mt-5 max-w-[12ch] text-6xl font-bold leading-[.9] tracking-[-0.05em] text-white sm:text-8xl">Welcome, {name}.</h1>
         </div>
-        <div className="max-w-sm border-l-2 border-[#d6cbb9] pl-5 text-sm leading-[1.8] text-[#625f6d]">
-          <p>The house is opening one room at a time. Start where your practice already has a pulse.</p>
+        <div className="max-w-sm border-l border-white/10 pl-5 text-sm leading-[1.8] text-zinc-400">
+          <p>The platform is opening one room at a time. Start where your practice already has a pulse.</p>
         </div>
       </div>
 
@@ -41,26 +39,26 @@ export default function Dashboard() {
             <Link
               key={category.slug}
               href={`/categories/${category.slug}`}
-              className={`soft-lift focus-house group relative min-h-[272px] overflow-hidden rounded-[1.5rem] border-2 p-6 ${available ? openDoorClass + ' door-shadow' : doorClass[category.accent] ?? doorClass.ink}`}
+              className={`soft-lift focus-house group relative min-h-[272px] overflow-hidden rounded-2xl border p-6 ${available ? openDoorClass + ' glow-accent' : doorClass[category.accent] ?? doorClass.ink}`}
               data-testid={`card-category-${category.slug}`}
             >
-              <span className="absolute -right-10 -top-12 h-36 w-36 rounded-full border border-current opacity-20 transition-transform duration-500 group-hover:scale-125" />
-              <span className="absolute right-6 top-6 font-mono-ui text-[10px] uppercase tracking-[0.16em] opacity-65">{String(index + 1).padStart(2, '0')} / {String(tandemCategories.length).padStart(2, '0')}</span>
+              <span className="absolute -right-10 -top-12 h-36 w-36 rounded-full border border-white/5 opacity-20 transition-transform duration-500 group-hover:scale-125" />
+              <span className="absolute right-6 top-6 font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">{String(index + 1).padStart(2, '0')} / {String(tandemCategories.length).padStart(2, '0')}</span>
               <div className="relative flex h-full flex-col justify-between">
                 <div className="flex items-center justify-between">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full border border-current bg-black/5">
-                    <Icon className="h-5 w-5" strokeWidth={1.7} />
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                    <Icon className="h-5 w-5 text-zinc-300" strokeWidth={1.7} />
                   </span>
-                  <span className={`rounded-full border border-current px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[0.13em] ${available ? 'bg-[#fff4e6]/20' : 'bg-black/10'}`}>
+                  <span className={`rounded-full border border-current px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[0.13em] ${available ? 'badge-glow border-[#3b82f6]/40 bg-[#3b82f6]/10 text-[#60a5fa]' : 'border-white/10 bg-white/5 text-zinc-400'}`}>
                     {available ? 'Open now' : category.status}
                   </span>
                 </div>
                 <div className="mt-12">
-                  <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] opacity-70">{available ? 'The first light' : 'On the blueprint'}</p>
-                  <h2 className="mt-2 max-w-[13ch] text-3xl font-extrabold leading-[.95] tracking-[-0.06em]">{category.name}</h2>
-                  <p className="mt-3 max-w-[19rem] text-sm leading-relaxed opacity-85">{category.description}</p>
+                  <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">{available ? 'The first light' : 'On the blueprint'}</p>
+                  <h2 className="mt-2 max-w-[13ch] text-3xl font-bold leading-[.98] tracking-[-0.04em] text-zinc-100">{category.name}</h2>
+                  <p className="mt-3 max-w-[19rem] text-sm leading-relaxed text-zinc-400">{category.description}</p>
                 </div>
-                <span className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border border-current opacity-75 transition-transform group-hover:rotate-45">
+                <span className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 opacity-75 transition-transform group-hover:rotate-45">
                   <ArrowUpRight className="h-4 w-4" />
                 </span>
               </div>
@@ -69,9 +67,9 @@ export default function Dashboard() {
         })}
       </div>
 
-      <div className="reveal reveal-2 mt-16 grid gap-5 border-t-2 border-[#d6cbb9] pt-7 sm:grid-cols-[auto_1fr] sm:items-center">
-        <DoorOpen className="h-7 w-7 text-[#e55b4c]" strokeWidth={1.5} />
-        <p className="max-w-2xl text-sm leading-relaxed text-[#77717a]">Every room starts with two. Tandem keeps the contribution visible, the connection human, and the strange route an idea took intact.</p>
+      <div className="reveal reveal-2 mt-16 grid gap-5 border-t border-white/5 pt-7 sm:grid-cols-[auto_1fr] sm:items-center">
+        <Compass className="h-7 w-7 text-[#3b82f6]" strokeWidth={1.5} />
+        <p className="max-w-2xl text-sm leading-relaxed text-zinc-500">Every room starts with two. Tandem keeps the contribution visible, the connection human, and the strange route an idea took intact.</p>
       </div>
     </div>
   );
