@@ -13,8 +13,8 @@ function PlatformDiagram() {
             <p className="font-mono-ui text-[9px] uppercase tracking-[0.18em] text-zinc-500">The foundation</p>
             <p className="mt-2 max-w-[13rem] text-[2rem] font-semibold leading-[.9] text-white sm:text-[2.8rem]">The Engine</p>
           </div>
-          <span className="flex h-11 w-11 items-center justify-center rounded-full border border-[#3b82f6]/40 bg-[#3b82f6]/10 sm:h-14 sm:w-14">
-            <Layers3 className="h-5 w-5 text-[#3b82f6] sm:h-6 sm:w-6" />
+          <span className="card-icon h-11 w-11 sm:h-14 sm:w-14">
+            <Layers3 className="h-5 w-5 sm:h-6 sm:w-6" />
           </span>
         </div>
         <div className="card-surface flex flex-col justify-between rounded-xl p-3 sm:p-5">
@@ -32,7 +32,7 @@ function PlatformDiagram() {
         <div className="relative card-surface flex flex-col justify-between rounded-xl p-3 sm:p-5">
           <span className="font-mono-ui text-[9px] uppercase tracking-[0.18em] text-zinc-500">Room 05</span>
           <span className="mt-2 text-[1.75rem] font-semibold leading-[.9] text-zinc-100 sm:text-[2.3rem]">Wonder</span>
-          <span className="absolute bottom-3 right-3 h-5 w-5 rounded-full border border-[#8b5cf6]/40 sm:bottom-5 sm:right-5 sm:h-8 sm:w-8" />
+          <span className="absolute bottom-3 right-3 h-5 w-5 rounded-full border border-[#8b5cf6]/40 shadow-[0_0_14px_-2px_rgba(139,92,246,0.5)] sm:bottom-5 sm:right-5 sm:h-8 sm:w-8" />
         </div>
       </div>
     </div>
