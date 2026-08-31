@@ -1,4 +1,4 @@
-import { ArrowUpRight, Clapperboard, Film, Mic2, Palette, Scissors } from 'lucide-react';
+import { ArrowUpRight, Clapperboard, Download, Film, Mic2, Palette, Scissors } from 'lucide-react';
 import { Link } from 'wouter';
 import { useUser } from '@clerk/react';
 import { SectionEyebrow } from '@/components/protected-shell';
@@ -47,6 +47,18 @@ export default function ContentCreatorsPage() {
                 Open Creators Den
                 <Clapperboard className="h-4 w-4" />
               </a>
+              {(import.meta.env.VITE_AGENT_DOWNLOAD_URL as string | undefined) && (
+                <a
+                  href={import.meta.env.VITE_AGENT_DOWNLOAD_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="focus-house mt-3 inline-flex items-center gap-3 rounded-full border border-[#fff4e6]/25 bg-transparent px-5 py-2.5 text-sm font-bold text-[#ffe6d7] transition-colors hover:bg-[#fff4e6]/10"
+                  data-testid="link-download-desktop-agent"
+                >
+                  <Download className="h-4 w-4" />
+                  Desktop agent for large files
+                </a>
+              )}
             </div>
           </div>
         </div>

@@ -1,0 +1,35 @@
+{
+  "name": "@workspace/desktop-agent",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Tandem desktop agent — generate proxies with FFmpeg and push them to Cloudflare R2 via presigned URLs.",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "compile": "tsc -p tsconfig.json && node -e \"require('fs').copyFileSync('src/renderer/index.html','dist/renderer/index.html');\"",
+    "build": "pnpm run compile && electron-builder",
+    "build:dir": "pnpm run compile && electron-builder --dir",
+    "dev": "pnpm run compile && electron .",
+    "start": "electron ."
+  },
+  "author": "Tandem",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "typescript": "~5.9.3",
+    "@types/node": "catalog:"
+  },
+  "build": {
+    "appId": "com.tandem.desktopagent",
+    "productName": "Tandem Desktop Agent",
+    "directories": { "output": "dist-bundle" },
+    "files": ["dist/**/*"],
+    "mac": { "target": ["dmg"], "category": "public.app-category.video" },
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "linux": { "target": ["AppImage"] }
+  }
+}

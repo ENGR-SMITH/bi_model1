@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tandem Desktop Agent</title>
+    <style>
+      :root { color-scheme: light; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: #faf6ee;
+        color: #2b2620;
+      }
+      .shell { max-width: 640px; margin: 0 auto; padding: 28px 22px 40px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      .sub { color: #8a8277; font-size: 13px; margin-bottom: 24px; }
+      .card {
+        background: #fff;
+        border: 1px solid #e4dccb;
+        border-radius: 14px;
+        padding: 18px;
+        margin-bottom: 14px;
+      }
+      .row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+      label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #6f675b; width: 90px; }
+      select, button { font-size: 14px; padding: 8px 12px; border-radius: 8px; }
+      select { flex: 1; border: 1px solid #d8cfbc; background: #fff; }
+      button {
+        border: 0; cursor: pointer; font-weight: 600;
+        background: #5b4a86; color: #fff;
+      }
+      button:disabled { opacity: 0.5; cursor: default; }
+      button.secondary { background: #efe9db; color: #3a332b; }
+      .status { font-size: 13px; white-space: pre-wrap; color: #555; }
+      .err { color: #b3261e; font-size: 13px; }
+      .ok { color: #1e7d3a; font-size: 13px; }
+      .bar { height: 8px; border-radius: 4px; background: #eee; margin-top: 8px; overflow: hidden; }
+      .bar > div { height: 100%; background: #5b4a86; width: 0; }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <h1>Tandem Desktop Agent</h1>
+      <div class="sub">Make a 720p proxy with local FFmpeg and upload it straight to Cloudflare R2.</div>
+
+      <div class="card" id="auth-card">
+        <div class="row">
+          <label>Account</label>
+          <span id="who" class="status">Checking…</span>
+          <button id="sign-in" class="secondary">Sign in</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <label>Project</label>
+          <select id="project"><option>— load a project —</option></select>
+        </div>
+        <div class="row">
+          <label>Asset</label>
+          <select id="asset"></select>
+        </div>
+        <div class="row">
+          <label>Source</label>
+          <button id="pick" class="secondary">Choose raw file…</button>
+          <span id="file" class="status"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <button id="upload" disabled>Generate proxy &amp; upload to R2</button>
+        <div class="bar"><div id="barfill"></div></div>
+        <div id="status" class="status"></div>
+      </div>
+
+      <button id="sign-out" class="secondary">Sign out</button>
+    </div>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>

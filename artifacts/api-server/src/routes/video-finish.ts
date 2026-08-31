@@ -35,6 +35,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { getFFmpegPath, uploadDir } from "../video/worker";
+import { getStore, r2Configured } from "../video/object-storage";
 import { logger } from "../lib/logger";
 import { emitJobProgress } from "../realtime";
 
@@ -365,13 +366,9 @@ router.get(
     const storageKey = file?.storageKey ?? asset.storageKey;
     const mimeType = file?.mimeType ?? asset.mimeType;
     const kind = file?.kind ?? "ORIGINAL";
-    const filePath = path.join(uploadDir(), storageKey);
-    if (!fs.existsSync(filePath)) {
-      res.status(404).json({ error: "File is missing on the server" });
-      return;
-    }
 
-    // Audit the download.
+    // Audit the download — always write the trail, regardless of storage
+    // backend, so the Lock/release paper trail stays complete.
     await db.insert(tandemVideoDownloadsTable).values({
       id: randomUUID(),
       projectId: project.id,
@@ -380,6 +377,23 @@ router.get(
       memberId: userId,
     });
     logger.info({ projectId: project.id, fileId: params.data.fileId, memberId: userId }, "File downloaded");
+
+    // The file lives in R2 → redirect to a short-lived presigned GET. The
+    // browser pulls bytes straight from Cloudflare; we only hand back a URL.
+    const provider = file?.storageProvider ?? (r2Configured() ? "r2" : "local");
+    if (provider === "r2") {
+      const url = await getStore().getUrl(project.id, storageKey);
+      if (url) {
+        res.redirect(302, url);
+        return;
+      }
+    }
+
+    const filePath = path.join(uploadDir(), storageKey);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: "File is missing on the server" });
+      return;
+    }
 
     res.setHeader("Content-Type", mimeType || "application/octet-stream");
     const downloadName = path.basename(storageKey);

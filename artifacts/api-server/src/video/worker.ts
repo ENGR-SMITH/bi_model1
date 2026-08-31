@@ -37,6 +37,7 @@ import os from "node:os";
 import path from "node:path";
 import { logger } from "../lib/logger";
 import { emitJobProgress, emitToProject } from "../realtime";
+import { persistArtifact } from "./object-storage";
 import { attachQueueEventBridge, bullmqEnabled, enqueueBullMqJob } from "./queues";
 import { buildCheckout } from "./checkout";
 import { buildZip, type ZipEntry } from "./zip";
@@ -322,6 +323,7 @@ export async function hasActiveRender(projectId: string, leg: string): Promise<b
 
 interface ProxyResult {
   storageKey: string;
+  storageProvider: string;
   mimeType: string;
   sizeBytes: number;
   demo: boolean;
@@ -388,8 +390,12 @@ async function processProxy(asset: TandemVideoAsset): Promise<ProxyResult> {
     }
 
     const stat = fs.statSync(outPath);
+    // Persist the rendered proxy into the active object store (R2 when
+    // configured) and carry the provider through to the row->record.
+    const provider = await persistArtifact(asset.projectId, outKey, outPath, "video/mp4");
     const result: ProxyResult = {
       storageKey: outKey,
+      storageProvider: provider,
       mimeType: "video/mp4",
       sizeBytes: stat.size,
       demo: false,
@@ -414,6 +420,7 @@ async function processProxy(asset: TandemVideoAsset): Promise<ProxyResult> {
   // flagged so the studio never mistakes it for a real degraded render.
   return {
     storageKey: asset.storageKey,
+    storageProvider: "local",
     mimeType: asset.mimeType,
     sizeBytes: asset.sizeBytes,
     demo: true,
@@ -814,11 +821,13 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
     }
 
     const stat = fs.statSync(outPath);
+    const storageProvider = await persistArtifact(asset.projectId, outKey, outPath, "video/mp4");
     await db.insert(tandemVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: asset.id,
       kind: "RENDER",
       storageKey: outKey,
+      storageProvider,
       mimeType: "video/mp4",
       sizeBytes: stat.size,
       metadata: { format, leg, demo: false },
@@ -871,11 +880,13 @@ async function processAudio(asset: TandemVideoAsset, job: TandemVideoJob): Promi
       throw new Error(`ffmpeg audio pass failed (exit ${run.status ?? "signal"})`);
     }
     const stat = fs.statSync(outPath);
+    const storageProvider = await persistArtifact(asset.projectId, outKey, outPath, "audio/mp4");
     await db.insert(tandemVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: asset.id,
       kind: "AUDIO_STEM",
       storageKey: outKey,
+      storageProvider,
       mimeType: "audio/mp4",
       sizeBytes: stat.size,
       metadata: { action, demo: false },
@@ -937,11 +948,13 @@ async function processExport(asset: TandemVideoAsset, job: TandemVideoJob): Prom
       throw new Error(`ffmpeg export failed (exit ${run.status ?? "signal"})`);
     }
     const stat = fs.statSync(outPath);
+    const storageProvider = await persistArtifact(asset.projectId, outKey, outPath, "video/mp4");
     await db.insert(tandemVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: asset.id,
       kind: "EXPORT",
       storageKey: outKey,
+      storageProvider,
       mimeType: "video/mp4",
       sizeBytes: stat.size,
       metadata: { format, demo: false },
@@ -1046,7 +1059,9 @@ async function processExportBundle(
   const zip = buildZip(entries);
   fs.mkdirSync(bundleDir(), { recursive: true });
   const storageKey = `bundles/${job.id}.zip`;
-  fs.writeFileSync(path.join(uploadDir(), storageKey), zip);
+  const outPath = path.join(uploadDir(), storageKey);
+  fs.writeFileSync(outPath, zip);
+  const storageProvider = await persistArtifact(job.projectId, storageKey, outPath, "application/zip");
 
   emitJobProgress({
     projectId: job.projectId,
@@ -1063,6 +1078,7 @@ async function processExportBundle(
     assetId: null,
     kind: "INTERCHANGE",
     storageKey,
+    storageProvider,
     mimeType: "application/zip",
     sizeBytes: zip.length,
     metadata: { leg, version: checkout.version, entries: entries.map((e) => e.name) },
@@ -1130,11 +1146,13 @@ async function processThumbnail(asset: TandemVideoAsset, job: TandemVideoJob): P
     }
 
     const stat = fs.statSync(outPath);
+    const storageProvider = await persistArtifact(source.projectId, outKey, outPath, "image/jpeg");
     await db.insert(tandemVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: source.id,
       kind: "THUMBNAIL",
       storageKey: outKey,
+      storageProvider,
       mimeType: "image/jpeg",
       sizeBytes: stat.size,
       metadata: { timeMs, demo: false },
@@ -1330,6 +1348,7 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
         assetId: asset!.id,
         kind: "PROXY",
         storageKey: proxy.storageKey,
+        storageProvider: proxy.storageProvider || "local",
         mimeType: proxy.mimeType,
         sizeBytes: proxy.sizeBytes,
         metadata: proxy.metadata,

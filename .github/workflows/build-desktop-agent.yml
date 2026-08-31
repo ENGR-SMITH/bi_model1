@@ -1,0 +1,69 @@
+name: Build Desktop Agent installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "agent-v*"
+
+env:
+  R2_BUCKET: ${{ vars.R2_BUCKET || 'tandem-media' }}
+  R2_PREFIX: desktop-agent
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install workspace deps (with agent)
+        run: pnpm install
+
+      - name: Build & package the agent
+        working-directory: artifacts/desktop-agent
+        run: pnpm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tandem-desktop-agent-${{ matrix.os }}
+          path: artifacts/desktop-agent/dist-bundle/*
+          if-no-files-found: error
+
+      # Publish the installer to Cloudflare R2 ($0 egress) so the in-app
+      # "Desktop agent" button can link straight to it. Requires secrets:
+      #   CF_ACCOUNT_ID, CF_R2_ACCESS_KEY, CF_R2_SECRET_KEY
+      # and a repository variable: R2_BUCKET (defaults to tandem-media).
+      - name: Upload installer to R2
+        if: env.CF_R2_ACCESS_KEY != ''
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_R2_ACCESS_KEY: ${{ secrets.CF_R2_ACCESS_KEY }}
+          CF_R2_SECRET_KEY: ${{ secrets.CF_R2_SECRET_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE=$(ls artifacts/desktop-agent/dist-bundle/*.exe artifacts/desktop-agent/dist-bundle/*.dmg 2>/dev/null | head -n1)
+          if [ -z "${FILE:-}" ]; then echo "no installer found"; exit 0; fi
+          EXT="${FILE##*.}"
+          DEST="${{ env.R2_PREFIX }}/tandem-desktop-agent-latest.$EXT"
+          aws s3 cp "$FILE" "s3://${{ env.R2_BUCKET }}/$DEST" \
+            --endpoint-url "https://${{ env.CF_ACCOUNT_ID }}.r2.cloudflarestorage.com" \
+            --region auto \
+            --acl public-read \
+            --content-type "application/octet-stream" || true
+          echo "Published to s3://${{ env.R2_BUCKET }}/$DEST"

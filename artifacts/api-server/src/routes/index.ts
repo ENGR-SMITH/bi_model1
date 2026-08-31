@@ -13,6 +13,7 @@ import videoSocialRouter from "./video-social";
 import accountRouter from "./account";
 import ticketsRouter from "./tickets";
 import subscriptionsRouter from "./subscriptions";
+import videoStorageRouter from "./video-storage";
 
 const router: IRouter = Router();
 
@@ -28,6 +29,7 @@ router.use(videoSocialRouter);
 router.use(accountRouter);
 router.use(ticketsRouter);
 router.use(subscriptionsRouter);
+router.use(videoStorageRouter);
 router.use(adminRouter);
 router.use(oracleRouter);
 

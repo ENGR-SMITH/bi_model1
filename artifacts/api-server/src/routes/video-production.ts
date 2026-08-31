@@ -82,7 +82,7 @@ import {
   SyncVideoAssetParams,
   SyncVideoAssetResponse,
 } from "@workspace/api-zod";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -96,6 +96,7 @@ import {
   requeueProxyJob,
   uploadDir,
 } from "../video/worker";
+import { getStore, r2Configured } from "../video/object-storage";
 import {
   parseTimelineEdl,
   resolveEdlEvents,
@@ -354,6 +355,16 @@ router.get(
     if (!proxy) {
       res.status(404).json({ error: "No proxy is available for this asset yet" });
       return;
+    }
+
+    // Proxy lives in R2 → hand the player a short-lived presigned GET. The
+    // server only ever generates the URL; the browser streams from the edge.
+    if (proxy.storageProvider === "r2") {
+      const url = await getStore().getUrl(asset.projectId, proxy.storageKey);
+      if (url) {
+        res.redirect(302, url);
+        return;
+      }
     }
 
     const filePath = path.join(uploadDir(), proxy.storageKey);
@@ -2035,6 +2046,28 @@ router.get(
     if (!result.storageKey) {
       res.status(404).json({ error: "The bundle file is missing" });
       return;
+    }
+
+    // Bundle lives in R2 → redirect to a short-lived presigned GET so the
+    // browser downloads straight from Cloudflare (no server-side bytes).
+    const bundleFile = await db
+      .select()
+      .from(tandemVideoAssetFilesTable)
+      .where(
+        and(
+          isNull(tandemVideoAssetFilesTable.assetId),
+          eq(tandemVideoAssetFilesTable.kind, "INTERCHANGE"),
+          eq(tandemVideoAssetFilesTable.storageKey, result.storageKey),
+        ),
+      )
+      .limit(1);
+    const provider = bundleFile[0]?.storageProvider ?? (r2Configured() ? "r2" : "local");
+    if (provider === "r2") {
+      const url = await getStore().getUrl(params.data.projectId, result.storageKey);
+      if (url) {
+        res.redirect(302, url);
+        return;
+      }
     }
 
     const filePath = path.join(uploadDir(), result.storageKey);
