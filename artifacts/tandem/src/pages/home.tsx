@@ -82,19 +82,25 @@ export default function Home() {
           </div>
           <div className="grid gap-5 sm:grid-cols-3">
             <div className="reveal card-surface card-surface-hover rounded-2xl p-6">
-              <EyeOff className="h-7 w-7 text-[#3b82f6]" strokeWidth={1.6} />
+              <span className="card-icon h-7 w-7">
+                <EyeOff className="h-7 w-7 text-[#3b82f6]" strokeWidth={1.6} />
+              </span>
               <p className="mt-12 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">01 / Contribute blind</p>
               <h3 className="mt-3 text-xl font-bold tracking-[-0.03em] text-zinc-100">Bring your half</h3>
               <p className="mt-3 text-sm leading-relaxed text-zinc-400">You make without seeing the other person's work. No adapting. No performing for a brief.</p>
             </div>
             <div className="reveal reveal-1 card-surface card-surface-hover rounded-2xl p-6">
-              <WandSparkles className="h-7 w-7 text-[#8b5cf6]" strokeWidth={1.6} />
+              <span className="card-icon h-7 w-7">
+                <WandSparkles className="h-7 w-7 text-[#8b5cf6]" strokeWidth={1.6} />
+              </span>
               <p className="mt-12 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">02 / Let the bridge work</p>
               <h3 className="mt-3 text-xl font-bold tracking-[-0.03em] text-zinc-100">AI as bridge</h3>
               <p className="mt-3 text-sm leading-relaxed text-zinc-400">The system holds context, finds the join, and protects the provenance of every contribution.</p>
             </div>
             <div className="reveal reveal-2 card-surface card-surface-hover rounded-2xl p-6">
-              <Sparkles className="h-7 w-7 text-[#fbbf24]" strokeWidth={1.6} />
+              <span className="card-icon h-7 w-7">
+                <Sparkles className="h-7 w-7 text-[#fbbf24]" strokeWidth={1.6} />
+              </span>
               <p className="mt-12 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">03 / Open the door</p>
               <h3 className="mt-3 text-xl font-bold tracking-[-0.03em] text-zinc-100">The reveal ceremony</h3>
               <p className="mt-3 text-sm leading-relaxed text-zinc-400">Two paths become one visible thing. The moment of recognition is part of the work.</p>
