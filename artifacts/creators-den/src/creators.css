@@ -321,6 +321,17 @@ select optgroup {
 .cd-metatext { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .cd-metatext b { font: 700 15px var(--app-font-sans); color: hsl(var(--foreground)); }
 .cd-metatext small { color: hsl(var(--muted-foreground)); font: 11px var(--app-font-mono); }
+.cd-agent-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 700 12px var(--app-font-sans);
+  color: hsl(var(--accent));
+  padding: 6px 12px;
+  border: 1px solid hsl(var(--accent) / .35);
+  border-radius: 999px;
+  text-decoration: none;
+  transition: background .15s ease, color .15s ease;
+}
+.cd-agent-link:hover { background: hsl(var(--accent) / .12); }
 
 /* ---- Action bar (pill row: Sync / Render / Checkout / Import / Submit / Compare) ---- */
 .cd-actionbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

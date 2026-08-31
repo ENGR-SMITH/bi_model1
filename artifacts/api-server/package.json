@@ -23,6 +23,8 @@
     "worker:reference": "node --enable-source-maps ./dist/workers/reference-worker.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1121.0",
+    "@aws-sdk/s3-request-presigner": "^3.1121.0",
     "@clerk/express": "^2.1.55",
     "@clerk/shared": "^4.28.1",
     "@workspace/api-zod": "workspace:*",

@@ -24,6 +24,10 @@ export const tandemVideoAssetFilesTable = pgTable("tandem_video_asset_files", {
   assetId: text("asset_id"),
   kind: text("kind").notNull(),
   storageKey: text("storage_key").notNull(),
+  // local (disk under VIDEO_UPLOAD_DIR) | r2 (Cloudflare R2 object storage).
+  // Proxies/renders/exports/bundles land in R2 when configured; originals stay
+  // local.
+  storageProvider: text("storage_provider").notNull().default("local"),
   // Content address (SHA-256) of this physical blob — lets a re-imported pass
   // reference an already-stored file (Git-LFS-style pointer) without a copy.
   contentHash: text("content_hash"),

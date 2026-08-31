@@ -66,6 +66,9 @@ export const tandemVideoAssetsTable = pgTable("tandem_video_assets", {
   sizeBytes: integer("size_bytes").notNull().default(0),
   durationMs: integer("duration_ms"),
   storageKey: text("storage_key").notNull(),
+  // local (disk under VIDEO_UPLOAD_DIR) | r2 (Cloudflare R2 object storage).
+  // Originals stay local; proxies/renders/exports/bundles are stored in R2.
+  storageProvider: text("storage_provider").notNull().default("local"),
   // Content address (SHA-256 of the original bytes) for Git-LFS-style dedupe:
   // identical uploads share one blob instead of storing duplicate copies.
   contentHash: text("content_hash"),
