@@ -63,7 +63,7 @@ function buildContributionGrid(
  * Resolves `isFollowing` for a target user from the viewer's perspective.
  * Returns `null` when viewing yourself (no self-follow).
  */
-async function resolveFollowState(
+export async function resolveFollowState(
   viewerId: string,
   targetId: string,
 ): Promise<boolean | null> {
@@ -81,7 +81,7 @@ async function resolveFollowState(
   return !!row;
 }
 
-async function getFollowCounts(targetId: string) {
+export async function getFollowCounts(targetId: string) {
   const followers = await db
     .select()
     .from(tandemVideoFollowsTable)

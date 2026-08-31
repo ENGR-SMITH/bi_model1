@@ -99,6 +99,11 @@ export function AnnotationCanvas({
   const create = useCreateVideoComment();
   const project = useGetVideoProject(projectId);
 
+  // Read-only viewers (non-members of a PUBLIC project) can see pins but not
+  // drop new ones — annotating is a crew write, so `canAnnotate` only counts
+  // when the viewer actually holds a role in the project.
+  const viewerCanAnnotate = canAnnotate && (project.data?.myRoles?.length ?? 0) > 0;
+
   const overlayRef = useRef<HTMLDivElement>(null);
   const [annotating, setAnnotating] = useState(false);
   const [drop, setDrop] = useState<{ x: number; y: number } | null>(null);
@@ -176,7 +181,7 @@ export function AnnotationCanvas({
       event.stopPropagation();
       return;
     }
-    if (!annotating || !canAnnotate || !assetId) return;
+    if (!annotating || !viewerCanAnnotate || !assetId) return;
     const el = overlayRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -315,7 +320,7 @@ export function AnnotationCanvas({
         </div>
       )}
 
-      {annotating && canAnnotate && !drop && !headerRef && (
+      {annotating && viewerCanAnnotate && !drop && !headerRef && (
         <button
           type="button"
           className="annotation-close-annotate"
@@ -329,7 +334,7 @@ export function AnnotationCanvas({
         </button>
       )}
 
-      {!annotating && canAnnotate && !headerRef && pins.length === 0 && (
+      {!annotating && viewerCanAnnotate && !headerRef && pins.length === 0 && (
         <button
           type="button"
           className="annotation-toggle"
@@ -342,7 +347,7 @@ export function AnnotationCanvas({
           <Pin size={12} /> Annotate
         </button>
       )}
-      {!annotating && canAnnotate && !headerRef && pins.length > 0 && (
+      {!annotating && viewerCanAnnotate && !headerRef && pins.length > 0 && (
         <button
           type="button"
           className="annotation-toggle"
@@ -429,8 +434,9 @@ export function AnnotationCanvas({
       )}
 
       {/* The header edit (pencil) button — the familiar editing-tools
-          affordance, portaled into the card header's top-right corner. */}
-      {headerRef && headerEl &&
+          affordance, portaled into the card header's top-right corner. Hidden
+          for read-only (non-member) viewers. */}
+      {headerRef && headerEl && viewerCanAnnotate &&
         createPortal(
           <button
             type="button"

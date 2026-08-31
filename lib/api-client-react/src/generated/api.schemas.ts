@@ -239,7 +239,35 @@ export interface CollaborationMessage {
   threadId: string;
   senderId: string;
   body: string;
+  /** @nullable */
+  audioUrl?: string | null;
+  /** @nullable */
+  audioName?: string | null;
+  /** @nullable */
+  audioDurationMs?: number | null;
   createdAt: string;
+}
+
+/**
+ * Multipart voice note for a collaboration thread
+ */
+export interface CollaborationVoiceNoteInput {
+  audio: Blob;
+  durationMs?: number;
+}
+
+/**
+ * An author discoverable in the Author Den explore list (someone with published seeds)
+ */
+export interface ExploreAuthor {
+  userId: string;
+  displayName: string;
+  /** @nullable */
+  imageUrl: string | null;
+  publishedSeedCount: number;
+  followerCount: number;
+  /** @nullable */
+  isFollowing: boolean | null;
 }
 
 export interface CollaborationThread {
@@ -457,6 +485,176 @@ export interface UserProfile {
   imageUrl: string | null;
 }
 
+export interface AccountQuotaStorage {
+  usedBytes: number;
+  totalBytes: number;
+  remainingBytes: number;
+}
+
+export interface AccountQuotaProjects {
+  used: number;
+  total: number;
+  remaining: number;
+}
+
+export interface StoragePlan {
+  id: string;
+  label: string;
+  priceUsd: number;
+  bytes: number;
+}
+
+export interface ProjectPlan {
+  id: string;
+  label: string;
+  priceUsd: number;
+  count: number;
+}
+
+export interface AccountQuotaPlans {
+  storage: StoragePlan[];
+  projects: ProjectPlan[];
+}
+
+export interface AccountQuota {
+  storageBytes: AccountQuotaStorage;
+  projects: AccountQuotaProjects;
+  plans: AccountQuotaPlans;
+}
+
+export type AccountQuotaPurchaseInputKind = typeof AccountQuotaPurchaseInputKind[keyof typeof AccountQuotaPurchaseInputKind];
+
+
+export const AccountQuotaPurchaseInputKind = {
+  storage: 'storage',
+  projects: 'projects',
+} as const;
+
+export interface AccountQuotaPurchaseInput {
+  kind: AccountQuotaPurchaseInputKind;
+  planId: string;
+}
+
+export type AccountQuotaPurchaseKind = typeof AccountQuotaPurchaseKind[keyof typeof AccountQuotaPurchaseKind];
+
+
+export const AccountQuotaPurchaseKind = {
+  storage: 'storage',
+  projects: 'projects',
+} as const;
+
+export interface AccountQuotaPurchase {
+  kind: AccountQuotaPurchaseKind;
+  planId: string;
+  label: string;
+  priceUsd: number;
+}
+
+export interface AccountQuotaPurchaseResponse {
+  storageBytes: AccountQuotaStorage;
+  projects: AccountQuotaProjects;
+  plans: AccountQuotaPlans;
+  purchased: AccountQuotaPurchase;
+}
+
+export interface UserCv {
+  userId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Multipart upload of a CV document (pdf/doc/docx/txt/image)
+ */
+export interface UserCvInput {
+  file: Blob;
+}
+
+export interface UserCvDeleteResult {
+  deleted: boolean;
+}
+
+export interface TicketPass {
+  category: string;
+  expiresAt: string;
+}
+
+export interface TicketStatus {
+  priceUsd: number;
+  weeks: number;
+  tickets: TicketPass[];
+}
+
+export interface TicketPromoValidateInput {
+  code: string;
+}
+
+/**
+ * @nullable
+ */
+export type TicketPromoValidateResponseKind = typeof TicketPromoValidateResponseKind[keyof typeof TicketPromoValidateResponseKind] | null;
+
+
+export const TicketPromoValidateResponseKind = {
+  FREE: 'FREE',
+  PERCENT: 'PERCENT',
+  FLAT: 'FLAT',
+} as const;
+
+export interface TicketPromoValidateResponse {
+  valid: boolean;
+  code: string;
+  /** @nullable */
+  kind?: TicketPromoValidateResponseKind;
+  /** @nullable */
+  label?: string | null;
+  /** @nullable */
+  discountedPriceUsd?: number | null;
+}
+
+/**
+ * Credit-card details for the pass checkout. Validated in-house (Luhn, expiry, cvc); only the last-4 is stored.
+ */
+export interface CardInput {
+  number: string;
+  expiryMonth: number;
+  expiryYear: number;
+  cvc: string;
+}
+
+export interface TicketPurchaseInput {
+  category: string;
+  card: CardInput;
+  /** @nullable */
+  promoCode?: string | null;
+}
+
+export interface TicketPurchaseReceipt {
+  subtotal: number;
+  discount: number;
+  total: number;
+  cardLast4: string;
+  /** @nullable */
+  promoCode: string | null;
+}
+
+export interface TicketPurchase {
+  category: string;
+  expiresAt: string;
+  priceUsd: number;
+  /** @nullable */
+  promoCode: string | null;
+  cardLast4: string;
+}
+
+export interface TicketPurchaseResponse {
+  ticket: TicketPurchase;
+  receipt: TicketPurchaseReceipt;
+}
+
 export interface WaitlistInput {
   /** @minLength 1 */
   categorySlug: string;
@@ -554,6 +752,65 @@ export interface ProviderUpdate {
   enabled: boolean;
   /** @minimum 1 */
   priority: number;
+}
+
+export type AdminPromoKind = typeof AdminPromoKind[keyof typeof AdminPromoKind];
+
+
+export const AdminPromoKind = {
+  FREE: 'FREE',
+  PERCENT: 'PERCENT',
+  FLAT: 'FLAT',
+} as const;
+
+export interface AdminPromo {
+  code: string;
+  kind: AdminPromoKind;
+  value: number;
+  maxUses: number;
+  uses: number;
+  /** @nullable */
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export type AdminPromoInputKind = typeof AdminPromoInputKind[keyof typeof AdminPromoInputKind];
+
+
+export const AdminPromoInputKind = {
+  FREE: 'FREE',
+  PERCENT: 'PERCENT',
+  FLAT: 'FLAT',
+} as const;
+
+export interface AdminPromoInput {
+  code: string;
+  kind: AdminPromoInputKind;
+  value: number;
+  maxUses: number;
+  /** @nullable */
+  expiresAt?: string | null;
+}
+
+export type AdminPromoUpdateKind = typeof AdminPromoUpdateKind[keyof typeof AdminPromoUpdateKind];
+
+
+export const AdminPromoUpdateKind = {
+  FREE: 'FREE',
+  PERCENT: 'PERCENT',
+  FLAT: 'FLAT',
+} as const;
+
+export interface AdminPromoUpdate {
+  kind: AdminPromoUpdateKind;
+  value: number;
+  maxUses: number;
+  /** @nullable */
+  expiresAt?: string | null;
+}
+
+export interface AdminPromoDeleteResult {
+  deleted: boolean;
 }
 
 export type OracleMessageRole = typeof OracleMessageRole[keyof typeof OracleMessageRole];
@@ -958,6 +1215,11 @@ export interface VideoMember {
      * @nullable
      */
   name: string | null;
+  /**
+     * Resolved Clerk avatar url
+     * @nullable
+     */
+  imageUrl: string | null;
   /** Every role this member holds in the project, e.g. ["VIDEO", "THUMBNAIL"] */
   roles: string[];
   status: string;
@@ -1341,6 +1603,11 @@ export interface VideoSubmission {
   decidedById: string | null;
   /** @nullable */
   decidedAt: string | null;
+  /**
+     * The Captain's improvement note sent back with the decision (always set when rejecting; optional on approval)
+     * @nullable
+     */
+  decisionNote: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1360,6 +1627,43 @@ export interface VideoSubmissionInput {
   leg: VideoSubmissionInputLeg;
   /** @maxLength 2000 */
   note?: string;
+}
+
+/**
+ * Optional note attached to an approve/reject decision — for a rejection it is the improvement message sent back to the submitter
+ */
+export interface VideoSubmissionDecisionInput {
+  /**
+     * Improvement instructions for the submitter (required in spirit on reject, enforced in the UI)
+     * @maxLength 2000
+     */
+  note?: string;
+}
+
+/**
+ * One pending (SUBMITTED) leg submission on the Captain's review queue, with the project context needed to open the review surface
+ */
+export interface VideoReviewQueueItem {
+  id: string;
+  projectId: string;
+  projectName: string;
+  leg: string;
+  timelineVersionId: string;
+  status: string;
+  note: string;
+  submittedById: string;
+  /**
+     * Resolved Clerk display name of the submitter, when available
+     * @nullable
+     */
+  submittedByName: string | null;
+  /**
+     * The leg's current head version id — the diff baseline for this pull request
+     * @nullable
+     */
+  headVersionId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface VideoChatMessage {

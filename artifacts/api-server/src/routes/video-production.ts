@@ -22,6 +22,7 @@ import {
   type TandemVideoMember,
 } from "@workspace/db";
 import {
+  ApproveVideoSubmissionBody,
   ApproveVideoSubmissionParams,
   ApproveVideoSubmissionResponse,
   CreateVideoCommentBody,
@@ -55,12 +56,14 @@ import {
   ListVideoCommentsResponse,
   ListVideoJobsParams,
   ListVideoJobsResponse,
+  ListVideoReviewQueueResponse,
   ListVideoSubmissionsParams,
   ListVideoSubmissionsResponse,
   ListVideoSyncsParams,
   ListVideoSyncsResponse,
   ListVideoTimelineVersionsParams,
   ListVideoTimelineVersionsResponse,
+  RejectVideoSubmissionBody,
   RejectVideoSubmissionParams,
   RejectVideoSubmissionResponse,
   RenderVideoTimelineBody,
@@ -112,7 +115,9 @@ import {
 import { buildCheckout } from "../video/checkout";
 import { upload } from "../video/upload";
 import { createAssetFromUpload } from "../video/content-address";
+import { ensureUploadFits } from "../video/quota";
 import { recordVideoActivity } from "../video/activity";
+import { resolveProjectAccess } from "../video/access";
 import { resolveUserNames } from "../lib/user-names";
 
 const router: IRouter = Router();
@@ -218,7 +223,8 @@ async function buildTimelineResponse(projectId: string, leg: string) {
 }
 
 // GET /video/projects/:projectId/assets/:assetId — processed asset detail
-// (files + transcript). Members only.
+// (files + transcript). Members only, except PUBLIC projects are readable
+// (read-only) by non-members so the preview pages can render their media.
 router.get(
   "/video/projects/:projectId/assets/:assetId",
   async (req: Request, res): Promise<void> => {
@@ -234,7 +240,7 @@ router.get(
       return;
     }
 
-    if (!(await requireMember(params.data.projectId, userId))) {
+    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -302,7 +308,8 @@ router.get(
 );
 
 // GET /video/projects/:projectId/assets/:assetId/proxy — stream the low-res
-// proxy. The Lock: only proxies leave the server, never originals.
+// proxy. The Lock: only proxies leave the server, never originals. PUBLIC
+// projects may stream proxies to non-members in read-only preview.
 router.get(
   "/video/projects/:projectId/assets/:assetId/proxy",
   async (req: Request, res): Promise<void> => {
@@ -318,7 +325,7 @@ router.get(
       return;
     }
 
-    if (!(await requireMember(params.data.projectId, userId))) {
+    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -394,6 +401,7 @@ router.get(
 );
 
 // GET /video/projects/:projectId/timelines/:leg — current working timeline.
+// Readable (read-only) by non-members of PUBLIC projects for the preview view.
 router.get(
   "/video/projects/:projectId/timelines/:leg",
   async (req: Request, res): Promise<void> => {
@@ -409,7 +417,7 @@ router.get(
       return;
     }
 
-    if (!(await requireMember(params.data.projectId, userId))) {
+    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -516,12 +524,32 @@ router.put(
       resourceId: version.id,
     });
 
+    // Notify the rest of the crew that the stage moved (M4).
+    const crew = await db
+      .select()
+      .from(tandemVideoMembersTable)
+      .where(eq(tandemVideoMembersTable.projectId, params.data.projectId));
+    for (const member of crew) {
+      if (member.userId === userId) continue;
+      await notify(
+        member.userId,
+        "video_timeline_updated",
+        `${params.data.leg} updated`,
+        `${params.data.leg} v${versionNumber} was saved${
+          version.message ? ` — “${version.message.slice(0, 120)}”` : ""
+        }.`,
+        `/creators-den/projects/${params.data.projectId}`,
+        version.id,
+      ).catch(() => {});
+    }
+
     const state = await buildTimelineResponse(params.data.projectId, params.data.leg);
     res.json(SaveVideoTimelineResponse.parse(state));
   },
 );
 
 // GET /video/projects/:projectId/timelines/:leg/versions — snapshot history.
+// Readable (read-only) by non-members of PUBLIC projects (the timeline view).
 router.get(
   "/video/projects/:projectId/timelines/:leg/versions",
   async (req: Request, res): Promise<void> => {
@@ -537,7 +565,7 @@ router.get(
       return;
     }
 
-    if (!(await requireMember(params.data.projectId, userId))) {
+    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -581,7 +609,8 @@ router.get(
 
 // GET /video/projects/:projectId/timelines/:leg/versions/:versionId — the full
 // snapshot of one version, so reviewers can diff two snapshots side-by-side
-// (the list endpoint returns summaries only).
+// (the list endpoint returns summaries only). PUBLIC projects are readable
+// (read-only) by non-members.
 router.get(
   "/video/projects/:projectId/timelines/:leg/versions/:versionId",
   async (req: Request, res: Response): Promise<void> => {
@@ -597,7 +626,7 @@ router.get(
       return;
     }
 
-    if (!(await requireMember(params.data.projectId, userId))) {
+    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -738,7 +767,71 @@ router.post(
   },
 );
 
-// GET /video/projects/:projectId/submissions — leg submissions for the project.
+// GET /video/review/queue — the Captain's review queue: pending (SUBMITTED)
+// leg submissions across every project the viewer owns, newest first. Each
+// row carries the project name and the leg's current head version (the diff
+// baseline) so the review surface opens without extra round-trips. Because
+// only owned projects are scanned, the queue is inherently Captain-only.
+router.get("/video/review/queue", async (req: Request, res: Response): Promise<void> => {
+  const userId = getAuth(req).userId;
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const owned = await db
+    .select()
+    .from(tandemVideoProjectsTable)
+    .where(eq(tandemVideoProjectsTable.ownerId, userId));
+
+  if (owned.length === 0) {
+    res.json(ListVideoReviewQueueResponse.parse([]));
+    return;
+  }
+
+  const projectIds = owned.map((project) => project.id);
+  const submissions = await db
+    .select()
+    .from(tandemVideoSubmissionsTable)
+    .where(
+      and(
+        inArray(tandemVideoSubmissionsTable.projectId, projectIds),
+        eq(tandemVideoSubmissionsTable.status, "SUBMITTED"),
+      ),
+    )
+    .orderBy(desc(tandemVideoSubmissionsTable.createdAt));
+
+  const timelines = await db
+    .select()
+    .from(tandemVideoTimelinesTable)
+    .where(inArray(tandemVideoTimelinesTable.projectId, projectIds));
+
+  const nameById = new Map(owned.map((project) => [project.id, project.name]));
+  const headByProjectLeg = new Map(
+    timelines
+      .filter((timeline) => timeline.currentVersionId)
+      .map((timeline) => [`${timeline.projectId}:${timeline.leg}`, timeline.currentVersionId as string]),
+  );
+
+  const submitterNames = await resolveUserNames([
+    ...new Set(submissions.map((submission) => submission.submittedById)),
+  ]);
+
+  res.json(
+    ListVideoReviewQueueResponse.parse(
+      submissions.map((submission) => ({
+        ...submission,
+        projectName: nameById.get(submission.projectId) ?? "Untitled project",
+        submittedByName: submitterNames[submission.submittedById] ?? null,
+        headVersionId: headByProjectLeg.get(`${submission.projectId}:${submission.leg}`) ?? null,
+      })),
+    ),
+  );
+});
+
+// GET /video/projects/:projectId/submissions — leg submissions for the
+// project (read-only for non-members of PUBLIC projects, so the preview
+// commit log can render without membership).
 router.get(
   "/video/projects/:projectId/submissions",
   async (req: Request, res): Promise<void> => {
@@ -754,7 +847,7 @@ router.get(
       return;
     }
 
-    if (!(await requireMember(params.data.projectId, userId))) {
+    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -922,6 +1015,14 @@ async function decideSubmission(
     return;
   }
 
+  // The decision can carry an improvement note — for a rejection it is the
+  // message sent back to the submitter telling them what to fix.
+  const body = (decision === "APPROVED" ? ApproveVideoSubmissionBody : RejectVideoSubmissionBody).safeParse(
+    req.body ?? {},
+  );
+  const decisionNote =
+    body.success && body.data.note?.trim() ? body.data.note.trim().slice(0, 2000) : null;
+
   const [project] = await db
     .select()
     .from(tandemVideoProjectsTable)
@@ -952,7 +1053,13 @@ async function decideSubmission(
 
   const [updated] = await db
     .update(tandemVideoSubmissionsTable)
-    .set({ status: decision, decidedById: userId, decidedAt: new Date(), updatedAt: new Date() })
+    .set({
+      status: decision,
+      decidedById: userId,
+      decidedAt: new Date(),
+      decisionNote,
+      updatedAt: new Date(),
+    })
     .where(eq(tandemVideoSubmissionsTable.id, submission.id))
     .returning();
 
@@ -982,7 +1089,9 @@ async function decideSubmission(
     summary:
       decision === "APPROVED"
         ? `Approved ${submission.leg}${decidedVersion ? ` v${decidedVersion.version}` : ""} — merged as the new baseline`
-        : `Rejected ${submission.leg}${decidedVersion ? ` v${decidedVersion.version}` : ""} — sent back for another pass`,
+        : `Rejected ${submission.leg}${decidedVersion ? ` v${decidedVersion.version}` : ""} — sent back for another pass${
+            decisionNote ? ` (${decisionNote.slice(0, 120)})` : ""
+          }`,
     actorId: userId,
     resourceId: submission.id,
   });
@@ -1013,15 +1122,20 @@ async function decideSubmission(
     }
   }
 
-  // Tell the submitter their leg was decided (M4).
+  // Tell the submitter their leg was decided (M4). A rejection carries the
+  // Captain's improvement note so they know exactly what to revise.
   if (submission.submittedById !== userId) {
     await notify(
       submission.submittedById,
       decision === "APPROVED" ? "video_approved" : "video_rejected",
       decision === "APPROVED" ? `Leg ${submission.leg} approved` : `Leg ${submission.leg} needs another pass`,
       decision === "APPROVED"
-        ? "The Captain approved your pull request — on to the next stage."
-        : "The Captain sent your pull request back — revise and resubmit.",
+        ? decisionNote
+          ? `Approved with a note: ${decisionNote}`
+          : "The Captain approved your pull request — on to the next stage."
+        : decisionNote
+          ? `Sent back for revision — ${decisionNote}`
+          : "The Captain sent your pull request back — revise and resubmit.",
       `/creators-den/projects/${submission.projectId}`,
       submission.id,
     ).catch(() => {});
@@ -1042,7 +1156,8 @@ router.post(
   (req, res) => decideSubmission(req, res, "REJECTED", (data) => RejectVideoSubmissionResponse.parse(data)),
 );
 
-// GET /video/projects/:projectId/comments — timecode comments.
+// GET /video/projects/:projectId/comments — timecode comments (readable
+// read-only by non-members of PUBLIC projects for the preview annotation rail).
 router.get(
   "/video/projects/:projectId/comments",
   async (req: Request, res): Promise<void> => {
@@ -1058,7 +1173,7 @@ router.get(
       return;
     }
 
-    if (!(await requireMember(params.data.projectId, userId))) {
+    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -1131,6 +1246,25 @@ router.post(
 
     // Realtime: pinned notes appear in teammates' studios as they land.
     emitToProject(params.data.projectId, "comment.new", comment);
+
+    // Notify the rest of the crew that a note was pinned under the preview (M4).
+    const crew = await db
+      .select()
+      .from(tandemVideoMembersTable)
+      .where(eq(tandemVideoMembersTable.projectId, params.data.projectId));
+    for (const member of crew) {
+      if (member.userId === userId) continue;
+      await notify(
+        member.userId,
+        "video_comment",
+        "New annotation",
+        `${comment.kind === "PIN" ? "A pin" : "A note"} was added${
+          comment.leg ? ` to the ${comment.leg} preview` : " to the project"
+        }.`,
+        `/creators-den/projects/${params.data.projectId}/preview`,
+        comment.id,
+      ).catch(() => {});
+    }
 
     res.status(201).json(CreateVideoCommentResponse.parse(comment));
   },
@@ -2004,6 +2138,17 @@ router.post(
     const mediaFiles: Express.Multer.File[] = Array.isArray(req.files)
       ? (req.files as Express.Multer.File[])
       : [];
+    // Account quota: the attached media must fit the owning Captain's storage
+    // before any of it lands in the vault.
+    if (mediaFiles.length > 0) {
+      const totalBytes = mediaFiles.reduce((sum, file) => sum + file.size, 0);
+      const fit = await ensureUploadFits(params.data.projectId, totalBytes);
+      if (!fit.ok) {
+        discardUploadedFiles(req);
+        res.status(413).json({ error: fit.error });
+        return;
+      }
+    }
     const landedMedia: Array<{ asset: TandemVideoAsset; deduplicated: boolean }> = [];
     for (let i = 0; i < mediaFiles.length; i++) {
       const file = mediaFiles[i];
@@ -2280,7 +2425,8 @@ router.post(
 
 // GET /video/projects/:projectId/activity — the project activity feed:
 // saves, imports, rollbacks, submissions, decisions, and vault uploads, newest
-// first. Members only.
+// first. Members only, except PUBLIC projects are readable (read-only) by
+// non-members so the timeline page renders from search.
 router.get(
   "/video/projects/:projectId/activity",
   async (req: Request, res: Response): Promise<void> => {
@@ -2295,7 +2441,7 @@ router.get(
       res.status(400).json({ error: "Invalid project id" });
       return;
     }
-    if (!(await requireMember(params.data.projectId, userId))) {
+    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }

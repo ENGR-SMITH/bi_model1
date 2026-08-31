@@ -117,6 +117,9 @@ export const tandemVideoSubmissionsTable = pgTable("tandem_video_submissions", {
   timelineVersionId: text("timeline_version_id").notNull(),
   status: text("status").notNull().default("DRAFT"),
   note: text("note").notNull().default(""),
+  // The Captain's decision note — the improvement message sent back to the
+  // submitter when a pull request is rejected (and optionally on approval).
+  decisionNote: text("decision_note"),
   submittedById: text("submitted_by_id").notNull(),
   decidedById: text("decided_by_id"),
   decidedAt: timestamp("decided_at", { withTimezone: true }),

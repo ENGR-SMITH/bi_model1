@@ -169,6 +169,48 @@ describe("authorization", () => {
     expect((await request(API).get(`/api/video/projects/${project.id}`)).status).toBe(200);
   });
 
+  it("PUBLIC projects open read-only to strangers (read OK, writes blocked)", async () => {
+    const project = await createProject();
+
+    // Captain marks the project PUBLIC.
+    state.userId = "captain-1";
+    const flip = await request(API)
+      .patch(`/api/video/projects/${project.id}/visibility`)
+      .send({ visibility: "PUBLIC" });
+    expect(flip.status).toBe(200);
+
+    // A stranger can now read the project read-only: no roles, but the member
+    // roster still resolves names + avatar urls (for timeline cards).
+    state.userId = "stranger-1";
+    const detail = await request(API).get(`/api/video/projects/${project.id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.myRoles).toEqual([]);
+    expect(detail.body.visibility).toBe("PUBLIC");
+    expect(detail.body.members.some((member: any) => member.userId === "captain-1")).toBe(true);
+    expect(detail.body.members[0].name).toBeTruthy();
+    expect(detail.body.members[0]).toHaveProperty("imageUrl");
+
+    // The read-only data the preview + timeline pages need is readable.
+    expect((await request(API).get(`/api/video/projects/${project.id}/assets`)).status).toBe(200);
+    expect((await request(API).get(`/api/video/projects/${project.id}/timelines/SELECTS`)).status).toBe(200);
+    expect((await request(API).get(`/api/video/projects/${project.id}/timelines/SELECTS/versions`)).status).toBe(200);
+    expect((await request(API).get(`/api/video/projects/${project.id}/comments`)).status).toBe(200);
+    expect((await request(API).get(`/api/video/projects/${project.id}/activity`)).status).toBe(200);
+
+    // Writes stay blocked for the stranger even on a PUBLIC project.
+    expect((await request(API).post(`/api/video/projects/${project.id}/assets`).attach("file", Buffer.from("x"), "a.mp4")).status).toBe(403);
+    expect(
+      (await request(API)
+        .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+        .send({ snapshot: { clips: [] } }))
+        .status,
+    ).toBe(403);
+
+    // Members still see their full roles.
+    state.userId = "captain-1";
+    expect((await request(API).get(`/api/video/projects/${project.id}`)).body.myRoles).toContain("CAPTAIN");
+  });
+
   it("returns 404 for a missing project", async () => {
     state.userId = "captain-1";
     expect((await request(API).get("/api/video/projects/does-not-exist")).status).toBe(404);

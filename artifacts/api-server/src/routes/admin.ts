@@ -1,8 +1,16 @@
 import crypto from "node:crypto";
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import { asc, eq } from "drizzle-orm";
+import { db, tandemPromoCodesTable } from "@workspace/db";
 import {
   AdminLoginBody,
   CheckAdminProviderParams,
+  CreateAdminPromoBody,
+  CreateAdminPromoResponse,
+  DeleteAdminPromoResponse,
+  ListAdminPromosResponse,
+  UpdateAdminPromoBody,
+  UpdateAdminPromoResponse,
   UpdateAdminProviderBody,
   UpdateAdminProviderParams,
 } from "@workspace/api-zod";
@@ -83,6 +91,131 @@ router.post("/admin/providers/:providerId/check", requireAdmin, async (req, res)
   await checkProvider(params.data.providerId as ProviderId);
   const providers = await listProviderStatuses();
   res.json(providers.find((item) => item.id === params.data.providerId));
+});
+
+// ---------------------------------------------------------------------------
+// Ticket promo codes — the admin surface that replaces the seed script. Codes
+// are managed here (create/update/delete); the checkout validates them live.
+// ---------------------------------------------------------------------------
+
+const PROMO_KINDS = ["FREE", "PERCENT", "FLAT"] as const;
+
+export function normalizePromoCode(raw: string): string {
+  return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function promoView(promo: typeof tandemPromoCodesTable.$inferSelect) {
+  return {
+    code: promo.code,
+    kind: promo.kind,
+    value: promo.value,
+    maxUses: promo.maxUses,
+    uses: promo.uses,
+    expiresAt: promo.expiresAt ? promo.expiresAt.toISOString() : null,
+    createdAt: promo.createdAt.toISOString(),
+  };
+}
+
+router.get("/admin/promos", requireAdmin, async (_req, res): Promise<void> => {
+  const rows = await db
+    .select()
+    .from(tandemPromoCodesTable)
+    .orderBy(asc(tandemPromoCodesTable.createdAt));
+  res.json(ListAdminPromosResponse.parse(rows.map(promoView)));
+});
+
+router.post("/admin/promos", requireAdmin, async (req, res): Promise<void> => {
+  const body = CreateAdminPromoBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Code, kind, value, and max uses are required" });
+    return;
+  }
+  const code = normalizePromoCode(body.data.code);
+  if (!code) {
+    res.status(400).json({ error: "A promo code is required" });
+    return;
+  }
+  if (!PROMO_KINDS.includes(body.data.kind as (typeof PROMO_KINDS)[number])) {
+    res.status(400).json({ error: `Kind must be one of: ${PROMO_KINDS.join(", ")}` });
+    return;
+  }
+
+  const [existing] = await db
+    .select({ code: tandemPromoCodesTable.code })
+    .from(tandemPromoCodesTable)
+    .where(eq(tandemPromoCodesTable.code, code))
+    .limit(1);
+  if (existing) {
+    res.status(409).json({ error: `A promo code named ${code} already exists` });
+    return;
+  }
+
+  const [promo] = await db
+    .insert(tandemPromoCodesTable)
+    .values({
+      code,
+      kind: body.data.kind,
+      value: Math.max(0, body.data.value),
+      maxUses: Math.max(0, body.data.maxUses),
+      uses: 0,
+      expiresAt: body.data.expiresAt ? new Date(body.data.expiresAt) : null,
+    })
+    .returning();
+  res.status(201).json(CreateAdminPromoResponse.parse(promoView(promo)));
+});
+
+router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void> => {
+  const body = UpdateAdminPromoBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: "Kind, value, and max uses are required" });
+    return;
+  }
+  const code = normalizePromoCode(String(req.params.code ?? ""));
+  if (!code) {
+    res.status(400).json({ error: "A promo code is required" });
+    return;
+  }
+  if (!PROMO_KINDS.includes(body.data.kind as (typeof PROMO_KINDS)[number])) {
+    res.status(400).json({ error: `Kind must be one of: ${PROMO_KINDS.join(", ")}` });
+    return;
+  }
+
+  const [existing] = await db
+    .select({ code: tandemPromoCodesTable.code })
+    .from(tandemPromoCodesTable)
+    .where(eq(tandemPromoCodesTable.code, code))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Promo code not found" });
+    return;
+  }
+
+  const [promo] = await db
+    .update(tandemPromoCodesTable)
+    .set({
+      kind: body.data.kind,
+      value: Math.max(0, body.data.value),
+      maxUses: Math.max(0, body.data.maxUses),
+      expiresAt: body.data.expiresAt ? new Date(body.data.expiresAt) : null,
+    })
+    .where(eq(tandemPromoCodesTable.code, code))
+    .returning();
+  res.json(UpdateAdminPromoResponse.parse(promoView(promo)));
+});
+
+router.delete("/admin/promos/:code", requireAdmin, async (req, res): Promise<void> => {
+  const code = normalizePromoCode(String(req.params.code ?? ""));
+  const [existing] = await db
+    .select({ code: tandemPromoCodesTable.code })
+    .from(tandemPromoCodesTable)
+    .where(eq(tandemPromoCodesTable.code, code))
+    .limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Promo code not found" });
+    return;
+  }
+  await db.delete(tandemPromoCodesTable).where(eq(tandemPromoCodesTable.code, code));
+  res.json(DeleteAdminPromoResponse.parse({ deleted: true }));
 });
 
 export default router;

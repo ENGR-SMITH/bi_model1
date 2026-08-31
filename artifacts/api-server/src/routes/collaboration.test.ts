@@ -1,8 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { eq } from "drizzle-orm";
 import { encryptSecret } from "../lib/oracle";
+
+// Voice-note uploads land on disk; point multer at a throwaway temp dir.
+process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "collaboration-test-"));
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -23,6 +29,7 @@ vi.mock("@workspace/db", async () => {
 });
 
 import collaborationRouter from "./collaboration";
+import videoSocialRouter from "./video-social";
 
 function createApp(): Express {
   const app = express();
@@ -32,6 +39,7 @@ function createApp(): Express {
     next();
   });
   app.use("/api", collaborationRouter);
+  app.use("/api", videoSocialRouter);
   return app;
 }
 
@@ -68,6 +76,7 @@ async function resetDb() {
   await state.db.delete(t.continuationSubmissionsTable);
   await state.db.delete(t.seedApplicationsTable);
   await state.db.delete(t.collaborationSeedsTable);
+  await state.db.delete(t.tandemVideoFollowsTable);
   state.userId = null;
 }
 
@@ -1042,5 +1051,118 @@ describe("stable-range continuation annotations", () => {
     state.userId = "stranger-1";
     const strangerDoc = await request(API).get(`/api/collaborations/projects/${projectId}/document`);
     expect(strangerDoc.status).toBe(403);
+  });
+});
+
+describe("collaboration voice notes", () => {
+  async function sharedThread() {
+    const seed = await publishSeed("creator-1");
+    const application = await applyToSeed(seed.id, "writer-1");
+    state.userId = "writer-1";
+    await request(API)
+      .patch(`/api/collaborations/applications/${application.id}`)
+      .send({ draftText: "Ada reached the salt pools.", draftComments: "", projectDocument: { title: "The Salt Road", scenes: [{ id: "s2", title: "Fork scene" }] } });
+    const submission = await submitContinuation(application.id, "writer-1");
+    state.userId = "creator-1";
+    const accepted = await request(API).post(`/api/collaborations/continuations/${submission.id}/accept`);
+    const projectId = accepted.body.id;
+    const thread = await request(API).post(`/api/collaborations/projects/${projectId}/thread`);
+    return { projectId, threadId: thread.body.id as string };
+  }
+
+  it("sends a voice note, streams it to the partner, and notifies them", async () => {
+    const { projectId, threadId } = await sharedThread();
+
+    state.userId = "creator-1";
+    const sent = await request(API)
+      .post(`/api/collaborations/threads/${threadId}/voice`)
+      .field("durationMs", "2400")
+      .attach("audio", Buffer.from("fake-wav-bytes"), "voice.wav");
+    expect(sent.status).toBe(201);
+    expect(sent.body.body).toBe("");
+    expect(sent.body.audioUrl).toContain(`/api/collaborations/threads/${threadId}/audio/`);
+    expect(sent.body.audioDurationMs).toBe(2400);
+
+    // The thread view carries the voice message for both participants.
+    state.userId = "writer-1";
+    const thread = await request(API).get(`/api/collaborations/threads/${threadId}`);
+    expect(thread.status).toBe(200);
+    expect(thread.body.messages[0].audioUrl).toBe(sent.body.audioUrl);
+    expect(thread.body.messages[0].audioDurationMs).toBe(2400);
+
+    // The partner can stream the audio bytes; a stranger cannot.
+    const fileId = sent.body.audioUrl.split("/").pop();
+    const audio = await request(API).get(`/api/collaborations/threads/${threadId}/audio/${fileId}`);
+    expect(audio.status).toBe(200);
+    expect(Buffer.from(audio.body).toString()).toBe("fake-wav-bytes");
+
+    state.userId = "stranger-1";
+    const strangerAudio = await request(API).get(`/api/collaborations/threads/${threadId}/audio/${fileId}`);
+    expect(strangerAudio.status).toBe(403);
+    const strangerVoice = await request(API)
+      .post(`/api/collaborations/threads/${threadId}/voice`)
+      .attach("audio", Buffer.from("x"), "x.wav");
+    expect(strangerVoice.status).toBe(403);
+
+    // The recipient's unread badge counts the voice note, and an inbox
+    // notification points back into the shared project.
+    state.userId = "writer-1";
+    const unread = await request(API).get(`/api/collaborations/projects/${projectId}/thread/unread`);
+    expect(unread.body).toEqual({ unread: true, count: 1 });
+    const notes = await request(API).get("/api/collaborations/inbox");
+    const note = notes.body.find((n: any) => n.category === "collaboration_message" && /voice/i.test(n.title));
+    expect(note).toBeTruthy();
+    expect(note.deepLink).toBe(`/authors-den/?project=${projectId}&chat=1`);
+  });
+
+  it("rejects voice notes without an audio file and from non-participants", async () => {
+    const { threadId } = await sharedThread();
+    state.userId = "creator-1";
+    expect((await request(API).post(`/api/collaborations/threads/${threadId}/voice`)).status).toBe(400);
+    expect((await request(API).get(`/api/collaborations/threads/${threadId}/audio/not-a-uuid`)).status).toBe(404);
+  });
+});
+
+describe("collaboration explore authors", () => {
+  it("lists writers with published seeds, their seed counts, and follow state", async () => {
+    await publishSeed("creator-1");
+    await publishSeed("creator-1");
+    await publishSeed("writer-1");
+
+    // writer-2 published nothing → not discoverable.
+    state.userId = "writer-2";
+    expect((await request(API).get("/api/collaborations/explore/authors")).status).toBe(200);
+
+    // creator-1 follows writer-1, then explores as a stranger would.
+    state.userId = "creator-1";
+    await request(API).post("/api/video/users/writer-1/follow");
+    state.userId = "viewer-1";
+    const res = await request(API).get("/api/collaborations/explore/authors");
+    expect(res.status).toBe(200);
+
+    const authors = res.body as any[];
+    const creator = authors.find((a: any) => a.userId === "creator-1");
+    const writer = authors.find((a: any) => a.userId === "writer-1");
+    expect(creator.publishedSeedCount).toBe(2);
+    expect(writer.publishedSeedCount).toBe(1);
+    // isFollowing is from the viewer's perspective: viewer-1 doesn't follow anyone.
+    expect(creator.isFollowing).toBe(false);
+    expect(writer.isFollowing).toBe(false);
+    expect(authors.every((a: any) => a.userId !== "writer-2")).toBe(true);
+    expect(authors.every((a: any) => a.displayName && typeof a.followerCount === "number")).toBe(true);
+  });
+
+  it("reflects the viewer's follow state", async () => {
+    await publishSeed("writer-1");
+    state.userId = "creator-1";
+    await request(API).post("/api/video/users/writer-1/follow");
+    const res = await request(API).get("/api/collaborations/explore/authors");
+    const writer = (res.body as any[]).find((a: any) => a.userId === "writer-1");
+    expect(writer.isFollowing).toBe(true);
+  });
+
+  it("requires authentication", async () => {
+    state.userId = null;
+    expect((await request(API).get("/api/collaborations/explore/authors")).status).toBe(401);
   });
 });

@@ -2,11 +2,14 @@ import { useState, type ReactNode } from 'react';
 import { useClerk, useUser } from '@clerk/react';
 import {
   Activity,
+  Bell,
   Check,
   ChevronDown,
   Clapperboard,
+  Eye,
   FileText,
   Film,
+  GitPullRequest,
   Home,
   Image,
   LogOut,
@@ -18,8 +21,16 @@ import {
   Video,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { useListVideoProjects } from '@workspace/api-client-react';
-import { useProjectPresence, useRealtimeSocket } from '@/lib/realtime';
+import {
+  getGetVideoProjectQueryKey,
+  getListVideoNotificationsQueryKey,
+  getListVideoReviewQueueQueryKey,
+  useGetVideoProject,
+  useListVideoNotifications,
+  useListVideoProjects,
+  useListVideoReviewQueue,
+} from '@workspace/api-client-react';
+import { useProjectPresence, useRealtimeNotifications, useRealtimeSocket } from '@/lib/realtime';
 import { ProjectChat } from '@/components/project-chat';
 
 export function SectionEyebrow({ children }: { children: ReactNode }) {
@@ -177,6 +188,7 @@ function ExploreSearch() {
 
 export function CreatorsShell({ children }: { children: ReactNode }) {
   const { signOut } = useClerk();
+  const { user } = useUser();
   const [location] = useLocation();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const projects = useListVideoProjects();
@@ -184,6 +196,34 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   const projectMatch = location.match(/^\/projects\/([^/]+)/);
   const projectId = projectMatch?.[1];
   const current = projects.data?.find((p) => p.id === projectId);
+
+  // Live notifications: the bell badge counts unread; the socket keeps it fresh.
+  useRealtimeNotifications();
+  const notifications = useListVideoNotifications();
+  const unreadCount = (notifications.data ?? []).filter((n) => !n.readAt).length;
+
+  // The Review desk is Captain-only: the queue scans owned projects, so the
+  // chip only appears (and only fetches) when the user owns at least one.
+  const isCaptain = (projects.data ?? []).some((p) => p.ownerId === user?.id);
+  const reviewQueue = useListVideoReviewQueue({
+    query: {
+      queryKey: getListVideoReviewQueueQueryKey(),
+      enabled: isCaptain,
+    },
+  });
+  const pendingReviews = (reviewQueue.data ?? []).length;
+
+  // Read-only mode: a PUBLIC project opened by someone who is not a member
+  // (e.g. from a search result). The detail query carries the viewer's roles
+  // — an empty `myRoles` means the viewer only gets PREVIEW + TIMELINE.
+  const detail = useGetVideoProject(projectId ?? '', {
+    query: {
+      queryKey: getGetVideoProjectQueryKey(projectId ?? ''),
+      enabled: Boolean(projectId),
+    },
+  });
+  const readOnly = Boolean(projectId) && Boolean(detail.data) && (detail.data?.myRoles?.length ?? 0) === 0;
+  const projectLabel = current?.name ?? detail.data?.name ?? 'Home';
 
   const logout = () => signOut({ redirectUrl: '/' });
 
@@ -219,6 +259,14 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           <ExploreSearch />
 
           <div className="cd-topnav-account">
+            <Link href="/notifications" className="cd-topnav-bell" aria-label="Notifications" title="Notifications" data-testid="nav-notifications">
+              <Bell size={16} />
+              {unreadCount > 0 && (
+                <span className="cd-topnav-bell-badge" data-testid="nav-notifications-badge">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Link>
             <UserChip />
           </div>
         </div>
@@ -226,6 +274,13 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
         {/* Tier 2 — three cut-out chips on one row: workspace · relay deck · sign out. */}
         <div className="cd-topnav-secondary">
           <div className="cd-topnav-workspace-col">
+            {/* The home notch — a quiet chip with just the home icon, sitting
+                beside the WORKSPACE dropdown. */}
+            <div className="cd-topnav-chip">
+              <Link href="/" className="cd-topnav-home-notch" aria-label="Home" title="Home" data-testid="nav-home-notch">
+                <Home size={15} />
+              </Link>
+            </div>
             <div className="cd-topnav-chip">
               <div className="top-workspace-wrap" onPointerLeave={() => setWorkspaceOpen(false)}>
                 <button
@@ -235,46 +290,69 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                   data-testid="top-workspace"
                 >
                   <span>Workspace</span>
-                  <b className="truncate">{current?.name ?? 'Home'}</b>
+                  <b className="truncate">{projectLabel}</b>
                   <ChevronDown size={13} />
                 </button>
                 {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
               </div>
             </div>
+            {/* The Review desk chip — Captain-only, with a pending-count badge. */}
+            {isCaptain && (
+              <div className="cd-topnav-chip">
+                <Link href="/review" className="cd-topnav-review" title="Review submissions" data-testid="nav-review">
+                  <GitPullRequest size={13} />
+                  <span>Review</span>
+                  {pendingReviews > 0 && (
+                    <b className="cd-topnav-review-badge" data-testid="nav-review-badge">
+                      {pendingReviews}
+                    </b>
+                  )}
+                </Link>
+              </div>
+            )}
           </div>
 
           {projectId && (
             <nav className="cd-topnav-tabs" aria-label="Project sections">
               <div className="cd-tab-group">
-                {tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
+                {/* A public (non-member) viewer only gets PREVIEW + TIMELINE. */}
+                {!readOnly && tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
                 {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
                 {tab(`/projects/${projectId}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview', true)}
               </div>
-              <span className="cd-tab-divider" aria-hidden />
-              {/* The four studios sit on the relay rail (numbered, lit on hover /
-                  active) — the removed Selects / Cut / Sound / Finish stages now
-                  live here as Video / Audio / Script / Thumbnail. */}
-              <div className="cd-tab-group cd-tab-stages">
-                {[
-                  { href: `/projects/${projectId}/role/video`, number: '01', label: 'Video', icon: <Video size={15} />, testId: 'nav-role-video' },
-                  { href: `/projects/${projectId}/role/audio`, number: '02', label: 'Audio', icon: <Mic2 size={15} />, testId: 'nav-role-audio' },
-                  { href: `/projects/${projectId}/role/script`, number: '03', label: 'Script', icon: <FileText size={15} />, testId: 'nav-role-script' },
-                  { href: `/projects/${projectId}/role/thumbnail`, number: '04', label: 'Thumbnail', icon: <Image size={15} />, testId: 'nav-role-thumbnail' },
-                  { href: `/projects/${projectId}/preview/finish`, number: '05', label: 'Finish', icon: <Package size={15} />, testId: 'nav-role-finish' },
-                ].map((item) => (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    title={item.label}
-                    className={`cd-tab ${location === item.href || location.startsWith(`${item.href}/`) ? 'active' : ''}`}
-                    data-testid={item.testId}
-                  >
-                    <span className="cd-tab-num">{item.number}</span>
-                    {item.icon}
-                    <span>{item.label}</span>
-                  </Link>
-                ))}
-              </div>
+              {readOnly ? (
+                <span className="den-tag muted cd-readonly-tag" title="You are viewing a PUBLIC project read-only — only its preview and timeline are open to you.">
+                  <Eye size={11} /> Read only
+                </span>
+              ) : (
+                <>
+                  <span className="cd-tab-divider" aria-hidden />
+                  {/* The four studios sit on the relay rail (numbered, lit on hover /
+                      active) — the removed Selects / Cut / Sound / Finish stages now
+                      live here as Video / Audio / Script / Thumbnail. */}
+                  <div className="cd-tab-group cd-tab-stages">
+                    {[
+                      { href: `/projects/${projectId}/role/video`, number: '01', label: 'Video', icon: <Video size={15} />, testId: 'nav-role-video' },
+                      { href: `/projects/${projectId}/role/audio`, number: '02', label: 'Audio', icon: <Mic2 size={15} />, testId: 'nav-role-audio' },
+                      { href: `/projects/${projectId}/role/script`, number: '03', label: 'Script', icon: <FileText size={15} />, testId: 'nav-role-script' },
+                      { href: `/projects/${projectId}/role/thumbnail`, number: '04', label: 'Thumbnail', icon: <Image size={15} />, testId: 'nav-role-thumbnail' },
+                      { href: `/projects/${projectId}/preview/finish`, number: '05', label: 'Finish', icon: <Package size={15} />, testId: 'nav-role-finish' },
+                    ].map((item) => (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        title={item.label}
+                        className={`cd-tab ${location === item.href || location.startsWith(`${item.href}/`) ? 'active' : ''}`}
+                        data-testid={item.testId}
+                      >
+                        <span className="cd-tab-num">{item.number}</span>
+                        {item.icon}
+                        <span>{item.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
             </nav>
           )}
 
@@ -290,7 +368,8 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="main-stage">
-        {projectId && <PresenceStrip projectId={projectId} />}
+        {/* Presence + the crew room are team surfaces — hidden in read-only. */}
+        {projectId && !readOnly && <PresenceStrip projectId={projectId} />}
         {/* Each page component supplies its own `.page` container; the shell
             must not add a second one or the content gets doubled padding. */}
         {children}
@@ -298,7 +377,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
 
       {/* The crew room floats over every project page, like the Author Den's
           draggable chat — project-wide instead of a private 1:1 thread. */}
-      {projectId && <ProjectChat projectId={projectId} />}
+      {projectId && !readOnly && <ProjectChat projectId={projectId} />}
     </div>
   );
 }

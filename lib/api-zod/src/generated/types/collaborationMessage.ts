@@ -11,5 +11,11 @@ export interface CollaborationMessage {
   threadId: string;
   senderId: string;
   body: string;
+  /** @nullable */
+  audioUrl?: string | null;
+  /** @nullable */
+  audioName?: string | null;
+  /** @nullable */
+  audioDurationMs?: number | null;
   createdAt: Date;
 }

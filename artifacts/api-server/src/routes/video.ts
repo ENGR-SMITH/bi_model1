@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { getAuth, clerkClient } from "@clerk/express";
 import { emitToProject } from "../realtime";
 import {
@@ -47,10 +48,13 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
 import { randomUUID } from "node:crypto";
 import type { TandemVideoMember } from "@workspace/db";
+import { notify } from "./video-platform";
 import { upload } from "../video/upload";
 import { createAssetFromUpload } from "../video/content-address";
+import { ensureUploadFits } from "../video/quota";
 import { recordVideoActivity } from "../video/activity";
-import { resolveUserNames } from "../lib/user-names";
+import { resolveProjectAccess } from "../video/access";
+import { resolveUserNames, resolveUserProfiles } from "../lib/user-names";
 import { normalizeTandemUid, tandemUid } from "../lib/tandem-uid";
 
 const router: IRouter = Router();
@@ -188,19 +192,28 @@ router.post("/video/projects", async (req, res): Promise<void> => {
     return [created, captain] as const;
   });
 
-  const captainNames = await resolveUserNames([member.userId]);
+  const captainProfiles = await resolveUserProfiles([member.userId]);
 
   res.status(201).json(
     CreateVideoProjectResponse.parse({
       ...project,
       myRoles: member.roles ?? [],
-      members: [{ ...member, roles: member.roles ?? [], name: captainNames[member.userId] ?? null }],
+      members: [
+        {
+          ...member,
+          roles: member.roles ?? [],
+          name: captainProfiles[member.userId]?.name ?? null,
+          imageUrl: captainProfiles[member.userId]?.imageUrl ?? null,
+        },
+      ],
       assets: [],
     }),
   );
 });
 
-// GET /video/projects/:projectId — detail with members + assets (members only).
+// GET /video/projects/:projectId — detail with members + assets. Members get
+// their full roles (`myRoles`); a non-member may open a PUBLIC project in
+// read-only mode (`myRoles: []`) so search results can be previewed.
 router.get("/video/projects/:projectId", async (req: Request, res): Promise<void> => {
   const userId = getAuth(req).userId;
   if (!userId) {
@@ -225,8 +238,8 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
     return;
   }
 
-  const member = await requireMember(project.id, userId);
-  if (!member) {
+  const access = await resolveProjectAccess(project.id, userId);
+  if (!access) {
     res.status(403).json({ error: "You are not a member of this project" });
     return;
   }
@@ -247,15 +260,21 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
     .where(eq(tandemVideoAssetsTable.projectId, project.id))
     .orderBy(desc(tandemVideoAssetsTable.createdAt));
 
-  // Resolve member ids to Clerk display names (cached, best-effort) so the
-  // vault roster and the commit log read names instead of raw ids.
-  const memberNames = await resolveUserNames(members.map((member) => member.userId));
+  // Resolve member ids to Clerk display names + avatar urls (cached,
+  // best-effort) so the vault roster, the commit log, and the timeline cards
+  // read names (and show avatars) instead of raw ids.
+  const memberProfiles = await resolveUserProfiles(members.map((member) => member.userId));
 
   res.json(
     GetVideoProjectResponse.parse({
       ...project,
-      myRoles: member.roles ?? [],
-      members: members.map((row) => ({ ...row, roles: row.roles ?? [], name: memberNames[row.userId] ?? null })),
+      myRoles: access.kind === "member" ? (access.member.roles ?? []) : [],
+      members: members.map((row) => ({
+        ...row,
+        roles: row.roles ?? [],
+        name: memberProfiles[row.userId]?.name ?? null,
+        imageUrl: memberProfiles[row.userId]?.imageUrl ?? null,
+      })),
       assets,
     }),
   );
@@ -565,11 +584,20 @@ router.post(
         .set({ roles: merged })
         .where(eq(tandemVideoMembersTable.id, existing.id))
         .returning();
-      const updatedNames = await resolveUserNames([clerkUserId]);
+      const updatedProfiles = await resolveUserProfiles([clerkUserId]);
+      await notify(
+        clerkUserId,
+        "video_invite",
+        "You were added to a project",
+        `The Captain added you to “${project.name}” as ${body.data.role.replaceAll("_", " ").toLowerCase()}.`,
+        `/creators-den/projects/${project.id}`,
+        project.id,
+      ).catch(() => {});
       res.status(200).json(
         AddVideoProjectMemberResponse.parse({
           ...updated,
-          name: updatedNames[clerkUserId] ?? null,
+          name: updatedProfiles[clerkUserId]?.name ?? null,
+          imageUrl: updatedProfiles[clerkUserId]?.imageUrl ?? null,
         }),
       );
       return;
@@ -586,11 +614,20 @@ router.post(
           status: "ACTIVE",
         })
         .returning();
-      const invitedNames = await resolveUserNames([clerkUserId]);
+      const invitedProfiles = await resolveUserProfiles([clerkUserId]);
+      await notify(
+        clerkUserId,
+        "video_invite",
+        "You were added to a project",
+        `The Captain added you to “${project.name}” as ${body.data.role.replaceAll("_", " ").toLowerCase()}.`,
+        `/creators-den/projects/${project.id}`,
+        project.id,
+      ).catch(() => {});
       res.status(201).json(
         AddVideoProjectMemberResponse.parse({
           ...member,
-          name: invitedNames[clerkUserId] ?? null,
+          name: invitedProfiles[clerkUserId]?.name ?? null,
+          imageUrl: invitedProfiles[clerkUserId]?.imageUrl ?? null,
         }),
       );
     } catch {
@@ -661,12 +698,13 @@ router.patch(
       .set({ roles })
       .where(eq(tandemVideoMembersTable.id, member.id))
       .returning();
-    const updatedNames = await resolveUserNames([member.userId]);
+    const updatedProfiles = await resolveUserProfiles([member.userId]);
 
     res.json(
       UpdateVideoProjectMemberRolesResponse.parse({
         ...updated,
-        name: updatedNames[member.userId] ?? null,
+        name: updatedProfiles[member.userId]?.name ?? null,
+        imageUrl: updatedProfiles[member.userId]?.imageUrl ?? null,
       }),
     );
   },
@@ -740,7 +778,9 @@ router.delete(
   },
 );
 
-// GET /video/projects/:projectId/assets — the locked vault (members only).
+// GET /video/projects/:projectId/assets — the locked vault. Members only,
+// except that a PUBLIC project is readable (read-only) by non-members so the
+// preview and timeline pages can render its media.
 router.get(
   "/video/projects/:projectId/assets",
   async (req: Request, res): Promise<void> => {
@@ -756,7 +796,7 @@ router.get(
       return;
     }
 
-    if (!(await requireMember(params.data.projectId, userId))) {
+    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -802,6 +842,19 @@ router.post(
     const rawKind = String(req.body?.kind ?? "RAW_VIDEO");
     if (!ALLOWED_ASSET_KINDS.includes(rawKind as (typeof ALLOWED_ASSET_KINDS)[number])) {
       res.status(400).json({ error: `Unknown asset kind: ${rawKind}` });
+      return;
+    }
+
+    // Account quota: the owning Captain's storage must fit this upload, or the
+    // file is rejected (the profile's storage bar enforces the same limit).
+    const fit = await ensureUploadFits(params.data.projectId, req.file.size);
+    if (!fit.ok) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        // Multer file already cleaned up — nothing to do.
+      }
+      res.status(413).json({ error: fit.error });
       return;
     }
 

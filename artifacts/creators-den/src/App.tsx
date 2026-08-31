@@ -6,6 +6,8 @@ import VaultPage from '@/pages/vault';
 import ActivityPage from '@/pages/activity';
 import ProfilePage from '@/pages/profile';
 import ExplorePage from '@/pages/explore';
+import NotificationsPage from '@/pages/notifications';
+import ReviewPage from '@/pages/review';
 import PreviewPage from '@/pages/preview';
 import VideoPreviewPage from '@/pages/preview-video';
 import AudioPreviewPage from '@/pages/preview-audio';
@@ -38,6 +40,8 @@ export default function App() {
           <Route path="/profile" component={ProfilePage} />
           <Route path="/profile/:userId" component={ProfilePage} />
           <Route path="/explore" component={ExplorePage} />
+          <Route path="/notifications" component={NotificationsPage} />
+          <Route path="/review" component={ReviewPage} />
           <Route path="/projects/:projectId" component={VaultPage} />
           <Route path="/projects/:projectId/activity" component={ActivityPage} />
           <Route path="/projects/:projectId/preview" component={PreviewPage} />
