@@ -1505,3 +1505,146 @@ describe("crew room chat (text + voice notes)", () => {
     expect(missing.status).toBe(404);
   });
 });
+
+describe("captain's review queue + decision notes (M4)", () => {
+  it("lists pending submissions across owned projects with project + head context", async () => {
+    const project = await createProject("captain-1", "Salt Road");
+    await uploadAsset(project.id);
+    state.userId = "captain-1";
+    const saved = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+      .send({ snapshot: { clips: [] } });
+    expect(saved.status).toBe(200);
+    await request(API)
+      .post(`/api/video/projects/${project.id}/submissions`)
+      .send({ leg: "SELECTS" });
+
+    const second = await createProject("captain-1", "Second Film");
+    await uploadAsset(second.id);
+    state.userId = "captain-1";
+    await request(API)
+      .put(`/api/video/projects/${second.id}/timelines/SOUND`)
+      .send({ snapshot: { passes: [] } });
+    await request(API)
+      .post(`/api/video/projects/${second.id}/submissions`)
+      .send({ leg: "SOUND" });
+
+    const queue = await request(API).get("/api/video/review/queue");
+    expect(queue.status).toBe(200);
+    expect(queue.body).toHaveLength(2);
+    expect(queue.body.map((item: any) => item.projectName).sort()).toEqual(["Salt Road", "Second Film"]);
+    expect(queue.body.every((item: any) => item.status === "SUBMITTED")).toBe(true);
+    expect(queue.body.every((item: any) => item.headVersionId)).toBe(true);
+  });
+
+  it("drops decided submissions from the queue", async () => {
+    const project = await createProject();
+    await uploadAsset(project.id);
+    state.userId = "captain-1";
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+      .send({ snapshot: { clips: [] } });
+    const submitted = await request(API)
+      .post(`/api/video/projects/${project.id}/submissions`)
+      .send({ leg: "SELECTS" });
+    const queueBefore = await request(API).get("/api/video/review/queue");
+    expect(queueBefore.body).toHaveLength(1);
+
+    await request(API).post(
+      `/api/video/projects/${project.id}/submissions/${submitted.body.id}/approve`,
+    );
+    const queueAfter = await request(API).get("/api/video/review/queue");
+    expect(queueAfter.body).toHaveLength(0);
+  });
+
+  it("is Captain-only: members and strangers get an empty queue", async () => {
+    const project = await createProject();
+    await uploadAsset(project.id);
+    state.userId = "captain-1";
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+      .send({ snapshot: { clips: [] } });
+    await request(API)
+      .post(`/api/video/projects/${project.id}/submissions`)
+      .send({ leg: "SELECTS" });
+
+    state.userId = "editor-1"; // member, not owner
+    expect((await request(API).get("/api/video/review/queue")).body).toEqual([]);
+    state.userId = "stranger-1";
+    expect((await request(API).get("/api/video/review/queue")).body).toEqual([]);
+    state.userId = null;
+    expect((await request(API).get("/api/video/review/queue")).status).toBe(401);
+  });
+
+  it("stores a rejection note and sends it back to the submitter", async () => {
+    const project = await createProject();
+    await addMember(project.id, "editor@example.com", "VIDEO");
+    await uploadAsset(project.id);
+
+    state.userId = "editor-1";
+    await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+      .send({ snapshot: { clips: [] } });
+    const submitted = await request(API)
+      .post(`/api/video/projects/${project.id}/submissions`)
+      .send({ leg: "SELECTS", note: "My selects pass" });
+
+    state.userId = "captain-1";
+    const rejected = await request(API)
+      .post(`/api/video/projects/${project.id}/submissions/${submitted.body.id}/reject`)
+      .send({ note: "Add a title card and rebalance the second beat." });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body.status).toBe("REJECTED");
+    expect(rejected.body.decisionNote).toBe("Add a title card and rebalance the second beat.");
+
+    // The submitter's notification carries the improvement note verbatim.
+    const notes = await state.db
+      .select()
+      .from(state.tables.tandemVideoNotificationsTable)
+      .where(eq(state.tables.tandemVideoNotificationsTable.recipientId, "editor-1"));
+    const rejectedNote = notes.find((n: any) => n.category === "video_rejected");
+    expect(rejectedNote).toBeTruthy();
+    expect(rejectedNote.body).toContain("Add a title card and rebalance the second beat.");
+  });
+
+  it("records an invite notification when the Captain adds a member", async () => {
+    const project = await createProject();
+    await addMember(project.id, "editor@example.com", "VIDEO");
+
+    const notes = await state.db
+      .select()
+      .from(state.tables.tandemVideoNotificationsTable)
+      .where(eq(state.tables.tandemVideoNotificationsTable.recipientId, "editor-1"));
+    const invite = notes.find((n: any) => n.category === "video_invite");
+    expect(invite).toBeTruthy();
+    expect(invite.body).toContain(project.name);
+    expect(invite.body).toContain("video");
+    expect(invite.deepLink).toContain(`/creators-den/projects/${project.id}`);
+  });
+
+  it("notifies the rest of the crew on timeline saves and pinned notes", async () => {
+    const project = await createProject();
+    await addMember(project.id, "editor@example.com", "VIDEO");
+
+    // The editor (not the Captain) saves a SELECTS pass — the Captain is
+    // notified the timeline moved.
+    state.userId = "editor-1";
+    const saved = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+      .send({ snapshot: { clips: [] } });
+    expect(saved.status).toBe(200);
+
+    // Then the editor pins a note — the Captain is notified about it too.
+    const comment = await request(API)
+      .post(`/api/video/projects/${project.id}/comments`)
+      .send({ leg: "SELECTS", body: "Check this beat", timecodeMs: 1200 });
+    expect(comment.status).toBe(201);
+
+    const captainNotes = await state.db
+      .select()
+      .from(state.tables.tandemVideoNotificationsTable)
+      .where(eq(state.tables.tandemVideoNotificationsTable.recipientId, "captain-1"));
+    expect(captainNotes.some((n: any) => n.category === "video_timeline_updated")).toBe(true);
+    expect(captainNotes.some((n: any) => n.category === "video_comment")).toBe(true);
+  });
+});

@@ -27,6 +27,12 @@ export const collaborationMessagesTable = pgTable("collaboration_messages", {
   threadId: text("thread_id").notNull(),
   senderId: text("sender_id").notNull(),
   body: text("body").notNull(),
+  // Optional voice note: the served audio file URL + display metadata. Text
+  // messages leave these null; a voice message carries the URL, the original
+  // file name, and the recorded duration in milliseconds.
+  audioUrl: text("audio_url"),
+  audioName: text("audio_name"),
+  audioDurationMs: integer("audio_duration_ms"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

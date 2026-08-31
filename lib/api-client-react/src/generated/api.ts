@@ -20,8 +20,15 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AccountQuota,
+  AccountQuotaPurchaseInput,
+  AccountQuotaPurchaseResponse,
   ActivityEvent,
   AdminLoginInput,
+  AdminPromo,
+  AdminPromoDeleteResult,
+  AdminPromoInput,
+  AdminPromoUpdate,
   AdminSession,
   AuthorProjectDocument,
   CollaborationAnnotation,
@@ -34,12 +41,14 @@ import type {
   CollaborationSeedInput,
   CollaborationSeedUpdate,
   CollaborationThread,
+  CollaborationVoiceNoteInput,
   ContinuationAdvisory,
   ContinuationDraftInput,
   ContinuationSubmission,
   ContinuityAuditInput,
   ContinuityAuditResult,
   ErrorResponse,
+  ExploreAuthor,
   GenealogyEntry,
   HealthStatus,
   InboxThread,
@@ -58,8 +67,16 @@ import type {
   StoryBibleEntry,
   StoryBibleEntryInput,
   ThreadUnread,
+  TicketPromoValidateInput,
+  TicketPromoValidateResponse,
+  TicketPurchaseInput,
+  TicketPurchaseResponse,
+  TicketStatus,
   ToneRewriteInput,
   ToneRewriteResult,
+  UserCv,
+  UserCvDeleteResult,
+  UserCvInput,
   UserProfile,
   VideoActivityEvent,
   VideoAsset,
@@ -97,7 +114,9 @@ import type {
   VideoPublicProject,
   VideoReference,
   VideoRenderInput,
+  VideoReviewQueueItem,
   VideoSubmission,
+  VideoSubmissionDecisionInput,
   VideoSubmissionInput,
   VideoSync,
   VideoSyncInput,
@@ -811,6 +830,297 @@ export const useCheckAdminProvider = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCheckAdminProviderMutationOptions(options));
+    }
+
+export const getListAdminPromosUrl = () => {
+
+
+
+
+  return `/api/admin/promos`
+}
+
+/**
+ * @summary List the ticket promo codes
+ */
+export const listAdminPromos = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminPromo[]> => {
+
+  return customFetch<AdminPromo[]>(getListAdminPromosUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminPromosQueryKey = () => {
+    return [
+    `/api/admin/promos`
+    ] as const;
+    }
+
+
+export const getListAdminPromosQueryOptions = <TData = Awaited<ReturnType<typeof listAdminPromos>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminPromos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminPromosQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminPromos>>> = ({ signal }) => listAdminPromos({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminPromos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminPromosQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminPromos>>>
+export type ListAdminPromosQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the ticket promo codes
+ */
+
+export function useListAdminPromos<TData = Awaited<ReturnType<typeof listAdminPromos>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminPromos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminPromosQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateAdminPromoUrl = () => {
+
+
+
+
+  return `/api/admin/promos`
+}
+
+/**
+ * @summary Create a ticket promo code
+ */
+export const createAdminPromo = async (adminPromoInput: AdminPromoInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminPromo> => {
+
+  return customFetch<AdminPromo>(getCreateAdminPromoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminPromoInput)
+  }
+);}
+
+
+
+
+
+export const getCreateAdminPromoMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminPromo>>, TError,{data: BodyType<AdminPromoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAdminPromo>>, TError,{data: BodyType<AdminPromoInput>}, TContext> => {
+
+const mutationKey = ['createAdminPromo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAdminPromo>>, {data: BodyType<AdminPromoInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createAdminPromo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAdminPromoMutationResult = NonNullable<Awaited<ReturnType<typeof createAdminPromo>>>
+    export type CreateAdminPromoMutationBody = BodyType<AdminPromoInput>
+    export type CreateAdminPromoMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Create a ticket promo code
+ */
+export const useCreateAdminPromo = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminPromo>>, TError,{data: BodyType<AdminPromoInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAdminPromo>>,
+        TError,
+        {data: BodyType<AdminPromoInput>},
+        TContext
+      > => {
+      return useMutation(getCreateAdminPromoMutationOptions(options));
+    }
+
+export const getUpdateAdminPromoUrl = (code: string,) => {
+
+
+
+
+  return `/api/admin/promos/${code}`
+}
+
+/**
+ * @summary Update a ticket promo code
+ */
+export const updateAdminPromo = async (code: string,
+    adminPromoUpdate: AdminPromoUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AdminPromo> => {
+
+  return customFetch<AdminPromo>(getUpdateAdminPromoUrl(code),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminPromoUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminPromoMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminPromo>>, TError,{code: string;data: BodyType<AdminPromoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminPromo>>, TError,{code: string;data: BodyType<AdminPromoUpdate>}, TContext> => {
+
+const mutationKey = ['updateAdminPromo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminPromo>>, {code: string;data: BodyType<AdminPromoUpdate>}> = (props) => {
+          const {code,data} = props ?? {};
+
+          return  updateAdminPromo(code,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminPromoMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminPromo>>>
+    export type UpdateAdminPromoMutationBody = BodyType<AdminPromoUpdate>
+    export type UpdateAdminPromoMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Update a ticket promo code
+ */
+export const useUpdateAdminPromo = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminPromo>>, TError,{code: string;data: BodyType<AdminPromoUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminPromo>>,
+        TError,
+        {code: string;data: BodyType<AdminPromoUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminPromoMutationOptions(options));
+    }
+
+export const getDeleteAdminPromoUrl = (code: string,) => {
+
+
+
+
+  return `/api/admin/promos/${code}`
+}
+
+/**
+ * @summary Delete a ticket promo code
+ */
+export const deleteAdminPromo = async (code: string, options?: Parameters<typeof customFetch>[1]): Promise<AdminPromoDeleteResult> => {
+
+  return customFetch<AdminPromoDeleteResult>(getDeleteAdminPromoUrl(code),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteAdminPromoMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminPromo>>, TError,{code: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminPromo>>, TError,{code: string}, TContext> => {
+
+const mutationKey = ['deleteAdminPromo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminPromo>>, {code: string}> = (props) => {
+          const {code} = props ?? {};
+
+          return  deleteAdminPromo(code,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAdminPromoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAdminPromo>>>
+
+    export type DeleteAdminPromoMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete a ticket promo code
+ */
+export const useDeleteAdminPromo = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminPromo>>, TError,{code: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAdminPromo>>,
+        TError,
+        {code: string},
+        TContext
+      > => {
+      return useMutation(getDeleteAdminPromoMutationOptions(options));
     }
 
 export const getOracleChatUrl = () => {
@@ -3179,6 +3489,245 @@ export const useSendCollaborationMessage = <TError = ErrorType<ErrorResponse>,
       return useMutation(getSendCollaborationMessageMutationOptions(options));
     }
 
+export const getSendCollaborationVoiceNoteUrl = (threadId: string,) => {
+
+
+
+
+  return `/api/collaborations/threads/${threadId}/voice`
+}
+
+/**
+ * Multipart voice note (the audio IS the message, mirroring the Creator Den crew room). The recorded audio lands on disk and the message carries the served URL + duration.
+ * @summary Send a voice note to a collaboration thread
+ */
+export const sendCollaborationVoiceNote = async (threadId: string,
+    collaborationVoiceNoteInput: CollaborationVoiceNoteInput, options?: Parameters<typeof customFetch>[1]): Promise<CollaborationMessage> => {
+    const formData = new FormData();
+formData.append(`audio`, collaborationVoiceNoteInput.audio);
+if(collaborationVoiceNoteInput.durationMs !== undefined) {
+ formData.append(`durationMs`, collaborationVoiceNoteInput.durationMs.toString())
+ }
+
+  return customFetch<CollaborationMessage>(getSendCollaborationVoiceNoteUrl(threadId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+
+
+
+export const getSendCollaborationVoiceNoteMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendCollaborationVoiceNote>>, TError,{threadId: string;data: BodyType<CollaborationVoiceNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendCollaborationVoiceNote>>, TError,{threadId: string;data: BodyType<CollaborationVoiceNoteInput>}, TContext> => {
+
+const mutationKey = ['sendCollaborationVoiceNote'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendCollaborationVoiceNote>>, {threadId: string;data: BodyType<CollaborationVoiceNoteInput>}> = (props) => {
+          const {threadId,data} = props ?? {};
+
+          return  sendCollaborationVoiceNote(threadId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendCollaborationVoiceNoteMutationResult = NonNullable<Awaited<ReturnType<typeof sendCollaborationVoiceNote>>>
+    export type SendCollaborationVoiceNoteMutationBody = BodyType<CollaborationVoiceNoteInput>
+    export type SendCollaborationVoiceNoteMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Send a voice note to a collaboration thread
+ */
+export const useSendCollaborationVoiceNote = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendCollaborationVoiceNote>>, TError,{threadId: string;data: BodyType<CollaborationVoiceNoteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendCollaborationVoiceNote>>,
+        TError,
+        {threadId: string;data: BodyType<CollaborationVoiceNoteInput>},
+        TContext
+      > => {
+      return useMutation(getSendCollaborationVoiceNoteMutationOptions(options));
+    }
+
+export const getGetCollaborationThreadAudioUrl = (threadId: string,
+    fileId: string,) => {
+
+
+
+
+  return `/api/collaborations/threads/${threadId}/audio/${fileId}`
+}
+
+/**
+ * Returns the audio bytes of a voice note. Participants only; the file lives in the shared upload dir under its uuid filename.
+ * @summary Stream a collaboration thread voice note
+ */
+export const getCollaborationThreadAudio = async (threadId: string,
+    fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetCollaborationThreadAudioUrl(threadId,fileId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCollaborationThreadAudioQueryKey = (threadId: string,
+    fileId: string,) => {
+    return [
+    `/api/collaborations/threads/${threadId}/audio/${fileId}`
+    ] as const;
+    }
+
+
+export const getGetCollaborationThreadAudioQueryOptions = <TData = Awaited<ReturnType<typeof getCollaborationThreadAudio>>, TError = ErrorType<ErrorResponse>>(threadId: string,
+    fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaborationThreadAudio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCollaborationThreadAudioQueryKey(threadId,fileId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCollaborationThreadAudio>>> = ({ signal }) => getCollaborationThreadAudio(threadId,fileId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: threadId !== null && threadId !== undefined && fileId !== null && fileId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCollaborationThreadAudio>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCollaborationThreadAudioQueryResult = NonNullable<Awaited<ReturnType<typeof getCollaborationThreadAudio>>>
+export type GetCollaborationThreadAudioQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Stream a collaboration thread voice note
+ */
+
+export function useGetCollaborationThreadAudio<TData = Awaited<ReturnType<typeof getCollaborationThreadAudio>>, TError = ErrorType<ErrorResponse>>(
+ threadId: string,
+    fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCollaborationThreadAudio>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCollaborationThreadAudioQueryOptions(threadId,fileId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListExploreAuthorsUrl = () => {
+
+
+
+
+  return `/api/collaborations/explore/authors`
+}
+
+/**
+ * Authors are writers with published seeds (public work) — the Author Den analogue of the Creator Den explore list. Includes follower counts and the viewer's follow state for the Follow buttons.
+ * @summary List discoverable authors
+ */
+export const listExploreAuthors = async ( options?: Parameters<typeof customFetch>[1]): Promise<ExploreAuthor[]> => {
+
+  return customFetch<ExploreAuthor[]>(getListExploreAuthorsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListExploreAuthorsQueryKey = () => {
+    return [
+    `/api/collaborations/explore/authors`
+    ] as const;
+    }
+
+
+export const getListExploreAuthorsQueryOptions = <TData = Awaited<ReturnType<typeof listExploreAuthors>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listExploreAuthors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListExploreAuthorsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listExploreAuthors>>> = ({ signal }) => listExploreAuthors({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listExploreAuthors>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListExploreAuthorsQueryResult = NonNullable<Awaited<ReturnType<typeof listExploreAuthors>>>
+export type ListExploreAuthorsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List discoverable authors
+ */
+
+export function useListExploreAuthors<TData = Awaited<ReturnType<typeof listExploreAuthors>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listExploreAuthors>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListExploreAuthorsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getListCollaborationProjectsUrl = () => {
 
 
@@ -4823,6 +5372,681 @@ export function useGetUserProfile<TData = Awaited<ReturnType<typeof getUserProfi
 
 
 
+
+export const getGetAccountQuotaUrl = () => {
+
+
+
+
+  return `/api/account/quota`
+}
+
+/**
+ * Returns the workspace storage bar data (used/total/remaining bytes) and the project-count bar data (used/total/remaining), plus the buy-more plans the profile pages render. Defaults to 2 GB / 5 projects until a plan is purchased.
+ * @summary Read the account's storage and project limits and usage
+ */
+export const getAccountQuota = async ( options?: Parameters<typeof customFetch>[1]): Promise<AccountQuota> => {
+
+  return customFetch<AccountQuota>(getGetAccountQuotaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAccountQuotaQueryKey = () => {
+    return [
+    `/api/account/quota`
+    ] as const;
+    }
+
+
+export const getGetAccountQuotaQueryOptions = <TData = Awaited<ReturnType<typeof getAccountQuota>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountQuota>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAccountQuotaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAccountQuota>>> = ({ signal }) => getAccountQuota({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAccountQuota>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAccountQuotaQueryResult = NonNullable<Awaited<ReturnType<typeof getAccountQuota>>>
+export type GetAccountQuotaQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the account's storage and project limits and usage
+ */
+
+export function useGetAccountQuota<TData = Awaited<ReturnType<typeof getAccountQuota>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAccountQuota>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAccountQuotaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPurchaseAccountQuotaUrl = () => {
+
+
+
+
+  return `/api/account/quota/purchase`
+}
+
+/**
+ * Extends the account's storage or project limit by the purchased plan. Payment is applied server-side here (the endpoint a Stripe Checkout confirmation will call once payments are wired); the profile bar reflects the new limit immediately.
+ * @summary Apply a buy-more plan to the account
+ */
+export const purchaseAccountQuota = async (accountQuotaPurchaseInput: AccountQuotaPurchaseInput, options?: Parameters<typeof customFetch>[1]): Promise<AccountQuotaPurchaseResponse> => {
+
+  return customFetch<AccountQuotaPurchaseResponse>(getPurchaseAccountQuotaUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(accountQuotaPurchaseInput)
+  }
+);}
+
+
+
+
+
+export const getPurchaseAccountQuotaMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof purchaseAccountQuota>>, TError,{data: BodyType<AccountQuotaPurchaseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof purchaseAccountQuota>>, TError,{data: BodyType<AccountQuotaPurchaseInput>}, TContext> => {
+
+const mutationKey = ['purchaseAccountQuota'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof purchaseAccountQuota>>, {data: BodyType<AccountQuotaPurchaseInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  purchaseAccountQuota(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PurchaseAccountQuotaMutationResult = NonNullable<Awaited<ReturnType<typeof purchaseAccountQuota>>>
+    export type PurchaseAccountQuotaMutationBody = BodyType<AccountQuotaPurchaseInput>
+    export type PurchaseAccountQuotaMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Apply a buy-more plan to the account
+ */
+export const usePurchaseAccountQuota = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof purchaseAccountQuota>>, TError,{data: BodyType<AccountQuotaPurchaseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof purchaseAccountQuota>>,
+        TError,
+        {data: BodyType<AccountQuotaPurchaseInput>},
+        TContext
+      > => {
+      return useMutation(getPurchaseAccountQuotaMutationOptions(options));
+    }
+
+export const getGetUserCvUrl = (userId: string,) => {
+
+
+
+
+  return `/api/users/${userId}/cv`
+}
+
+/**
+ * Returns the CV metadata (file name, type, size, updated time) for a profile. Any signed-in user can see it so CVs are viewable on profiles.
+ * @summary Read a user's CV metadata
+ */
+export const getUserCv = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<UserCv> => {
+
+  return customFetch<UserCv>(getGetUserCvUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUserCvQueryKey = (userId: string,) => {
+    return [
+    `/api/users/${userId}/cv`
+    ] as const;
+    }
+
+
+export const getGetUserCvQueryOptions = <TData = Awaited<ReturnType<typeof getUserCv>>, TError = ErrorType<ErrorResponse>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserCv>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUserCvQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserCv>>> = ({ signal }) => getUserCv(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserCv>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUserCvQueryResult = NonNullable<Awaited<ReturnType<typeof getUserCv>>>
+export type GetUserCvQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read a user's CV metadata
+ */
+
+export function useGetUserCv<TData = Awaited<ReturnType<typeof getUserCv>>, TError = ErrorType<ErrorResponse>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserCv>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUserCvQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUploadUserCvUrl = (userId: string,) => {
+
+
+
+
+  return `/api/users/${userId}/cv`
+}
+
+/**
+ * Multipart upload of the CV file. Only the user themselves may upload; re-uploading replaces the previous file.
+ * @summary Upload or replace the user's CV
+ */
+export const uploadUserCv = async (userId: string,
+    userCvInput: UserCvInput, options?: Parameters<typeof customFetch>[1]): Promise<UserCv> => {
+    const formData = new FormData();
+formData.append(`file`, userCvInput.file);
+
+  return customFetch<UserCv>(getUploadUserCvUrl(userId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+
+
+
+export const getUploadUserCvMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadUserCv>>, TError,{userId: string;data: BodyType<UserCvInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadUserCv>>, TError,{userId: string;data: BodyType<UserCvInput>}, TContext> => {
+
+const mutationKey = ['uploadUserCv'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadUserCv>>, {userId: string;data: BodyType<UserCvInput>}> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  uploadUserCv(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadUserCvMutationResult = NonNullable<Awaited<ReturnType<typeof uploadUserCv>>>
+    export type UploadUserCvMutationBody = BodyType<UserCvInput>
+    export type UploadUserCvMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Upload or replace the user's CV
+ */
+export const useUploadUserCv = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadUserCv>>, TError,{userId: string;data: BodyType<UserCvInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadUserCv>>,
+        TError,
+        {userId: string;data: BodyType<UserCvInput>},
+        TContext
+      > => {
+      return useMutation(getUploadUserCvMutationOptions(options));
+    }
+
+export const getDeleteUserCvUrl = (userId: string,) => {
+
+
+
+
+  return `/api/users/${userId}/cv`
+}
+
+/**
+ * Deletes the CV from the profile. Only the user themselves may delete it.
+ * @summary Remove the user's CV
+ */
+export const deleteUserCv = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<UserCvDeleteResult> => {
+
+  return customFetch<UserCvDeleteResult>(getDeleteUserCvUrl(userId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteUserCvMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUserCv>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteUserCv>>, TError,{userId: string}, TContext> => {
+
+const mutationKey = ['deleteUserCv'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUserCv>>, {userId: string}> = (props) => {
+          const {userId} = props ?? {};
+
+          return  deleteUserCv(userId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteUserCvMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUserCv>>>
+
+    export type DeleteUserCvMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Remove the user's CV
+ */
+export const useDeleteUserCv = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUserCv>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteUserCv>>,
+        TError,
+        {userId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteUserCvMutationOptions(options));
+    }
+
+export const getGetUserCvFileUrl = (userId: string,) => {
+
+
+
+
+  return `/api/users/${userId}/cv/file`
+}
+
+/**
+ * Returns the CV bytes so a profile visitor can view or download it.
+ * @summary Stream a user's CV file
+ */
+export const getUserCvFile = async (userId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetUserCvFileUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUserCvFileQueryKey = (userId: string,) => {
+    return [
+    `/api/users/${userId}/cv/file`
+    ] as const;
+    }
+
+
+export const getGetUserCvFileQueryOptions = <TData = Awaited<ReturnType<typeof getUserCvFile>>, TError = ErrorType<ErrorResponse>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserCvFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUserCvFileQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserCvFile>>> = ({ signal }) => getUserCvFile(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserCvFile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUserCvFileQueryResult = NonNullable<Awaited<ReturnType<typeof getUserCvFile>>>
+export type GetUserCvFileQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Stream a user's CV file
+ */
+
+export function useGetUserCvFile<TData = Awaited<ReturnType<typeof getUserCvFile>>, TError = ErrorType<ErrorResponse>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserCvFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUserCvFileQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetTicketStatusUrl = () => {
+
+
+
+
+  return `/api/tickets/status`
+}
+
+/**
+ * Returns the pass price ($1.88) and duration (3 weeks) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
+ * @summary Read the viewer's active category passes and the pass price
+ */
+export const getTicketStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<TicketStatus> => {
+
+  return customFetch<TicketStatus>(getGetTicketStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTicketStatusQueryKey = () => {
+    return [
+    `/api/tickets/status`
+    ] as const;
+    }
+
+
+export const getGetTicketStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTicketStatus>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTicketStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTicketStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTicketStatus>>> = ({ signal }) => getTicketStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTicketStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTicketStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getTicketStatus>>>
+export type GetTicketStatusQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the viewer's active category passes and the pass price
+ */
+
+export function useGetTicketStatus<TData = Awaited<ReturnType<typeof getTicketStatus>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTicketStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTicketStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getValidateTicketPromoUrl = () => {
+
+
+
+
+  return `/api/tickets/promo/validate`
+}
+
+/**
+ * Live promo-code check for the coupon card — returns the discount and the discounted pass price (or valid:false for an unknown/expired/used-up code).
+ * @summary Validate a promo code for the ticket checkout
+ */
+export const validateTicketPromo = async (ticketPromoValidateInput: TicketPromoValidateInput, options?: Parameters<typeof customFetch>[1]): Promise<TicketPromoValidateResponse> => {
+
+  return customFetch<TicketPromoValidateResponse>(getValidateTicketPromoUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ticketPromoValidateInput)
+  }
+);}
+
+
+
+
+
+export const getValidateTicketPromoMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validateTicketPromo>>, TError,{data: BodyType<TicketPromoValidateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof validateTicketPromo>>, TError,{data: BodyType<TicketPromoValidateInput>}, TContext> => {
+
+const mutationKey = ['validateTicketPromo'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof validateTicketPromo>>, {data: BodyType<TicketPromoValidateInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  validateTicketPromo(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ValidateTicketPromoMutationResult = NonNullable<Awaited<ReturnType<typeof validateTicketPromo>>>
+    export type ValidateTicketPromoMutationBody = BodyType<TicketPromoValidateInput>
+    export type ValidateTicketPromoMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Validate a promo code for the ticket checkout
+ */
+export const useValidateTicketPromo = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof validateTicketPromo>>, TError,{data: BodyType<TicketPromoValidateInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof validateTicketPromo>>,
+        TError,
+        {data: BodyType<TicketPromoValidateInput>},
+        TContext
+      > => {
+      return useMutation(getValidateTicketPromoMutationOptions(options));
+    }
+
+export const getPurchaseTicketUrl = () => {
+
+
+
+
+  return `/api/tickets/purchase`
+}
+
+/**
+ * Validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass for the category. Card details are validated in-house today (only the last-4 is kept); a Stripe Checkout session will replace this once keys are added.
+ * @summary Buy a category pass with a credit card
+ */
+export const purchaseTicket = async (ticketPurchaseInput: TicketPurchaseInput, options?: Parameters<typeof customFetch>[1]): Promise<TicketPurchaseResponse> => {
+
+  return customFetch<TicketPurchaseResponse>(getPurchaseTicketUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(ticketPurchaseInput)
+  }
+);}
+
+
+
+
+
+export const getPurchaseTicketMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof purchaseTicket>>, TError,{data: BodyType<TicketPurchaseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof purchaseTicket>>, TError,{data: BodyType<TicketPurchaseInput>}, TContext> => {
+
+const mutationKey = ['purchaseTicket'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof purchaseTicket>>, {data: BodyType<TicketPurchaseInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  purchaseTicket(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PurchaseTicketMutationResult = NonNullable<Awaited<ReturnType<typeof purchaseTicket>>>
+    export type PurchaseTicketMutationBody = BodyType<TicketPurchaseInput>
+    export type PurchaseTicketMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Buy a category pass with a credit card
+ */
+export const usePurchaseTicket = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof purchaseTicket>>, TError,{data: BodyType<TicketPurchaseInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof purchaseTicket>>,
+        TError,
+        {data: BodyType<TicketPurchaseInput>},
+        TContext
+      > => {
+      return useMutation(getPurchaseTicketMutationOptions(options));
+    }
 
 export const getListVideoProjectsUrl = () => {
 
@@ -7873,6 +9097,84 @@ export const useCreateVideoSubmission = <TError = ErrorType<ErrorResponse>,
       return useMutation(getCreateVideoSubmissionMutationOptions(options));
     }
 
+export const getListVideoReviewQueueUrl = () => {
+
+
+
+
+  return `/api/video/review/queue`
+}
+
+/**
+ * Only projects the viewer owns (i.e. is Captain of) are scanned, so the page is naturally Captain-only
+ * @summary Captain's review queue — pending (SUBMITTED) leg submissions across the viewer's owned projects
+ */
+export const listVideoReviewQueue = async ( options?: Parameters<typeof customFetch>[1]): Promise<VideoReviewQueueItem[]> => {
+
+  return customFetch<VideoReviewQueueItem[]>(getListVideoReviewQueueUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListVideoReviewQueueQueryKey = () => {
+    return [
+    `/api/video/review/queue`
+    ] as const;
+    }
+
+
+export const getListVideoReviewQueueQueryOptions = <TData = Awaited<ReturnType<typeof listVideoReviewQueue>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoReviewQueue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListVideoReviewQueueQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoReviewQueue>>> = ({ signal }) => listVideoReviewQueue({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listVideoReviewQueue>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListVideoReviewQueueQueryResult = NonNullable<Awaited<ReturnType<typeof listVideoReviewQueue>>>
+export type ListVideoReviewQueueQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Captain's review queue — pending (SUBMITTED) leg submissions across the viewer's owned projects
+ */
+
+export function useListVideoReviewQueue<TData = Awaited<ReturnType<typeof listVideoReviewQueue>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoReviewQueue>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListVideoReviewQueueQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getApproveVideoSubmissionUrl = (projectId: string,
     submissionId: string,) => {
 
@@ -7883,17 +9185,18 @@ export const getApproveVideoSubmissionUrl = (projectId: string,
 }
 
 /**
- * @summary Captain approves a leg submission
+ * @summary Captain approves a leg submission (optional note)
  */
 export const approveVideoSubmission = async (projectId: string,
-    submissionId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoSubmission> => {
+    submissionId: string,
+    videoSubmissionDecisionInput?: VideoSubmissionDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoSubmission> => {
 
   return customFetch<VideoSubmission>(getApproveVideoSubmissionUrl(projectId,submissionId),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(videoSubmissionDecisionInput)
   }
 );}
 
@@ -7902,8 +9205,8 @@ export const approveVideoSubmission = async (projectId: string,
 
 
 export const getApproveVideoSubmissionMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveVideoSubmission>>, TError,{projectId: string;submissionId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof approveVideoSubmission>>, TError,{projectId: string;submissionId: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveVideoSubmission>>, TError,{projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof approveVideoSubmission>>, TError,{projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>}, TContext> => {
 
 const mutationKey = ['approveVideoSubmission'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -7915,10 +9218,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveVideoSubmission>>, {projectId: string;submissionId: string}> = (props) => {
-          const {projectId,submissionId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveVideoSubmission>>, {projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>}> = (props) => {
+          const {projectId,submissionId,data} = props ?? {};
 
-          return  approveVideoSubmission(projectId,submissionId,requestOptions)
+          return  approveVideoSubmission(projectId,submissionId,data,requestOptions)
         }
 
 
@@ -7929,18 +9232,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type ApproveVideoSubmissionMutationResult = NonNullable<Awaited<ReturnType<typeof approveVideoSubmission>>>
-
+    export type ApproveVideoSubmissionMutationBody = BodyType<VideoSubmissionDecisionInput> | undefined
     export type ApproveVideoSubmissionMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Captain approves a leg submission
+ * @summary Captain approves a leg submission (optional note)
  */
 export const useApproveVideoSubmission = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveVideoSubmission>>, TError,{projectId: string;submissionId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveVideoSubmission>>, TError,{projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof approveVideoSubmission>>,
         TError,
-        {projectId: string;submissionId: string},
+        {projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>},
         TContext
       > => {
       return useMutation(getApproveVideoSubmissionMutationOptions(options));
@@ -7956,17 +9259,18 @@ export const getRejectVideoSubmissionUrl = (projectId: string,
 }
 
 /**
- * @summary Captain rejects a leg submission
+ * @summary Captain rejects a leg submission (note = the improvement message sent back to the submitter)
  */
 export const rejectVideoSubmission = async (projectId: string,
-    submissionId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoSubmission> => {
+    submissionId: string,
+    videoSubmissionDecisionInput?: VideoSubmissionDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoSubmission> => {
 
   return customFetch<VideoSubmission>(getRejectVideoSubmissionUrl(projectId,submissionId),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(videoSubmissionDecisionInput)
   }
 );}
 
@@ -7975,8 +9279,8 @@ export const rejectVideoSubmission = async (projectId: string,
 
 
 export const getRejectVideoSubmissionMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectVideoSubmission>>, TError,{projectId: string;submissionId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof rejectVideoSubmission>>, TError,{projectId: string;submissionId: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectVideoSubmission>>, TError,{projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejectVideoSubmission>>, TError,{projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>}, TContext> => {
 
 const mutationKey = ['rejectVideoSubmission'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -7988,10 +9292,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejectVideoSubmission>>, {projectId: string;submissionId: string}> = (props) => {
-          const {projectId,submissionId} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejectVideoSubmission>>, {projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>}> = (props) => {
+          const {projectId,submissionId,data} = props ?? {};
 
-          return  rejectVideoSubmission(projectId,submissionId,requestOptions)
+          return  rejectVideoSubmission(projectId,submissionId,data,requestOptions)
         }
 
 
@@ -8002,18 +9306,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type RejectVideoSubmissionMutationResult = NonNullable<Awaited<ReturnType<typeof rejectVideoSubmission>>>
-
+    export type RejectVideoSubmissionMutationBody = BodyType<VideoSubmissionDecisionInput> | undefined
     export type RejectVideoSubmissionMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Captain rejects a leg submission
+ * @summary Captain rejects a leg submission (note = the improvement message sent back to the submitter)
  */
 export const useRejectVideoSubmission = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectVideoSubmission>>, TError,{projectId: string;submissionId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectVideoSubmission>>, TError,{projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof rejectVideoSubmission>>,
         TError,
-        {projectId: string;submissionId: string},
+        {projectId: string;submissionId: string;data?: BodyType<VideoSubmissionDecisionInput>},
         TContext
       > => {
       return useMutation(getRejectVideoSubmissionMutationOptions(options));

@@ -24,3 +24,5 @@ export * from "./collaboration-threads";
 export * from "./collaboration-work";
 export * from "./video-projects";
 export * from "./video-production";
+export * from "./account";
+export * from "./tickets";

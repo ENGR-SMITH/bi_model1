@@ -15,27 +15,36 @@ import {
   LogOut,
   Menu,
   Network,
+  Pencil,
+  Plus,
   RefreshCw,
   Save,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   TerminalSquare,
+  Ticket,
+  Trash2,
   X,
   Zap,
 } from 'lucide-react';
 import {
   getGetAdminSessionQueryKey,
+  getListAdminPromosQueryKey,
   getListAdminProvidersQueryKey,
   useAdminLogin,
   useAdminLogout,
   useCheckAdminProvider,
+  useCreateAdminPromo,
+  useDeleteAdminPromo,
   useGetAdminSession,
+  useListAdminPromos,
   useListAdminProviders,
   useOracleChat,
+  useUpdateAdminPromo,
   useUpdateAdminProvider,
 } from '@workspace/api-client-react';
-import type { ProviderStatus, ProviderUpdate } from '@workspace/api-client-react';
+import type { AdminPromo, ProviderStatus, ProviderUpdate } from '@workspace/api-client-react';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -203,7 +212,7 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
   const session = useGetAdminSession();
   const providers = useListAdminProviders();
   const logout = useAdminLogout();
-  const [activeSection, setActiveSection] = useState<'overview' | 'providers'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'providers' | 'promos'>('overview');
 
   const providerList = useMemo(() => providers.data || [], [providers.data]);
   const connectedCount = providerList.filter((provider) => provider.status === 'connected').length;
@@ -227,6 +236,7 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
             <nav className="mt-3 space-y-1">
               <button data-testid="button-nav-overview" onClick={() => { setActiveSection('overview'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'overview' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><Activity className="h-4 w-4" /> System overview</button>
               <button data-testid="button-nav-providers" onClick={() => { setActiveSection('providers'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'providers' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><SlidersHorizontal className="h-4 w-4" /> Provider routing</button>
+              <button data-testid="button-nav-promos" onClick={() => { setActiveSection('promos'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'promos' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><Ticket className="h-4 w-4" /> Promo codes</button>
             </nav>
           </div>
           <div className="mt-auto">
@@ -242,6 +252,8 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
         <main className="min-w-0 flex-1 px-5 py-8 sm:px-8 sm:py-10 lg:px-14 lg:py-12">
           {activeSection === 'overview' ? (
             <Overview providers={providerList} isLoading={providers.isLoading} isError={providers.isError} onRetry={() => providers.refetch()} connectedCount={connectedCount} configuredCount={configuredCount} onConfigure={() => setActiveSection('providers')} />
+          ) : activeSection === 'promos' ? (
+            <PromosSection session={session.data?.authenticated ?? false} />
           ) : (
             <ProvidersSection providers={providerList} isLoading={providers.isLoading} isError={providers.isError} onRetry={() => providers.refetch()} session={session.data?.authenticated ?? false} />
           )}
@@ -386,6 +398,248 @@ function formatDate(value: string) {
   } catch {
     return 'Recently';
   }
+}
+
+// ---------------------------------------------------------------------------
+// Ticket promo codes — the admin surface for the $1.88 category passes.
+// Codes are created/edited/deleted here; the checkout validates them live.
+// ---------------------------------------------------------------------------
+
+const PROMO_KIND_META: Record<string, { label: string; tone: string }> = {
+  FREE: { label: 'Free pass', tone: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/25' },
+  PERCENT: { label: '% off', tone: 'text-amber-600 bg-amber-500/10 border-amber-500/25' },
+  FLAT: { label: '$ off', tone: 'text-sky-600 bg-sky-500/10 border-sky-500/25' },
+};
+
+function PromoValueLabel(promo: AdminPromo): string {
+  if (promo.kind === 'FREE') return 'Whole pass free';
+  if (promo.kind === 'PERCENT') return `${promo.value}% off`;
+  return `$${(promo.value / 100).toFixed(2)} off`;
+}
+
+function PromosSection({ session }: { session: boolean }) {
+  const promos = useListAdminPromos();
+  const queryClient = useQueryClient();
+  const remove = useDeleteAdminPromo({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminPromosQueryKey() }),
+    },
+  });
+
+  return (
+    <div className="mx-auto max-w-[1180px]">
+      <div className="animate-in">
+        <PageHeading
+          eyebrow="Control room / ticket passes"
+          title="Manage the promo codes."
+          description="Create, tune, and retire the codes the $1.88 category-pass checkout accepts. A code that is deleted stops working immediately."
+          action={
+            <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
+              <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
+            </div>
+          }
+        />
+      </div>
+
+      <div className="mt-10 space-y-6 animate-in delay-100">
+        <CreatePromoForm />
+        {promos.isError ? (
+          <ErrorState onRetry={() => promos.refetch()} />
+        ) : promos.isLoading ? (
+          <PromoSkeleton />
+        ) : (promos.data ?? []).length === 0 ? (
+          <div data-testid="state-promos-empty" className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+            <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-muted-foreground"><Ticket className="h-5 w-5" /></div>
+            <h3 className="mt-4 text-sm font-semibold">No promo codes yet</h3>
+            <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Create one above — for example a FREE code for early testers or a 50% off launch code.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {(promos.data ?? []).map((promo) => (
+              <PromoRow key={promo.code} promo={promo} onDelete={() => remove.mutate({ code: promo.code })} deleting={remove.isPending} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PromoSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      {[0, 1, 2].map((item) => (
+        <div key={item} className="h-24 rounded-2xl border border-border bg-secondary/60" />
+      ))}
+    </div>
+  );
+}
+
+function CreatePromoForm() {
+  const queryClient = useQueryClient();
+  const create = useCreateAdminPromo({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListAdminPromosQueryKey() });
+        setCode('');
+        setValue('');
+        setMaxUses('0');
+        setExpiry('');
+        setNotice('');
+      },
+      onError: (error) => {
+        const apiError = error as { response?: { data?: { error?: string } } } | null;
+        setNotice(apiError?.response?.data?.error || 'That code could not be created.');
+      },
+    },
+  });
+  const [code, setCode] = useState('');
+  const [kind, setKind] = useState<'FREE' | 'PERCENT' | 'FLAT'>('PERCENT');
+  const [value, setValue] = useState('50');
+  const [maxUses, setMaxUses] = useState('0');
+  const [expiry, setExpiry] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setNotice('');
+    if (!code.trim()) {
+      setNotice('Give the code a name, e.g. LAUNCH50.');
+      return;
+    }
+    create.mutate({
+      data: {
+        code: code.trim(),
+        kind,
+        value: Number(value) || 0,
+        maxUses: Number(maxUses) || 0,
+        expiresAt: expiry ? new Date(expiry).toISOString() : undefined,
+      },
+    });
+  };
+
+  const inputClass = 'h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15';
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-5" data-testid="create-promo-form">
+      <div className="flex items-center gap-2">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-foreground"><Plus className="h-4 w-4" /></span>
+        <div>
+          <h3 className="text-sm font-semibold">New promo code</h3>
+          <p className="text-xs text-muted-foreground">Codes are stored uppercase — the checkout matches them exactly.</p>
+        </div>
+      </div>
+      <form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-[1.2fr_.8fr_.8fr_.8fr_1fr_auto]">
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Code</span>
+          <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="LAUNCH50" className={inputClass} data-testid="input-promo-code" />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Kind</span>
+          <select value={kind} onChange={(event) => setKind(event.target.value as 'FREE' | 'PERCENT' | 'FLAT')} className={inputClass} data-testid="select-promo-kind">
+            <option value="FREE">Free pass</option>
+            <option value="PERCENT">Percent off</option>
+            <option value="FLAT">Cents off</option>
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{kind === 'PERCENT' ? 'Percent' : kind === 'FLAT' ? 'Cents off' : 'Value'}</span>
+          <input type="number" min="0" value={value} onChange={(event) => setValue(event.target.value)} className={inputClass} data-testid="input-promo-value" />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Max uses</span>
+          <input type="number" min="0" value={maxUses} onChange={(event) => setMaxUses(event.target.value)} className={inputClass} data-testid="input-promo-max-uses" />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Expires (optional)</span>
+          <input type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} className={inputClass} data-testid="input-promo-expiry" />
+        </label>
+        <button type="submit" disabled={create.isPending} className="mt-6 h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60" data-testid="button-create-promo">
+          {create.isPending ? 'Creating…' : 'Create'}
+        </button>
+      </form>
+      {notice && <p className="mt-3 text-xs font-semibold text-destructive" role="alert" data-testid="create-promo-notice">{notice}</p>}
+    </section>
+  );
+}
+
+function PromoRow({ promo, onDelete, deleting }: { promo: AdminPromo; onDelete: () => void; deleting: boolean }) {
+  const queryClient = useQueryClient();
+  const update = useUpdateAdminPromo({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminPromosQueryKey() }),
+    },
+  });
+  const [editing, setEditing] = useState(false);
+  const [kind, setKind] = useState<'FREE' | 'PERCENT' | 'FLAT'>(promo.kind as 'FREE' | 'PERCENT' | 'FLAT');
+  const [value, setValue] = useState(String(promo.value));
+  const [maxUses, setMaxUses] = useState(String(promo.maxUses));
+  const [expiry, setExpiry] = useState(promo.expiresAt ? new Date(promo.expiresAt).toISOString().slice(0, 10) : '');
+
+  const meta = PROMO_KIND_META[promo.kind] ?? PROMO_KIND_META.PERCENT;
+  const exhausted = promo.maxUses > 0 && promo.uses >= promo.maxUses;
+  const inputClass = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15';
+
+  const save = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    update.mutate({
+      code: promo.code,
+      data: {
+        kind,
+        value: Number(value) || 0,
+        maxUses: Number(maxUses) || 0,
+        expiresAt: expiry ? new Date(expiry).toISOString() : undefined,
+      },
+    });
+    setEditing(false);
+  };
+
+  return (
+    <div data-testid={`promo-${promo.code}`} className="rounded-2xl border border-border bg-card p-5">
+      {editing ? (
+        <form onSubmit={save} className="grid gap-4 md:grid-cols-[1fr_.8fr_.8fr_1fr_auto]">
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Kind</span>
+            <select value={kind} onChange={(event) => setKind(event.target.value as 'FREE' | 'PERCENT' | 'FLAT')} className={inputClass}>
+              <option value="FREE">Free pass</option>
+              <option value="PERCENT">Percent off</option>
+              <option value="FLAT">Cents off</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{kind === 'PERCENT' ? 'Percent' : kind === 'FLAT' ? 'Cents off' : 'Value'}</span>
+            <input type="number" min="0" value={value} onChange={(event) => setValue(event.target.value)} className={inputClass} />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Max uses</span>
+            <input type="number" min="0" value={maxUses} onChange={(event) => setMaxUses(event.target.value)} className={inputClass} />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Expires (optional)</span>
+            <input type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} className={inputClass} />
+          </label>
+          <div className="flex items-end gap-2">
+            <button type="submit" disabled={update.isPending} className="h-10 rounded-xl bg-primary px-4 text-xs font-semibold text-primary-foreground transition hover:brightness-105 disabled:opacity-60">Save</button>
+            <button type="button" onClick={() => setEditing(false)} className="h-10 rounded-xl border border-border px-4 text-xs font-semibold hover:bg-secondary">Cancel</button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-4">
+          <span className={`rounded-lg border px-2.5 py-1 font-mono text-xs font-bold tracking-[0.12em] ${meta.tone}`}>{promo.code}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">{PromoValueLabel(promo)}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {promo.uses} of {promo.maxUses > 0 ? promo.maxUses : '∞'} used
+              {exhausted && <span className="ml-2 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">exhausted</span>}
+              {promo.expiresAt && <span className="ml-2">· expires {formatDate(promo.expiresAt)}</span>}
+            </p>
+          </div>
+          <button data-testid={`button-edit-${promo.code}`} type="button" onClick={() => setEditing(true)} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-secondary"><Pencil className="h-3.5 w-3.5" /> Edit</button>
+          <button data-testid={`button-delete-${promo.code}`} type="button" onClick={onDelete} disabled={deleting} className="flex items-center gap-2 rounded-lg border border-destructive/25 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /> {deleting ? 'Removing…' : 'Delete'}</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default App;

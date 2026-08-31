@@ -204,6 +204,116 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /admin/promos:
+    get:
+      operationId: listAdminPromos
+      tags: [admin]
+      summary: List the ticket promo codes
+      responses:
+        "200":
+          description: Promo codes with usage counts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminPromo" }
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: createAdminPromo
+      tags: [admin]
+      summary: Create a ticket promo code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPromoInput" }
+      responses:
+        "201":
+          description: Created promo code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPromo" }
+        "400":
+          description: Invalid promo code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: A code with that name already exists
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/promos/{code}:
+    patch:
+      operationId: updateAdminPromo
+      tags: [admin]
+      summary: Update a ticket promo code
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPromoUpdate" }
+      responses:
+        "200":
+          description: Updated promo code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPromo" }
+        "400":
+          description: Invalid promo code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Promo code not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: deleteAdminPromo
+      tags: [admin]
+      summary: Delete a ticket promo code
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPromoDeleteResult" }
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Promo code not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /oracle/chat:
     post:
       operationId: oracleChat
@@ -929,6 +1039,82 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/threads/{threadId}/voice:
+    post:
+      operationId: sendCollaborationVoiceNote
+      tags: [collaborations]
+      summary: Send a voice note to a collaboration thread
+      description: Multipart voice note (the audio IS the message, mirroring the Creator Den crew room). The recorded audio lands on disk and the message carries the served URL + duration.
+      parameters:
+        - { $ref: "#/components/parameters/ThreadId" }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/CollaborationVoiceNoteInput" }
+      responses:
+        "201":
+          description: Sent voice message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CollaborationMessage" }
+        "400":
+          description: Invalid voice note
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/threads/{threadId}/audio/{fileId}:
+    get:
+      operationId: getCollaborationThreadAudio
+      tags: [collaborations]
+      summary: Stream a collaboration thread voice note
+      description: Returns the audio bytes of a voice note. Participants only; the file lives in the shared upload dir under its uuid filename.
+      parameters:
+        - { $ref: "#/components/parameters/ThreadId" }
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: The voice note audio bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Audio file not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/explore/authors:
+    get:
+      operationId: listExploreAuthors
+      tags: [collaborations]
+      summary: List discoverable authors
+      description: Authors are writers with published seeds (public work) — the Author Den analogue of the Creator Den explore list. Includes follower counts and the viewer's follow state for the Follow buttons.
+      responses:
+        "200":
+          description: Discoverable authors
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ExploreAuthor" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /collaborations/projects:
     get:
       operationId: listCollaborationProjects
@@ -1363,6 +1549,220 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         "404":
           description: User not found or profile unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /account/quota:
+    get:
+      operationId: getAccountQuota
+      tags: [account]
+      summary: Read the account's storage and project limits and usage
+      description: Returns the workspace storage bar data (used/total/remaining bytes) and the project-count bar data (used/total/remaining), plus the buy-more plans the profile pages render. Defaults to 2 GB / 5 projects until a plan is purchased.
+      responses:
+        "200":
+          description: Account quota and usage
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountQuota" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /account/quota/purchase:
+    post:
+      operationId: purchaseAccountQuota
+      tags: [account]
+      summary: Apply a buy-more plan to the account
+      description: Extends the account's storage or project limit by the purchased plan. Payment is applied server-side here (the endpoint a Stripe Checkout confirmation will call once payments are wired); the profile bar reflects the new limit immediately.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AccountQuotaPurchaseInput" }
+      responses:
+        "200":
+          description: Updated quota with the applied plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AccountQuotaPurchaseResponse" }
+        "400":
+          description: Unknown plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /users/{userId}/cv:
+    get:
+      operationId: getUserCv
+      tags: [users]
+      summary: Read a user's CV metadata
+      description: Returns the CV metadata (file name, type, size, updated time) for a profile. Any signed-in user can see it so CVs are viewable on profiles.
+      parameters:
+        - { $ref: "#/components/parameters/UserId" }
+      responses:
+        "200":
+          description: CV metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserCv" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: No CV uploaded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: uploadUserCv
+      tags: [users]
+      summary: Upload or replace the user's CV
+      description: Multipart upload of the CV file. Only the user themselves may upload; re-uploading replaces the previous file.
+      parameters:
+        - { $ref: "#/components/parameters/UserId" }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/UserCvInput" }
+      responses:
+        "201":
+          description: Uploaded CV metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserCv" }
+        "400":
+          description: Invalid upload
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Only the user may manage their own CV
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: deleteUserCv
+      tags: [users]
+      summary: Remove the user's CV
+      description: Deletes the CV from the profile. Only the user themselves may delete it.
+      parameters:
+        - { $ref: "#/components/parameters/UserId" }
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserCvDeleteResult" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Only the user may manage their own CV
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /users/{userId}/cv/file:
+    get:
+      operationId: getUserCvFile
+      tags: [users]
+      summary: Stream a user's CV file
+      description: Returns the CV bytes so a profile visitor can view or download it.
+      parameters:
+        - { $ref: "#/components/parameters/UserId" }
+      responses:
+        "200":
+          description: The CV bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: No CV uploaded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /tickets/status:
+    get:
+      operationId: getTicketStatus
+      tags: [tandems]
+      summary: Read the viewer's active category passes and the pass price
+      description: Returns the pass price ($1.88) and duration (3 weeks) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
+      responses:
+        "200":
+          description: Ticket status and active passes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TicketStatus" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /tickets/promo/validate:
+    post:
+      operationId: validateTicketPromo
+      tags: [tandems]
+      summary: Validate a promo code for the ticket checkout
+      description: Live promo-code check for the coupon card — returns the discount and the discounted pass price (or valid:false for an unknown/expired/used-up code).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TicketPromoValidateInput" }
+      responses:
+        "200":
+          description: Promo validation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TicketPromoValidateResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /tickets/purchase:
+    post:
+      operationId: purchaseTicket
+      tags: [tandems]
+      summary: Buy a category pass with a credit card
+      description: Validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass for the category. Card details are validated in-house today (only the last-4 is kept); a Stripe Checkout session will replace this once keys are added.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TicketPurchaseInput" }
+      responses:
+        "201":
+          description: Purchased pass with receipt
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TicketPurchaseResponse" }
+        "400":
+          description: Invalid card, category, or promo code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -2299,14 +2699,38 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/review/queue:
+    get:
+      operationId: listVideoReviewQueue
+      tags: [content-creators]
+      summary: Captain's review queue — pending (SUBMITTED) leg submissions across the viewer's owned projects
+      description: Only projects the viewer owns (i.e. is Captain of) are scanned, so the page is naturally Captain-only
+      responses:
+        "200":
+          description: Pending submissions, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoReviewQueueItem" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/projects/{projectId}/submissions/{submissionId}/approve:
     post:
       operationId: approveVideoSubmission
       tags: [content-creators]
-      summary: Captain approves a leg submission
+      summary: Captain approves a leg submission (optional note)
       parameters:
         - { $ref: "#/components/parameters/VideoProjectId" }
         - { $ref: "#/components/parameters/VideoSubmissionId" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoSubmissionDecisionInput" }
       responses:
         "200":
           description: Approved submission
@@ -2327,10 +2751,15 @@ paths:
     post:
       operationId: rejectVideoSubmission
       tags: [content-creators]
-      summary: Captain rejects a leg submission
+      summary: Captain rejects a leg submission (note = the improvement message sent back to the submitter)
       parameters:
         - { $ref: "#/components/parameters/VideoProjectId" }
         - { $ref: "#/components/parameters/VideoSubmissionId" }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VideoSubmissionDecisionInput" }
       responses:
         "200":
           description: Rejected submission
@@ -3244,8 +3673,32 @@ components:
         threadId: { type: string }
         senderId: { type: string }
         body: { type: string }
+        audioUrl: { type: ["string", "null"] }
+        audioName: { type: ["string", "null"] }
+        audioDurationMs: { type: ["integer", "null"] }
         createdAt: { type: string, format: date-time }
       required: [id, threadId, senderId, body, createdAt]
+    CollaborationVoiceNoteInput:
+      type: object
+      description: Multipart voice note for a collaboration thread
+      properties:
+        audio:
+          type: string
+          format: binary
+        durationMs:
+          type: integer
+      required: [audio]
+    ExploreAuthor:
+      type: object
+      description: An author discoverable in the Author Den explore list (someone with published seeds)
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        imageUrl: { type: ["string", "null"] }
+        publishedSeedCount: { type: integer }
+        followerCount: { type: integer }
+        isFollowing: { type: ["boolean", "null"] }
+      required: [userId, displayName, imageUrl, publishedSeedCount, followerCount, isFollowing]
     CollaborationThread:
       type: object
       properties:
@@ -3427,6 +3880,173 @@ components:
         displayName: { type: string }
         imageUrl: { type: ["string", "null"] }
       required: [userId, displayName, imageUrl]
+    AccountQuotaStorage:
+      type: object
+      properties:
+        usedBytes: { type: integer }
+        totalBytes: { type: integer }
+        remainingBytes: { type: integer }
+      required: [usedBytes, totalBytes, remainingBytes]
+    AccountQuotaProjects:
+      type: object
+      properties:
+        used: { type: integer }
+        total: { type: integer }
+        remaining: { type: integer }
+      required: [used, total, remaining]
+    StoragePlan:
+      type: object
+      properties:
+        id: { type: string }
+        label: { type: string }
+        priceUsd: { type: integer }
+        bytes: { type: integer }
+      required: [id, label, priceUsd, bytes]
+    ProjectPlan:
+      type: object
+      properties:
+        id: { type: string }
+        label: { type: string }
+        priceUsd: { type: integer }
+        count: { type: integer }
+      required: [id, label, priceUsd, count]
+    AccountQuotaPlans:
+      type: object
+      properties:
+        storage:
+          type: array
+          items: { $ref: "#/components/schemas/StoragePlan" }
+        projects:
+          type: array
+          items: { $ref: "#/components/schemas/ProjectPlan" }
+      required: [storage, projects]
+    AccountQuota:
+      type: object
+      properties:
+        storageBytes: { $ref: "#/components/schemas/AccountQuotaStorage" }
+        projects: { $ref: "#/components/schemas/AccountQuotaProjects" }
+        plans: { $ref: "#/components/schemas/AccountQuotaPlans" }
+      required: [storageBytes, projects, plans]
+    AccountQuotaPurchaseInput:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [storage, projects]
+        planId: { type: string }
+      required: [kind, planId]
+    AccountQuotaPurchase:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [storage, projects]
+        planId: { type: string }
+        label: { type: string }
+        priceUsd: { type: integer }
+      required: [kind, planId, label, priceUsd]
+    AccountQuotaPurchaseResponse:
+      type: object
+      properties:
+        storageBytes: { $ref: "#/components/schemas/AccountQuotaStorage" }
+        projects: { $ref: "#/components/schemas/AccountQuotaProjects" }
+        plans: { $ref: "#/components/schemas/AccountQuotaPlans" }
+        purchased: { $ref: "#/components/schemas/AccountQuotaPurchase" }
+      required: [storageBytes, projects, plans, purchased]
+    UserCv:
+      type: object
+      properties:
+        userId: { type: string }
+        fileName: { type: string }
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [userId, fileName, mimeType, sizeBytes, createdAt, updatedAt]
+    UserCvInput:
+      type: object
+      description: Multipart upload of a CV document (pdf/doc/docx/txt/image)
+      properties:
+        file:
+          type: string
+          format: binary
+      required: [file]
+    UserCvDeleteResult:
+      type: object
+      properties:
+        deleted: { type: boolean }
+      required: [deleted]
+    TicketPass:
+      type: object
+      properties:
+        category: { type: string }
+        expiresAt: { type: string, format: date-time }
+      required: [category, expiresAt]
+    TicketStatus:
+      type: object
+      properties:
+        priceUsd: { type: integer }
+        weeks: { type: integer }
+        tickets:
+          type: array
+          items: { $ref: "#/components/schemas/TicketPass" }
+      required: [priceUsd, weeks, tickets]
+    TicketPromoValidateInput:
+      type: object
+      properties:
+        code: { type: string }
+      required: [code]
+    TicketPromoValidateResponse:
+      type: object
+      properties:
+        valid: { type: boolean }
+        code: { type: string }
+        kind:
+          type: ["string", "null"]
+          enum: [FREE, PERCENT, FLAT, null]
+        label: { type: ["string", "null"] }
+        discountedPriceUsd: { type: ["integer", "null"] }
+      required: [valid, code]
+    CardInput:
+      type: object
+      description: Credit-card details for the pass checkout. Validated in-house (Luhn, expiry, cvc); only the last-4 is stored.
+      properties:
+        number: { type: string }
+        expiryMonth: { type: integer }
+        expiryYear: { type: integer }
+        cvc: { type: string }
+      required: [number, expiryMonth, expiryYear, cvc]
+    TicketPurchaseInput:
+      type: object
+      properties:
+        category: { type: string }
+        card: { $ref: "#/components/schemas/CardInput" }
+        promoCode: { type: ["string", "null"] }
+      required: [category, card]
+    TicketPurchaseReceipt:
+      type: object
+      properties:
+        subtotal: { type: integer }
+        discount: { type: integer }
+        total: { type: integer }
+        cardLast4: { type: string }
+        promoCode: { type: ["string", "null"] }
+      required: [subtotal, discount, total, cardLast4, promoCode]
+    TicketPurchase:
+      type: object
+      properties:
+        category: { type: string }
+        expiresAt: { type: string, format: date-time }
+        priceUsd: { type: integer }
+        promoCode: { type: ["string", "null"] }
+        cardLast4: { type: string }
+      required: [category, expiresAt, priceUsd, promoCode, cardLast4]
+    TicketPurchaseResponse:
+      type: object
+      properties:
+        ticket: { $ref: "#/components/schemas/TicketPurchase" }
+        receipt: { $ref: "#/components/schemas/TicketPurchaseReceipt" }
+      required: [ticket, receipt]
     WaitlistInput:
       type: object
       properties:
@@ -3539,6 +4159,45 @@ components:
           type: number
           minimum: 1
       required: [enabled, priority]
+    AdminPromo:
+      type: object
+      properties:
+        code: { type: string }
+        kind:
+          type: string
+          enum: [FREE, PERCENT, FLAT]
+        value: { type: integer }
+        maxUses: { type: integer }
+        uses: { type: integer }
+        expiresAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+      required: [code, kind, value, maxUses, uses, expiresAt, createdAt]
+    AdminPromoInput:
+      type: object
+      properties:
+        code: { type: string }
+        kind:
+          type: string
+          enum: [FREE, PERCENT, FLAT]
+        value: { type: integer }
+        maxUses: { type: integer }
+        expiresAt: { type: ["string", "null"], format: date-time }
+      required: [code, kind, value, maxUses]
+    AdminPromoUpdate:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [FREE, PERCENT, FLAT]
+        value: { type: integer }
+        maxUses: { type: integer }
+        expiresAt: { type: ["string", "null"], format: date-time }
+      required: [kind, value, maxUses]
+    AdminPromoDeleteResult:
+      type: object
+      properties:
+        deleted: { type: boolean }
+      required: [deleted]
     OracleMessage:
       type: object
       properties:
@@ -3908,13 +4567,14 @@ components:
         projectId: { type: string }
         userId: { type: string }
         name: { type: ["string", "null"], description: Resolved Clerk display name, when available (falls back to the raw id client-side) }
+        imageUrl: { type: ["string", "null"], description: Resolved Clerk avatar url, when available (drives avatars on timeline cards and rosters) }
         roles:
           type: array
           items: { type: string }
           description: Every role this member holds in the project, e.g. ["VIDEO", "THUMBNAIL"]
         status: { type: string }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, userId, name, roles, status, createdAt]
+      required: [id, projectId, userId, name, imageUrl, roles, status, createdAt]
     VideoMemberInput:
       type: object
       description: Invite a teammate by their unique Tandem ID (e.g. TANDEM6EUHY) — the handle shown on every user's profile.
@@ -4182,15 +4842,41 @@ components:
         submittedById: { type: string }
         decidedById: { type: ["string", "null"] }
         decidedAt: { type: ["string", "null"], format: date-time }
+        decisionNote: { type: ["string", "null"], description: "The Captain's improvement note sent back with the decision (always set when rejecting; optional on approval)" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, projectId, leg, timelineVersionId, status, note, submittedById, decidedById, decidedAt, createdAt, updatedAt]
+      required: [id, projectId, leg, timelineVersionId, status, note, submittedById, decidedById, decidedAt, decisionNote, createdAt, updatedAt]
     VideoSubmissionInput:
       type: object
       properties:
         leg: { type: string, enum: [SELECTS, CUT, SOUND, FINISH, THUMBNAIL] }
         note: { type: string, maxLength: 2000 }
       required: [leg]
+    VideoSubmissionDecisionInput:
+      type: object
+      description: Optional note attached to an approve/reject decision — for a rejection it is the improvement message sent back to the submitter
+      properties:
+        note:
+          type: string
+          maxLength: 2000
+          description: Improvement instructions for the submitter (required in spirit on reject, enforced in the UI)
+    VideoReviewQueueItem:
+      type: object
+      description: One pending (SUBMITTED) leg submission on the Captain's review queue, with the project context needed to open the review surface
+      properties:
+        id: { type: string }
+        projectId: { type: string }
+        projectName: { type: string }
+        leg: { type: string }
+        timelineVersionId: { type: string }
+        status: { type: string }
+        note: { type: string }
+        submittedById: { type: string }
+        submittedByName: { type: ["string", "null"], description: "Resolved Clerk display name of the submitter, when available" }
+        headVersionId: { type: ["string", "null"], description: "The leg's current head version id — the diff baseline for this pull request" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, projectName, leg, timelineVersionId, status, note, submittedById, submittedByName, headVersionId, createdAt, updatedAt]
     VideoChatMessage:
       type: object
       properties:

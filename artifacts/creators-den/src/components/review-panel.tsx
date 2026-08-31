@@ -40,6 +40,7 @@ export function ReviewPanel({
   submission,
   headVersionId,
   onClose,
+  hideDecision = false,
 }: {
   projectId: string;
   /** The pending submission being reviewed (leg + pinned version). */
@@ -47,6 +48,9 @@ export function ReviewPanel({
   /** The submission's leg's head version id (the diff baseline). */
   headVersionId: string | null;
   onClose: () => void;
+  /** Hide the built-in decision card — used by the captain's REVIEW page, which
+      renders its own large decision + oracle cards below the media surface. */
+  hideDecision?: boolean;
 }) {
   const queryClient = useQueryClient();
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -217,33 +221,35 @@ export function ReviewPanel({
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <CommentsPanel projectId={projectId} leg={leg} submissionId={submission.id} timelineVersionId={submission.timelineVersionId} />
-        <div className="paper-card">
-          <div className="inline-heading">
-            <span className="eyebrow"><Clapperboard size={13} /> Decision</span>
-          </div>
-          <p className="setting-copy">
-            Approving merges this version as the new baseline for the {leg.toLowerCase()} stage. Rejecting sends it back for another pass.
-          </p>
-          {isCaptain && isPending ? (
-            <div className="mt-3 flex gap-2">
-              <button type="button" onClick={() => decide('approve')} disabled={approve.isPending || reject.isPending} className="secondary-btn" data-testid="review-approve">
-                <Check size={13} /> Approve — merge
-              </button>
-              <button type="button" onClick={() => decide('reject')} disabled={approve.isPending || reject.isPending} className="secondary-btn" data-testid="review-reject">
-                <X size={13} /> Reject
-              </button>
+        {!hideDecision && (
+          <div className="paper-card">
+            <div className="inline-heading">
+              <span className="eyebrow"><Clapperboard size={13} /> Decision</span>
             </div>
-          ) : (
-            <p className="setting-copy mt-3">
-              {isPending ? 'Only the Captain can decide this review.' : 'This review is already decided.'}
+            <p className="setting-copy">
+              Approving merges this version as the new baseline for the {leg.toLowerCase()} stage. Rejecting sends it back for another pass.
             </p>
-          )}
-          {(approve.isError || reject.isError) && (
-            <p className="setting-copy mt-2" role="alert">
-              {decisionError?.response?.data?.error || 'The decision could not be saved.'}
-            </p>
-          )}
-        </div>
+            {isCaptain && isPending ? (
+              <div className="mt-3 flex gap-2">
+                <button type="button" onClick={() => decide('approve')} disabled={approve.isPending || reject.isPending} className="secondary-btn" data-testid="review-approve">
+                  <Check size={13} /> Approve — merge
+                </button>
+                <button type="button" onClick={() => decide('reject')} disabled={approve.isPending || reject.isPending} className="secondary-btn" data-testid="review-reject">
+                  <X size={13} /> Reject
+                </button>
+              </div>
+            ) : (
+              <p className="setting-copy mt-3">
+                {isPending ? 'Only the Captain can decide this review.' : 'This review is already decided.'}
+              </p>
+            )}
+            {(approve.isError || reject.isError) && (
+              <p className="setting-copy mt-2" role="alert">
+                {decisionError?.response?.data?.error || 'The decision could not be saved.'}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {headVersionId && (

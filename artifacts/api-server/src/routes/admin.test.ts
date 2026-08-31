@@ -22,6 +22,7 @@ vi.mock("@workspace/db", async () => {
 });
 
 import adminRouter from "./admin";
+import ticketsRouter from "./tickets";
 
 function createApp(): Express {
   const app = express();
@@ -32,6 +33,7 @@ function createApp(): Express {
     next();
   });
   app.use("/api", adminRouter);
+  app.use("/api", ticketsRouter);
   return app;
 }
 
@@ -39,6 +41,7 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
+  await state.db.delete(t.tandemPromoCodesTable);
   await state.db.delete(t.oracleHealthEventsTable);
   await state.db.delete(t.oracleProvidersTable);
 }
@@ -89,5 +92,99 @@ describe("admin access", () => {
     const groq = providers.body.find((item: any) => item.id === "groq");
     expect(groq.configured).toBe(true);
     expect(groq.keyHint).toContain("-123");
+  });
+});
+
+describe("admin promo codes", () => {
+  async function login(): Promise<string> {
+    const loginRes = await request(API).post("/api/admin/login").send({ accessCode: "TANDEM_123" });
+    const cookie = loginRes.headers["set-cookie"]?.[0]?.split(";")[0];
+    expect(cookie).toBeTruthy();
+    return cookie as string;
+  }
+
+  it("creates, lists, updates, and deletes promo codes", async () => {
+    const cookie = await login();
+
+    // Start empty.
+    const empty = await request(API).get("/api/admin/promos").set("Cookie", cookie);
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual([]);
+
+    // Create — the code is normalized to uppercase.
+    const created = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ code: "halfpass", kind: "PERCENT", value: 50, maxUses: 0 });
+    expect(created.status).toBe(201);
+    expect(created.body.code).toBe("HALFPASS");
+    expect(created.body.kind).toBe("PERCENT");
+    expect(created.body.uses).toBe(0);
+
+    // Duplicate code → 409.
+    const dup = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ code: "HALFPASS", kind: "FLAT", value: 20, maxUses: 1 });
+    expect(dup.status).toBe(409);
+
+    // Update.
+    const updated = await request(API)
+      .patch("/api/admin/promos/HALFPASS")
+      .set("Cookie", cookie)
+      .send({ kind: "FLAT", value: 25, maxUses: 5 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.kind).toBe("FLAT");
+    expect(updated.body.value).toBe(25);
+    expect(updated.body.maxUses).toBe(5);
+
+    // The checkout sees the updated code (valid + discounted price).
+    state.userId = "user-1";
+    const validated = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "HALFPASS" });
+    expect(validated.body.valid).toBe(true);
+    expect(validated.body.kind).toBe("FLAT");
+    expect(validated.body.discountedPriceUsd).toBe(188 - 25);
+
+    // List reflects the row.
+    const list = await request(API).get("/api/admin/promos").set("Cookie", cookie);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].code).toBe("HALFPASS");
+
+    // Delete.
+    const deleted = await request(API).delete("/api/admin/promos/HALFPASS").set("Cookie", cookie);
+    expect(deleted.status).toBe(200);
+    expect(deleted.body.deleted).toBe(true);
+    const after = await request(API).get("/api/admin/promos").set("Cookie", cookie);
+    expect(after.body).toEqual([]);
+  });
+
+  it("rejects invalid input and unknown codes", async () => {
+    const cookie = await login();
+
+    const badKind = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ code: "X", kind: "BOGUS", value: 10, maxUses: 0 });
+    expect(badKind.status).toBe(400);
+
+    const missing = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ kind: "FREE", value: 0, maxUses: 0 });
+    expect(missing.status).toBe(400);
+
+    const notFound = await request(API).patch("/api/admin/promos/NOPE").set("Cookie", cookie).send({ kind: "FREE", value: 0, maxUses: 0 });
+    expect(notFound.status).toBe(404);
+    const deleteMissing = await request(API).delete("/api/admin/promos/NOPE").set("Cookie", cookie);
+    expect(deleteMissing.status).toBe(404);
+  });
+
+  it("requires an admin session", async () => {
+    expect((await request(API).get("/api/admin/promos")).status).toBe(401);
+    expect((await request(API).post("/api/admin/promos").send({ code: "X", kind: "FREE", value: 0, maxUses: 0 })).status).toBe(401);
+    expect((await request(API).patch("/api/admin/promos/X").send({ kind: "FREE", value: 0, maxUses: 0 })).status).toBe(401);
+    expect((await request(API).delete("/api/admin/promos/X")).status).toBe(401);
   });
 });

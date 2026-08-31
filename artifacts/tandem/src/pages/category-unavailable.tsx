@@ -7,6 +7,7 @@ import { SectionEyebrow } from '@/components/protected-shell';
 import { getTandemCategory } from '@/data/categories';
 import AuthorsPage from '@/pages/authors';
 import ContentCreatorsPage from '@/pages/content-creators';
+import { TicketGate } from '@/components/ticket-gate';
 import { useToast } from '@/hooks/use-toast';
 
 export default function CategoryUnavailable() {
@@ -32,8 +33,22 @@ export default function CategoryUnavailable() {
   }, [category, mutation.isSuccess, toast]);
 
   if (!category) return <CategoryNotFound />;
-  if (category.slug === 'authors') return <AuthorsPage />;
-  if (category.slug === 'content-creators') return <ContentCreatorsPage />;
+  // The paywall: authors and content-creators need an active pass ($1.88 / 3
+  // weeks) before the room opens — the coupon-card popup handles the purchase.
+  if (category.slug === 'authors') {
+    return (
+      <TicketGate slug="authors" name={category.name}>
+        <AuthorsPage />
+      </TicketGate>
+    );
+  }
+  if (category.slug === 'content-creators') {
+    return (
+      <TicketGate slug="content-creators" name={category.name}>
+        <ContentCreatorsPage />
+      </TicketGate>
+    );
+  }
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { getAuth } from "@clerk/express";
 import {
   and,
@@ -54,6 +56,10 @@ import {
   SaveSeedApplicationDraftBody,
   SendCollaborationMessageBody,
   SendCollaborationMessageParams,
+  SendCollaborationVoiceNoteParams,
+  SendCollaborationVoiceNoteResponse,
+  GetCollaborationThreadAudioParams,
+  ListExploreAuthorsResponse,
   StartContinuationThreadParams,
   SubmitCollaborationWorkBlockParams,
   SubmitSeedApplicationParams,
@@ -61,6 +67,10 @@ import {
   UpdateCollaborationSeedParams,
 } from "@workspace/api-zod";
 import { observeCollaboration } from "../lib/oracle";
+import { resolveUserProfiles } from "../lib/user-names";
+import { upload } from "../video/upload";
+import { uploadDir } from "../video/worker";
+import { getFollowCounts, resolveFollowState } from "./video-social";
 
 const router: IRouter = Router();
 
@@ -835,6 +845,9 @@ async function threadView(thread: typeof collaborationThreadsTable.$inferSelect)
       threadId: message.threadId,
       senderId: message.senderId,
       body: message.body,
+      audioUrl: message.audioUrl ?? null,
+      audioName: message.audioName ?? null,
+      audioDurationMs: message.audioDurationMs ?? null,
       createdAt: message.createdAt.toISOString(),
     })),
     createdAt: thread.createdAt.toISOString(),
@@ -1025,8 +1038,184 @@ router.post("/collaborations/threads/:threadId/messages", async (req, res): Prom
     threadId: message.threadId,
     senderId: message.senderId,
     body: message.body,
+    audioUrl: message.audioUrl ?? null,
+    audioName: message.audioName ?? null,
+    audioDurationMs: message.audioDurationMs ?? null,
     createdAt: message.createdAt.toISOString(),
   });
+});
+
+// POST /collaborations/threads/:threadId/voice — send a voice note to the
+// private collaboration thread. Multipart: the recorded audio blob lands on
+// disk (same upload dir as the Creator Den) and the message carries the served
+// URL + duration, mirroring the crew-room voice notes. The body is empty for
+// voice notes — the audio IS the message.
+router.post(
+  "/collaborations/threads/:threadId/voice",
+  upload.single("audio"),
+  async (req: Request, res: Response): Promise<void> => {
+    const viewerId = userId(req, res);
+    if (!viewerId) return;
+
+    const params = SendCollaborationVoiceNoteParams.safeParse({
+      threadId: parseParam(req.params.threadId),
+    });
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid thread id" });
+      return;
+    }
+
+    const thread = await getThreadForViewer(params.data.threadId, viewerId, res);
+    if (!thread) return;
+
+    if (!req.file) {
+      res.status(400).json({ error: "A recorded voice note is required" });
+      return;
+    }
+
+    const durationMs = Number(req.body.durationMs);
+    const audioUrl = `/api/collaborations/threads/${thread.id}/audio/${req.file.filename}`;
+    const [message] = await db
+      .insert(collaborationMessagesTable)
+      .values({
+        id: crypto.randomUUID(),
+        threadId: thread.id,
+        senderId: viewerId,
+        body: "",
+        audioUrl,
+        audioName:
+          typeof req.body.name === "string" && req.body.name.trim()
+            ? req.body.name.trim().slice(0, 200)
+            : req.file.originalname.slice(0, 200),
+        audioDurationMs: Number.isFinite(durationMs) && durationMs > 0 ? Math.round(durationMs) : null,
+      })
+      .returning();
+    await db.update(collaborationThreadsTable).set({ updatedAt: new Date() }).where(eq(collaborationThreadsTable.id, thread.id));
+
+    const recipientId = thread.creatorId === viewerId ? thread.respondentId : thread.creatorId;
+    // The private room lives in the shared project (accepted fork) — deep-link
+    // there with the chat open, mirroring the text-message notification.
+    const [projectRow] = await db
+      .select({ id: collaborationProjectsTable.id })
+      .from(collaborationProjectsTable)
+      .innerJoin(continuationSubmissionsTable, and(
+        eq(collaborationProjectsTable.seedId, continuationSubmissionsTable.seedId),
+        eq(collaborationProjectsTable.respondentId, thread.respondentId),
+      ))
+      .where(eq(continuationSubmissionsTable.id, thread.continuationId))
+      .limit(1);
+    const messageLink = projectRow
+      ? `/authors-den/?project=${projectRow.id}&chat=1`
+      : `/authors/collaborations/thread/${thread.id}`;
+    await notify(
+      recipientId,
+      "collaboration_message",
+      "A voice note is waiting",
+      "Your collaborator sent a voice note — open it in the shared project.",
+      messageLink,
+      thread.id,
+    );
+    await recordActivity({
+      eventType: "message_sent",
+      summary: "A voice note was exchanged in the collaboration thread.",
+      actorId: viewerId,
+      resourceId: thread.id,
+    });
+
+    res.status(201).json(
+      SendCollaborationVoiceNoteResponse.parse({
+        id: message.id,
+        threadId: message.threadId,
+        senderId: message.senderId,
+        body: message.body,
+        audioUrl: message.audioUrl ?? null,
+        audioName: message.audioName ?? null,
+        audioDurationMs: message.audioDurationMs ?? null,
+        createdAt: message.createdAt.toISOString(),
+      }),
+    );
+  },
+);
+
+// GET /collaborations/threads/:threadId/audio/:fileId — stream a collaboration
+// thread voice note. Participants only; the file lives in the shared upload
+// dir under its uuid filename (same ephemeral-disk model as vault media).
+router.get(
+  "/collaborations/threads/:threadId/audio/:fileId",
+  async (req: Request, res: Response): Promise<void> => {
+    const viewerId = userId(req, res);
+    if (!viewerId) return;
+
+    const params = GetCollaborationThreadAudioParams.safeParse({
+      threadId: parseParam(req.params.threadId),
+      fileId: parseParam(req.params.fileId),
+    });
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid audio file id" });
+      return;
+    }
+
+    const thread = await getThreadForViewer(params.data.threadId, viewerId, res);
+    if (!thread) return;
+
+    // Only allow plain uploaded filenames (uuid + short extension) — never
+    // path segments — so a crafted fileId can't escape the upload dir.
+    if (!/^[a-f0-9-]{36}(\.[a-z0-9]{1,12})?$/i.test(params.data.fileId)) {
+      res.status(404).json({ error: "Audio file not found" });
+      return;
+    }
+
+    const filePath = path.join(uploadDir(), params.data.fileId);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: "Audio file not found" });
+      return;
+    }
+
+    res.sendFile(filePath);
+  },
+);
+
+// GET /collaborations/explore/authors — discoverable authors for the Author
+// Den explore page: writers who have published seeds (public work), with their
+// published-seed count, follower count, and the viewer's follow state.
+router.get("/collaborations/explore/authors", async (req: Request, res: Response): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+
+  const seeds = await db
+    .select({ creatorId: collaborationSeedsTable.creatorId })
+    .from(collaborationSeedsTable)
+    .where(eq(collaborationSeedsTable.visibility, "SEED_AND_BRIEF"));
+
+  const seedCountByAuthor = new Map<string, number>();
+  for (const seed of seeds) {
+    seedCountByAuthor.set(seed.creatorId, (seedCountByAuthor.get(seed.creatorId) ?? 0) + 1);
+  }
+  const authorIds = [...seedCountByAuthor.keys()];
+
+  if (authorIds.length === 0) {
+    res.json(ListExploreAuthorsResponse.parse([]));
+    return;
+  }
+
+  const profiles = await resolveUserProfiles(authorIds);
+  const authors = await Promise.all(
+    authorIds.map(async (authorId) => {
+      const counts = await getFollowCounts(authorId);
+      const profile = profiles[authorId];
+      return {
+        userId: authorId,
+        displayName: profile?.name ?? authorId.slice(0, 12),
+        imageUrl: profile?.imageUrl ?? null,
+        publishedSeedCount: seedCountByAuthor.get(authorId) ?? 0,
+        followerCount: counts.followerCount,
+        isFollowing: await resolveFollowState(viewerId, authorId),
+      };
+    }),
+  );
+
+  authors.sort((a, b) => b.publishedSeedCount - a.publishedSeedCount);
+  res.json(ListExploreAuthorsResponse.parse(authors));
 });
 
 router.get("/collaborations/seeds/:seedId/selection", async (req, res): Promise<void> => {

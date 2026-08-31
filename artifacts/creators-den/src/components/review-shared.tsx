@@ -14,6 +14,7 @@ import {
   getListVideoSubmissionsQueryKey,
   useCreateVideoComment,
   useCreateVideoSubmission,
+  useGetVideoProject,
   useListVideoComments,
   useResolveVideoComment,
   useRollbackVideoTimeline,
@@ -175,6 +176,10 @@ export function CommentsPanel({
   const comments = useListVideoComments(projectId);
   const create = useCreateVideoComment();
   const resolve = useResolveVideoComment();
+  const project = useGetVideoProject(projectId);
+  // Read-only (non-member) viewers of a PUBLIC project can read the notes
+  // rail but not pin new notes.
+  const canPost = (project.data?.myRoles?.length ?? 0) > 0;
   const [body, setBody] = useState('');
   const [timecodeMs, setTimecodeMs] = useState<number | null>(null);
 
@@ -224,30 +229,36 @@ export function CommentsPanel({
         <span className="eyebrow"><MessageSquare size={13} /> {submissionId ? 'PR review notes' : 'Timecode notes'}</span>
         {submissionId && <span className="den-tag gold">scoped to review</span>}
       </div>
-      <form className="space-y-2" onSubmit={submit} data-testid="form-comment">
-        <textarea
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-          placeholder="Pinned note — e.g. the lighting shift at 02:14 is jarring, can we grade this?"
-          maxLength={4000}
-          rows={2}
-          required
-          data-testid="input-comment"
-        />
-        <div className="flex items-center gap-2">
-          <span className="mono-label">Pin at</span>
-          <input
-            value={timecodeMs == null ? '' : formatTimecode(timecodeMs)}
-            readOnly
-            placeholder="playhead time"
-            className="w-28 text-center"
+      {canPost ? (
+        <form className="space-y-2" onSubmit={submit} data-testid="form-comment">
+          <textarea
+            value={body}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder="Pinned note — e.g. the lighting shift at 02:14 is jarring, can we grade this?"
+            maxLength={4000}
+            rows={2}
+            required
+            data-testid="input-comment"
           />
-          <button type="submit" disabled={create.isPending || !body.trim()} className="primary-btn ml-auto" data-testid="button-add-comment">
-            <Plus size={13} />
-            {create.isPending ? 'Pinning…' : 'Pin note'}
-          </button>
-        </div>
-      </form>
+          <div className="flex items-center gap-2">
+            <span className="mono-label">Pin at</span>
+            <input
+              value={timecodeMs == null ? '' : formatTimecode(timecodeMs)}
+              readOnly
+              placeholder="playhead time"
+              className="w-28 text-center"
+            />
+            <button type="submit" disabled={create.isPending || !body.trim()} className="primary-btn ml-auto" data-testid="button-add-comment">
+              <Plus size={13} />
+              {create.isPending ? 'Pinning…' : 'Pin note'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <p className="setting-copy mt-2" data-testid="comments-readonly-hint">
+          Read only — join the project to pin notes.
+        </p>
+      )}
 
       {rows.length > 0 ? (
         <div className="den-stack mt-4">

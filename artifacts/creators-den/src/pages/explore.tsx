@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearch } from 'wouter';
 import { useUser } from '@clerk/react';
-import { Check, Compass, Eye, Film, Search, UserPlus, UserRound } from 'lucide-react';
+import { ArrowUpRight, Check, Compass, Eye, Film, Search, UserPlus, UserRound } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetVideoUserSocialQueryKey,
@@ -16,10 +16,13 @@ import {
 } from '@workspace/api-client-react';
 import type { VideoCreatorSummary, VideoPublicProject } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
+import { matchesCreatorQuery, matchesProjectQuery } from '@/lib/explore-search';
 
 // ---------------------------------------------------------------------------
 // Explore — GitHub-style discovery. Two browse rails (creators / projects)
-// over PUBLIC track history, with client-side name search.
+// over PUBLIC track history. The search box matches display names AND the
+// unique Tandem / Clerk user IDs shown on profiles; clicking a project opens
+// it read-only (PREVIEW + TIMELINE only) for anyone, since it is PUBLIC.
 // ---------------------------------------------------------------------------
 
 export function FollowButton({ userId, isFollowing, size = 'sm' }: { userId: string; isFollowing: boolean | null; size?: 'sm' | 'md' }) {
@@ -92,16 +95,26 @@ function ProjectCard({ project }: { project: VideoPublicProject }) {
         <Avatar imageUrl={project.ownerImageUrl} name={project.ownerName} className="is-tiny" />
         <span>{project.ownerName}</span>
       </Link>
-      <div className="explore-project-body">
+      {/* The whole card body opens the project read-only — PUBLIC projects are
+          viewable by anyone, with only the PREVIEW and TIMELINE tabs. */}
+      <Link
+        href={`/projects/${project.id}`}
+        className="explore-project-body"
+        data-testid={`explore-project-open-${project.id}`}
+      >
         <span className="explore-project-icon"><Film size={20} /></span>
-        <div className="min-w-0">
+        <span className="min-w-0 flex-1">
           <b className="explore-project-title">{project.name}</b>
           <small>
             {project.status.replaceAll('_', ' ')} · {new Date(project.createdAt).toLocaleDateString()}
           </small>
           {project.description && <p className="explore-project-desc">{project.description}</p>}
-        </div>
-      </div>
+        </span>
+        <span className="explore-project-open" aria-hidden>
+          <ArrowUpRight size={13} />
+          <small>Open</small>
+        </span>
+      </Link>
       <span className="den-tag muted"><Eye size={11} /> Public</span>
     </div>
   );
@@ -121,14 +134,13 @@ export default function ExplorePage() {
   const creators = useListExploreCreators({ query: { queryKey: getListExploreCreatorsQueryKey() } });
   const projects = useListExploreProjects({ query: { queryKey: getListExploreProjectsQueryKey() } });
 
-  const q = query.trim().toLowerCase();
   const filteredCreators = useMemo(
-    () => (creators.data ?? []).filter((c) => !q || c.displayName.toLowerCase().includes(q)),
-    [creators.data, q],
+    () => (creators.data ?? []).filter((c) => matchesCreatorQuery(c, query)),
+    [creators.data, query],
   );
   const filteredProjects = useMemo(
-    () => (projects.data ?? []).filter((p) => !q || p.name.toLowerCase().includes(q) || p.ownerName.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)),
-    [projects.data, q],
+    () => (projects.data ?? []).filter((p) => matchesProjectQuery(p, query)),
+    [projects.data, query],
   );
 
   const loading = tab === 'creators' ? creators.isLoading : projects.isLoading;
@@ -147,7 +159,7 @@ export default function ExplorePage() {
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={tab === 'creators' ? 'Search creators by name…' : 'Search projects by name, owner, or description…'}
+            placeholder={tab === 'creators' ? 'Search creators by name or ID…' : 'Search projects by name, owner, or ID…'}
             data-testid="explore-search"
           />
         </div>
@@ -170,7 +182,7 @@ export default function ExplorePage() {
           <h3>{query ? 'Nothing matches that search.' : tab === 'creators' ? 'No creators yet.' : 'No public projects yet.'}</h3>
           <p>
             {query
-              ? 'Try a different name, or clear the search to see everything.'
+              ? 'Try a different name, or search by the unique Tandem ID (e.g. TANDEM6EUHY) shown on a profile.'
               : tab === 'creators'
                 ? 'When a Captain marks a project PUBLIC, they appear here.'
                 : 'When a Captain marks a project PUBLIC, it appears here.'}

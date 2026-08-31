@@ -18,6 +18,11 @@ export interface VideoSubmission {
   decidedById: string | null;
   /** @nullable */
   decidedAt: Date | null;
+  /**
+     * The Captain's improvement note sent back with the decision (always set when rejecting; optional on approval)
+     * @nullable
+     */
+  decisionNote: string | null;
   createdAt: Date;
   updatedAt: Date;
 }

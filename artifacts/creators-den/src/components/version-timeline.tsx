@@ -181,6 +181,16 @@ function keyOf(node: TLNode): string {
   return `${node.kind}:${node.id}`;
 }
 
+/** Small avatar chip for the person who created a version / upload. */
+function MemberAvatar({ imageUrl, name }: { imageUrl: string | null; name: string }) {
+  if (imageUrl) return <img src={imageUrl} alt="" className="snake-card-avatar" />;
+  return (
+    <span className="snake-card-avatar" aria-hidden>
+      {name.slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
 // chron = chronological ascending (oldest first). Build rows bottom→up, then
 // reverse so the caller renders the newest pair first (top of the page).
 function buildSnake(chron: TLNode[]): SnakeRow[] {
@@ -307,6 +317,13 @@ export function VersionTimeline({
     [project.data?.members],
   );
 
+  // Avatar urls ride on the same member rows (resolved server-side from Clerk)
+  // so every card can show the submitter's account picture next to their name.
+  const memberImageById = useMemo(
+    () => new Map((project.data?.members ?? []).map((member) => [member.userId, member.imageUrl ?? null])),
+    [project.data?.members],
+  );
+
   // Filter → sort chronological ascending → snake rows (newest pair first).
   const chron = useMemo(() => {
     const filtered = leg === 'all' ? merged : merged.filter((node) => node.leg === leg);
@@ -337,6 +354,7 @@ export function VersionTimeline({
     const isHead = keyOf(node) === headKey;
     const isSynced = keyOf(node) === activeKey;
     const author = memberNameById.get(node.authorId) ?? node.authorId.slice(0, 8);
+    const authorImage = memberImageById.get(node.authorId) ?? null;
     // The first upload of the file type wears the blue vault design; every
     // later upload of that kind in the same role switches to red.
     const isFirstUpload =
@@ -418,7 +436,8 @@ export function VersionTimeline({
           <p className="snake-card-kind">{KIND_LABELS[node.assetKind ?? ''] ?? node.assetKind}</p>
           <div className="snake-card-meta">
             {idButton}
-            <span className="snake-card-person" title="Uploaded by">
+            <span className="snake-card-person" title={`Uploaded by ${author}`}>
+              <MemberAvatar imageUrl={authorImage} name={author} />
               {author}
             </span>
             <span className="snake-card-sep" aria-hidden />
@@ -459,7 +478,8 @@ export function VersionTimeline({
         {node.message && <p className="snake-card-msg">{node.message}</p>}
         <div className="snake-card-meta">
           {idButton}
-          <span className="snake-card-person" title="Submitted by">
+          <span className="snake-card-person" title={`Submitted by ${author}`}>
+            <MemberAvatar imageUrl={authorImage} name={author} />
             {author}
           </span>
           <span className="snake-card-sep" aria-hidden />

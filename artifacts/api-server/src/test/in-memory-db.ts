@@ -145,6 +145,9 @@ export const collaborationMessagesTable = sqliteTable("collaboration_messages", 
   threadId: text("thread_id").notNull(),
   senderId: text("sender_id").notNull(),
   body: text("body").notNull(),
+  audioUrl: text("audio_url"),
+  audioName: text("audio_name"),
+  audioDurationMs: integer("audio_duration_ms"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -347,6 +350,7 @@ export const tandemVideoSubmissionsTable = sqliteTable("tandem_video_submissions
   timelineVersionId: text("timeline_version_id").notNull(),
   status: text("status").notNull().default("DRAFT"),
   note: text("note").notNull().default(""),
+  decisionNote: text("decision_note"),
   submittedById: text("submitted_by_id").notNull(),
   decidedById: text("decided_by_id"),
   decidedAt: integer("decided_at", { mode: "timestamp" }),
@@ -423,6 +427,44 @@ export const tandemVideoNotificationsTable = sqliteTable("tandem_video_notificat
   resourceId: text("resource_id"),
   readAt: integer("read_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const tandemAccountQuotasTable = sqliteTable("tandem_account_quotas", {
+  userId: text("user_id").primaryKey(),
+  storageLimitBytes: integer("storage_limit_bytes").notNull(),
+  projectLimit: integer("project_limit").notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const tandemTicketsTable = sqliteTable("tandem_tickets", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  category: text("category").notNull(),
+  priceUsd: integer("price_usd").notNull(),
+  promoCode: text("promo_code"),
+  cardLast4: text("card_last_4").notNull(),
+  purchasedAt: integer("purchased_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  expiresAt: integer("expires_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const tandemPromoCodesTable = sqliteTable("tandem_promo_codes", {
+  code: text("code").primaryKey(),
+  kind: text("kind").notNull(),
+  value: integer("value").notNull().default(0),
+  maxUses: integer("max_uses").notNull().default(0),
+  uses: integer("uses").notNull().default(0),
+  expiresAt: integer("expires_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const tandemUserCvsTable = sqliteTable("tandem_user_cvs", {
+  userId: text("user_id").primaryKey(),
+  fileName: text("file_name").notNull(),
+  mimeType: text("mime_type").notNull().default("application/pdf"),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  storageKey: text("storage_key").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
 export const tandemVideoDownloadsTable = sqliteTable("tandem_video_downloads", {
@@ -563,7 +605,9 @@ export async function buildInMemoryDb() {
     );
     CREATE TABLE collaboration_messages (
       id TEXT PRIMARY KEY NOT NULL, thread_id TEXT NOT NULL,
-      sender_id TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL
+      sender_id TEXT NOT NULL, body TEXT NOT NULL,
+      audio_url TEXT, audio_name TEXT, audio_duration_ms INTEGER,
+      created_at INTEGER NOT NULL
     );
     CREATE TABLE continuation_annotations (
       id TEXT PRIMARY KEY NOT NULL, continuation_id TEXT NOT NULL,
@@ -674,7 +718,8 @@ export async function buildInMemoryDb() {
       leg TEXT NOT NULL, timeline_version_id TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'DRAFT', note TEXT NOT NULL DEFAULT '',
       submitted_by_id TEXT NOT NULL, decided_by_id TEXT,
-      decided_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      decided_at INTEGER, decision_note TEXT,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
     CREATE TABLE tandem_video_comments (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
@@ -721,6 +766,32 @@ export async function buildInMemoryDb() {
       category TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
       deep_link TEXT NOT NULL, resource_id TEXT, read_at INTEGER,
       created_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_tickets (
+      id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
+      category TEXT NOT NULL, price_usd INTEGER NOT NULL,
+      promo_code TEXT, card_last_4 TEXT NOT NULL,
+      purchased_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_promo_codes (
+      code TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL,
+      value INTEGER NOT NULL DEFAULT 0, max_uses INTEGER NOT NULL DEFAULT 0,
+      uses INTEGER NOT NULL DEFAULT 0, expires_at INTEGER,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_account_quotas (
+      user_id TEXT PRIMARY KEY NOT NULL,
+      storage_limit_bytes INTEGER NOT NULL,
+      project_limit INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_user_cvs (
+      user_id TEXT PRIMARY KEY NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/pdf',
+      size_bytes INTEGER NOT NULL DEFAULT 0,
+      storage_key TEXT NOT NULL,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
     CREATE TABLE tandem_video_chat_messages (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
@@ -786,6 +857,10 @@ export async function buildInMemoryDb() {
     tandemVideoGrantsTable,
     tandemVideoNotificationsTable,
     tandemVideoChatMessagesTable,
+    tandemAccountQuotasTable,
+    tandemUserCvsTable,
+    tandemTicketsTable,
+    tandemPromoCodesTable,
   };
   return { db, tables, exports: { db, ...tables } };
 }

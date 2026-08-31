@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  AlertTriangle, Archive, ArrowLeft, ArrowRight, BookOpen, Bold, Check, CheckCircle2, ChevronDown, CircleHelp,
+  AlertTriangle, Archive, ArrowLeft, ArrowRight, Bell, BookOpen, Bold, Check, CheckCircle2, ChevronDown, CircleHelp,
   ClipboardList, Clock3, Copy, Download, Eraser, ExternalLink, FileDown, FileText, FolderOpen,
   GitFork, Globe2, Heading1, Heading2, Highlighter, ImagePlus,  Italic, Library, Link2, List,
-  ListOrdered, Lock, LockOpen, LogOut, MapPin, Menu, Move, PanelLeft, PenLine, Play, Plus,
+  ListOrdered, Lock, LockOpen, LogOut, MapPin, Menu, Mic, Move, PanelLeft, PenLine, Play, Plus,
   Printer, Quote, Redo2, RefreshCw, RotateCcw, Save, Search, Send, Settings, ShieldCheck, Sparkles, Strikethrough, Trash2,
   Type, Undo2, Upload, Users, WandSparkles, X, XCircle, Zap, MessageCircle
 } from "lucide-react";
 import { exportProject, type ExportFormat } from "./export";
 import { useUser } from "@clerk/react";
 import { Toaster } from "@/components/ui/toaster";
+import { BuyProjectsModal, ProfilePage } from "@/components/profile-page";
+import { ExplorePage } from "@/components/explore";
+import { NotificationsPage } from "@/components/notifications";
 import { continuityAudit, oracleChat, outlineAssist, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
 import {
   acceptContinuation,
@@ -23,6 +26,7 @@ import {
   getCollaborationThread,
   getContinuation,
   getContinuationProject,
+  getGetCollaborationInboxQueryKey,
   getOrCreateProjectThread,
   getUserProfile,
   markCollaborationProjectThreadRead,
@@ -30,18 +34,21 @@ import {
   saveCollaborationProjectDocument,
   saveSeedApplicationDraft,
   sendCollaborationMessage,
+  sendCollaborationVoiceNote,
   submitSeedApplication,
   useAcceptContinuation,
   useCreateCollaborationSeed,
   useCreateSeedApplication,
   useDeclineContinuation,
+  useGetAccountQuota,
+  useGetCollaborationInbox,
   useListCollaborationProjects,
   useSaveCollaborationProjectDocument,
   useSaveSeedApplicationDraft,
   useSubmitSeedApplication,
 } from "@workspace/api-client-react";
 
-type View = "home" | "general" | "characters" | "plots" | "world" | "outline" | "editor" | "search" | "revisions" | "oracle" | "tools" | "settings";
+type View = "home" | "profile" | "explore" | "notifications" | "general" | "characters" | "plots" | "world" | "outline" | "editor" | "search" | "revisions" | "oracle" | "tools" | "settings";
 type MediaItem = { id: string; name: string; src: string; x: number; y: number; size: number };
 type Scene = { id: string; title: string; synopsis: string; content: string; status: string; compile: boolean; target: number; pov: string; labels: string; notes: string; media?: MediaItem[] };
 type Character = { id: string; name: string; role: string; pov: string; importance: string; color: string; description: string; notes: string; custom: { key: string; value: string }[] };
@@ -221,7 +228,11 @@ function App() {
   const [chatThread, setChatThread] = useState<{ id: string; creatorId: string; respondentId: string; creatorName: string; respondentName: string; projectId: string | null } | null>(null);
   const [chatPartnerAvatar, setChatPartnerAvatar] = useState<string | null>(null);
   const chatAvatarFetchedForRef = useRef<string | null>(null);
-  const [chatMessages, setChatMessages] = useState<{ id: string; senderId: string; body: string; createdAt: string }[]>([]);
+  const [chatMessages, setChatMessages] = useState<{ id: string; senderId: string; body: string; audioUrl?: string | null; audioName?: string | null; audioDurationMs?: number | null; createdAt: string }[]>([]);
+  const [chatRecording, setChatRecording] = useState(false);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recorderChunksRef = useRef<Blob[]>([]);
+  const recorderStartedAtRef = useRef(0);
   const [chatText, setChatText] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
   const [chatUnread, setChatUnread] = useState(0);
@@ -234,6 +245,19 @@ function App() {
   const acceptCont = useAcceptContinuation();
   const declineCont = useDeclineContinuation();
   const projectDocsQ = useListCollaborationProjects();
+  // The account's project-count quota (5 free projects, buy-more plans) gates
+  // creating/duplicating new works. The tutorial sample never counts.
+  const accountQuota = useGetAccountQuota();
+  // The bell badge + notifications page read the collaboration inbox; polling
+  // keeps the unread count fresh while the studio is open.
+  const inbox = useGetCollaborationInbox({
+    query: { queryKey: getGetCollaborationInboxQueryKey(), refetchInterval: 30000 },
+  });
+  const unreadCount = (inbox.data ?? []).filter((note) => !note.read).length;
+  const [buyProjectsOpen, setBuyProjectsOpen] = useState(false);
+  const createdProjectCount = projects.filter((item) => !item.isTutorial).length;
+  const projectLimit = accountQuota.data?.projects.total ?? 5;
+  const atProjectLimit = createdProjectCount >= projectLimit;
   const projectsRef = useRef(projects);
   useEffect(() => { projectsRef.current = projects; }, [projects]);
   const previewActive = Boolean(preview);
@@ -540,6 +564,48 @@ function App() {
       setChatBusy(false);
     }
   };
+  // Voice notes in the private room — the audio IS the message, mirroring the
+  // Creator Den crew room. Tap the mic to record, tap again to send.
+  const toggleVoiceNote = async () => {
+    if (chatRecording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    if (!chatThread) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      recorderChunksRef.current = [];
+      recorderStartedAtRef.current = Date.now();
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recorderChunksRef.current.push(event.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const durationMs = Date.now() - recorderStartedAtRef.current;
+        const blob = new Blob(recorderChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        setChatRecording(false);
+        if (blob.size === 0 || !chatThread) return;
+        setChatBusy(true);
+        try {
+          const message = await sendCollaborationVoiceNote(chatThread.id, {
+            audio: new File([blob], "voice-note.webm", { type: blob.type }),
+            durationMs,
+          });
+          setChatMessages((items) => [...items, message as any]);
+        } catch {
+          notify("That voice note could not be sent.");
+        } finally {
+          setChatBusy(false);
+        }
+      };
+      recorder.start();
+      recorderRef.current = recorder;
+      setChatRecording(true);
+    } catch {
+      notify("Microphone access is needed to record a voice note.");
+    }
+  };
   // Refresh messages while the chat is open, and mark anything seen as read so
   // the badge (and the Tandem inbox) reflect what the user has actually opened.
   useEffect(() => {
@@ -596,8 +662,9 @@ function App() {
   const startTutorial = () => { const tutorial = projects.find((item) => item.isTutorial) ?? project ?? sample(); if (!projects.some((item) => item.id === tutorial.id)) setProjects((items) => [tutorial, ...items]); setMode("lesson"); setProjectId(tutorial.id); setEditorSceneId(tutorial.scenes[0]?.id ?? null); setTutorialStep(0); setView("general"); setTutorialOpen(false); setModal("tutorial"); };
   const closeTutorial = () => { setModal(null); setTutorialOpen(true); };
   const nextLesson = () => { if (tutorialStep >= tutorialViews.length - 1) { markLessonComplete(); setTutorialOpen(false); notify("Tutorial complete — make the desk yours"); return; } const next = tutorialStep + 1; setTutorialStep(next); setView(tutorialViews[next]); if (next === 2) setEditorSceneId(project?.scenes[0]?.id ?? null); setModal("tutorial"); setTutorialOpen(false); };
-  const createProject = (template: string, title: string, author: string) => { markLessonComplete(); const seed = sample(); const item: Project = { ...seed, id: uid(), title: title || `Untitled ${template}`, author: author || "Untitled author", template, isTutorial: false, premise: "", synopsis: "", summary: "", characters: [], plots: [], world: [], revisions: [], scenes: [{ ...seed.scenes[0], id: uid(), title: "Untitled scene", synopsis: "", content: "", status: "Idea", pov: "", labels: "", notes: "", media: [] }] }; setMode("draft"); setDraftNudge(false); setProjects((items) => [item, ...items]); setProjectId(item.id); setEditorSceneId(item.scenes[0].id); setModal(null); setTutorialOpen(false); setView("editor"); notify("Project created — your blank desk is ready"); };
+  const createProject = (template: string, title: string, author: string) => { if (atProjectLimit) { setBuyProjectsOpen(true); notify("Project limit reached — buy more projects to create another"); return; } markLessonComplete(); const seed = sample(); const item: Project = { ...seed, id: uid(), title: title || `Untitled ${template}`, author: author || "Untitled author", template, isTutorial: false, premise: "", synopsis: "", summary: "", characters: [], plots: [], world: [], revisions: [], scenes: [{ ...seed.scenes[0], id: uid(), title: "Untitled scene", synopsis: "", content: "", status: "Idea", pov: "", labels: "", notes: "", media: [] }] }; setMode("draft"); setDraftNudge(false); setProjects((items) => [item, ...items]); setProjectId(item.id); setEditorSceneId(item.scenes[0].id); setModal(null); setTutorialOpen(false); setView("editor"); notify("Project created — your blank desk is ready"); };
   const duplicateProject = (item: Project) => {
+    if (atProjectLimit) { setBuyProjectsOpen(true); notify("Project limit reached — buy more projects to duplicate another"); return; }
     const duplicate: Project = {
       ...item,
       id: uid(),
@@ -740,20 +807,21 @@ function App() {
              mode the lesson stays reachable from the sidebar's "Explore the
              tutorial" button instead of cluttering the top bar. */}
          {mode === "lesson" && <div className="mode-switch" role="tablist" aria-label="Writing mode"><button className="draft-mode-tab wave-nudge" onClick={switchToDraft} role="tab" aria-selected={false}><PenLine size={13} /> Draft</button><button className="active" onClick={switchToLesson} role="tab" aria-selected={true}><BookOpen size={13} /> Lesson</button></div>}
-         <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><button className="avatar" aria-label="Author settings" onClick={() => project && setView("settings")}>{project?.author?.slice(0, 1) ?? "A"}</button></div>
+         <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><button className="icon-btn bell-wrap" aria-label="Notifications" onClick={() => setView("notifications")}><Bell size={18} />{unreadCount > 0 && <span className="bell-badge" data-testid="bell-unread">{unreadCount}</span>}</button><button className="avatar" aria-label="Open your profile" onClick={() => setView("profile")}>{user?.firstName?.[0] ?? "A"}</button></div>
       </header>
         {cloneBusy && <div className="den-status-banner"><RefreshCw size={15} className="spin" /> Opening your fork of this seed…</div>}
         {forkError && <div className="den-status-banner error"><XCircle size={15} /> {forkError}</div>}
         {preview && <div className="den-status-banner preview"><GitFork size={15} /> Previewing {previewMeta?.respondentName ? `${previewMeta.respondentName}'s` : "a writer's"} submission of “{previewMeta?.title ?? project.title}” — read only. Approve to merge it into the shared project.</div>}
         {sharedOpenError && <div className="den-status-banner error"><XCircle size={15} /> This shared room has no merged document in your studio yet — shared projects appear here once a submission has been approved and merged.</div>}
-        {view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
+        {view === "profile" ? <ProfilePage projectCount={createdProjectCount} /> : view === "explore" ? <ExplorePage /> : view === "notifications" ? <NotificationsPage /> : view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
+      {buyProjectsOpen && <BuyProjectsModal onClose={() => setBuyProjectsOpen(false)} />}
       {tutorialOpen && <TutorialDock step={tutorialStep} onNext={nextLesson} onDismiss={() => setTutorialOpen(false)} />}
     </main>
     {isSharedProject && <div ref={chatShellRef} className={`den-chat ${chatOpen ? "den-chat-open" : ""} ${chatDragRef.current ? "den-chat-dragging" : ""}`} style={chatPos ? { left: chatPos.x, top: chatPos.y, right: "auto", bottom: "auto" } : undefined} onMouseEnter={openChat} onMouseLeave={closeChat}>
       {chatOpen ? <div className="den-chat-panel">
         <div className="den-chat-head" onPointerDown={chatDragStart} title="Drag to move the chat"><ChatAvatar name={chatPartnerName} src={chatPartnerAvatar} /><div><b>{chatPartnerName || "Private thread"}</b><small>Private thread with {chatPartnerName || "your co-writer"}</small></div><button className="icon-btn" aria-label="Close private thread" onClick={closeChat}><X size={16} /></button></div>
-        <div className="den-chat-messages">{chatMessages.length ? chatMessages.map((message) => <div key={message.id} className={`den-chat-msg ${message.senderId === user?.id ? "mine" : ""}`}><p>{message.body}</p><time>{new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time></div>) : <div className="den-chat-empty">No messages yet — say hello to your co-writer.</div>}</div>
-        <div className="den-chat-compose"><textarea value={chatText} onChange={(event) => setChatText(event.target.value)} placeholder="Write to your co-writer…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") sendChat(); }} disabled={chatBusy} /><button className="den-chat-send" onClick={sendChat} disabled={chatBusy || !chatText.trim()}><Send size={14} /> Send</button></div>
+        <div className="den-chat-messages">{chatMessages.length ? chatMessages.map((message) => <div key={message.id} className={`den-chat-msg ${message.senderId === user?.id ? "mine" : ""}`}>{message.audioUrl ? <div className="den-chat-voice"><audio controls src={message.audioUrl} preload="none" /><small>{message.audioName ? message.audioName.replace(/\.(webm|ogg|mp4|m4a|wav)$/i, "") : "Voice note"}{message.audioDurationMs ? ` · ${Math.round(message.audioDurationMs / 1000)}s` : ""}</small></div> : <p>{message.body}</p>}<time>{new Date(message.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</time></div>) : <div className="den-chat-empty">No messages yet — say hello to your co-writer.</div>}</div>
+        <div className="den-chat-compose"><textarea value={chatText} onChange={(event) => setChatText(event.target.value)} placeholder="Write to your co-writer…" onKeyDown={(event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") sendChat(); }} disabled={chatBusy} /><button className={`den-chat-mic ${chatRecording ? "recording" : ""}`} onClick={() => void toggleVoiceNote()} disabled={chatBusy || !chatThread} title={chatRecording ? "Stop recording" : "Record a voice note"} aria-label={chatRecording ? "Stop recording" : "Record a voice note"}>{chatRecording ? <span className="den-chat-mic-pulse" /> : <Mic size={14} />}</button><button className="den-chat-send" onClick={sendChat} disabled={chatBusy || !chatText.trim()}><Send size={14} /> Send</button></div>
       </div> : <><div className="den-chat-fab-wrap" onMouseEnter={openChat}>{incomingAlert && <div className="den-chat-alert"><ChatAvatar name={chatPartnerName} src={chatPartnerAvatar} /><button className="den-chat-alert-body" onClick={openChat}><b>New message</b><small>from {incomingAlert}</small></button><button className="den-chat-alert-close" aria-label="Dismiss" onClick={() => setIncomingAlert(null)}><X size={13} /></button></div>}<button className="den-chat-fab" aria-label="Open private thread" title={`Private thread with ${chatPartnerName}`} onClick={openChat}><ChatAvatar name={chatPartnerName} src={chatPartnerAvatar} /><MessageCircle size={20} />{chatUnread > 0 && <span className="den-chat-badge">{chatUnread}</span>}</button></div></>}
     </div>}
     {modal === "project" && <ProjectModal onClose={() => setModal(null)} onCreate={createProject} />}
@@ -773,9 +841,9 @@ function WorkspaceMenu({ projects, project, onSelect, onNew }: { projects: Proje
 
 function Sidebar({ view, setView, project, projects, openProject, openEditor, mobile, close, onNew, onTutorial, workspaceOpen, setWorkspaceOpen, mode, hasUserProject, notify, collapsed, setCollapsed }: { view: View; setView: (view: View) => void; project?: Project; projects: Project[]; openProject: (project: Project, view?: View, sceneId?: string) => void; openEditor: (sceneId?: string) => void; mobile: boolean; close: () => void; onNew: () => void; onTutorial: () => void; workspaceOpen: boolean; setWorkspaceOpen: (open: boolean) => void; mode: "lesson" | "draft"; hasUserProject: boolean; notify: (message: string) => void; collapsed: boolean; setCollapsed: (collapsed: boolean) => void }) {
   const nav: [View, string, ReactNode][] = [["general", "General", <PenLine size={17} />], ["characters", "Characters", <Users size={17} />], ["world", "World", <Globe2 size={17} />], ["plots", "Plots", <Sparkles size={17} />], ["outline", "Outline", <ClipboardList size={17} />], ["editor", "Draft", <BookOpen size={17} />]];
-   const aux: [View, string, ReactNode][] = [["search", "Search", <Search size={17} />], ["revisions", "Revisions", <Archive size={17} />], ["oracle", "Oracle", <WandSparkles size={17} />], ["tools", "Tools", <Zap size={17} />], ["settings", "Settings", <Settings size={17} />]];
+   const aux: [View, string, ReactNode][] = [["search", "Search", <Search size={17} />], ["revisions", "Revisions", <Archive size={17} />], ["oracle", "Oracle", <WandSparkles size={17} />], ["tools", "Tools", <Zap size={17} />], ["settings", "Settings", <Settings size={17} />], ["explore", "Explore", <Search size={17} />], ["notifications", "Notifications", <Bell size={17} />], ["profile", "Profile", <Users size={17} />]];
   const gated = mode === "draft" && !hasUserProject;
-  const go = (id: View) => { if (gated) { notify("Create a project first to open your current work"); return; } if (id === "editor") openEditor(); else setView(id); close(); };
+  const go = (id: View) => { if (id === "profile" || id === "explore" || id === "notifications") { setView(id); close(); return; } if (gated) { notify("Create a project first to open your current work"); return; } if (id === "editor") openEditor(); else setView(id); close(); };
    return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><a className="tandem-back-btn" href="/" title="Back to Tandem"><LogOut size={15} /><span>Back to Tandem</span></a><div className="brand-row"><div className="brand-mark">A</div><div className="brand-copy"><div className="brand-name">Authors Den</div><div className="brand-sub">writing studio</div></div><button className="icon-btn sidebar-close mobile-only" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
      <div className="workspace-switch-wrap" onPointerLeave={() => setWorkspaceOpen(false)}><button className={`workspace-switch ${workspaceOpen ? "open" : ""}`} onClick={() => setWorkspaceOpen(!workspaceOpen)}><span className="workspace-icon"><Library size={14} /></span><span className="workspace-copy"><small>WORKSPACE</small><strong>My writing desk</strong></span><ChevronDown size={14} /></button>{workspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setWorkspaceOpen(false); }} onNew={() => { onNew(); setWorkspaceOpen(false); }} />}</div>
     <button className={`nav-item ${view === "home" ? "active" : ""}`} onClick={() => { setView("home"); close(); }}><FolderOpen size={17} /><span>Projects</span><span className="nav-count">{projects.length}</span></button>

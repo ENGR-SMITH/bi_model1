@@ -194,6 +194,80 @@ export const CheckAdminProviderResponse = zod.object({
 
 
 /**
+ * @summary List the ticket promo codes
+ */
+export const ListAdminPromosResponseItem = zod.object({
+  "code": zod.string(),
+  "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
+  "value": zod.number().int(),
+  "maxUses": zod.number().int(),
+  "uses": zod.number().int(),
+  "expiresAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminPromosResponse = zod.array(ListAdminPromosResponseItem)
+
+
+/**
+ * @summary Create a ticket promo code
+ */
+export const CreateAdminPromoBody = zod.object({
+  "code": zod.string(),
+  "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
+  "value": zod.number().int(),
+  "maxUses": zod.number().int(),
+  "expiresAt": zod.coerce.date().nullish()
+})
+
+export const CreateAdminPromoResponse = zod.object({
+  "code": zod.string(),
+  "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
+  "value": zod.number().int(),
+  "maxUses": zod.number().int(),
+  "uses": zod.number().int(),
+  "expiresAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Update a ticket promo code
+ */
+export const UpdateAdminPromoParams = zod.object({
+  "code": zod.coerce.string()
+})
+
+export const UpdateAdminPromoBody = zod.object({
+  "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
+  "value": zod.number().int(),
+  "maxUses": zod.number().int(),
+  "expiresAt": zod.coerce.date().nullish()
+})
+
+export const UpdateAdminPromoResponse = zod.object({
+  "code": zod.string(),
+  "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
+  "value": zod.number().int(),
+  "maxUses": zod.number().int(),
+  "uses": zod.number().int(),
+  "expiresAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete a ticket promo code
+ */
+export const DeleteAdminPromoParams = zod.object({
+  "code": zod.coerce.string()
+})
+
+export const DeleteAdminPromoResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
  * @summary Ask the Story Oracle with automatic provider failover
  */
 export const oracleChatBodyMessagesItemContentMax = 4000;
@@ -944,6 +1018,9 @@ export const GetContinuationThreadResponse = zod.object({
   "threadId": zod.string(),
   "senderId": zod.string(),
   "body": zod.string(),
+  "audioUrl": zod.string().nullish(),
+  "audioName": zod.string().nullish(),
+  "audioDurationMs": zod.number().int().nullish(),
   "createdAt": zod.coerce.date()
 })),
   "createdAt": zod.coerce.date(),
@@ -974,6 +1051,9 @@ export const StartContinuationThreadResponse = zod.object({
   "threadId": zod.string(),
   "senderId": zod.string(),
   "body": zod.string(),
+  "audioUrl": zod.string().nullish(),
+  "audioName": zod.string().nullish(),
+  "audioDurationMs": zod.number().int().nullish(),
   "createdAt": zod.coerce.date()
 })),
   "createdAt": zod.coerce.date(),
@@ -1112,6 +1192,9 @@ export const GetCollaborationThreadResponse = zod.object({
   "threadId": zod.string(),
   "senderId": zod.string(),
   "body": zod.string(),
+  "audioUrl": zod.string().nullish(),
+  "audioName": zod.string().nullish(),
+  "audioDurationMs": zod.number().int().nullish(),
   "createdAt": zod.coerce.date()
 })),
   "createdAt": zod.coerce.date(),
@@ -1142,8 +1225,69 @@ export const SendCollaborationMessageResponse = zod.object({
   "threadId": zod.string(),
   "senderId": zod.string(),
   "body": zod.string(),
+  "audioUrl": zod.string().nullish(),
+  "audioName": zod.string().nullish(),
+  "audioDurationMs": zod.number().int().nullish(),
   "createdAt": zod.coerce.date()
 })
+
+
+/**
+ * Multipart voice note (the audio IS the message, mirroring the Creator Den crew room). The recorded audio lands on disk and the message carries the served URL + duration.
+ * @summary Send a voice note to a collaboration thread
+ */
+
+
+
+export const SendCollaborationVoiceNoteParams = zod.object({
+  "threadId": zod.coerce.string().min(1)
+})
+
+export const SendCollaborationVoiceNoteBody = zod.object({
+  "audio": zod.instanceof(File),
+  "durationMs": zod.number().int().optional()
+}).describe('Multipart voice note for a collaboration thread')
+
+export const SendCollaborationVoiceNoteResponse = zod.object({
+  "id": zod.string(),
+  "threadId": zod.string(),
+  "senderId": zod.string(),
+  "body": zod.string(),
+  "audioUrl": zod.string().nullish(),
+  "audioName": zod.string().nullish(),
+  "audioDurationMs": zod.number().int().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * Returns the audio bytes of a voice note. Participants only; the file lives in the shared upload dir under its uuid filename.
+ * @summary Stream a collaboration thread voice note
+ */
+
+
+
+export const GetCollaborationThreadAudioParams = zod.object({
+  "threadId": zod.coerce.string().min(1),
+  "fileId": zod.coerce.string()
+})
+
+export const GetCollaborationThreadAudioResponse = zod.unknown()
+
+
+/**
+ * Authors are writers with published seeds (public work) — the Author Den analogue of the Creator Den explore list. Includes follower counts and the viewer's follow state for the Follow buttons.
+ * @summary List discoverable authors
+ */
+export const ListExploreAuthorsResponseItem = zod.object({
+  "userId": zod.string(),
+  "displayName": zod.string(),
+  "imageUrl": zod.string().nullable(),
+  "publishedSeedCount": zod.number().int(),
+  "followerCount": zod.number().int(),
+  "isFollowing": zod.boolean().nullable()
+}).describe('An author discoverable in the Author Den explore list (someone with published seeds)')
+export const ListExploreAuthorsResponse = zod.array(ListExploreAuthorsResponseItem)
 
 
 /**
@@ -1263,6 +1407,9 @@ export const GetOrCreateProjectThreadResponse = zod.object({
   "threadId": zod.string(),
   "senderId": zod.string(),
   "body": zod.string(),
+  "audioUrl": zod.string().nullish(),
+  "audioName": zod.string().nullish(),
+  "audioDurationMs": zod.number().int().nullish(),
   "createdAt": zod.coerce.date()
 })),
   "createdAt": zod.coerce.date(),
@@ -1668,6 +1815,221 @@ export const GetUserProfileResponse = zod.object({
 
 
 /**
+ * Returns the workspace storage bar data (used/total/remaining bytes) and the project-count bar data (used/total/remaining), plus the buy-more plans the profile pages render. Defaults to 2 GB / 5 projects until a plan is purchased.
+ * @summary Read the account's storage and project limits and usage
+ */
+export const GetAccountQuotaResponse = zod.object({
+  "storageBytes": zod.object({
+  "usedBytes": zod.number().int(),
+  "totalBytes": zod.number().int(),
+  "remainingBytes": zod.number().int()
+}),
+  "projects": zod.object({
+  "used": zod.number().int(),
+  "total": zod.number().int(),
+  "remaining": zod.number().int()
+}),
+  "plans": zod.object({
+  "storage": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "priceUsd": zod.number().int(),
+  "bytes": zod.number().int()
+})),
+  "projects": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "priceUsd": zod.number().int(),
+  "count": zod.number().int()
+}))
+})
+})
+
+
+/**
+ * Extends the account's storage or project limit by the purchased plan. Payment is applied server-side here (the endpoint a Stripe Checkout confirmation will call once payments are wired); the profile bar reflects the new limit immediately.
+ * @summary Apply a buy-more plan to the account
+ */
+export const PurchaseAccountQuotaBody = zod.object({
+  "kind": zod.enum(['storage', 'projects']),
+  "planId": zod.string()
+})
+
+export const PurchaseAccountQuotaResponse = zod.object({
+  "storageBytes": zod.object({
+  "usedBytes": zod.number().int(),
+  "totalBytes": zod.number().int(),
+  "remainingBytes": zod.number().int()
+}),
+  "projects": zod.object({
+  "used": zod.number().int(),
+  "total": zod.number().int(),
+  "remaining": zod.number().int()
+}),
+  "plans": zod.object({
+  "storage": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "priceUsd": zod.number().int(),
+  "bytes": zod.number().int()
+})),
+  "projects": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "priceUsd": zod.number().int(),
+  "count": zod.number().int()
+}))
+}),
+  "purchased": zod.object({
+  "kind": zod.enum(['storage', 'projects']),
+  "planId": zod.string(),
+  "label": zod.string(),
+  "priceUsd": zod.number().int()
+})
+})
+
+
+/**
+ * Returns the CV metadata (file name, type, size, updated time) for a profile. Any signed-in user can see it so CVs are viewable on profiles.
+ * @summary Read a user's CV metadata
+ */
+
+
+
+export const GetUserCvParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const GetUserCvResponse = zod.object({
+  "userId": zod.string(),
+  "fileName": zod.string(),
+  "mimeType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Multipart upload of the CV file. Only the user themselves may upload; re-uploading replaces the previous file.
+ * @summary Upload or replace the user's CV
+ */
+
+
+
+export const UploadUserCvParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const UploadUserCvBody = zod.object({
+  "file": zod.instanceof(File)
+}).describe('Multipart upload of a CV document (pdf\/doc\/docx\/txt\/image)')
+
+export const UploadUserCvResponse = zod.object({
+  "userId": zod.string(),
+  "fileName": zod.string(),
+  "mimeType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Deletes the CV from the profile. Only the user themselves may delete it.
+ * @summary Remove the user's CV
+ */
+
+
+
+export const DeleteUserCvParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const DeleteUserCvResponse = zod.object({
+  "deleted": zod.boolean()
+})
+
+
+/**
+ * Returns the CV bytes so a profile visitor can view or download it.
+ * @summary Stream a user's CV file
+ */
+
+
+
+export const GetUserCvFileParams = zod.object({
+  "userId": zod.coerce.string().min(1)
+})
+
+export const GetUserCvFileResponse = zod.unknown()
+
+
+/**
+ * Returns the pass price ($1.88) and duration (3 weeks) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
+ * @summary Read the viewer's active category passes and the pass price
+ */
+export const GetTicketStatusResponse = zod.object({
+  "priceUsd": zod.number().int(),
+  "weeks": zod.number().int(),
+  "tickets": zod.array(zod.object({
+  "category": zod.string(),
+  "expiresAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * Live promo-code check for the coupon card — returns the discount and the discounted pass price (or valid:false for an unknown/expired/used-up code).
+ * @summary Validate a promo code for the ticket checkout
+ */
+export const ValidateTicketPromoBody = zod.object({
+  "code": zod.string()
+})
+
+export const ValidateTicketPromoResponse = zod.object({
+  "valid": zod.boolean(),
+  "code": zod.string(),
+  "kind": zod.union([zod.literal('FREE'),zod.literal('PERCENT'),zod.literal('FLAT'),zod.literal(null)]).nullish(),
+  "label": zod.string().nullish(),
+  "discountedPriceUsd": zod.number().int().nullish()
+})
+
+
+/**
+ * Validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass for the category. Card details are validated in-house today (only the last-4 is kept); a Stripe Checkout session will replace this once keys are added.
+ * @summary Buy a category pass with a credit card
+ */
+export const PurchaseTicketBody = zod.object({
+  "category": zod.string(),
+  "card": zod.object({
+  "number": zod.string(),
+  "expiryMonth": zod.number().int(),
+  "expiryYear": zod.number().int(),
+  "cvc": zod.string()
+}).describe('Credit-card details for the pass checkout. Validated in-house (Luhn, expiry, cvc); only the last-4 is stored.'),
+  "promoCode": zod.string().nullish()
+})
+
+export const PurchaseTicketResponse = zod.object({
+  "ticket": zod.object({
+  "category": zod.string(),
+  "expiresAt": zod.coerce.date(),
+  "priceUsd": zod.number().int(),
+  "promoCode": zod.string().nullable(),
+  "cardLast4": zod.string()
+}),
+  "receipt": zod.object({
+  "subtotal": zod.number().int(),
+  "discount": zod.number().int(),
+  "total": zod.number().int(),
+  "cardLast4": zod.string(),
+  "promoCode": zod.string().nullable()
+})
+})
+
+
+/**
  * @summary List the authenticated user's content-creation projects
  */
 export const ListVideoProjectsResponseItem = zod.object({
@@ -1710,6 +2072,7 @@ export const CreateVideoProjectResponse = zod.object({
   "projectId": zod.string(),
   "userId": zod.string(),
   "name": zod.string().nullable().describe('Resolved Clerk display name'),
+  "imageUrl": zod.string().nullable().describe('Resolved Clerk avatar url'),
   "roles": zod.array(zod.string()).describe('Every role this member holds in the project, e.g. [\"VIDEO\", \"THUMBNAIL\"]'),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -1929,6 +2292,7 @@ export const GetVideoProjectResponse = zod.object({
   "projectId": zod.string(),
   "userId": zod.string(),
   "name": zod.string().nullable().describe('Resolved Clerk display name'),
+  "imageUrl": zod.string().nullable().describe('Resolved Clerk avatar url'),
   "roles": zod.array(zod.string()).describe('Every role this member holds in the project, e.g. [\"VIDEO\", \"THUMBNAIL\"]'),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -2017,6 +2381,7 @@ export const AddVideoProjectMemberResponse = zod.object({
   "projectId": zod.string(),
   "userId": zod.string(),
   "name": zod.string().nullable().describe('Resolved Clerk display name'),
+  "imageUrl": zod.string().nullable().describe('Resolved Clerk avatar url'),
   "roles": zod.array(zod.string()).describe('Every role this member holds in the project, e.g. [\"VIDEO\", \"THUMBNAIL\"]'),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -2048,6 +2413,7 @@ export const UpdateVideoProjectMemberRolesResponse = zod.object({
   "projectId": zod.string(),
   "userId": zod.string(),
   "name": zod.string().nullable().describe('Resolved Clerk display name'),
+  "imageUrl": zod.string().nullable().describe('Resolved Clerk avatar url'),
   "roles": zod.array(zod.string()).describe('Every role this member holds in the project, e.g. [\"VIDEO\", \"THUMBNAIL\"]'),
   "status": zod.string(),
   "createdAt": zod.coerce.date()
@@ -2622,6 +2988,7 @@ export const ListVideoSubmissionsResponseItem = zod.object({
   "submittedById": zod.string(),
   "decidedById": zod.string().nullable(),
   "decidedAt": zod.coerce.date().nullable(),
+  "decisionNote": zod.string().nullable().describe('The Captain\'s improvement note sent back with the decision (always set when rejecting; optional on approval)'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -2657,13 +3024,35 @@ export const CreateVideoSubmissionResponse = zod.object({
   "submittedById": zod.string(),
   "decidedById": zod.string().nullable(),
   "decidedAt": zod.coerce.date().nullable(),
+  "decisionNote": zod.string().nullable().describe('The Captain\'s improvement note sent back with the decision (always set when rejecting; optional on approval)'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
 
 
 /**
- * @summary Captain approves a leg submission
+ * Only projects the viewer owns (i.e. is Captain of) are scanned, so the page is naturally Captain-only
+ * @summary Captain's review queue — pending (SUBMITTED) leg submissions across the viewer's owned projects
+ */
+export const ListVideoReviewQueueResponseItem = zod.object({
+  "id": zod.string(),
+  "projectId": zod.string(),
+  "projectName": zod.string(),
+  "leg": zod.string(),
+  "timelineVersionId": zod.string(),
+  "status": zod.string(),
+  "note": zod.string(),
+  "submittedById": zod.string(),
+  "submittedByName": zod.string().nullable().describe('Resolved Clerk display name of the submitter, when available'),
+  "headVersionId": zod.string().nullable().describe('The leg\'s current head version id — the diff baseline for this pull request'),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('One pending (SUBMITTED) leg submission on the Captain\'s review queue, with the project context needed to open the review surface')
+export const ListVideoReviewQueueResponse = zod.array(ListVideoReviewQueueResponseItem)
+
+
+/**
+ * @summary Captain approves a leg submission (optional note)
  */
 
 
@@ -2673,6 +3062,14 @@ export const ApproveVideoSubmissionParams = zod.object({
   "projectId": zod.coerce.string().min(1),
   "submissionId": zod.coerce.string().min(1)
 })
+
+export const approveVideoSubmissionBodyNoteMax = 2000;
+
+
+
+export const ApproveVideoSubmissionBody = zod.object({
+  "note": zod.string().max(approveVideoSubmissionBodyNoteMax).optional().describe('Improvement instructions for the submitter (required in spirit on reject, enforced in the UI)')
+}).describe('Optional note attached to an approve\/reject decision — for a rejection it is the improvement message sent back to the submitter')
 
 export const ApproveVideoSubmissionResponse = zod.object({
   "id": zod.string(),
@@ -2684,13 +3081,14 @@ export const ApproveVideoSubmissionResponse = zod.object({
   "submittedById": zod.string(),
   "decidedById": zod.string().nullable(),
   "decidedAt": zod.coerce.date().nullable(),
+  "decisionNote": zod.string().nullable().describe('The Captain\'s improvement note sent back with the decision (always set when rejecting; optional on approval)'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
 
 
 /**
- * @summary Captain rejects a leg submission
+ * @summary Captain rejects a leg submission (note = the improvement message sent back to the submitter)
  */
 
 
@@ -2700,6 +3098,14 @@ export const RejectVideoSubmissionParams = zod.object({
   "projectId": zod.coerce.string().min(1),
   "submissionId": zod.coerce.string().min(1)
 })
+
+export const rejectVideoSubmissionBodyNoteMax = 2000;
+
+
+
+export const RejectVideoSubmissionBody = zod.object({
+  "note": zod.string().max(rejectVideoSubmissionBodyNoteMax).optional().describe('Improvement instructions for the submitter (required in spirit on reject, enforced in the UI)')
+}).describe('Optional note attached to an approve\/reject decision — for a rejection it is the improvement message sent back to the submitter')
 
 export const RejectVideoSubmissionResponse = zod.object({
   "id": zod.string(),
@@ -2711,6 +3117,7 @@ export const RejectVideoSubmissionResponse = zod.object({
   "submittedById": zod.string(),
   "decidedById": zod.string().nullable(),
   "decidedAt": zod.coerce.date().nullable(),
+  "decisionNote": zod.string().nullable().describe('The Captain\'s improvement note sent back with the decision (always set when rejecting; optional on approval)'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })

@@ -20,6 +20,7 @@ import {
 import type { VideoContributionDay, VideoProject } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
 import { FollowButton } from '@/pages/explore';
+import { CvCard, StorageBar } from '@/components/account-panel';
 
 // ---------------------------------------------------------------------------
 // Profile — the creator's public track history. It lists every project the
@@ -268,6 +269,15 @@ export default function ProfilePage() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="account-cards">
+        {/* The workspace size bar is the account owner's private limit — it
+            only renders on the signed-in user's own profile, with buy-more. */}
+        {viewingSelf && <StorageBar />}
+        {/* The CV is public profile info: editable on your own profile,
+            view-only on anyone else's. */}
+        <CvCard userId={profileUserId} editable={viewingSelf} />
       </div>
 
       {contributionsDays.length > 0 && (
