@@ -294,6 +294,28 @@
   color: #70b8ff !important;
 }
 
+.resend-app [class~="text-[#8b5cf6]"],
+.resend-app [class~="text-[#a78bfa]"],
+.resend-site [class~="text-[#8b5cf6]"],
+.resend-site [class~="text-[#a78bfa]"] {
+  color: #b8bec8 !important;
+}
+
+.resend-app [class~="bg-[#34d399]/10"],
+.resend-site [class~="bg-[#34d399]/10"] {
+  background-color: rgba(34, 255, 153, 0.12) !important;
+}
+
+.resend-app [class~="text-[#34d399]"],
+.resend-site [class~="text-[#34d399]"] {
+  color: #46fea5 !important;
+}
+
+.resend-app [class~="text-[#fbbf24]"],
+.resend-site [class~="text-[#fbbf24]"] {
+  color: #ffca16 !important;
+}
+
 .resend-app input,
 .resend-app textarea,
 .resend-app select,
