@@ -262,6 +262,17 @@
   border-radius: 12px;
 }
 
+.resend-app [class*="rounded-[1.25rem]"],
+.resend-app [class*="rounded-[1.35rem]"],
+.resend-app [class*="rounded-[1.5rem]"],
+.resend-app [class*="rounded-[1.75rem]"],
+.resend-site [class*="rounded-[1.25rem]"],
+.resend-site [class*="rounded-[1.35rem]"],
+.resend-site [class*="rounded-[1.5rem]"],
+.resend-site [class*="rounded-[1.75rem]"] {
+  border-radius: 12px !important;
+}
+
 .resend-app button.rounded-full,
 .resend-app a.rounded-full,
 .resend-site button.rounded-full,
@@ -282,6 +293,13 @@
 .resend-app [class~="bg-[#3b82f6]"],
 .resend-site [class~="bg-[#3b82f6]"] {
   background-color: #3b9eff !important;
+}
+
+.resend-app [class~="bg-[#3b82f6]/10"],
+.resend-app [class~="bg-[#3b82f6]/15"],
+.resend-site [class~="bg-[#3b82f6]/10"],
+.resend-site [class~="bg-[#3b82f6]/15"] {
+  background-color: rgba(0, 119, 255, 0.18) !important;
 }
 
 .resend-app [class~="text-[#3b82f6]"],
