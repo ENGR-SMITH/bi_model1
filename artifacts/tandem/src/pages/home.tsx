@@ -41,7 +41,7 @@ function PlatformDiagram() {
 
 export default function Home() {
   return (
-    <main className="min-h-[100dvh] overflow-x-clip bg-[#0a0a0a]">
+    <main className="min-h-[100dvh] overflow-x-clip bg-[#0a0a0a] lg:pl-[72px]">
       <div className="hero-glow absolute inset-x-0 top-0 h-[600px]" />
       <HouseNav />
       <section className="relative mx-auto max-w-[1400px] px-4 pb-20 pt-12 sm:px-6 sm:pt-20 lg:px-8 lg:pb-32 lg:pt-24">
