@@ -62,15 +62,15 @@ function UserChip() {
   return (
     <Link
       href="/profile"
-      className="focus-house group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/5"
+      className="focus-house group flex min-w-0 items-center gap-2 rounded-lg px-2 py-1 transition-colors hover:bg-white/5"
       data-testid="link-profile-chip"
     >
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] font-mono-ui text-[10px] font-medium uppercase text-white">
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] font-mono-ui text-[8px] font-medium uppercase text-white">
         {initials}
       </span>
-      <span className="hidden text-left sm:block">
-        <span className="block text-xs font-semibold text-zinc-100" data-testid="text-user-name">{name}</span>
-        <span className="block max-w-40 truncate text-[10px] text-zinc-500">{user?.primaryEmailAddress?.emailAddress || 'Tandem member'}</span>
+      <span className="min-w-0 text-left">
+        <span className="block truncate text-[10px] font-semibold text-zinc-100" data-testid="text-user-name">{name}</span>
+        <span className="block truncate text-[8px] text-zinc-500">{user?.primaryEmailAddress?.emailAddress || 'Tandem member'}</span>
       </span>
     </Link>
   );
@@ -80,24 +80,23 @@ function PrivateShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { signOut } = useClerk();
-  const currentNav = desktopNav.find((item) => item.href === location);
 
   const logout = () => signOut({ redirectUrl: '/' });
 
   return (
     <div className="resend-app min-h-[100dvh] bg-[#000000] text-zinc-100">
-      <aside className="resend-sidebar fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col border-r border-white/[0.08] bg-[#050505] px-3 py-4 md:flex">
-        <div className="px-3 pb-5">
+      <aside className="resend-sidebar fixed inset-y-0 left-0 z-40 hidden w-[132px] flex-col border-r border-white/[0.08] bg-[#050505] px-2 py-3 md:flex">
+        <div className="px-2 pb-4">
           <TandemLogo />
         </div>
-        <button type="button" className="focus-house mb-5 flex items-center justify-between rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06]" aria-label="Current workspace">
+        <button type="button" className="focus-house mb-4 flex items-center justify-between rounded-lg border border-white/[0.08] bg-white/[0.03] px-2 py-2 text-left transition-colors hover:bg-white/[0.06]" aria-label="Current workspace">
           <span>
-            <span className="block text-xs font-semibold text-white">Tandem</span>
-            <span className="mt-0.5 block text-[11px] text-zinc-500">Creative workspace</span>
+            <span className="block text-[11px] font-semibold text-white">Tandem</span>
+            <span className="mt-0.5 block truncate text-[9px] text-zinc-500">Creative workspace</span>
           </span>
-          <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+          <ChevronDown className="ml-1 h-3 w-3 shrink-0 text-zinc-500" />
         </button>
-        <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-600">Workspace</p>
+        <p className="px-2 pb-1.5 text-[8px] font-medium uppercase tracking-[0.12em] text-zinc-600">Workspace</p>
         <nav className="space-y-0.5" aria-label="Private navigation">
           {desktopNav.map((item) => {
             const Icon = item.icon;
@@ -106,42 +105,38 @@ function PrivateShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`focus-house flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors ${active ? 'bg-white/[0.09] text-white' : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100'}`}
+                className={`focus-house flex items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] font-medium transition-colors ${active ? 'bg-white/[0.09] text-white' : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100'}`}
                 data-testid={`link-nav-${item.label.toLowerCase()}`}
               >
-                <Icon className="h-4 w-4" strokeWidth={1.8} />
+                <Icon className="h-3 w-3 shrink-0" strokeWidth={1.8} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <div className="mt-6 border-t border-white/[0.08] pt-5">
-          <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-600">Connected rooms</p>
-          <Link href="/categories/authors" className="focus-house flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100" data-testid="link-header-authors">
-            <ArrowLeft className="h-4 w-4" />
-            Author's Atrium
+        <div className="mt-5 border-t border-white/[0.08] pt-4">
+          <p className="px-2 pb-1.5 text-[8px] font-medium uppercase tracking-[0.12em] text-zinc-600">Rooms</p>
+          <Link href="/categories/authors" className="focus-house flex items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] font-medium text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100" data-testid="link-header-authors">
+            <ArrowLeft className="h-3 w-3 shrink-0" />
+            <span className="truncate">Author's Atrium</span>
           </Link>
         </div>
-        <div className="mt-auto border-t border-white/[0.08] pt-3">
+        <div className="mt-auto border-t border-white/[0.08] pt-2">
           <UserChip />
-          <Link href="/profile" className="focus-house mt-1 flex items-center gap-3 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"><Settings className="h-3.5 w-3.5" />Settings</Link>
-          <button type="button" onClick={logout} className="focus-house mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200" data-testid="button-header-logout">
-            <LogOut className="h-3.5 w-3.5" />
+          <Link href="/profile" className="focus-house mt-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-[10px] text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"><Settings className="h-3 w-3" />Settings</Link>
+          <button type="button" onClick={logout} className="focus-house mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200" data-testid="button-header-logout">
+            <LogOut className="h-3 w-3" />
             Sign out
           </button>
         </div>
       </aside>
 
-      <div className="min-h-[100dvh] md:pl-[232px]">
+      <div className="min-h-[100dvh] md:pl-[132px]">
         <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#000000]/90 backdrop-blur-xl">
-          <div className="flex h-[60px] items-center justify-between px-5 sm:px-8">
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-zinc-100">{currentNav?.label ?? 'Tandem'}</span>
-              <span className="text-zinc-700">/</span>
-              <span className="text-xs text-zinc-500">Tandem workspace</span>
-            </div>
+          <div className="flex h-[32px] items-center justify-end px-3 sm:px-5">
             <div className="flex items-center gap-2">
-              <div className="hidden sm:block"><UserChip /></div>
+              <Link href="/#how-it-works" className="hidden rounded-md px-2 py-1 text-[9px] text-zinc-400 transition-colors hover:bg-white/5 hover:text-white sm:block">Docs</Link>
+              <Link href="/#how-it-works" className="rounded-md border border-white/[0.08] px-2 py-1 text-[9px] text-zinc-400 transition-colors hover:bg-white/5 hover:text-white">Need help?</Link>
               <button type="button" onClick={() => setMenuOpen((open) => !open)} className="focus-house rounded-lg border border-white/[0.1] p-2 text-zinc-300 md:hidden" aria-label={menuOpen ? 'Close menu' : 'Open menu'} data-testid="button-mobile-profile-menu">
                 {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
               </button>
@@ -159,7 +154,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
             </div>
           )}
         </header>
-        <main className="mx-auto max-w-[1240px] px-5 py-8 sm:px-8 lg:px-10 lg:pb-12">{children}</main>
+         <main className="mx-auto max-w-[640px] px-5 py-5 sm:px-5 lg:pb-10">{children}</main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-[#050505]/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden" aria-label="Mobile navigation">
