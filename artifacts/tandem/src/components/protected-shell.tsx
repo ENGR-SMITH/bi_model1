@@ -2,10 +2,12 @@ import { useAuth, useClerk, useUser } from '@clerk/react';
 import {
   Activity,
   ArrowLeft,
+  ChevronDown,
   Inbox,
   LayoutGrid,
   LogOut,
   Menu,
+  Settings,
   Ticket,
   UserRound,
   X,
@@ -15,17 +17,17 @@ import { Link, Redirect, useLocation } from 'wouter';
 import { TandemLogo } from '@/components/tandem-house';
 
 const desktopNav = [
-  { href: '/dashboard', label: 'Atrium', icon: LayoutGrid },
+  { href: '/dashboard', label: 'Overview', icon: LayoutGrid },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
-  { href: '/subscriptions', label: 'Subscriptions', icon: Ticket },
+  { href: '/subscriptions', label: 'Billing', icon: Ticket },
 ];
 
 const mobileNav = [
-  { href: '/dashboard', label: 'Atrium', icon: LayoutGrid },
+  { href: '/dashboard', label: 'Overview', icon: LayoutGrid },
   { href: '/activity', label: 'Activity', icon: Activity },
   { href: '/inbox', label: 'Inbox', icon: Inbox },
-  { href: '/subscriptions', label: 'Subscriptions', icon: Ticket },
+  { href: '/subscriptions', label: 'Billing', icon: Ticket },
   { href: '/profile', label: 'Profile', icon: UserRound },
 ];
 
@@ -78,88 +80,97 @@ function PrivateShell({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const { signOut } = useClerk();
+  const currentNav = desktopNav.find((item) => item.href === location);
 
   const logout = () => signOut({ redirectUrl: '/' });
 
   return (
-    <div className="min-h-[100dvh] bg-[#0a0a0a] text-zinc-100">
-      {/* Resend-style top navigation bar */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0a]/85 backdrop-blur-md">
-        <div className="mx-auto flex h-[60px] max-w-[1240px] items-center gap-4 px-5 sm:px-8 lg:px-10">
+    <div className="resend-app min-h-[100dvh] bg-[#000000] text-zinc-100">
+      <aside className="resend-sidebar fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col border-r border-white/[0.08] bg-[#050505] px-3 py-4 md:flex">
+        <div className="px-3 pb-5">
           <TandemLogo />
-
-          {/* Desktop nav — pill tabs like Resend's dashboard nav */}
-          <nav className="hidden min-w-0 flex-1 items-center gap-1 md:flex" aria-label="Private navigation">
-            {desktopNav.map((item) => {
-              const Icon = item.icon;
-              const active = location === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`focus-house flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${active ? 'bg-white/10 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'}`}
-                  data-testid={`link-nav-${item.label.toLowerCase()}`}
-                >
-                  <Icon className="h-4 w-4" strokeWidth={1.8} />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          {/* Right cluster — authors shortcut, user chip, sign out */}
-          <div className="ml-auto flex items-center gap-2">
-            <Link href="/categories/authors" className="focus-house hidden items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100 lg:flex" data-testid="link-header-authors">
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Author's Atrium
-            </Link>
-            <UserChip />
-            <button type="button" onClick={logout} className="focus-house hidden items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-100 sm:flex" data-testid="button-header-logout">
-              <LogOut className="h-3.5 w-3.5" />
-              Sign out
-            </button>
-            <button type="button" onClick={() => setMenuOpen((open) => !open)} className="focus-house rounded-lg border border-white/10 p-2 md:hidden" aria-label="Open menu" data-testid="button-mobile-profile-menu">
-              {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </button>
-          </div>
         </div>
-
-        {/* Mobile dropdown menu */}
-        {menuOpen && (
-          <div className="absolute inset-x-4 top-[68px] rounded-2xl border border-white/10 bg-[#111111] p-2 shadow-2xl md:hidden">
-            {mobileNav.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-zinc-200 hover:bg-white/5" data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}>
-                  <Icon className="h-4 w-4 text-zinc-500" />
-                  {item.label}
-                </Link>
-              );
-            })}
-            <div className="my-1 h-px bg-white/5" />
-            <Link href="/categories/authors" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-zinc-200 hover:bg-white/5" data-testid="link-mobile-authors"><ArrowLeft className="h-4 w-4 text-zinc-500" />Author's Atrium</Link>
-            <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-zinc-400 hover:bg-white/5" data-testid="button-mobile-logout"><LogOut className="h-4 w-4" />Sign out</button>
-          </div>
-        )}
-      </header>
-
-      {/* Mobile bottom tab bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/5 bg-[#0d0d0d]/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-lg md:hidden" aria-label="Mobile navigation">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-          {mobileNav.map((item) => {
+        <button type="button" className="focus-house mb-5 flex items-center justify-between rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-left transition-colors hover:bg-white/[0.06]" aria-label="Current workspace">
+          <span>
+            <span className="block text-xs font-semibold text-white">Tandem</span>
+            <span className="mt-0.5 block text-[11px] text-zinc-500">Creative workspace</span>
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+        </button>
+        <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-600">Workspace</p>
+        <nav className="space-y-0.5" aria-label="Private navigation">
+          {desktopNav.map((item) => {
             const Icon = item.icon;
             const active = location === item.href;
             return (
-              <Link key={item.href} href={item.href} className={`focus-house flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-medium ${active ? 'text-[#3b82f6]' : 'text-zinc-500'}`} data-testid={`link-mobile-${item.label.toLowerCase()}`}>
-                <Icon className={`h-5 w-5 ${active ? 'stroke-[2.2]' : 'stroke-[1.7]'}`} />
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`focus-house flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium transition-colors ${active ? 'bg-white/[0.09] text-white' : 'text-zinc-400 hover:bg-white/[0.05] hover:text-zinc-100'}`}
+                data-testid={`link-nav-${item.label.toLowerCase()}`}
+              >
+                <Icon className="h-4 w-4" strokeWidth={1.8} />
                 {item.label}
               </Link>
             );
           })}
+        </nav>
+        <div className="mt-6 border-t border-white/[0.08] pt-5">
+          <p className="px-3 pb-2 text-[10px] font-medium uppercase tracking-[0.12em] text-zinc-600">Connected rooms</p>
+          <Link href="/categories/authors" className="focus-house flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-zinc-400 transition-colors hover:bg-white/[0.05] hover:text-zinc-100" data-testid="link-header-authors">
+            <ArrowLeft className="h-4 w-4" />
+            Author's Atrium
+          </Link>
+        </div>
+        <div className="mt-auto border-t border-white/[0.08] pt-3">
+          <UserChip />
+          <Link href="/profile" className="focus-house mt-1 flex items-center gap-3 rounded-lg px-3 py-2 text-xs text-zinc-500 hover:bg-white/[0.05] hover:text-zinc-200"><Settings className="h-3.5 w-3.5" />Settings</Link>
+          <button type="button" onClick={logout} className="focus-house mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-xs text-zinc-500 transition-colors hover:bg-white/[0.05] hover:text-zinc-200" data-testid="button-header-logout">
+            <LogOut className="h-3.5 w-3.5" />
+            Sign out
+          </button>
+        </div>
+      </aside>
+
+      <div className="min-h-[100dvh] md:pl-[232px]">
+        <header className="sticky top-0 z-30 border-b border-white/[0.08] bg-[#000000]/90 backdrop-blur-xl">
+          <div className="flex h-[60px] items-center justify-between px-5 sm:px-8">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-zinc-100">{currentNav?.label ?? 'Tandem'}</span>
+              <span className="text-zinc-700">/</span>
+              <span className="text-xs text-zinc-500">Tandem workspace</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:block"><UserChip /></div>
+              <button type="button" onClick={() => setMenuOpen((open) => !open)} className="focus-house rounded-lg border border-white/[0.1] p-2 text-zinc-300 md:hidden" aria-label={menuOpen ? 'Close menu' : 'Open menu'} data-testid="button-mobile-profile-menu">
+                {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+          {menuOpen && (
+            <div className="absolute inset-x-3 top-[68px] rounded-xl border border-white/[0.1] bg-[#0a0a0c] p-2 shadow-2xl md:hidden">
+              {mobileNav.map((item) => {
+                const Icon = item.icon;
+                return <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-white/[0.06]" data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}><Icon className="h-4 w-4 text-zinc-500" />{item.label}</Link>;
+              })}
+              <div className="my-1 h-px bg-white/[0.08]" />
+              <Link href="/categories/authors" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-white/[0.06]" data-testid="link-mobile-authors"><ArrowLeft className="h-4 w-4 text-zinc-500" />Author's Atrium</Link>
+              <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-zinc-500 hover:bg-white/[0.06]" data-testid="button-mobile-logout"><LogOut className="h-4 w-4" />Sign out</button>
+            </div>
+          )}
+        </header>
+        <main className="mx-auto max-w-[1240px] px-5 py-8 sm:px-8 lg:px-10 lg:pb-12">{children}</main>
+      </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-[#050505]/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden" aria-label="Mobile navigation">
+        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+          {mobileNav.map((item) => {
+            const Icon = item.icon;
+            const active = location === item.href;
+            return <Link key={item.href} href={item.href} className={`focus-house flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-medium ${active ? 'text-[#3b82f6]' : 'text-zinc-500'}`} data-testid={`link-mobile-${item.label.toLowerCase()}`}><Icon className={`h-5 w-5 ${active ? 'stroke-[2.2]' : 'stroke-[1.7]'}`} />{item.label}</Link>;
+          })}
         </div>
       </nav>
-
-      <main className="mx-auto max-w-[1240px] px-5 py-8 sm:px-8 lg:px-10 lg:pb-12">{children}</main>
     </div>
   );
 }
