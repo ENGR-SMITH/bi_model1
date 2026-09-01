@@ -14,6 +14,8 @@ const doorClass: Record<string, string> = {
   blue: 'card-surface border-[#3b82f6]/25',
   coral: 'card-surface border-[#3b82f6]/30',
 };
+const doorIconClass = 'card-icon h-11 w-11';
+const doorCardTitleClass = 'mt-2 max-w-[13ch] text-3xl font-bold leading-[.98] tracking-[-0.04em] text-zinc-100';
 
 export default function Dashboard() {
   const { user } = useUser();
@@ -46,8 +48,8 @@ export default function Dashboard() {
               <span className="absolute right-6 top-6 font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">{String(index + 1).padStart(2, '0')} / {String(tandemCategories.length).padStart(2, '0')}</span>
               <div className="relative flex h-full flex-col justify-between">
                 <div className="flex items-center justify-between">
-                  <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5">
-                    <Icon className="h-5 w-5 text-zinc-300" strokeWidth={1.7} />
+                  <span className={doorIconClass}>
+                    <Icon className="h-5 w-5" strokeWidth={1.7} />
                   </span>
                   <span className={`rounded-full border border-current px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[0.13em] ${available ? 'badge-glow border-[#3b82f6]/40 bg-[#3b82f6]/10 text-[#60a5fa]' : 'border-white/10 bg-white/5 text-zinc-400'}`}>
                     {available ? 'Open now' : category.status}
@@ -55,7 +57,7 @@ export default function Dashboard() {
                 </div>
                 <div className="mt-12">
                   <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">{available ? 'The first light' : 'On the blueprint'}</p>
-                  <h2 className="mt-2 max-w-[13ch] text-3xl font-bold leading-[.98] tracking-[-0.04em] text-zinc-100">{category.name}</h2>
+                  <h2 className={doorCardTitleClass}>{category.name}</h2>
                   <p className="mt-3 max-w-[19rem] text-sm leading-relaxed text-zinc-400">{category.description}</p>
                 </div>
                 <span className="absolute bottom-0 right-0 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 opacity-75 transition-transform group-hover:rotate-45">

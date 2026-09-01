@@ -167,15 +167,40 @@
     box-shadow: 0 0 60px -10px rgba(59, 130, 246, 0.4);
   }
   .card-surface {
-    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.015) 40%, rgba(255, 255, 255, 0) 100%),
+      #0d0d0d;
     border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+      0 1px 2px rgba(0, 0, 0, 0.4);
   }
   .card-surface-hover {
-    transition: border-color 200ms ease, background 200ms ease, transform 200ms ease;
+    transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
   }
   .card-surface-hover:hover {
-    border-color: rgba(255, 255, 255, 0.16);
-    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.09),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 12px 32px -12px rgba(0, 0, 0, 0.7);
+  }
+  /* Resend-style icon chip: quiet square with an inner top highlight */
+  .card-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.625rem;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+    color: #d4d4d8;
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+  }
+  /* Hairline separator used inside cards */
+  .card-divider {
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
   }
   .text-gradient {
     background: linear-gradient(135deg, #fafafa 0%, #a1a1aa 100%);
@@ -200,7 +225,7 @@
   }
   .divider-line { border-color: rgba(255, 255, 255, 0.08); }
   .soft-lift { transition: transform 220ms cubic-bezier(.2,.8,.2,1), border-color 220ms ease, background 220ms ease, box-shadow 220ms ease; }
-  .soft-lift:hover { transform: translateY(-3px); border-color: rgba(255,255,255,0.16); }
+  .soft-lift:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.18); }
   .focus-house:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
   .reveal { animation: reveal 600ms cubic-bezier(.2,.8,.2,1) both; }
   .reveal-1 { animation-delay: 80ms; }
