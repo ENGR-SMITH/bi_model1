@@ -34,16 +34,16 @@ export default function ContentCreatorsPage() {
           </div>
 
           <div className="flex items-center">
-            <div className="w-full rounded-[1.5rem] border-2 border-[#c7473c] bg-[#3b82f6] p-6 text-[#fff4e6] shadow-[10px_12px_0_rgba(41,43,69,0.12)]" data-testid="card-open-creators-den">
+            <div className="w-full rounded-[1.5rem] border border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent p-6" data-testid="card-open-creators-den">
               <div className="flex items-center justify-between">
                 <span className="flex h-11 w-11 items-center justify-center rounded-full border border-current"><Clapperboard className="h-5 w-5" /></span>
-                <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#ffe6d7]">Your platform</span>
+                <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-100">Your platform</span>
               </div>
               <h2 className="mt-6 max-w-[14ch] text-3xl font-extrabold leading-[.9] tracking-[-0.05em] sm:text-4xl">Open Creators Den</h2>
-              <p className="mt-2 max-w-[24rem] text-sm leading-relaxed text-[#ffe6d7]">
+              <p className="mt-2 max-w-[24rem] text-sm leading-relaxed text-zinc-100">
                 The locked room for pre-recorded video — selects, cut, sound, and finish studios.
               </p>
-              <a href="/creators-den/" className="focus-house mt-5 inline-flex items-center gap-3 rounded-full border border-[#fff4e6]/35 bg-[#111111]/10 px-5 py-2.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#111111]/20" data-testid="link-open-creators-den">
+              <a href="/creators-den/" className="focus-house mt-5 inline-flex items-center gap-3 rounded-full border border-white/20 bg-[#111111]/10 px-5 py-2.5 text-sm font-bold text-zinc-100 transition-colors hover:bg-[#111111]/20" data-testid="link-open-creators-den">
                 Open Creators Den
                 <Clapperboard className="h-4 w-4" />
               </a>
@@ -52,7 +52,7 @@ export default function ContentCreatorsPage() {
                   href={import.meta.env.VITE_AGENT_DOWNLOAD_URL}
                   target="_blank"
                   rel="noreferrer"
-                  className="focus-house mt-3 inline-flex items-center gap-3 rounded-full border border-[#fff4e6]/25 bg-transparent px-5 py-2.5 text-sm font-bold text-[#ffe6d7] transition-colors hover:bg-[#111111]/10"
+                  className="focus-house mt-3 inline-flex items-center gap-3 rounded-full border border-white/15 bg-transparent px-5 py-2.5 text-sm font-bold text-zinc-100 transition-colors hover:bg-[#111111]/10"
                   data-testid="link-download-desktop-agent"
                 >
                   <Download className="h-4 w-4" />
@@ -66,7 +66,7 @@ export default function ContentCreatorsPage() {
         <div className="mt-8">
           <div className="flex items-center gap-4">
             <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">The relay</span>
-            <div className="h-px flex-1 bg-[#d6cbb9]" />
+            <div className="h-px flex-1 bg-white/10" />
           </div>
           <p className="mt-2 font-display text-2xl italic text-white">Four roles. One locked timeline.</p>
 
@@ -74,9 +74,9 @@ export default function ContentCreatorsPage() {
             {LEGS.map((leg) => {
               const Icon = leg.icon;
               return (
-                <div key={leg.number} className="soft-lift rounded-[1.25rem] border-2 border-white/10 bg-[#111111] p-4" data-testid={`card-door-leg-${leg.number}`}>
+                <div key={leg.number} className="soft-lift rounded-[1.25rem] card-surface p-4" data-testid={`card-door-leg-${leg.number}`}>
                   <div className="flex items-center justify-between">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#111111] text-[#f0c85c]"><Icon className="h-4 w-4" /></span>
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#111111] text-[#3b82f6]"><Icon className="h-4 w-4" /></span>
                     <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-600">{leg.number} / 04</span>
                   </div>
                   <p className="mt-4 font-mono-ui text-[9px] uppercase tracking-[0.16em] text-[#3b82f6]">{leg.studio}</p>

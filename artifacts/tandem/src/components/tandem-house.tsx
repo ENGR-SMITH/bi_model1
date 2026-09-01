@@ -54,44 +54,46 @@ export function HouseNav() {
   };
 
   return (
-    <header className="relative z-30 mx-auto flex w-full max-w-[1240px] items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
-      <TandemLogo />
-      <nav className="hidden items-center gap-8 md:flex" aria-label="Primary navigation">
-        <button type="button" onClick={goToRooms} className="text-sm font-medium text-zinc-400 transition-colors hover:text-white" data-testid="button-nav-rooms">
-          Explore rooms
-        </button>
-        <button type="button" onClick={goToMethod} className="text-sm font-medium text-zinc-400 transition-colors hover:text-white" data-testid="button-nav-method">
-          The method
-        </button>
-        <Link href="/room/engine" className="group flex items-center gap-2 text-sm font-medium text-white" data-testid="link-nav-engine">
-          Start at the Engine
-          <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-        </Link>
-        <Show when="signed-out">
-          <div className="flex items-center gap-2 border-l border-white/10 pl-6">
-            <Link href="/sign-in" className="rounded-full px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:text-white" data-testid="link-nav-login">
-              Log in
-            </Link>
-            <Link href="/sign-up" className="rounded-full bg-[#3b82f6] px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-[#2563eb] hover:shadow-[0_0_20px_-4px_rgba(59,130,246,0.5)]" data-testid="link-nav-signup">
-              Sign up
-            </Link>
-          </div>
-        </Show>
-        <Show when="signed-in">
-          <Link href="/dashboard" className="rounded-full bg-[#3b82f6] px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-[#2563eb] hover:shadow-[0_0_20px_-4px_rgba(59,130,246,0.5)]" data-testid="link-nav-atrium">
-            Open your atrium
+    <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-md">
+      <div className="mx-auto flex h-[64px] w-full max-w-[1240px] items-center justify-between px-5 sm:px-8 lg:px-10">
+        <TandemLogo />
+        <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
+          <button type="button" onClick={goToRooms} className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-nav-rooms">
+            Explore rooms
+          </button>
+          <button type="button" onClick={goToMethod} className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-nav-method">
+            The method
+          </button>
+          <Link href="/room/engine" className="group flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white" data-testid="link-nav-engine">
+            Start at the Engine
+            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </Link>
-        </Show>
-      </nav>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="rounded-full border border-white/10 p-2 text-white md:hidden"
-        aria-label={open ? 'Close menu' : 'Open menu'}
-        data-testid="button-mobile-menu"
-      >
-        {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </button>
+          <Show when="signed-out">
+            <div className="ml-4 flex items-center gap-2 border-l border-white/10 pl-5">
+              <Link href="/sign-in" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="link-nav-login">
+                Log in
+              </Link>
+              <Link href="/sign-up" className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200" data-testid="link-nav-signup">
+                Sign up
+              </Link>
+            </div>
+          </Show>
+          <Show when="signed-in">
+            <Link href="/dashboard" className="ml-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200" data-testid="link-nav-atrium">
+              Open your atrium
+            </Link>
+          </Show>
+        </nav>
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="rounded-lg border border-white/10 p-2 text-white md:hidden"
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          data-testid="button-mobile-menu"
+        >
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </div>
       {open && (
         <div className="absolute left-5 right-5 top-[76px] rounded-2xl border border-white/10 bg-[#111111] p-3 shadow-2xl md:hidden">
           <button type="button" onClick={goToRooms} className="block w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 hover:bg-white/5" data-testid="button-mobile-rooms">
@@ -107,12 +109,12 @@ export function HouseNav() {
             <Link href="/sign-in" onClick={() => setOpen(false)} className="mt-2 block rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 hover:bg-white/5" data-testid="link-mobile-login">
               Log in
             </Link>
-            <Link href="/sign-up" onClick={() => setOpen(false)} className="mt-1 block rounded-xl bg-[#3b82f6] px-4 py-3 text-sm font-semibold text-white" data-testid="link-mobile-signup">
+            <Link href="/sign-up" onClick={() => setOpen(false)} className="mt-1 block rounded-xl bg-white px-4 py-3 text-sm font-semibold text-zinc-900" data-testid="link-mobile-signup">
               Sign up
             </Link>
           </Show>
           <Show when="signed-in">
-            <Link href="/dashboard" onClick={() => setOpen(false)} className="mt-2 block rounded-xl bg-[#3b82f6] px-4 py-3 text-sm font-semibold text-white" data-testid="link-mobile-atrium">
+            <Link href="/dashboard" onClick={() => setOpen(false)} className="mt-2 block rounded-xl bg-white px-4 py-3 text-sm font-semibold text-zinc-900" data-testid="link-mobile-atrium">
               Open your atrium
             </Link>
           </Show>
