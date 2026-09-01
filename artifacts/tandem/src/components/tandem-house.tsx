@@ -54,72 +54,86 @@ export function HouseNav() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-md">
-      <div className="mx-auto flex h-[64px] w-full max-w-[1240px] items-center justify-between px-5 sm:px-8 lg:px-10">
-        <TandemLogo />
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
-          <button type="button" onClick={goToRooms} className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-nav-rooms">
-            Explore rooms
-          </button>
-          <button type="button" onClick={goToMethod} className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-nav-method">
-            The method
-          </button>
-          <Link href="/room/engine" className="group flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white" data-testid="link-nav-engine">
-            Start at the Engine
-            <PiArrowUpRightDuotone className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-          </Link>
-          <Show when="signed-out">
-            <div className="ml-4 flex items-center gap-2 border-l border-white/10 pl-5">
-              <Link href="/sign-in" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="link-nav-login">
+    <header className="sticky top-0 z-40">
+      <div className="mx-auto w-full max-w-[1240px] px-4 pt-3 sm:px-8 sm:pt-4 lg:px-10">
+        <div className="relative flex h-[60px] items-center justify-between rounded-2xl border border-white/10 bg-[#0d0d0d]/85 px-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_12px_40px_-16px_rgba(0,0,0,0.9),0_0_50px_-20px_rgba(59,130,246,0.45)] backdrop-blur-xl sm:px-4">
+          <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/40 to-transparent" />
+          <TandemLogo />
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
+            <button type="button" onClick={goToRooms} className="group relative rounded-full px-3.5 py-2 text-sm font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/5 hover:text-white" data-testid="button-nav-rooms">
+              Explore rooms
+              <span className="absolute inset-x-4 bottom-1 h-px bg-gradient-to-r from-[#3b82f6]/80 to-[#8b5cf6]/80 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+            </button>
+            <button type="button" onClick={goToMethod} className="group relative rounded-full px-3.5 py-2 text-sm font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/5 hover:text-white" data-testid="button-nav-method">
+              The method
+              <span className="absolute inset-x-4 bottom-1 h-px bg-gradient-to-r from-[#3b82f6]/80 to-[#8b5cf6]/80 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+            </button>
+            <Link href="/room/engine" className="group ml-2 flex items-center gap-2 rounded-full bg-gradient-to-b from-[#3b82f6] to-[#2563eb] px-4 py-2 text-sm font-semibold text-white shadow-[0_0_24px_-8px_rgba(59,130,246,0.7)] transition-all duration-200 hover:shadow-[0_0_32px_-4px_rgba(59,130,246,0.9)]" data-testid="link-nav-engine">
+              Start at the Engine
+              <PiArrowUpRightDuotone className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </Link>
+          </nav>
+          <div className="hidden items-center gap-2 md:flex">
+            <span aria-hidden="true" className="mr-1 flex items-center gap-[3px]">
+              <span className="h-1 w-1 rounded-full bg-[#3b82f6]" />
+              <span className="h-1 w-1 rounded-full bg-[#8b5cf6]/80" />
+            </span>
+            <Show when="signed-out">
+              <Link href="/sign-in" className="rounded-full px-3.5 py-2 text-sm font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/5 hover:text-white" data-testid="link-nav-login">
                 Log in
               </Link>
-              <Link href="/sign-up" className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200" data-testid="link-nav-signup">
+              <Link href="/sign-up" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-[0_0_20px_-8px_rgba(255,255,255,0.4)] transition-all duration-200 hover:bg-zinc-100" data-testid="link-nav-signup">
                 Sign up
               </Link>
-            </div>
-          </Show>
-          <Show when="signed-in">
-            <Link href="/dashboard" className="ml-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200" data-testid="link-nav-atrium">
-              Open your atrium
-            </Link>
-          </Show>
-        </nav>
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="rounded-lg border border-white/10 p-2 text-white md:hidden"
-          aria-label={open ? 'Close menu' : 'Open menu'}
-          data-testid="button-mobile-menu"
-        >
-          {open ? <PiXDuotone className="h-5 w-5" /> : <PiListDuotone className="h-5 w-5" />}
-        </button>
-      </div>
-      {open && (
-        <div className="absolute left-5 right-5 top-[76px] rounded-2xl border border-white/10 bg-[#111111] p-3 shadow-2xl md:hidden">
-          <button type="button" onClick={goToRooms} className="block w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 hover:bg-white/5" data-testid="button-mobile-rooms">
-            Explore rooms
+            </Show>
+            <Show when="signed-in">
+              <Link href="/dashboard" className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-zinc-900 shadow-[0_0_20px_-8px_rgba(255,255,255,0.4)] transition-all duration-200 hover:bg-zinc-100" data-testid="link-nav-atrium">
+                Open your atrium
+              </Link>
+            </Show>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="rounded-xl border border-white/10 p-2 text-white transition-colors duration-200 hover:border-white/20 hover:bg-white/5 md:hidden"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            data-testid="button-mobile-menu"
+          >
+            {open ? <PiXDuotone className="h-5 w-5" /> : <PiListDuotone className="h-5 w-5" />}
           </button>
-          <button type="button" onClick={goToMethod} className="block w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 hover:bg-white/5" data-testid="button-mobile-method">
-            The method
-          </button>
-          <Link href="/room/engine" onClick={() => setOpen(false)} className="block rounded-xl bg-[#3b82f6]/10 px-4 py-3 text-sm font-medium text-[#3b82f6]" data-testid="link-mobile-engine">
-            Start at the Engine
-          </Link>
-          <Show when="signed-out">
-            <Link href="/sign-in" onClick={() => setOpen(false)} className="mt-2 block rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 hover:bg-white/5" data-testid="link-mobile-login">
-              Log in
-            </Link>
-            <Link href="/sign-up" onClick={() => setOpen(false)} className="mt-1 block rounded-xl bg-white px-4 py-3 text-sm font-semibold text-zinc-900" data-testid="link-mobile-signup">
-              Sign up
-            </Link>
-          </Show>
-          <Show when="signed-in">
-            <Link href="/dashboard" onClick={() => setOpen(false)} className="mt-2 block rounded-xl bg-white px-4 py-3 text-sm font-semibold text-zinc-900" data-testid="link-mobile-atrium">
-              Open your atrium
-            </Link>
-          </Show>
         </div>
-      )}
+        {open && (
+          <div className="absolute inset-x-4 top-[78px] rounded-2xl border border-white/10 bg-[#0d0d0d]/95 p-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_24px_60px_-20px_rgba(0,0,0,0.95),0_0_60px_-24px_rgba(59,130,246,0.5)] backdrop-blur-xl sm:inset-x-8 md:hidden lg:inset-x-10">
+            <span className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/50 to-transparent" />
+            <button type="button" onClick={goToRooms} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-mobile-rooms">
+              <span className="font-mono-ui text-[10px] tracking-[0.14em] text-[#3b82f6]">01 /</span>
+              Explore rooms
+            </button>
+            <button type="button" onClick={goToMethod} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-mobile-method">
+              <span className="font-mono-ui text-[10px] tracking-[0.14em] text-[#3b82f6]">02 /</span>
+              The method
+            </button>
+            <div className="my-1 h-px bg-white/5" />
+            <Link href="/room/engine" onClick={() => setOpen(false)} className="group flex items-center justify-between rounded-xl bg-gradient-to-b from-[#3b82f6] to-[#2563eb] px-4 py-3 text-sm font-semibold text-white shadow-[0_0_24px_-8px_rgba(59,130,246,0.7)]" data-testid="link-mobile-engine">
+              Start at the Engine
+              <PiArrowUpRightDuotone className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </Link>
+            <Show when="signed-out">
+              <Link href="/sign-in" onClick={() => setOpen(false)} className="mt-1 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid="link-mobile-login">
+                Log in
+              </Link>
+              <Link href="/sign-up" onClick={() => setOpen(false)} className="mt-1 block rounded-xl bg-white px-4 py-3 text-center text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-100" data-testid="link-mobile-signup">
+                Sign up
+              </Link>
+            </Show>
+            <Show when="signed-in">
+              <Link href="/dashboard" onClick={() => setOpen(false)} className="mt-2 block rounded-xl bg-white px-4 py-3 text-center text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-100" data-testid="link-mobile-atrium">
+                Open your atrium
+              </Link>
+            </Show>
+          </div>
+        )}
+      </div>
     </header>
   );
 }
