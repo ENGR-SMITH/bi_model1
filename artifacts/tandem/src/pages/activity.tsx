@@ -22,7 +22,7 @@ export default function ActivityPage() {
   const events: any[] = q.data || [];
 
   return (
-    <div className="mx-auto max-w-[1180px]">
+    <div className="mx-auto max-w-[1360px]">
       <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>Your trail / activity</SectionEyebrow>
@@ -66,13 +66,13 @@ export default function ActivityPage() {
                 <div className="mt-5 space-y-3">{dayEvents.map((event) => {
                   const tone = eventTone[event.eventType] ?? 'bg-white/10 text-zinc-300';
                   return (
-                    <div key={event.id} data-testid={`account-activity-${event.id}`} className="soft-lift flex items-start gap-4 rounded-2xl border card-surface p-5">
-                      <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tone}`}>
+                    <div key={event.id} data-testid={`account-activity-${event.id}`} className="soft-lift flex items-start gap-5 rounded-2xl border card-surface p-6">
+                      <span className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${tone}`}>
                         <History className="h-4 w-4" />
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold leading-relaxed text-zinc-100">{event.summary}</p>
-                        <span className="mt-1 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-500">
+                        <span className="mt-1.5 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-500">
                           {event.eventType.replaceAll('_', ' ')} · {new Date(event.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
                         </span>
                       </div>
@@ -83,11 +83,11 @@ export default function ActivityPage() {
             ))}</div>;
           })()
         ) : (
-          <div className="card-surface rounded-2xl p-7 sm:p-10">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#3b82f6]/10 text-[#3b82f6]">
-              <ActivityIcon className="h-6 w-6" strokeWidth={1.6} />
-            </div>
-            <p className="mt-8 text-4xl font-semibold text-zinc-100">Nothing has moved yet.</p>
+          <div className="card-surface rounded-2xl p-8 sm:p-12">
+            <span className="card-icon h-14 w-14 rounded-xl border-[#3b82f6]/30">
+              <ActivityIcon className="h-7 w-7 text-[#60a5fa]" />
+            </span>
+            <p className="mt-9 text-4xl font-semibold text-zinc-100">Nothing has moved yet.</p>
             <p className="mt-4 max-w-xl text-sm leading-[1.8] text-zinc-500">
               Publish a seed, answer a seed, or open a room and your trail will gather here — every publish, submission, selection, contract lock, and approved pass.
             </p>

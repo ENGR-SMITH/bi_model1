@@ -9,7 +9,7 @@ export default function AuthorsPage() {
   const firstName = user?.firstName || 'writer';
 
   return (
-    <div className="mx-auto flex max-w-[1180px] flex-col justify-between gap-5 lg:h-[calc(100dvh-170px)]">
+    <div className="mx-auto flex max-w-[1360px] flex-col justify-between gap-5 lg:h-[calc(100dvh-170px)]">
       <div>
         <Link href="/dashboard" className="focus-house inline-flex items-center gap-2 rounded-full py-1 text-xs font-bold text-zinc-500 hover:text-white" data-testid="link-authors-back-dashboard">
           <ArrowUpRight className="h-3.5 w-3.5 rotate-[225deg]" />
@@ -28,9 +28,9 @@ export default function AuthorsPage() {
           </div>
 
           <div className="flex items-center">
-            <div className="w-full rounded-[1.5rem] border border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent p-6" data-testid="card-open-manuscript-studio">
+            <div className="w-full rounded-2xl border border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent p-6" data-testid="card-open-manuscript-studio">
               <div className="flex items-center justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-full border border-current"><PenLine className="h-5 w-5" /></span>
+                <span className="card-icon h-12 w-12 rounded-xl border-[#3b82f6]/30"><PenLine className="h-5 w-5 text-[#60a5fa]" /></span>
                 <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-100">Your studio</span>
               </div>
               <h2 className="mt-6 max-w-[12ch] text-3xl font-extrabold leading-[.9] tracking-[-0.05em] sm:text-4xl">Open Manuscript Studio</h2>
@@ -53,10 +53,10 @@ export default function AuthorsPage() {
           <p className="mt-2 font-display text-2xl italic text-white">Two voices. One room.</p>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[1.25fr_.75fr]">
-            <Link href="/authors/pitch-board" className="soft-lift focus-house group relative flex flex-col overflow-hidden rounded-[1.5rem] bg-[#111111] p-6 text-zinc-100" data-testid="link-pitch-board">
+            <Link href="/authors/pitch-board" className="soft-lift focus-house group relative flex flex-col overflow-hidden rounded-2xl bg-[#111111] p-6 text-zinc-100" data-testid="link-pitch-board">
               <span className="absolute -right-14 -top-14 h-40 w-40 rounded-full border border-[#3b82f6]/30 transition-transform duration-500 group-hover:scale-125" />
               <div className="flex items-center justify-between">
-                <Search className="h-6 w-6 text-[#3b82f6]" />
+                <span className="card-icon h-12 w-12 rounded-xl border-[#3b82f6]/30"><Search className="h-5 w-5 text-[#60a5fa]" /></span>
                 <span className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#3b82f6]">01 · The pitch board</span>
               </div>
               <h2 className="mt-4 max-w-[11ch] text-3xl font-extrabold leading-[.95] tracking-[-.05em]">Find a seed worth answering.</h2>
@@ -64,12 +64,12 @@ export default function AuthorsPage() {
               <span className="mt-4 inline-flex w-fit items-center gap-2 rounded-full bg-[#3b82f6] px-4 py-2 text-xs font-semibold text-white">Browse seeds <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" /></span>
             </Link>
             <div className="grid gap-4">
-              <Link href="/authors/collaborations/continuations" className="soft-lift focus-house group rounded-[1.25rem] card-surface p-5" data-testid="link-review-desk">
+              <Link href="/authors/collaborations/continuations" className="soft-lift focus-house group rounded-xl card-surface p-5" data-testid="link-review-desk">
                 <div className="flex items-center justify-between"><Inbox className="text-[#34d399]" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-zinc-600">02</span></div>
                 <h2 className="mt-3 font-display text-2xl italic">Your review desk</h2>
                 <p className="mt-1 text-xs text-zinc-500">Continuations waiting on your eye, side by side with the seed that called them.</p>
               </Link>
-              <Link href="/authors/work" className="soft-lift focus-house group rounded-[1.25rem] border-2 border-[#3b82f6] bg-[#3b82f6] p-5" data-testid="link-work-in-motion">
+              <Link href="/authors/work" className="soft-lift focus-house group rounded-xl border-2 border-[#3b82f6] bg-[#3b82f6] p-5" data-testid="link-work-in-motion">
                 <div className="flex items-center justify-between"><Users className="text-white" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-white/60">03</span></div>
                 <h2 className="mt-3 font-display text-2xl italic">Work in motion</h2>
                 <p className="mt-1 text-xs text-white/80">Solo pieces and Tandem projects, together in one room.</p>

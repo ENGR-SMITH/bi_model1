@@ -28,7 +28,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-[900px]">
+    <div className="mx-auto max-w-[1080px]">
       <SectionEyebrow>Your corner / profile</SectionEyebrow>
       <h1 className="mt-5 text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">
         Your place in the house.
@@ -46,8 +46,8 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-        <div className="grid gap-3 p-5 sm:grid-cols-2 sm:p-7">
-          <div className="card-surface rounded-2xl p-5 sm:col-span-2">
+        <div className="grid gap-4 p-6 sm:grid-cols-2 sm:p-8">
+          <div className="card-surface rounded-2xl p-6 sm:col-span-2">
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#3b82f6]">Your lights on</p>
             <h3 className="mt-3 text-xl font-bold tracking-[-0.03em] text-zinc-100">Rooms you're waiting for</h3>
             {isLoadingWaitlist ? (

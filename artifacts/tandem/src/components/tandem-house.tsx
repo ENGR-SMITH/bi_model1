@@ -137,9 +137,9 @@ export function RoomDoor({ room, compact = false }: { room: Room; compact?: bool
         <ArrowUpRight className="h-4 w-4" />
       </span>
       <div className="relative flex h-full min-h-[inherit] flex-col justify-between">
-        <div className="flex items-start justify-between">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5">
-            <Icon className="h-5 w-5 text-zinc-300" strokeWidth={1.7} />
+        <div className="relative flex items-start justify-between">
+          <span className="card-icon h-12 w-12 rounded-xl border-white/15 shadow-[0_0_24px_-8px_rgba(59,130,246,0.45)]">
+            <Icon className="h-[1.35rem] w-[1.35rem] text-[#93c5fd]" />
           </span>
           <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">
             {room.foundation ? '01 / 17' : `${String(Number(room.slug.length) % 16 + 2).padStart(2, '0')} / 17`}

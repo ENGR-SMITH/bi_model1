@@ -54,10 +54,10 @@ export default function InboxPage() {
   }
   const cardClass = (kind: string) =>
     kind === 'turn' || kind === 'contract'
-      ? 'bg-[#fbbf24]/20 text-[#fbbf24]'
+      ? { card: 'border-[#fbbf24]/35', chip: 'border-[#fbbf24]/25 text-[#fbbf24]', glow: 'hover:shadow-[0_0_36px_-16px_rgba(251,191,36,0.35)]' }
       : kind === 'review'
-      ? 'bg-red-500/20 text-red-400'
-      : 'bg-[#34d399]/20 text-[#34d399]';
+      ? { card: 'border-red-500/35', chip: 'border-red-500/25 text-red-400', glow: 'hover:shadow-[0_0_36px_-16px_rgba(239,68,68,0.35)]' }
+      : { card: 'border-[#34d399]/35', chip: 'border-[#34d399]/25 text-[#34d399]', glow: 'hover:shadow-[0_0_36px_-16px_rgba(52,211,153,0.35)]' };
 
   const openNote = (n: any) => {
     mark.mutate({ notificationId: n.id });
@@ -72,7 +72,7 @@ export default function InboxPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1180px]">
+    <div className="mx-auto max-w-[1360px]">
       <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>Messages / inbox</SectionEyebrow>
@@ -93,15 +93,19 @@ export default function InboxPage() {
             <h2 className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#3b82f6]">Urgent work</h2>
             <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">{urgent.length} item{urgent.length === 1 ? '' : 's'} need you</span>
           </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {urgent.slice(0, 6).map((item) => (
-              <Link key={`${item.kind}-${item.href}`} href={item.href} className={`soft-lift focus-house rounded-2xl p-6 ${cardClass(item.kind)}`}>
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5">{item.icon}</span>
-                <h3 className="mt-6 text-lg font-bold tracking-[-.03em] text-zinc-100">{item.label}</h3>
-                <p className="mt-1 text-xs leading-relaxed opacity-80">{item.body}</p>
-                <span className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-zinc-300">Open <ArrowRight className="h-3.5 w-3.5" /></span>
-              </Link>
-            ))}
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {urgent.slice(0, 6).map((item) => {
+              const tone = cardClass(item.kind);
+              return (
+                <Link key={`${item.kind}-${item.href}`} href={item.href} className={`soft-lift focus-house group relative overflow-hidden rounded-2xl border card-surface p-6 ${tone.card} ${tone.glow}`}>
+                  <span className="absolute -right-8 -top-10 h-28 w-28 rounded-full border border-white/5 opacity-20 transition-transform duration-500 group-hover:scale-125" />
+                  <span className={`card-icon h-11 w-11 rounded-xl ${tone.chip}`}>{item.icon}</span>
+                  <h3 className="mt-7 text-lg font-bold tracking-[-.03em] text-zinc-100">{item.label}</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-zinc-400">{item.body}</p>
+                  <span className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-zinc-300 transition-colors group-hover:text-white">Open <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" /></span>
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}
@@ -119,7 +123,7 @@ export default function InboxPage() {
               <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-white/5" />)}</div>
             ) : threads.length ? threads.map((t) => (
               <button key={t.id} data-testid={`inbox-thread-${t.id}`} onClick={() => t.projectId ? window.location.href = `/authors-den/?project=${t.projectId}&chat=1` : setLocation(`/authors/collaborations/thread/${t.id}`)}
-                className={`focus-house soft-lift flex w-full items-start gap-4 rounded-2xl border p-5 text-left ${t.unread ? 'border-[#3b82f6]/40 bg-[#3b82f6]/5' : 'card-surface'}`}>
+                className={`focus-house soft-lift flex w-full items-start gap-4 rounded-2xl border p-6 text-left ${t.unread ? 'border-[#3b82f6]/40 bg-[#3b82f6]/5' : 'card-surface'}`}>
                 <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] font-mono-ui text-[11px] font-medium uppercase text-white">{(t.partnerName || 'W').slice(0, 1)}</span>
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-baseline justify-between gap-2">

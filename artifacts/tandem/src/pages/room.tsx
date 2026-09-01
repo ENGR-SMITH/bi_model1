@@ -29,7 +29,7 @@ export default function RoomPage() {
     <main className="resend-site min-h-[100dvh] overflow-hidden bg-[#000000]">
       <div className="hero-glow absolute inset-x-0 top-0 h-[600px]" />
       <HouseNav />
-      <section className="relative mx-auto max-w-[1240px] px-5 pb-16 pt-12 sm:px-8 sm:pt-20 lg:px-10 lg:pb-24 lg:pt-24">
+      <section className="relative mx-auto max-w-[1480px] px-4 pb-16 pt-12 sm:px-6 sm:pt-20 lg:px-8 lg:pb-24 lg:pt-24">
         <Link href="/" className="group inline-flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500 transition-colors hover:text-[#3b82f6]" data-testid="link-return-house">
           <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" /> Back to the house
         </Link>
@@ -48,7 +48,7 @@ export default function RoomPage() {
                   <span className="card-icon h-5 w-5"><LockKeyhole className="h-5 w-5" strokeWidth={1.6} /></span>
                 </div>
                 <div className="flex min-h-[240px] flex-col items-center justify-center text-center sm:min-h-[300px]">
-                  <span className="card-icon h-20 w-20 sm:h-24 sm:w-24">
+                  <span className="card-icon animate-float h-20 w-20 rounded-2xl border-[#8b5cf6]/30 sm:h-24 sm:w-24">
                     <Sparkles className="h-9 w-9 text-[#a78bfa]" strokeWidth={1.2} />
                   </span>
                   <p className="mt-7 text-5xl font-bold leading-none text-white">Not yet</p>
@@ -64,7 +64,7 @@ export default function RoomPage() {
         </div>
       </section>
       <section className="border-y border-white/5 bg-[#0d0d0d]">
-        <div className="mx-auto grid max-w-[1240px] gap-10 px-5 py-16 sm:px-8 lg:grid-cols-[.7fr_1.3fr] lg:px-10 lg:py-24">
+        <div className="mx-auto grid max-w-[1480px] gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[.7fr_1.3fr] lg:px-8 lg:py-24">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">A room can wait</p>
             <h2 className="mt-5 max-w-[12ch] text-4xl font-bold leading-[.94] tracking-[-0.04em] text-white sm:text-5xl">The house is open before every door is.</h2>
@@ -82,7 +82,7 @@ export default function RoomPage() {
           </div>
         </div>
       </section>
-      <section className="mx-auto max-w-[1240px] px-5 py-16 sm:px-8 lg:px-10 lg:py-24">
+      <section className="mx-auto max-w-[1480px] px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
         <div className="flex items-end justify-between gap-5">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">Keep wandering</p>
@@ -94,7 +94,7 @@ export default function RoomPage() {
           {suggestions.map((suggestion) => <RoomDoor key={suggestion.slug} room={suggestion} compact />)}
         </div>
       </section>
-      <footer className="border-t border-white/5 px-5 py-7 text-center font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500 sm:px-8">
+      <footer className="border-t border-white/5 px-4 py-7 text-center font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500 sm:px-6">
         Tandem / the house is still taking shape
       </footer>
     </main>

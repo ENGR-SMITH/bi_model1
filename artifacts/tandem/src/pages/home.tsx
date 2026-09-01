@@ -1,4 +1,5 @@
-import { ArrowUpRight, EyeOff, Layers3, Sparkles, WandSparkles } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import { PiEyeSlash, PiMagicWand, PiSparkle, PiStack } from 'react-icons/pi';
 import { Link } from 'wouter';
 import { HouseNav, RoomDoor, TandemLogo } from '@/components/tandem-house';
 import { roomGroups, rooms } from '@/data/rooms';
@@ -13,8 +14,8 @@ function PlatformDiagram() {
             <p className="font-mono-ui text-[9px] uppercase tracking-[0.18em] text-zinc-500">The foundation</p>
             <p className="mt-2 max-w-[13rem] text-[2rem] font-semibold leading-[.9] text-white sm:text-[2.8rem]">The Engine</p>
           </div>
-          <span className="card-icon h-11 w-11 sm:h-14 sm:w-14">
-            <Layers3 className="h-5 w-5 sm:h-6 sm:w-6" />
+          <span className="card-icon h-12 w-12 rounded-xl border-[#3b82f6]/25 sm:h-14 sm:w-14">
+            <PiStack className="h-6 w-6 text-[#60a5fa] sm:h-7 sm:w-7" />
           </span>
         </div>
         <div className="card-surface flex flex-col justify-between rounded-xl p-3 sm:p-5">
@@ -44,7 +45,7 @@ export default function Home() {
     <main className="resend-site min-h-[100dvh] overflow-x-clip bg-[#000000]">
       <div className="hero-glow absolute inset-x-0 top-0 h-[600px]" />
       <HouseNav />
-      <section className="relative mx-auto max-w-[1240px] px-5 pb-20 pt-12 sm:px-8 sm:pt-20 lg:px-10 lg:pb-32 lg:pt-24">
+      <section className="relative mx-auto max-w-[1480px] px-4 pb-20 pt-12 sm:px-6 sm:pt-20 lg:px-8 lg:pb-32 lg:pt-24">
         <div className="grid items-center gap-14 lg:grid-cols-[1.02fr_.98fr] lg:gap-10">
           <div className="reveal max-w-[670px]">
             <div className="inline-flex items-center gap-2 rounded-full border border-[#3b82f6]/30 bg-[#3b82f6]/10 px-3 py-1.5">
@@ -75,33 +76,33 @@ export default function Home() {
       </section>
 
       <section id="how-it-works" className="border-y border-white/5 bg-[#0d0d0d]">
-        <div className="mx-auto grid max-w-[1240px] gap-10 px-5 py-20 sm:px-8 lg:grid-cols-[.7fr_1.3fr] lg:px-10 lg:py-28">
+        <div className="mx-auto grid max-w-[1480px] gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[.7fr_1.3fr] lg:px-8 lg:py-28">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">The method</p>
             <h2 className="mt-5 max-w-[10ch] text-5xl font-bold leading-[.92] tracking-[-0.04em] text-white sm:text-6xl">A little less knowing. A lot more discovering.</h2>
           </div>
-          <div className="grid gap-5 sm:grid-cols-3">
-            <div className="reveal card-surface card-surface-hover rounded-2xl p-6">
-              <span className="card-icon h-7 w-7">
-                <EyeOff className="h-7 w-7 text-[#3b82f6]" strokeWidth={1.6} />
+          <div className="grid gap-6 sm:grid-cols-3">
+            <div className="reveal card-surface card-surface-hover rounded-2xl p-7">
+              <span className="card-icon animate-float h-12 w-12 rounded-xl border-[#3b82f6]/30">
+                <PiEyeSlash className="h-6 w-6 text-[#60a5fa]" />
               </span>
-              <p className="mt-12 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">01 / Contribute blind</p>
+              <p className="mt-14 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">01 / Contribute blind</p>
               <h3 className="mt-3 text-xl font-bold tracking-[-0.03em] text-zinc-100">Bring your half</h3>
               <p className="mt-3 text-sm leading-relaxed text-zinc-400">You make without seeing the other person's work. No adapting. No performing for a brief.</p>
             </div>
-            <div className="reveal reveal-1 card-surface card-surface-hover rounded-2xl p-6">
-              <span className="card-icon h-7 w-7">
-                <WandSparkles className="h-7 w-7 text-[#8b5cf6]" strokeWidth={1.6} />
+            <div className="reveal reveal-1 card-surface card-surface-hover rounded-2xl p-7">
+              <span className="card-icon animate-float animate-float-delay h-12 w-12 rounded-xl border-[#8b5cf6]/30">
+                <PiMagicWand className="h-6 w-6 text-[#a78bfa]" />
               </span>
-              <p className="mt-12 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">02 / Let the bridge work</p>
+              <p className="mt-14 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">02 / Let the bridge work</p>
               <h3 className="mt-3 text-xl font-bold tracking-[-0.03em] text-zinc-100">AI as bridge</h3>
               <p className="mt-3 text-sm leading-relaxed text-zinc-400">The system holds context, finds the join, and protects the provenance of every contribution.</p>
             </div>
-            <div className="reveal reveal-2 card-surface card-surface-hover rounded-2xl p-6">
-              <span className="card-icon h-7 w-7">
-                <Sparkles className="h-7 w-7 text-[#fbbf24]" strokeWidth={1.6} />
+            <div className="reveal reveal-2 card-surface card-surface-hover rounded-2xl p-7">
+              <span className="card-icon animate-float animate-float-slow h-12 w-12 rounded-xl border-[#fbbf24]/30">
+                <PiSparkle className="h-6 w-6 text-[#fbbf24]" />
               </span>
-              <p className="mt-12 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">03 / Open the door</p>
+              <p className="mt-14 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">03 / Open the door</p>
               <h3 className="mt-3 text-xl font-bold tracking-[-0.03em] text-zinc-100">The reveal ceremony</h3>
               <p className="mt-3 text-sm leading-relaxed text-zinc-400">Two paths become one visible thing. The moment of recognition is part of the work.</p>
             </div>
@@ -109,7 +110,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="rooms" className="mx-auto max-w-[1240px] px-5 py-20 sm:px-8 lg:px-10 lg:py-32">
+      <section id="rooms" className="mx-auto max-w-[1480px] px-4 py-20 sm:px-6 lg:px-8 lg:py-32">
         <div className="flex flex-col justify-between gap-7 sm:flex-row sm:items-end">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">The rooms</p>
@@ -147,7 +148,7 @@ export default function Home() {
       </section>
 
       <section className="border-t border-white/5 bg-[#0d0d0d]">
-        <div className="mx-auto grid max-w-[1240px] gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1fr_.8fr] lg:items-end lg:px-10 lg:py-28">
+        <div className="mx-auto grid max-w-[1480px] gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_.8fr] lg:items-end lg:px-8 lg:py-28">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">A note from the platform</p>
             <blockquote className="mt-7 max-w-[14ch] text-5xl font-semibold leading-[.94] text-white sm:text-7xl">"The point is not to disappear into the machine. It is to become more visible to one another."</blockquote>
@@ -160,7 +161,7 @@ export default function Home() {
             </Link>
           </div>
         </div>
-        <footer className="mx-auto flex max-w-[1240px] flex-col gap-4 border-t border-white/5 px-5 py-7 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-8 lg:px-10">
+        <footer className="mx-auto flex max-w-[1480px] flex-col gap-4 border-t border-white/5 px-4 py-7 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <TandemLogo />
           <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em]">A platform for creative connection / 2025</span>
         </footer>

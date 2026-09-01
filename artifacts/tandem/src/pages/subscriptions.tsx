@@ -82,7 +82,7 @@ export default function SubscriptionsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-[1060px]">
+    <div className="mx-auto max-w-[1280px]">
       <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>Billing & passes</SectionEyebrow>
@@ -98,8 +98,8 @@ export default function SubscriptionsPage() {
       </div>
 
       {/* Current usage — the live account state. */}
-      <div className="reveal reveal-1 mt-10 grid gap-5 lg:grid-cols-3">
-        <div className="soft-lift card-surface rounded-2xl p-5">
+      <div className="reveal reveal-1 mt-10 grid gap-6 lg:grid-cols-3">
+        <div className="soft-lift card-surface rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <span className="text-2xl font-semibold text-zinc-100">Passes</span>
             <Ticket className="h-5 w-5 text-[#3b82f6]" />
@@ -118,7 +118,7 @@ export default function SubscriptionsPage() {
           </div>
         </div>
 
-        <div className="soft-lift card-surface rounded-2xl p-5">
+        <div className="soft-lift card-surface rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <span className="text-2xl font-semibold text-zinc-100">Storage</span>
             <HardDrive className="h-5 w-5 text-[#34d399]" />
@@ -133,7 +133,7 @@ export default function SubscriptionsPage() {
           <p className="mt-2 text-xs text-zinc-500">{formatBytes(Math.max(0, storageTotal - storageUsed))} left</p>
         </div>
 
-        <div className="soft-lift card-surface rounded-2xl p-5">
+        <div className="soft-lift card-surface rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <span className="text-2xl font-semibold text-zinc-100">Projects</span>
             <FolderOpen className="h-5 w-5 text-[#fbbf24]" />
@@ -151,7 +151,7 @@ export default function SubscriptionsPage() {
 
       {/* The plan catalog, grouped by product. */}
       {plansQuery.isLoading ? (
-        <div className="public-card mt-10 rounded-[1.5rem] border border-white/10 bg-[#111111] p-8 text-center text-zinc-500">Opening the price list…</div>
+        <div className="public-card mt-10 rounded-2xl border border-white/10 bg-[#111111] p-8 text-center text-zinc-500">Opening the price list…</div>
       ) : (
         groups.map((groupPlans, index) => {
           const kind = groupPlans[0]?.kind as keyof typeof KIND_META;
@@ -167,11 +167,11 @@ export default function SubscriptionsPage() {
                 <div className="h-px flex-1 bg-white/5" />
                 <span className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-zinc-600">0{index + 1}</span>
               </div>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {groupPlans.map((plan) => {
                   const activeSub = activeByPlan.get(`${plan.kind}:${plan.planId}`);
                   return (
-                    <div key={`${plan.kind}:${plan.planId}`} className="soft-lift flex flex-col card-surface rounded-2xl p-5" data-testid={`plan-${plan.kind}-${plan.planId}`}>
+                    <div key={`${plan.kind}:${plan.planId}`} className="soft-lift flex flex-col card-surface rounded-2xl p-6" data-testid={`plan-${plan.kind}-${plan.planId}`}>
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-xl font-semibold leading-none text-zinc-100">{plan.planLabel}</p>
                         <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-500">{plan.intervalLabel}</span>
@@ -213,7 +213,7 @@ export default function SubscriptionsPage() {
           <h2 className="text-2xl font-semibold text-zinc-100">Every subscription on this account</h2>
           <div className="h-px flex-1 bg-white/5" />
         </div>
-        <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-white/10">
+        <div className="mt-5 overflow-hidden rounded-2xl border border-white/10">
           {((data?.current ?? []).length === 0) ? (
             <div className="p-8 text-center text-sm text-zinc-500" data-testid="subscriptions-history-empty">
               No subscriptions yet — every pass and extension you buy lands here.

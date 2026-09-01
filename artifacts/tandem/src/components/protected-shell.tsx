@@ -154,7 +154,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
             </div>
           )}
         </header>
-         <main className="mx-auto max-w-[640px] px-5 py-5 sm:px-5 lg:pb-10">{children}</main>
+        <main className="mx-auto max-w-[1480px] px-4 py-8 sm:px-6 lg:px-8 lg:pb-12">{children}</main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-[#050505]/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden" aria-label="Mobile navigation">

@@ -1,13 +1,13 @@
 import {
-  AudioLines,
-  Clapperboard,
-  Compass,
-  Headphones,
-  Mic2,
-  PenLine,
-  Podcast,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+  PiCompass,
+  PiHeadphones,
+  PiMicrophoneStage,
+  PiPalette,
+  PiPenNib,
+  PiRadio,
+  PiVideoCamera,
+} from 'react-icons/pi';
+import type { IconType } from 'react-icons';
 
 export type TandemCategory = {
   slug: string;
@@ -15,7 +15,7 @@ export type TandemCategory = {
   shortName: string;
   description: string;
   status: 'Available' | 'Coming Soon';
-  icon: LucideIcon;
+  icon: IconType;
   accent: 'coral' | 'teal' | 'gold' | 'plum' | 'blue' | 'ink';
 };
 
@@ -26,7 +26,7 @@ export const tandemCategories: TandemCategory[] = [
     shortName: 'Authors',
     description: 'Write beside a stranger. Find the sentence that was waiting for both of you.',
     status: 'Available',
-    icon: PenLine,
+    icon: PiPenNib,
     accent: 'coral',
   },
   {
@@ -35,7 +35,7 @@ export const tandemCategories: TandemCategory[] = [
     shortName: 'Creators',
     description: 'Turn raw footage into publish-ready masters with a four-role relay. The clips stay locked in the room.',
     status: 'Available',
-    icon: Clapperboard,
+    icon: PiVideoCamera,
     accent: 'blue',
   },
   {
@@ -44,7 +44,7 @@ export const tandemCategories: TandemCategory[] = [
     shortName: 'Singers',
     description: 'Trade a melody before you know what the other voice sounds like.',
     status: 'Coming Soon',
-    icon: Mic2,
+    icon: PiMicrophoneStage,
     accent: 'teal',
   },
   {
@@ -53,7 +53,7 @@ export const tandemCategories: TandemCategory[] = [
     shortName: 'DJs',
     description: 'Build a set from two instincts, connected without a shared brief.',
     status: 'Coming Soon',
-    icon: Headphones,
+    icon: PiHeadphones,
     accent: 'gold',
   },
   {
@@ -62,7 +62,7 @@ export const tandemCategories: TandemCategory[] = [
     shortName: 'Artists',
     description: 'Let two visual languages meet in the middle of the canvas.',
     status: 'Coming Soon',
-    icon: AudioLines,
+    icon: PiPalette,
     accent: 'plum',
   },
   {
@@ -71,7 +71,7 @@ export const tandemCategories: TandemCategory[] = [
     shortName: 'Storytellers',
     description: 'Follow the thread another voice leaves in the room.',
     status: 'Coming Soon',
-    icon: Podcast,
+    icon: PiRadio,
     accent: 'blue',
   },
   {
@@ -80,7 +80,7 @@ export const tandemCategories: TandemCategory[] = [
     shortName: 'Explore',
     description: 'A wider house for every way people make meaning together.',
     status: 'Coming Soon',
-    icon: Compass,
+    icon: PiCompass,
     accent: 'ink',
   },
 ];

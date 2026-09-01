@@ -60,21 +60,21 @@ export default function CategoryUnavailable() {
   const errorMessage = apiError?.response?.data?.error || apiError?.message || 'We could not save that just yet. Try once more.';
 
   return (
-    <div className="mx-auto max-w-[900px]">
+    <div className="mx-auto max-w-[1100px]">
       <Link href="/dashboard" className="focus-house inline-flex items-center gap-2 rounded-full py-2 text-xs font-bold text-zinc-500 hover:text-white" data-testid="link-back-dashboard">
         <ArrowLeft className="h-3.5 w-3.5" />
         Back to the atrium
       </Link>
       <div className="reveal mt-10 grid gap-12 lg:grid-cols-[.8fr_1.2fr] lg:items-center">
         <div>
-          <span className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-[#3b82f6]/10 text-[#3b82f6]">
-            <category.icon className="h-7 w-7" strokeWidth={1.5} />
+          <span className="card-icon animate-float h-16 w-16 rounded-2xl border-[#3b82f6]/30 shadow-[0_0_32px_-10px_rgba(59,130,246,0.5)]">
+            <category.icon className="h-8 w-8 text-[#60a5fa]" />
           </span>
           <SectionEyebrow>Door {category.shortName.toLowerCase()} / on the blueprint</SectionEyebrow>
           <h1 className="mt-5 text-6xl font-extrabold leading-[.86] tracking-[-0.08em] text-white sm:text-8xl">Not quite lit.</h1>
           <p className="mt-7 max-w-[25rem] text-base leading-[1.8] text-zinc-400">{category.description} We&apos;re preparing this room with care.</p>
         </div>
-        <div className="card-surface rounded-[1.75rem] p-6 sm:p-9">
+        <div className="card-surface rounded-2xl p-7 sm:p-10">
           <div className="flex items-start gap-4">
             <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3b82f6]/10 text-[#3b82f6]"><Bell className="h-5 w-5" /></span>
             <div>
