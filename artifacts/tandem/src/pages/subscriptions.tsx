@@ -83,7 +83,7 @@ export default function SubscriptionsPage() {
 
   return (
     <div className="mx-auto max-w-[1060px]">
-      <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
+      <div className="tandem-page-header reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>Billing & passes</SectionEyebrow>
           <h1 className="mt-5 text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-7xl">Yours at a glance.</h1>
@@ -300,8 +300,8 @@ function PayModal({ plan, onClose, onPaid }: { plan: SubscriptionPlan; onClose: 
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="subscription-pay-gate">
-      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] text-white shadow-2xl">
+    <div className="tandem-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="subscription-pay-gate">
+      <div className="tandem-modal relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] text-white shadow-2xl">
         <div className="rounded-t-[1.35rem] p-6 pb-5">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">

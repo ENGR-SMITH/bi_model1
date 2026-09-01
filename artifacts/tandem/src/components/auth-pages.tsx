@@ -17,7 +17,7 @@ export const clerkAppearance = {
     socialButtonsVariant: 'blockButton' as const,
   },
   variables: {
-    colorPrimary: '#3b82f6',
+    colorPrimary: '#f973a8',
     colorForeground: '#fafafa',
     colorMutedForeground: '#71717a',
     colorBackground: '#0a0a0a',
@@ -36,15 +36,15 @@ export const clerkAppearance = {
     headerSubtitle: 'text-zinc-500',
     socialButtonsBlockButtonText: 'text-white font-semibold',
     formFieldLabel: 'text-zinc-400 font-medium',
-    footerActionLink: 'text-[#3b82f6] font-semibold',
+    footerActionLink: 'text-[#f973a8] font-semibold',
     footerActionText: 'text-zinc-500',
     dividerText: 'text-zinc-500',
     logoBox: 'hidden',
     socialButtonsBlockButton: 'border border-white/10 bg-[#111111] hover:bg-[#161616]',
-    formButtonPrimary: 'bg-[#3b82f6] text-white hover:bg-[#2563eb] font-semibold',
-    formFieldInput: 'border border-white/10 bg-[#111111] text-white focus:border-[#3b82f6]',
-    alert: 'border border-[#3b82f6]/40 bg-[#3b82f6]/10',
-    alertText: 'text-[#60a5fa]',
+    formButtonPrimary: 'bg-white text-black hover:bg-zinc-200 font-semibold',
+    formFieldInput: 'border border-white/10 bg-[#111111] text-white focus:border-[#f973a8]',
+    alert: 'border border-[#f973a8]/40 bg-[#f973a8]/10',
+    alertText: 'text-[#f9a8d4]',
     formFieldSuccessText: 'text-[#34d399]',
     identityPreviewEditButton: 'text-[#3b82f6] font-semibold',
     dividerLine: 'bg-white/10',
@@ -54,7 +54,7 @@ export const clerkAppearance = {
 
 export function AuthFrame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="atrium-grid flex min-h-[100dvh] flex-col items-center px-5 py-7 sm:px-8 sm:py-10">
+    <main className="tandem-public atrium-grid flex min-h-[100dvh] flex-col items-center px-5 py-7 sm:px-8 sm:py-10">
       <div className="flex w-full max-w-[1060px] items-center justify-between">
         <TandemLogo />
         <Link href="/" className="focus-house inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100" data-testid="link-auth-back-home">
@@ -67,7 +67,7 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
           <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">A private door</p>
           <h1 className="mt-6 max-w-[8ch] text-7xl font-bold leading-[.9] tracking-[-0.05em] text-white">Come in, there&apos;s room.</h1>
           <p className="mt-7 max-w-[20rem] text-sm leading-[1.8] text-zinc-400">Tandem is where unfinished ideas find the person who can change their shape.</p>
-          <div className="mt-10 h-1 w-20 rounded-full bg-gradient-to-r from-[#3b82f6] to-transparent" />
+           <div className="mt-10 h-1 w-20 rounded-full bg-gradient-to-r from-[#f973a8] to-transparent" />
         </div>
         <div className="flex justify-center">{children}</div>
       </div>

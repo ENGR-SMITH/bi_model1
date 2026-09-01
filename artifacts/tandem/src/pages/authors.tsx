@@ -9,7 +9,7 @@ export default function AuthorsPage() {
   const firstName = user?.firstName || 'writer';
 
   return (
-    <div className="mx-auto flex max-w-[1180px] flex-col justify-between gap-5 lg:h-[calc(100dvh-170px)]">
+    <div className="tandem-room-page mx-auto flex max-w-[1180px] flex-col justify-between gap-5 lg:h-[calc(100dvh-170px)]">
       <div>
         <Link href="/dashboard" className="focus-house inline-flex items-center gap-2 rounded-full py-1 text-xs font-bold text-zinc-500 hover:text-white" data-testid="link-authors-back-dashboard">
           <ArrowUpRight className="h-3.5 w-3.5 rotate-[225deg]" />
@@ -28,7 +28,7 @@ export default function AuthorsPage() {
           </div>
 
           <div className="flex items-center">
-            <div className="w-full rounded-[1.5rem] border border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent p-6" data-testid="card-open-manuscript-studio">
+            <div className="tandem-room-hero w-full rounded-[1.5rem] border border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent p-6" data-testid="card-open-manuscript-studio">
               <div className="flex items-center justify-between">
                 <span className="flex h-11 w-11 items-center justify-center rounded-full border border-current"><PenLine className="h-5 w-5" /></span>
                 <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-100">Your studio</span>
@@ -53,7 +53,7 @@ export default function AuthorsPage() {
           <p className="mt-2 font-display text-2xl italic text-white">Two voices. One room.</p>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-[1.25fr_.75fr]">
-            <Link href="/authors/pitch-board" className="soft-lift focus-house group relative flex flex-col overflow-hidden rounded-[1.5rem] bg-[#111111] p-6 text-zinc-100" data-testid="link-pitch-board">
+            <Link href="/authors/pitch-board" className="tandem-room-feature soft-lift focus-house group relative flex flex-col overflow-hidden rounded-[1.5rem] bg-[#111111] p-6 text-zinc-100" data-testid="link-pitch-board">
               <span className="absolute -right-14 -top-14 h-40 w-40 rounded-full border border-[#3b82f6]/30 transition-transform duration-500 group-hover:scale-125" />
               <div className="flex items-center justify-between">
                 <Search className="h-6 w-6 text-[#3b82f6]" />

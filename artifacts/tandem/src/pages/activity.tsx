@@ -23,7 +23,7 @@ export default function ActivityPage() {
 
   return (
     <div className="mx-auto max-w-[1180px]">
-      <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
+      <div className="tandem-page-header reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>Your trail / activity</SectionEyebrow>
           <h1 className="mt-5 max-w-[12ch] text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">
