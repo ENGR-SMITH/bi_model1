@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 @layer theme, base, clerk, components, utilities;
 @import 'tailwindcss';
 @import '@clerk/themes/shadcn.css';
@@ -83,11 +83,11 @@
   --sidebar-accent-foreground: 0 0% 98%;
    --sidebar-ring: 334 84% 70%;
   --app-font-sans: 'Inter', system-ui, sans-serif;
-  --app-font-serif: 'Inter', system-ui, sans-serif;
+   --app-font-serif: 'DM Serif Display', Georgia, serif;
   --app-font-mono: 'JetBrains Mono', monospace;
   --radius: 0.75rem;
-  --elevate-1: rgba(59, 130, 246, 0.08);
-  --elevate-2: rgba(59, 130, 246, 0.15);
+   --elevate-1: rgba(249, 115, 168, 0.08);
+   --elevate-2: rgba(249, 115, 168, 0.15);
   /* Tandem premium palette */
   --tandem-bg: #0a0a0a;
   --tandem-surface: #111111;
@@ -144,7 +144,7 @@
     min-width: 320px;
   }
   button, a { -webkit-tap-highlight-color: transparent; }
-  ::selection { background: rgba(59, 130, 246, 0.3); color: #fafafa; }
+   ::selection { background: rgba(249, 115, 168, 0.3); color: #fafafa; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: #0a0a0a; }
   ::-webkit-scrollbar-thumb { background: #262626; border-radius: 5px; border: 2px solid #0a0a0a; }
