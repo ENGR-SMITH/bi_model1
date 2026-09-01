@@ -42,13 +42,13 @@ export default function RoomPage() {
           <div className="reveal reveal-1 relative mx-auto w-full max-w-[430px]">
             <div className="absolute -inset-5 rounded-[2rem] border border-dashed border-white/10" />
             <div className="relative rounded-[2rem] border border-white/10 bg-[#0d0d0d] p-4 shadow-[0_0_60px_-15px_rgba(59,130,246,0.2)] sm:p-6">
-              <div className="rounded-[1.25rem] border border-[#8b5cf6]/30 bg-gradient-to-br from-[#8b5cf6]/15 to-transparent px-6 py-12 text-center sm:px-10 sm:py-16">
+              <div className="relative rounded-[1.25rem] border border-[#8b5cf6]/30 bg-gradient-to-br from-[#8b5cf6]/15 to-transparent px-6 py-12 text-center sm:px-10 sm:py-16">
                 <div className="flex items-start justify-between">
                   <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">Blueprint / {room.slug}</span>
-                  <LockKeyhole className="h-5 w-5 text-[#8b5cf6]" strokeWidth={1.6} />
+                  <span className="card-icon h-5 w-5"><LockKeyhole className="h-5 w-5" strokeWidth={1.6} /></span>
                 </div>
                 <div className="flex min-h-[240px] flex-col items-center justify-center text-center sm:min-h-[300px]">
-                  <span className="flex h-20 w-20 items-center justify-center rounded-full border border-[#8b5cf6]/40 bg-[#8b5cf6]/10 sm:h-24 sm:w-24">
+                  <span className="card-icon h-20 w-20 sm:h-24 sm:w-24">
                     <Sparkles className="h-9 w-9 text-[#a78bfa]" strokeWidth={1.2} />
                   </span>
                   <p className="mt-7 text-5xl font-bold leading-none text-white">Not yet</p>

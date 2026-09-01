@@ -152,12 +152,12 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
     });
     return (
       <div className="fixed inset-0 z-50 grid place-items-center bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-success">
-        <div className="relative w-full max-w-md rounded-3xl border-2 border-dashed border-[#8dc2ad] bg-[#111111] p-7 text-white shadow-[12px_14px_0_rgba(41,43,69,0.18)]">
+        <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-7 text-white shadow-2xl">
           <div className="flex items-center justify-between">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#e5f1e8] text-[#286254]">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#34d399]/10 text-[#34d399]">
               <PartyPopper className="h-6 w-6" />
             </span>
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#286254]">PASS PURCHASED</span>
+            <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">PASS PURCHASED</span>
           </div>
           <h2 className="mt-5 font-display text-3xl font-extrabold tracking-[-0.05em]">
             You're in, {name.split(' ')[0]}.
@@ -165,7 +165,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <p className="mt-3 text-sm leading-relaxed text-zinc-400">
             Your {name} pass is active until <b className="text-white">{expires}</b>
             {purchased.receipt.promoCode ? (
-              <span className="mt-2 flex items-center gap-2 text-[#286254]">
+              <span className="mt-2 flex items-center gap-2 text-[#34d399]">
                 <BadgeCheck className="h-4 w-4" /> Promo {purchased.receipt.promoCode} applied — {purchased.receipt.discount > 0 ? `you saved $${(purchased.receipt.discount / 100).toFixed(2)}` : 'the pass was free'}.
               </span>
             ) : null}
@@ -179,14 +179,14 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <button
             type="button"
             onClick={onPurchased}
-            className="focus-house mt-6 w-full rounded-xl bg-[#111111] py-3.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#3e8074]"
+            className="focus-house mt-6 w-full rounded-xl bg-[#3b82f6] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2563eb]"
             data-testid="button-enter-room"
           >
-            Enter the room <Ticket className="ml-1 inline h-4 w-4 text-[#f0c85c]" />
+            Enter the room <Ticket className="ml-1 inline h-4 w-4 text-white/80" />
           </button>
           <button
             type="button"
-            className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-zinc-500 hover:bg-[#d6cbb9]/40 hover:text-white"
+            className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white"
             onClick={() => { setPurchased(null); onPurchased(); }}
             aria-label="Close"
           >
@@ -199,12 +199,12 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-gate">
-      <div className="relative w-full max-w-md rounded-3xl border-2 border-dashed border-[#e1b956] bg-[#111111] text-white shadow-[12px_14px_0_rgba(41,43,69,0.18)]">
+      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] text-white shadow-2xl">
         {/* Coupon stub header */}
         <div className="rounded-t-[1.35rem] p-6 pb-5">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-white/10 bg-[#f0c85c] text-white shadow-[3px_4px_0_rgba(41,43,69,0.12)]">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#3b82f6]/10 text-[#3b82f6]">
                 <Ticket className="h-5 w-5" />
               </span>
               <div>
@@ -238,7 +238,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
                 placeholder="4242 4242 4242 4242"
                 inputMode="numeric"
                 autoComplete="cc-number"
-                className="focus-house w-full rounded-xl border-2 border-white/10 bg-[#111111] py-3 pl-11 pr-4 text-sm text-white placeholder:text-zinc-600"
+                className="focus-house w-full rounded-xl border border-white/10 bg-[#111111] py-3 pl-11 pr-4 text-sm text-white placeholder:text-zinc-600"
                 data-testid="input-card-number"
               />
             </div>
@@ -252,7 +252,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
                 placeholder="MM/YY"
                 inputMode="numeric"
                 autoComplete="cc-exp"
-                className="focus-house mt-2 w-full rounded-xl border-2 border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600"
+                className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600"
                 data-testid="input-card-expiry"
               />
             </label>
@@ -264,7 +264,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
                 placeholder="123"
                 inputMode="numeric"
                 autoComplete="cc-csc"
-                className="focus-house mt-2 w-full rounded-xl border-2 border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600"
+                className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600"
                 data-testid="input-card-cvc"
               />
             </label>
@@ -282,33 +282,33 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
                   setPromoError('');
                 }}
                 placeholder="PROMOCODE"
-                className="focus-house min-w-0 flex-1 rounded-xl border-2 border-white/10 bg-[#111111] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600"
+                className="focus-house min-w-0 flex-1 rounded-xl border border-white/10 bg-[#111111] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600"
                 data-testid="input-promo"
               />
               <button
                 type="button"
                 onClick={applyPromo}
                 disabled={validatePromo.isPending}
-                className="focus-house rounded-xl border-2 border-white/10 bg-[#111111] px-4 text-sm font-bold text-white transition-colors hover:bg-[#e1b956] disabled:cursor-wait disabled:opacity-60"
+                className="focus-house rounded-xl border border-white/10 bg-[#111111] px-4 text-sm font-semibold text-white transition-colors hover:border-[#3b82f6]/50 hover:bg-[#3b82f6]/10 disabled:cursor-wait disabled:opacity-60"
                 data-testid="button-apply-promo"
               >
                 {validatePromo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
               </button>
             </div>
             {promo?.valid && (
-              <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-[#286254]" data-testid="promo-applied">
+              <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-[#34d399]" data-testid="promo-applied">
                 <Check className="h-3.5 w-3.5" /> {promo.code} — {promo.label}. Pass is now {totalLabel}.
               </p>
             )}
             {promoError && (
-              <p className="mt-2 text-xs font-semibold text-[#a33d31]" role="alert" data-testid="promo-error">
+              <p className="mt-2 text-xs font-semibold text-red-400" role="alert" data-testid="promo-error">
                 {promoError}
               </p>
             )}
           </div>
 
           {purchaseError && (
-            <p className="mt-3 rounded-xl border-2 border-[#e5c3bc] bg-[#f9e9e4] p-3 text-xs font-semibold text-[#a33d31]" role="alert" data-testid="purchase-error">
+            <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-400" role="alert" data-testid="purchase-error">
               {purchaseError}
             </p>
           )}
@@ -317,13 +317,13 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             type="button"
             onClick={pay}
             disabled={purchase.isPending}
-            className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#111111] py-3.5 text-sm font-bold text-[#fff4e6] transition-colors hover:bg-[#3e8074] disabled:cursor-wait disabled:opacity-60"
+            className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b82f6] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2563eb] disabled:cursor-wait disabled:opacity-60"
             data-testid="button-pay"
           >
             {purchase.isPending ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Processing…</>
             ) : (
-              <><Lock className="h-4 w-4 text-[#f0c85c]" /> Pay {totalLabel} · {weeks} weeks</>
+              <><Lock className="h-4 w-4 text-white/80" /> Pay {totalLabel} · {weeks} weeks</>
             )}
           </button>
           <p className="mt-3 flex items-center gap-2 text-center text-[10px] leading-relaxed text-zinc-600">
@@ -333,23 +333,22 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
         </div>
 
         {/* Coupon detach footer — barcode + expiry, so the pass reads like a
-            printed coupon you tear off along the dashed line. */}
-        <div className="flex items-center gap-4 border-t-2 border-dashed border-white/10 px-6 py-4">
-          <div className="flex flex-col items-center gap-1" aria-hidden>
-            <span className="h-8 w-5 -rotate-90 rounded-md border-2 border-dashed border-[#3b82f6]" />
+            printed coupon you tear off along the dashed line. */}          <div className="flex items-center gap-4 border-t border-white/10 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="h-8 w-5 -rotate-90 rounded-md border border-[#3b82f6]" />
             <span className="font-mono-ui text-[8px] uppercase tracking-[0.18em] text-[#3b82f6]">Tear</span>
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Tandem access pass · {weeks} weeks</p>
             <div className="mt-2 flex h-8 items-end gap-[2px]">
               {Array.from({ length: 26 }).map((_, i) => (
-                <span key={i} className="rounded-[1px] bg-[#111111]" style={{ width: '2px', height: `${34 + ((i * 47) % 46)}%` }} />
+                <span key={i} className="rounded-[1px] bg-zinc-600" style={{ width: '2px', height: `${34 + ((i * 47) % 46)}%` }} />
               ))}
             </div>
           </div>
           <div className="text-right">
             <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Valid until</p>
-            <p className="mt-1 font-display text-sm italic text-white">
+            <p className="mt-1 font-mono-ui text-sm font-medium text-white">
               {new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
           </div>

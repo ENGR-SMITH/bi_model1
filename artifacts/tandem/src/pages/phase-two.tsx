@@ -10,12 +10,12 @@ export default function PhaseTwo({ title, eyebrow, description }: { title: strin
         Back to Author&apos;s Atrium
       </Link>
       <div className="reveal mt-12 max-w-2xl">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-white/10 bg-[#e1b956] text-white"><Construction className="h-6 w-6" strokeWidth={1.6} /></span>
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-[#3b82f6]/10 text-[#3b82f6]"><Construction className="h-6 w-6" strokeWidth={1.6} /></span>
         <SectionEyebrow>{eyebrow} / phase 2</SectionEyebrow>
         <h1 className="mt-5 text-6xl font-extrabold leading-[.87] tracking-[-0.08em] text-white sm:text-8xl">{title}</h1>
         <p className="mt-7 max-w-xl text-base leading-[1.8] text-zinc-400">{description}</p>
       </div>
-      <div className="reveal reveal-1 mt-14 flex max-w-2xl items-start gap-4 rounded-3xl border-2 border-dashed border-[#cfc1b0] bg-[#111111] p-6 sm:p-8">
+      <div className="reveal reveal-1 mt-14 flex max-w-2xl items-start gap-4 rounded-3xl border border-dashed border-white/15 bg-[#111111] p-6 sm:p-8">
         <MessageCircle className="mt-1 h-5 w-5 shrink-0 text-[#3b82f6]" strokeWidth={1.6} />
         <div>
           <p className="font-bold text-white">This room is being set for the next gathering.</p>

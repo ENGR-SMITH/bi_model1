@@ -17,47 +17,47 @@ export const clerkAppearance = {
     socialButtonsVariant: 'blockButton' as const,
   },
   variables: {
-    colorPrimary: '#e55b4c',
-    colorForeground: '#292b45',
-    colorMutedForeground: '#77717a',
-    colorBackground: '#fff4e6',
-    colorInput: '#f7eddf',
-    colorInputForeground: '#292b45',
-    colorNeutral: '#d6cbb9',
-    fontFamily: 'Manrope, sans-serif',
-    borderRadius: '0.85rem',
+    colorPrimary: '#3b82f6',
+    colorForeground: '#fafafa',
+    colorMutedForeground: '#71717a',
+    colorBackground: '#0a0a0a',
+    colorInput: '#111111',
+    colorInputForeground: '#fafafa',
+    colorNeutral: '#262626',
+    fontFamily: 'Inter, sans-serif',
+    borderRadius: '0.75rem',
   },
   elements: {
     rootBox: 'w-full flex justify-center',
-    cardBox: 'bg-[#111111] border-2 border-white/10 rounded-[1.5rem] w-[440px] max-w-full overflow-hidden shadow-[10px_12px_0_rgba(41,43,69,0.10)]',
+    cardBox: 'bg-[#111111] border border-white/10 rounded-2xl w-[440px] max-w-full overflow-hidden shadow-2xl',
     card: '!shadow-none !border-0 !bg-transparent !rounded-none',
     footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
-    headerTitle: 'text-white font-extrabold tracking-[-0.05em]',
+    headerTitle: 'text-white font-bold tracking-[-0.04em]',
     headerSubtitle: 'text-zinc-500',
-    socialButtonsBlockButtonText: 'text-white font-bold',
-    formFieldLabel: 'text-zinc-400 font-bold',
-    footerActionLink: 'text-[#3b82f6] font-bold',
+    socialButtonsBlockButtonText: 'text-white font-semibold',
+    formFieldLabel: 'text-zinc-400 font-medium',
+    footerActionLink: 'text-[#3b82f6] font-semibold',
     footerActionText: 'text-zinc-500',
     dividerText: 'text-zinc-500',
     logoBox: 'hidden',
-    socialButtonsBlockButton: 'border-2 border-white/10 bg-[#111111] hover:bg-[#111111]',
-    formButtonPrimary: 'bg-[#111111] text-[#fff4e6] hover:bg-[#3e8074] font-bold',
-    formFieldInput: 'border-2 border-white/10 bg-[#111111] text-white focus:border-[#3b82f6]',
-    alert: 'border-2 border-[#3b82f6] bg-[#fbe4dc]',
-    alertText: 'text-[#8e342b]',
-    formFieldSuccessText: 'text-[#3e8074]',
-    identityPreviewEditButton: 'text-[#3b82f6] font-bold',
-    dividerLine: 'bg-[#d6cbb9]',
+    socialButtonsBlockButton: 'border border-white/10 bg-[#111111] hover:bg-[#161616]',
+    formButtonPrimary: 'bg-[#3b82f6] text-white hover:bg-[#2563eb] font-semibold',
+    formFieldInput: 'border border-white/10 bg-[#111111] text-white focus:border-[#3b82f6]',
+    alert: 'border border-[#3b82f6]/40 bg-[#3b82f6]/10',
+    alertText: 'text-[#60a5fa]',
+    formFieldSuccessText: 'text-[#34d399]',
+    identityPreviewEditButton: 'text-[#3b82f6] font-semibold',
+    dividerLine: 'bg-white/10',
     main: 'gap-5',
   },
 };
 
 export function AuthFrame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="paper-noise atrium-grid flex min-h-[100dvh] flex-col items-center px-5 py-7 sm:px-8 sm:py-10">
+    <main className="atrium-grid flex min-h-[100dvh] flex-col items-center px-5 py-7 sm:px-8 sm:py-10">
       <div className="flex w-full max-w-[1060px] items-center justify-between">
         <TandemLogo />
-        <Link href="/" className="focus-house inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold text-zinc-400 hover:bg-[#111111]" data-testid="link-auth-back-home">
+        <Link href="/" className="focus-house inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100" data-testid="link-auth-back-home">
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to the house
         </Link>
@@ -65,9 +65,9 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
       <div className="grid w-full max-w-[1060px] flex-1 items-center gap-10 py-12 lg:grid-cols-[.78fr_1fr] lg:gap-20">
         <div className="hidden lg:block">
           <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">A private door</p>
-          <h1 className="mt-6 max-w-[8ch] text-7xl font-extrabold leading-[.86] tracking-[-0.08em] text-white">Come in, there&apos;s room.</h1>
+          <h1 className="mt-6 max-w-[8ch] text-7xl font-bold leading-[.9] tracking-[-0.05em] text-white">Come in, there&apos;s room.</h1>
           <p className="mt-7 max-w-[20rem] text-sm leading-[1.8] text-zinc-400">Tandem is where unfinished ideas find the person who can change their shape.</p>
-          <div className="mt-10 h-2 w-20 rounded-full bg-[#f0c85c]" />
+          <div className="mt-10 h-1 w-20 rounded-full bg-gradient-to-r from-[#3b82f6] to-transparent" />
         </div>
         <div className="flex justify-center">{children}</div>
       </div>
