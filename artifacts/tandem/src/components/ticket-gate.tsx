@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { BadgeCheck, Check, CreditCard, Loader2, Lock, PartyPopper, Ticket, X } from 'lucide-react';
+import { PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiCreditCardDuotone, PiLockKeyDuotone, PiTicketDuotone, PiXDuotone } from 'react-icons/pi';
 import {
   getGetTicketStatusQueryKey,
   useGetTicketStatus,
@@ -154,8 +154,8 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
       <div className="fixed inset-0 z-50 grid place-items-center bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-success">
         <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-7 text-white shadow-2xl">
           <div className="flex items-center justify-between">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#34d399]/10 text-[#34d399]">
-              <PartyPopper className="h-6 w-6" />
+            <span className="icon-chip h-14 w-14 text-[#34d399]">
+              <PiConfettiDuotone className="h-7 w-7" />
             </span>
             <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">PASS PURCHASED</span>
           </div>
@@ -166,7 +166,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             Your {name} pass is active until <b className="text-white">{expires}</b>
             {purchased.receipt.promoCode ? (
               <span className="mt-2 flex items-center gap-2 text-[#34d399]">
-                <BadgeCheck className="h-4 w-4" /> Promo {purchased.receipt.promoCode} applied — {purchased.receipt.discount > 0 ? `you saved $${(purchased.receipt.discount / 100).toFixed(2)}` : 'the pass was free'}.
+                <PiCheckCircleDuotone className="h-4 w-4" /> Promo {purchased.receipt.promoCode} applied — {purchased.receipt.discount > 0 ? `you saved $${(purchased.receipt.discount / 100).toFixed(2)}` : 'the pass was free'}.
               </span>
             ) : null}
           </p>
@@ -182,7 +182,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             className="focus-house mt-6 w-full rounded-xl bg-[#3b82f6] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2563eb]"
             data-testid="button-enter-room"
           >
-            Enter the room <Ticket className="ml-1 inline h-4 w-4 text-white/80" />
+            Enter the room <PiTicketDuotone className="ml-1 inline h-4 w-4 text-white/80" />
           </button>
           <button
             type="button"
@@ -190,7 +190,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             onClick={() => { setPurchased(null); onPurchased(); }}
             aria-label="Close"
           >
-            <X className="h-4 w-4" />
+            <PiXDuotone className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -204,8 +204,8 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
         <div className="rounded-t-[1.35rem] p-6 pb-5">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#3b82f6]/10 text-[#3b82f6]">
-                <Ticket className="h-5 w-5" />
+              <span className="icon-chip h-11 w-11 text-[#3b82f6]">
+                <PiTicketDuotone className="h-5 w-5" />
               </span>
               <div>
                 <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">Tandem access pass</p>
@@ -231,7 +231,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <label className="block">
             <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Card number</span>
             <div className="relative mt-2">
-              <CreditCard className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
+              <PiCreditCardDuotone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
               <input
                 value={cardNumber}
                 onChange={(event) => setCardNumber(formatCardNumber(event.target.value))}
@@ -292,12 +292,12 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
                 className="focus-house rounded-xl border border-white/10 bg-[#111111] px-4 text-sm font-semibold text-white transition-colors hover:border-[#3b82f6]/50 hover:bg-[#3b82f6]/10 disabled:cursor-wait disabled:opacity-60"
                 data-testid="button-apply-promo"
               >
-                {validatePromo.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                {validatePromo.isPending ? <PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> : 'Apply'}
               </button>
             </div>
             {promo?.valid && (
               <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-[#34d399]" data-testid="promo-applied">
-                <Check className="h-3.5 w-3.5" /> {promo.code} — {promo.label}. Pass is now {totalLabel}.
+                <PiCheckDuotone className="h-3.5 w-3.5" /> {promo.code} — {promo.label}. Pass is now {totalLabel}.
               </p>
             )}
             {promoError && (
@@ -321,13 +321,13 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             data-testid="button-pay"
           >
             {purchase.isPending ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Processing…</>
+              <><PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> Processing…</>
             ) : (
-              <><Lock className="h-4 w-4 text-white/80" /> Pay {totalLabel} · {weeks} weeks</>
+              <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay {totalLabel} · {weeks} weeks</>
             )}
           </button>
           <p className="mt-3 flex items-center gap-2 text-center text-[10px] leading-relaxed text-zinc-600">
-            <Lock className="h-3 w-3 shrink-0" />
+            <PiLockKeyDuotone className="h-3 w-3 shrink-0" />
             Cards are validated securely; only the last four digits are stored. Test card: 4242 4242 4242 4242.
           </p>
         </div>

@@ -169,12 +169,62 @@
   .card-surface {
     position: relative;
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.045) 0%, rgba(255, 255, 255, 0.015) 40%, rgba(255, 255, 255, 0) 100%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.018) 38%, rgba(255, 255, 255, 0) 100%),
       #0d0d0d;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.09);
     box-shadow:
-      inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
-      0 1px 2px rgba(0, 0, 0, 0.4);
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.07),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.015),
+      0 1px 2px rgba(0, 0, 0, 0.45);
+  }
+  /* Premium raised card: stronger top edge, soft depth — used for hero cards */
+  .card-raised {
+    position: relative;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 100%),
+      linear-gradient(180deg, #131316 0%, #0d0d0f 100%);
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.1),
+      0 24px 48px -24px rgba(0, 0, 0, 0.8);
+  }
+  /* Shine sweep overlay — sits inside an overflow-hidden card, runs on hover */
+  .card-shine {
+    pointer-events: none;
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: 0;
+    width: 46%;
+    background: linear-gradient(105deg, transparent 0%, rgba(255, 255, 255, 0.06) 45%, rgba(255, 255, 255, 0.11) 50%, rgba(255, 255, 255, 0.06) 55%, transparent 100%);
+    transform: translateX(-160%) skewX(-16deg);
+    transition: transform 900ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .group:hover > .card-shine, .group:hover .card-shine {
+    transform: translateX(340%) skewX(-16deg);
+  }
+  /* Premium icon chip: duotone icons sit in a lit, gradient tile */
+  .icon-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background:
+      radial-gradient(120% 120% at 30% 0%, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.03) 45%, transparent 100%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+      0 10px 24px -14px rgba(0, 0, 0, 0.9);
+    color: #d4d4d8;
+    transition: transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 300ms ease, border-color 300ms ease, color 300ms ease;
+  }
+  .group:hover .icon-chip {
+    transform: translateY(-2px) scale(1.05);
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow:
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.16),
+      0 0 30px -8px rgba(59, 130, 246, 0.45);
   }
   .card-surface-hover {
     transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
@@ -232,8 +282,31 @@
   .reveal-2 { animation-delay: 160ms; }
   .reveal-3 { animation-delay: 240ms; }
   .reveal-4 { animation-delay: 320ms; }
+  .reveal-5 { animation-delay: 400ms; }
   .glow-dot { box-shadow: 0 0 12px 2px rgba(59, 130, 246, 0.6); }
   .badge-glow { box-shadow: 0 0 24px -6px rgba(59, 130, 246, 0.5); }
+  /* --- premium motion utilities --- */
+  .animate-float { animation: float 6s ease-in-out infinite; }
+  .animate-float-slow { animation: float 9s ease-in-out infinite; }
+  .animate-spin-slow { animation: spin-slow 16s linear infinite; }
+  .animate-pulse-soft { animation: pulse-soft 2.6s ease-in-out infinite; }
+  .animate-breathe { animation: breathe 5s ease-in-out infinite; }
+  .animate-wiggle { animation: wiggle 0.6s ease-in-out; }
+  .group:hover .animate-wiggle-on-hover { animation: wiggle 0.55s ease-in-out; }
+  .icon-lift { transition: transform 300ms cubic-bezier(.2,.8,.2,1); }
+  .group:hover .icon-lift { transform: translateY(-2px) scale(1.07) rotate(-4deg); }
+  .arrow-nudge { transition: transform 300ms cubic-bezier(.2,.8,.2,1); }
+  .group:hover .arrow-nudge { transform: translate(2px, -2px); }
+  .group:hover .arrow-nudge-right { transform: translateX(3px); }
+  .card-spot {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(80% 60% at 50% -10%, rgba(59, 130, 246, 0.16), transparent 70%);
+    opacity: 0;
+    transition: opacity 400ms ease;
+  }
+  .group:hover .card-spot, .card-spot-visible { opacity: 1; }
 }
 
 .cl-formFieldInput::placeholder {
@@ -248,4 +321,31 @@
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
+}
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-5deg); }
+  60% { transform: rotate(5deg); }
+  80% { transform: rotate(-3deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-1, .reveal-2, .reveal-3, .reveal-4, .reveal-5,
+  .animate-float, .animate-float-slow, .animate-spin-slow,
+  .animate-pulse-soft, .animate-breathe, .animate-wiggle,
+  .group:hover .animate-wiggle-on-hover, .group:hover .icon-lift,
+  .group:hover > .card-shine, .group:hover .card-shine {
+    animation: none !important;
+    transition: none !important;
+  }
 }

@@ -1,6 +1,6 @@
 import { SignIn, SignUp } from '@clerk/react';
 import { shadcn } from '@clerk/themes';
-import { ArrowLeft } from 'lucide-react';
+import { PiArrowLeftDuotone } from 'react-icons/pi';
 import { Link } from 'wouter';
 import { TandemLogo } from '@/components/tandem-house';
 
@@ -57,8 +57,8 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
     <main className="atrium-grid flex min-h-[100dvh] flex-col items-center px-5 py-7 sm:px-8 sm:py-10">
       <div className="flex w-full max-w-[1060px] items-center justify-between">
         <TandemLogo />
-        <Link href="/" className="focus-house inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100" data-testid="link-auth-back-home">
-          <ArrowLeft className="h-3.5 w-3.5" />
+        <Link href="/" className="focus-house group inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100" data-testid="link-auth-back-home">
+          <PiArrowLeftDuotone className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-1" />
           Back to the house
         </Link>
       </div>

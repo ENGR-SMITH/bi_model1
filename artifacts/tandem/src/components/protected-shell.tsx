@@ -1,32 +1,32 @@
 import { useAuth, useClerk, useUser } from '@clerk/react';
 import {
-  Activity,
-  ArrowLeft,
-  Inbox,
-  LayoutGrid,
-  LogOut,
-  Menu,
-  Ticket,
-  UserRound,
-  X,
-} from 'lucide-react';
+  PiArrowLeftDuotone,
+  PiChartLineUpDuotone,
+  PiListDuotone,
+  PiSignOutDuotone,
+  PiSquaresFourDuotone,
+  PiTicketDuotone,
+  PiTrayDuotone,
+  PiUserCircleDuotone,
+  PiXDuotone,
+} from 'react-icons/pi';
 import { type ReactNode, useState } from 'react';
 import { Link, Redirect, useLocation } from 'wouter';
 import { TandemLogo } from '@/components/tandem-house';
 
 const desktopNav = [
-  { href: '/dashboard', label: 'Atrium', icon: LayoutGrid },
-  { href: '/activity', label: 'Activity', icon: Activity },
-  { href: '/inbox', label: 'Inbox', icon: Inbox },
-  { href: '/subscriptions', label: 'Subscriptions', icon: Ticket },
+  { href: '/dashboard', label: 'Atrium', icon: PiSquaresFourDuotone },
+  { href: '/activity', label: 'Activity', icon: PiChartLineUpDuotone },
+  { href: '/inbox', label: 'Inbox', icon: PiTrayDuotone },
+  { href: '/subscriptions', label: 'Subscriptions', icon: PiTicketDuotone },
 ];
 
 const mobileNav = [
-  { href: '/dashboard', label: 'Atrium', icon: LayoutGrid },
-  { href: '/activity', label: 'Activity', icon: Activity },
-  { href: '/inbox', label: 'Inbox', icon: Inbox },
-  { href: '/subscriptions', label: 'Subscriptions', icon: Ticket },
-  { href: '/profile', label: 'Profile', icon: UserRound },
+  { href: '/dashboard', label: 'Atrium', icon: PiSquaresFourDuotone },
+  { href: '/activity', label: 'Activity', icon: PiChartLineUpDuotone },
+  { href: '/inbox', label: 'Inbox', icon: PiTrayDuotone },
+  { href: '/subscriptions', label: 'Subscriptions', icon: PiTicketDuotone },
+  { href: '/profile', label: 'Profile', icon: PiUserCircleDuotone },
 ];
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -63,7 +63,7 @@ function UserChip() {
       className="focus-house group flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-white/5"
       data-testid="link-profile-chip"
     >
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] font-mono-ui text-[10px] font-medium uppercase text-white">
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] font-mono-ui text-[10px] font-medium uppercase text-white shadow-[0_0_18px_-4px_rgba(59,130,246,0.7)]">
         {initials}
       </span>
       <span className="hidden text-left sm:block">
@@ -85,7 +85,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
     <div className="min-h-[100dvh] bg-[#0a0a0a] text-zinc-100">
       {/* Resend-style top navigation bar */}
       <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0a]/85 backdrop-blur-md">
-        <div className="mx-auto flex h-[60px] max-w-[1240px] items-center gap-4 px-5 sm:px-8 lg:px-10">
+        <div className="mx-auto flex h-[60px] max-w-[1400px] items-center gap-4 px-4 sm:px-6 lg:px-8">
           <TandemLogo />
 
           {/* Desktop nav — pill tabs like Resend's dashboard nav */}
@@ -97,10 +97,10 @@ function PrivateShell({ children }: { children: ReactNode }) {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`focus-house flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${active ? 'bg-white/10 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'}`}
+                  className={`focus-house group flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${active ? 'bg-white/10 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'}`}
                   data-testid={`link-nav-${item.label.toLowerCase()}`}
                 >
-                  <Icon className="h-4 w-4" strokeWidth={1.8} />
+                  <Icon className={`h-4 w-4 ${active ? 'text-[#60a5fa]' : 'text-zinc-500 group-hover:text-zinc-200'}`} />
                   {item.label}
                 </Link>
               );
@@ -109,17 +109,17 @@ function PrivateShell({ children }: { children: ReactNode }) {
 
           {/* Right cluster — authors shortcut, user chip, sign out */}
           <div className="ml-auto flex items-center gap-2">
-            <Link href="/categories/authors" className="focus-house hidden items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100 lg:flex" data-testid="link-header-authors">
-              <ArrowLeft className="h-3.5 w-3.5" />
+            <Link href="/categories/authors" className="focus-house group hidden items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100 lg:flex" data-testid="link-header-authors">
+              <PiArrowLeftDuotone className="h-3.5 w-3.5 text-zinc-500 transition-transform group-hover:-translate-x-0.5" />
               Author's Atrium
             </Link>
             <UserChip />
-            <button type="button" onClick={logout} className="focus-house hidden items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-100 sm:flex" data-testid="button-header-logout">
-              <LogOut className="h-3.5 w-3.5" />
+            <button type="button" onClick={logout} className="focus-house group hidden items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-100 sm:flex" data-testid="button-header-logout">
+              <PiSignOutDuotone className="h-3.5 w-3.5 text-zinc-500 transition-transform group-hover:-translate-x-0.5 group-hover:translate-y-0.5" />
               Sign out
             </button>
             <button type="button" onClick={() => setMenuOpen((open) => !open)} className="focus-house rounded-lg border border-white/10 p-2 md:hidden" aria-label="Open menu" data-testid="button-mobile-profile-menu">
-              {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              {menuOpen ? <PiXDuotone className="h-4 w-4" /> : <PiListDuotone className="h-4 w-4" />}
             </button>
           </div>
         </div>
@@ -137,8 +137,8 @@ function PrivateShell({ children }: { children: ReactNode }) {
               );
             })}
             <div className="my-1 h-px bg-white/5" />
-            <Link href="/categories/authors" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-zinc-200 hover:bg-white/5" data-testid="link-mobile-authors"><ArrowLeft className="h-4 w-4 text-zinc-500" />Author's Atrium</Link>
-            <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-zinc-400 hover:bg-white/5" data-testid="button-mobile-logout"><LogOut className="h-4 w-4" />Sign out</button>
+            <Link href="/categories/authors" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-zinc-200 hover:bg-white/5" data-testid="link-mobile-authors"><PiArrowLeftDuotone className="h-4 w-4 text-zinc-500" />Author's Atrium</Link>
+            <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-zinc-400 hover:bg-white/5" data-testid="button-mobile-logout"><PiSignOutDuotone className="h-4 w-4" />Sign out</button>
           </div>
         )}
       </header>
@@ -151,7 +151,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
             const active = location === item.href;
             return (
               <Link key={item.href} href={item.href} className={`focus-house flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-medium ${active ? 'text-[#3b82f6]' : 'text-zinc-500'}`} data-testid={`link-mobile-${item.label.toLowerCase()}`}>
-                <Icon className={`h-5 w-5 ${active ? 'stroke-[2.2]' : 'stroke-[1.7]'}`} />
+                <Icon className={`h-5 w-5 ${active ? 'text-[#3b82f6]' : 'text-zinc-500'}`} />
                 {item.label}
               </Link>
             );
@@ -159,7 +159,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      <main className="mx-auto max-w-[1240px] px-5 py-8 sm:px-8 lg:px-10 lg:pb-12">{children}</main>
+      <main className="mx-auto max-w-[1400px] px-4 py-10 sm:px-6 lg:px-8 lg:pb-14">{children}</main>
     </div>
   );
 }

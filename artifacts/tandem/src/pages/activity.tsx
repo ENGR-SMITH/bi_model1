@@ -1,4 +1,4 @@
-import { Activity as ActivityIcon, ArrowRight, CircleAlert, History, Sparkles } from 'lucide-react';
+import { PiArrowRightDuotone, PiChartLineUpDuotone, PiClockCountdownDuotone, PiSparkleDuotone, PiWarningCircleDuotone } from 'react-icons/pi';
 import { Link } from 'wouter';
 import { useListAccountActivity } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/protected-shell';
@@ -22,8 +22,8 @@ export default function ActivityPage() {
   const events: any[] = q.data || [];
 
   return (
-    <div className="mx-auto max-w-[1180px]">
-      <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
+    <div className="mx-auto max-w-[1320px]">
+      <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-10 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>Your trail / activity</SectionEyebrow>
           <h1 className="mt-5 max-w-[12ch] text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">
@@ -44,7 +44,7 @@ export default function ActivityPage() {
           </div>
         ) : q.isError ? (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-8">
-            <CircleAlert className="text-red-400" />
+            <PiWarningCircleDuotone className="h-6 w-6 text-red-400" />
             <p className="mt-4 text-3xl font-semibold text-zinc-100">The record could not be opened.</p>
             <p className="mt-2 text-sm text-zinc-500">Your work is safe. Try again in a moment.</p>
             <button onClick={() => q.refetch()} className="focus-house mt-5 rounded-full bg-[#3b82f6] px-5 py-3 text-sm font-semibold text-white">
@@ -66,9 +66,9 @@ export default function ActivityPage() {
                 <div className="mt-5 space-y-3">{dayEvents.map((event) => {
                   const tone = eventTone[event.eventType] ?? 'bg-white/10 text-zinc-300';
                   return (
-                    <div key={event.id} data-testid={`account-activity-${event.id}`} className="soft-lift flex items-start gap-4 rounded-2xl border card-surface p-5">
-                      <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tone}`}>
-                        <History className="h-4 w-4" />
+                    <div key={event.id} data-testid={`account-activity-${event.id}`} className="soft-lift flex items-start gap-4 rounded-2xl border card-surface p-6">
+                      <span className={`icon-chip mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${tone}`}>
+                        <PiClockCountdownDuotone className="h-4 w-4" />
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold leading-relaxed text-zinc-100">{event.summary}</p>
@@ -83,23 +83,23 @@ export default function ActivityPage() {
             ))}</div>;
           })()
         ) : (
-          <div className="card-surface rounded-2xl p-7 sm:p-10">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#3b82f6]/10 text-[#3b82f6]">
-              <ActivityIcon className="h-6 w-6" strokeWidth={1.6} />
+          <div className="card-surface overflow-hidden rounded-3xl p-8 sm:p-10">
+            <div className="icon-chip h-16 w-16 text-[#3b82f6]">
+              <PiChartLineUpDuotone className="h-7 w-7" />
             </div>
-            <p className="mt-8 text-4xl font-semibold text-zinc-100">Nothing has moved yet.</p>
+            <p className="mt-9 text-4xl font-semibold text-zinc-100">Nothing has moved yet.</p>
             <p className="mt-4 max-w-xl text-sm leading-[1.8] text-zinc-500">
               Publish a seed, answer a seed, or open a room and your trail will gather here — every publish, submission, selection, contract lock, and approved pass.
             </p>
             <Link href="/authors/pitch-board" className="focus-house mt-8 inline-flex items-center gap-2 rounded-full bg-[#3b82f6] px-5 py-3 text-sm font-semibold text-white" data-testid="link-activity-dashboard">
               Visit the pitch board
-              <ArrowRight className="h-4 w-4" />
+              <PiArrowRightDuotone className="h-4 w-4" />
             </Link>
           </div>
         )}
       </div>
-      <div className="mt-6 flex items-center gap-3 text-xs text-zinc-500">
-        <Sparkles className="h-4 w-4 text-[#3b82f6]" />
+      <div className="mt-7 flex items-center gap-3 text-xs text-zinc-500">
+        <PiSparkleDuotone className="h-4 w-4 animate-pulse-soft text-[#3b82f6]" />
         <span>Activity reflects your rooms only — private by design.</span>
       </div>
     </div>

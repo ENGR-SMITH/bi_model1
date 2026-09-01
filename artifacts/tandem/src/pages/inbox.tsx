@@ -1,4 +1,4 @@
-import { ArrowRight, FileText, Hourglass, Inbox as InboxIcon, MessageCircle, PenLine, Users } from 'lucide-react';
+import { PiArrowRightDuotone, PiChatCircleDuotone, PiFileTextDuotone, PiHourglassDuotone, PiPenDuotone, PiTrayDuotone, PiUsersDuotone } from 'react-icons/pi';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@clerk/react';
 import {
@@ -39,18 +39,18 @@ export default function InboxPage() {
     const myRole = p.creatorId === user?.id ? 'CREATOR' : 'RESPONDENT';
     const myApproved = p.creatorId === user?.id ? p.creatorApproved : p.respondentApproved;
     if (p.status === 'CONTRACT_PENDING' && !myApproved) {
-      urgent.push({ kind: 'contract', label: 'Contract action required', body: `Approve the contract for “${p.title}” so the room can open.`, href: `/authors-den/?project=${p.id}`, icon: <FileText className="h-4 w-4" /> });
+      urgent.push({ kind: 'contract', label: 'Contract action required', body: `Approve the contract for “${p.title}” so the room can open.`, href: `/authors-den/?project=${p.id}`, icon: <PiFileTextDuotone className="h-4 w-4" /> });
     } else if (p.status === 'ACTIVE' && p.currentTurn === myRole) {
-      urgent.push({ kind: 'turn', label: 'Your turn', body: `The next pass in “${p.title}” is yours to write.`, href: `/authors-den/?project=${p.id}`, icon: <PenLine className="h-4 w-4" /> });
+      urgent.push({ kind: 'turn', label: 'Your turn', body: `The next pass in “${p.title}” is yours to write.`, href: `/authors-den/?project=${p.id}`, icon: <PiPenDuotone className="h-4 w-4" /> });
     } else if (p.status === 'ACTIVE') {
-      urgent.push({ kind: 'waiting', label: 'Waiting on partner', body: `${roleLabel(p, p.currentTurn)} is carrying “${p.title}”.`, href: `/authors-den/?project=${p.id}`, icon: <Hourglass className="h-4 w-4" /> });
+      urgent.push({ kind: 'waiting', label: 'Waiting on partner', body: `${roleLabel(p, p.currentTurn)} is carrying “${p.title}”.`, href: `/authors-den/?project=${p.id}`, icon: <PiHourglassDuotone className="h-4 w-4" /> });
     }
   });
   if (pendingReviews.length) {
-    urgent.push({ kind: 'review', label: 'Review pending', body: `${pendingReviews.length} continuation${pendingReviews.length === 1 ? '' : 's'} waiting on your eye.`, href: '/authors/collaborations/continuations', icon: <InboxIcon className="h-4 w-4" /> });
+    urgent.push({ kind: 'review', label: 'Review pending', body: `${pendingReviews.length} continuation${pendingReviews.length === 1 ? '' : 's'} waiting on your eye.`, href: '/authors/collaborations/continuations', icon: <PiTrayDuotone className="h-4 w-4" /> });
   }
   if (unreadNotes.length) {
-    urgent.push({ kind: 'inbox', label: `${unreadNotes.length} unread note${unreadNotes.length === 1 ? '' : 's'}`, body: 'Private notifications from your rooms.', href: '/inbox', icon: <InboxIcon className="h-4 w-4" /> });
+    urgent.push({ kind: 'inbox', label: `${unreadNotes.length} unread note${unreadNotes.length === 1 ? '' : 's'}`, body: 'Private notifications from your rooms.', href: '/inbox', icon: <PiTrayDuotone className="h-4 w-4" /> });
   }
   const cardClass = (kind: string) =>
     kind === 'turn' || kind === 'contract'
@@ -72,8 +72,8 @@ export default function InboxPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1180px]">
-      <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
+    <div className="mx-auto max-w-[1320px]">
+      <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-10 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>Messages / inbox</SectionEyebrow>
           <h1 className="mt-5 max-w-[12ch] text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">
@@ -93,13 +93,14 @@ export default function InboxPage() {
             <h2 className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#3b82f6]">Urgent work</h2>
             <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">{urgent.length} item{urgent.length === 1 ? '' : 's'} need you</span>
           </div>
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {urgent.slice(0, 6).map((item) => (
-              <Link key={`${item.kind}-${item.href}`} href={item.href} className={`soft-lift focus-house rounded-2xl p-6 ${cardClass(item.kind)}`}>
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5">{item.icon}</span>
-                <h3 className="mt-6 text-lg font-bold tracking-[-.03em] text-zinc-100">{item.label}</h3>
-                <p className="mt-1 text-xs leading-relaxed opacity-80">{item.body}</p>
-                <span className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-zinc-300">Open <ArrowRight className="h-3.5 w-3.5" /></span>
+              <Link key={`${item.kind}-${item.href}`} href={item.href} className={`soft-lift focus-house group overflow-hidden rounded-3xl border p-7 ${cardClass(item.kind)}`}>
+                <span className="card-spot" />
+                <span className="icon-chip h-12 w-12">{item.icon}</span>
+                <h3 className="mt-7 text-lg font-bold tracking-[-.03em] text-zinc-100">{item.label}</h3>
+                <p className="mt-2 text-xs leading-relaxed opacity-80">{item.body}</p>
+                <span className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-zinc-300">Open <PiArrowRightDuotone className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" /></span>
               </Link>
             ))}
           </div>
@@ -110,7 +111,7 @@ export default function InboxPage() {
         <section aria-labelledby="threads-heading">
           <div className="flex items-center justify-between gap-4">
             <h2 id="threads-heading" className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#3b82f6]">
-              <MessageCircle className="h-4 w-4" /> Conversations
+              <PiChatCircleDuotone className="h-4 w-4" /> Conversations
             </h2>
             <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">{threads.length} thread{threads.length === 1 ? '' : 's'}</span>
           </div>
@@ -146,7 +147,7 @@ export default function InboxPage() {
         <section aria-labelledby="notes-heading">
           <div className="flex items-center justify-between gap-4">
             <h2 id="notes-heading" className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#34d399]">
-              <InboxIcon className="h-4 w-4" /> Room notes
+              <PiTrayDuotone className="h-4 w-4" /> Room notes
             </h2>
             <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">{unreadNotes.length} unread</span>
           </div>
@@ -162,7 +163,7 @@ export default function InboxPage() {
                   <span className="mt-1 block text-xs leading-relaxed text-zinc-500">{n.body}</span>
                   <span className="mt-2 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-600">{n.category} · {new Date(n.createdAt).toLocaleDateString()}</span>
                   {n.category === 'continuation_submitted' && n.resourceId && (
-                    <button onClick={(e) => { e.stopPropagation(); window.location.href = `/authors-den/?preview=${n.resourceId}`; }} className="focus-house mt-3 inline-flex items-center gap-2 rounded-full border border-[#34d399]/40 px-3 py-1.5 text-xs font-semibold text-[#34d399]">Preview in Author Den <ArrowRight className="h-3.5 w-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); window.location.href = `/authors-den/?preview=${n.resourceId}`; }} className="focus-house mt-3 inline-flex items-center gap-2 rounded-full border border-[#34d399]/40 px-3 py-1.5 text-xs font-semibold text-[#34d399]">Preview in Author Den <PiArrowRightDuotone className="h-3.5 w-3.5" /></button>
                   )}
                 </span>
               </div>
@@ -176,11 +177,11 @@ export default function InboxPage() {
         </section>
       </div>
 
-      <div className="reveal reveal-2 mt-10 flex flex-wrap items-center gap-3 border-t border-white/5 pt-6 text-sm text-zinc-500">
-        <Users className="h-4 w-4 text-[#34d399]" />
+      <div className="reveal reveal-2 mt-12 flex flex-wrap items-center gap-3 border-t border-white/5 pt-7 text-sm text-zinc-500">
+        <PiUsersDuotone className="h-4 w-4 text-[#34d399]" />
         <span>Everything here is private to you — urgent work, notes, and conversations from your rooms only.</span>
         <Link href="/categories/authors" className="focus-house ml-auto inline-flex items-center gap-2 rounded-full bg-[#3b82f6] px-4 py-2 text-xs font-semibold text-white">
-          Authors room <ArrowRight className="h-3.5 w-3.5" />
+          Authors room <PiArrowRightDuotone className="h-3.5 w-3.5" />
         </Link>
       </div>
     </div>

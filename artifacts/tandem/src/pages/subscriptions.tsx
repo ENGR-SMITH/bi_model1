@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, BadgeCheck, Check, CreditCard, FolderOpen, HardDrive, Loader2, Lock, PartyPopper, Sparkles, Ticket, X } from 'lucide-react';
+import { PiArrowLeftDuotone, PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiCreditCardDuotone, PiFolderOpenDuotone, PiHardDrivesDuotone, PiLockKeyDuotone, PiSparkleDuotone, PiTicketDuotone, PiXDuotone } from 'react-icons/pi';
+import type { IconType } from 'react-icons';
 import { Link } from 'wouter';
 import { SectionEyebrow } from '@/components/protected-shell';
 import {
@@ -31,10 +32,10 @@ function price(usd: number): string {
   return `$${(usd / 100).toFixed(2)}`;
 }
 
-const KIND_META: Record<string, { icon: typeof Ticket; label: string }> = {
-  pass: { icon: Ticket, label: 'Category passes' },
-  storage: { icon: HardDrive, label: 'Creator Den · workspace storage' },
-  projects: { icon: FolderOpen, label: 'Author Den · work projects' },
+const KIND_META: Record<string, { icon: IconType; label: string }> = {
+  pass: { icon: PiTicketDuotone, label: 'Category passes' },
+  storage: { icon: PiHardDrivesDuotone, label: 'Creator Den · workspace storage' },
+  projects: { icon: PiFolderOpenDuotone, label: 'Author Den · work projects' },
 };
 
 function barPercent(used: number, total: number): number {
@@ -82,8 +83,8 @@ export default function SubscriptionsPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-[1060px]">
-      <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
+    <div className="mx-auto max-w-[1200px]">
+      <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-10 md:flex-row md:items-end">
         <div>
           <SectionEyebrow>Billing & passes</SectionEyebrow>
           <h1 className="mt-5 text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-7xl">Yours at a glance.</h1>
@@ -91,37 +92,39 @@ export default function SubscriptionsPage() {
             Every subscription on your account — category passes, Creators Den storage, and Author&nbsp;Den projects — in one place. Subscribe here, or on the den itself; your plan follows your account.
           </p>
         </div>
-        <Link href="/dashboard" className="focus-house inline-flex items-center gap-2 rounded-full py-2 text-xs font-semibold text-zinc-500 hover:text-zinc-100" data-testid="link-subscriptions-back">
-          <ArrowLeft className="h-3.5 w-3.5" />
+        <Link href="/dashboard" className="focus-house group inline-flex items-center gap-2 rounded-full py-2 text-xs font-semibold text-zinc-500 hover:text-zinc-100" data-testid="link-subscriptions-back">
+          <PiArrowLeftDuotone className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-1" />
           Back to the atrium
         </Link>
       </div>
 
       {/* Current usage — the live account state. */}
-      <div className="reveal reveal-1 mt-10 grid gap-5 lg:grid-cols-3">
-        <div className="soft-lift card-surface rounded-2xl p-5">
+      <div className="reveal reveal-1 mt-12 grid gap-6 lg:grid-cols-3">
+        <div className="soft-lift group card-surface overflow-hidden rounded-3xl p-6">
+          <span className="card-spot" />
           <div className="flex items-center justify-between">
             <span className="text-2xl font-semibold text-zinc-100">Passes</span>
-            <Ticket className="h-5 w-5 text-[#3b82f6]" />
+            <PiTicketDuotone className="h-6 w-6 text-[#3b82f6]" />
           </div>
           <p className="mt-2 text-sm text-zinc-500">{activeByPlan.size} active</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-4 flex flex-wrap gap-2">
             {data?.current.filter((s) => s.active).length === 0 && (
               <span className="rounded-full bg-white/5 px-3 py-1 font-mono-ui text-[10px] uppercase tracking-[.14em] text-zinc-500">No active pass</span>
             )}
             {data?.current.filter((s) => s.active).map((sub) => (
               <span key={sub.id} className="inline-flex items-center gap-1.5 rounded-full bg-[#34d399]/10 px-3 py-1 font-mono-ui text-[10px] uppercase tracking-[.12em] text-[#34d399]">
-                <BadgeCheck className="h-3 w-3" />
+                <PiCheckCircleDuotone className="h-3 w-3" />
                 {sub.planLabel.split(' ').slice(0, 2).join(' ')} · until {formatDate(sub.periodEnd)}
               </span>
             ))}
           </div>
         </div>
 
-        <div className="soft-lift card-surface rounded-2xl p-5">
+        <div className="soft-lift group card-surface overflow-hidden rounded-3xl p-6">
+          <span className="card-spot" />
           <div className="flex items-center justify-between">
             <span className="text-2xl font-semibold text-zinc-100">Storage</span>
-            <HardDrive className="h-5 w-5 text-[#34d399]" />
+            <PiHardDrivesDuotone className="h-6 w-6 text-[#34d399]" />
           </div>
           <div className="mt-3 flex items-baseline gap-2 text-sm">
             <span className="text-lg font-bold text-zinc-100">{formatBytes(storageUsed)}</span>
@@ -133,10 +136,11 @@ export default function SubscriptionsPage() {
           <p className="mt-2 text-xs text-zinc-500">{formatBytes(Math.max(0, storageTotal - storageUsed))} left</p>
         </div>
 
-        <div className="soft-lift card-surface rounded-2xl p-5">
+        <div className="soft-lift group card-surface overflow-hidden rounded-3xl p-6">
+          <span className="card-spot" />
           <div className="flex items-center justify-between">
             <span className="text-2xl font-semibold text-zinc-100">Projects</span>
-            <FolderOpen className="h-5 w-5 text-[#fbbf24]" />
+            <PiFolderOpenDuotone className="h-6 w-6 text-[#fbbf24]" />
           </div>
           <div className="mt-3 flex items-baseline gap-2 text-sm">
             <span className="text-lg font-bold text-zinc-100">{projectsUsed}</span>
@@ -155,23 +159,23 @@ export default function SubscriptionsPage() {
       ) : (
         groups.map((groupPlans, index) => {
           const kind = groupPlans[0]?.kind as keyof typeof KIND_META;
-          const meta = KIND_META[kind] ?? { icon: Ticket, label: 'Plans' };
+          const meta = KIND_META[kind] ?? { icon: PiTicketDuotone, label: 'Plans' };
           const Icon = meta.icon;
           return (
             <section key={kind} className="reveal mt-12">
               <div className="flex items-center gap-4">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#3b82f6]/10 text-[#3b82f6]"><Icon className="h-4 w-4" /></span>
+                <span className="icon-chip h-11 w-11 text-[#3b82f6]"><Icon className="h-5 w-5" /></span>
                 <div>
                   <h2 className="text-2xl font-semibold text-zinc-100">{meta.label}</h2>
                 </div>
                 <div className="h-px flex-1 bg-white/5" />
                 <span className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-zinc-600">0{index + 1}</span>
               </div>
-              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {groupPlans.map((plan) => {
                   const activeSub = activeByPlan.get(`${plan.kind}:${plan.planId}`);
                   return (
-                    <div key={`${plan.kind}:${plan.planId}`} className="soft-lift flex flex-col card-surface rounded-2xl p-5" data-testid={`plan-${plan.kind}-${plan.planId}`}>
+                    <div key={`${plan.kind}:${plan.planId}`} className="soft-lift group flex flex-col card-surface overflow-hidden rounded-3xl p-6" data-testid={`plan-${plan.kind}-${plan.planId}`}>
                       <div className="flex items-start justify-between gap-2">
                         <p className="text-xl font-semibold leading-none text-zinc-100">{plan.planLabel}</p>
                         <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-500">{plan.intervalLabel}</span>
@@ -185,7 +189,7 @@ export default function SubscriptionsPage() {
                       </div>
                       {activeSub ? (
                         <span className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#34d399]/10 px-4 py-2.5 text-center text-xs font-semibold text-[#34d399]" data-testid={`plan-active-${plan.planId}`}>
-                          <Check className="h-3.5 w-3.5" />
+                          <PiCheckDuotone className="h-3.5 w-3.5" />
                           Active until {formatDate(activeSub.periodEnd)}
                         </span>
                       ) : (
@@ -224,7 +228,7 @@ export default function SubscriptionsPage() {
                 <li key={sub.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4" data-testid={`subscription-${sub.id}`}>
                   <div className="flex items-center gap-3">
                     <span className={`flex h-9 w-9 items-center justify-center rounded-full ${sub.active ? 'bg-[#34d399]/10 text-[#34d399]' : 'bg-white/5 text-zinc-500'}`}>
-                      {sub.active ? <Check className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                      {sub.active ? <PiCheckDuotone className="h-4 w-4" /> : <PiSparkleDuotone className="h-4 w-4" />}
                     </span>
                     <div>
                       <p className="text-sm font-semibold text-zinc-100">{sub.planLabel}</p>
@@ -305,8 +309,8 @@ function PayModal({ plan, onClose, onPaid }: { plan: SubscriptionPlan; onClose: 
         <div className="rounded-t-[1.35rem] p-6 pb-5">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-[#3b82f6]/10 text-[#3b82f6]">
-                <CreditCard className="h-5 w-5" />
+              <span className="icon-chip h-11 w-11 text-[#3b82f6]">
+                <PiCreditCardDuotone className="h-5 w-5" />
               </span>
               <div>
                 <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">Subscription</p>
@@ -316,7 +320,7 @@ function PayModal({ plan, onClose, onPaid }: { plan: SubscriptionPlan; onClose: 
             <span className="font-display text-2xl font-extrabold tracking-[-0.04em]">{price(plan.priceUsd)}</span>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-zinc-400">{plan.detail} · billed per {plan.intervalLabel}.</p>
-          <button type="button" onClick={onClose} aria-label="Close" className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} aria-label="Close" className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white"><PiXDuotone className="h-4 w-4" /></button>
         </div>
 
         <div className="relative flex items-center px-2">
@@ -328,7 +332,7 @@ function PayModal({ plan, onClose, onPaid }: { plan: SubscriptionPlan; onClose: 
         {result ? (
           <div className="rounded-b-[1.35rem] p-6 pt-5" data-testid="subscription-success">
             <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#34d399]/10 text-[#34d399]"><PartyPopper className="h-6 w-6" /></span>
+              <span className="icon-chip h-14 w-14 text-[#34d399]"><PiConfettiDuotone className="h-7 w-7" /></span>
               <div>
                 <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">Subscribed</p>
                 <h3 className="text-2xl font-extrabold tracking-[-0.04em]">{plan.planLabel}</h3>
@@ -345,7 +349,7 @@ function PayModal({ plan, onClose, onPaid }: { plan: SubscriptionPlan; onClose: 
             <label className="block">
               <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Card number</span>
               <div className="relative mt-2">
-                <CreditCard className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
+                <PiCreditCardDuotone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
                 <input value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} placeholder="4242 4242 4242 4242" inputMode="numeric" autoComplete="cc-number" className="focus-house w-full rounded-xl border border-white/10 bg-[#111111] py-3 pl-11 pr-4 text-sm text-white placeholder:text-zinc-600" data-testid="sub-input-card" />
               </div>
             </label>
@@ -365,7 +369,7 @@ function PayModal({ plan, onClose, onPaid }: { plan: SubscriptionPlan; onClose: 
             </div>
             {error && <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-400" role="alert" data-testid="subscription-error">{error}</p>}
             <button type="button" onClick={pay} disabled={purchase.isPending} className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b82f6] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#2563eb] disabled:cursor-wait disabled:opacity-60" data-testid="sub-button-pay">
-              {purchase.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing…</> : <><Lock className="h-4 w-4 text-white/80" /> Pay {price(plan.priceUsd)}</>}
+              {purchase.isPending ? <><PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> Processing…</> : <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay {price(plan.priceUsd)}</>}
             </button>
           </div>
         )}
