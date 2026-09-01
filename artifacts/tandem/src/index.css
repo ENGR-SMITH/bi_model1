@@ -540,3 +540,223 @@
   from { opacity: 0; transform: translateY(8px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* Tandem product chrome: one shared visual system across every Tandem route.
+   The separate Den applications do not import this stylesheet. */
+.tandem-app,
+.tandem-public {
+  background:
+    radial-gradient(720px 340px at 50% -190px, rgba(249, 115, 168, 0.14), transparent 72%),
+    linear-gradient(180deg, #070707 0%, #050505 42%, #050505 100%);
+}
+
+.tandem-app::before,
+.tandem-public::before {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: '';
+  opacity: 0.26;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: linear-gradient(to bottom, black, transparent 70%);
+}
+
+.tandem-app > *,
+.tandem-public > * {
+  position: relative;
+  z-index: 1;
+}
+
+.tandem-app-header,
+.tandem-public-header {
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.tandem-header-inner {
+  min-width: 0;
+}
+
+.tandem-header-nav {
+  min-width: 0;
+}
+
+.tandem-header-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  padding: 0.45rem 0.65rem;
+  color: #71717a;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.tandem-header-link:hover {
+  color: #fafafa;
+  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
+}
+
+.tandem-header-link.is-active {
+  color: #fafafa;
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.tandem-header-link.is-active svg {
+  color: #f973a8;
+}
+
+.tandem-header-action {
+  border: 1px solid transparent;
+}
+
+.tandem-mobile-menu {
+  animation: menu-in 180ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.tandem-mobile-link {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.75rem;
+  color: #a1a1aa;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.tandem-mobile-link:hover,
+.tandem-mobile-link.is-active {
+  color: #fafafa;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.tandem-mobile-link.is-active svg {
+  color: #f973a8;
+}
+
+.tandem-page {
+  animation: page-in 360ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.tandem-page h1,
+.tandem-public h1 {
+  color: #fafafa;
+  letter-spacing: -0.065em;
+}
+
+.tandem-page h2,
+.tandem-page h3,
+.tandem-public h2,
+.tandem-public h3 {
+  letter-spacing: -0.04em;
+}
+
+.tandem-page .card-surface,
+.tandem-page .public-card,
+.tandem-public .card-surface,
+.tandem-public .public-card {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.012) 45%, rgba(255, 255, 255, 0.02)),
+    rgba(12, 12, 12, 0.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.065),
+    0 14px 38px -32px rgba(0, 0, 0, 0.95);
+}
+
+.tandem-page .card-surface-hover:hover,
+.tandem-public .card-surface-hover:hover {
+  border-color: rgba(249, 115, 168, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    0 20px 42px -30px rgba(249, 115, 168, 0.34);
+}
+
+.tandem-page .card-icon,
+.tandem-public .card-icon {
+  border-color: rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.tandem-page [class*="text-[#3b82f6]"],
+.tandem-public [class*="text-[#3b82f6]"],
+.tandem-page [class*="text-[#60a5fa]"],
+.tandem-public [class*="text-[#60a5fa]"] {
+  color: #f973a8 !important;
+}
+
+.tandem-page [class*="bg-[#3b82f6]"],
+.tandem-public [class*="bg-[#3b82f6]"] {
+  background-color: #f973a8 !important;
+}
+
+.tandem-page [class*="border-[#3b82f6]"],
+.tandem-public [class*="border-[#3b82f6]"] {
+  border-color: rgba(249, 115, 168, 0.42) !important;
+}
+
+.tandem-page [class*="ring-[#3b82f6]"],
+.tandem-public [class*="ring-[#3b82f6]"] {
+  --tw-ring-color: rgba(249, 115, 168, 0.45) !important;
+}
+
+.tandem-page input,
+.tandem-page textarea,
+.tandem-page select {
+  border-color: rgba(255, 255, 255, 0.13);
+  background: rgba(7, 7, 7, 0.76);
+}
+
+.tandem-page input:focus,
+.tandem-page textarea:focus,
+.tandem-page select:focus {
+  border-color: rgba(249, 115, 168, 0.72);
+  box-shadow: 0 0 0 3px rgba(249, 115, 168, 0.11);
+}
+
+.tandem-page button,
+.tandem-page a,
+.tandem-public button,
+.tandem-public a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tandem-button-primary {
+  background: #fafafa;
+  color: #090909;
+  box-shadow: 0 10px 24px -16px rgba(255, 255, 255, 0.8);
+}
+
+.tandem-button-primary:hover {
+  background: #e4e4e7;
+}
+
+@media (max-width: 767px) {
+  .tandem-page {
+    min-height: calc(100dvh - 68px);
+  }
+
+  .tandem-page h1,
+  .tandem-public h1 {
+    letter-spacing: -0.055em;
+  }
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -1,7 +1,6 @@
 import { useAuth, useClerk, useUser } from '@clerk/react';
 import {
   Activity,
-  ChevronDown,
   Inbox,
   LayoutGrid,
   LogOut,
@@ -19,20 +18,12 @@ const primaryNav = [
   { href: '/dashboard', label: 'Overview', testId: 'atrium', icon: LayoutGrid },
   { href: '/activity', label: 'Activity', testId: 'activity', icon: Activity },
   { href: '/inbox', label: 'Inbox', testId: 'inbox', icon: Inbox },
-  { href: '/subscriptions', label: 'Plans & passes', testId: 'subscriptions', icon: Ticket },
+  { href: '/subscriptions', label: 'Plans', testId: 'subscriptions', icon: Ticket },
 ];
 
 const roomNav = [
   { href: '/categories/authors', label: "Author's room", testId: 'authors', icon: PenLine },
   { href: '/categories/content-creators', label: "Creators' room", testId: 'content-creators', icon: UserRound },
-];
-
-const mobileNav = [
-  { href: '/dashboard', label: 'Overview', testId: 'atrium', icon: LayoutGrid },
-  { href: '/activity', label: 'Activity', testId: 'activity', icon: Activity },
-  { href: '/inbox', label: 'Inbox', testId: 'inbox', icon: Inbox },
-  { href: '/subscriptions', label: 'Plans', testId: 'subscriptions', icon: Ticket },
-  { href: '/profile', label: 'Profile', testId: 'profile', icon: UserRound },
 ];
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -86,93 +77,60 @@ function PrivateShell({ children }: { children: ReactNode }) {
   const { signOut } = useClerk();
 
   const logout = () => signOut({ redirectUrl: '/' });
+  const isActive = (href: string) => location === href || location.startsWith(`${href}/`);
+  const allNav = [...primaryNav, ...roomNav];
 
   return (
     <div className="tandem-app min-h-[100dvh] bg-[#050505] text-zinc-100">
-      <aside className="tandem-sidebar fixed inset-y-0 left-0 z-40 hidden w-[252px] flex-col border-r border-white/[0.08] bg-[#080808] px-3 py-4 md:flex">
-        <div className="px-3 pb-5">
+      <header className="tandem-app-header sticky top-0 z-40 border-b border-white/[0.08] bg-[#050505]/85 px-4 backdrop-blur-xl sm:px-6">
+        <div className="tandem-header-inner mx-auto flex h-[68px] max-w-[1180px] items-center gap-5">
           <TandemLogo />
-        </div>
+          <span className="hidden h-4 w-px bg-white/10 sm:block" />
+          <span className="hidden font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-600 sm:block">workspace</span>
 
-        <button type="button" className="tandem-workspace-switcher focus-house mx-1 flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.035] px-3 py-3 text-left transition-colors hover:bg-white/[0.06]" data-testid="button-workspace-switcher">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-sm font-bold text-black">T</span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[11px] font-semibold text-zinc-100">Tandem</span>
-            <span className="mt-0.5 block truncate text-[10px] text-zinc-500">Creative connection</span>
-          </span>
-          <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
-        </button>
-
-        <nav className="mt-7" aria-label="Private navigation">
-          <p className="tandem-nav-label">Workspace</p>
-          <div className="mt-2 space-y-0.5">
+          <nav className="tandem-header-nav hidden flex-1 items-center justify-center gap-0.5 md:flex" aria-label="Private navigation">
             {primaryNav.map((item) => {
               const Icon = item.icon;
-              const active = location === item.href;
+              const active = isActive(item.href);
               return (
-                <Link key={item.href} href={item.href} className={`tandem-sidebar-link focus-house ${active ? 'is-active' : ''}`} data-testid={`link-nav-${item.testId}`}>
-                  <Icon className="h-4 w-4" strokeWidth={1.8} />
+                <Link key={item.href} href={item.href} className={`tandem-header-link focus-house ${active ? 'is-active' : ''}`} data-testid={`link-nav-${item.testId}`}>
+                  <Icon className="h-3.5 w-3.5" strokeWidth={1.8} />
                   {item.label}
-                  {item.href === '/inbox' && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[#f973a8]" />}
+                  {item.href === '/inbox' && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-[#f973a8]" />}
                 </Link>
               );
             })}
-          </div>
-
-          <p className="tandem-nav-label mt-8">Rooms</p>
-          <div className="mt-2 space-y-0.5">
+            <span className="mx-2 h-4 w-px bg-white/10" />
             {roomNav.map((item) => {
               const Icon = item.icon;
-              const active = location === item.href;
-              return <Link key={item.href} href={item.href} className={`tandem-sidebar-link focus-house ${active ? 'is-active' : ''}`} data-testid={`link-room-nav-${item.testId}`}><Icon className="h-4 w-4" strokeWidth={1.8} />{item.label}</Link>;
+              const active = isActive(item.href);
+              return <Link key={item.href} href={item.href} className={`tandem-header-link focus-house ${active ? 'is-active' : ''}`} data-testid={`link-room-nav-${item.testId}`}><Icon className="h-3.5 w-3.5" strokeWidth={1.8} />{item.label.replace(' room', '')}</Link>;
             })}
+          </nav>
+
+          <div className="ml-auto flex items-center gap-1">
+            <UserChip />
+            <button type="button" onClick={logout} className="tandem-header-action focus-house hidden rounded-lg p-2 text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-100 sm:inline-flex" aria-label="Sign out" data-testid="button-header-logout">
+              <LogOut className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={() => setMenuOpen((open) => !open)} className="tandem-header-action focus-house rounded-lg p-2 text-zinc-300 transition-colors hover:bg-white/5 md:hidden" aria-label={menuOpen ? 'Close menu' : 'Open menu'} data-testid="button-mobile-profile-menu">
+              {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </div>
-        </nav>
-
-        <div className="mt-auto border-t border-white/[0.08] pt-3">
-          <UserChip />
-          <button type="button" onClick={logout} className="tandem-sidebar-link focus-house mt-1 w-full text-left text-zinc-500 hover:text-zinc-200" data-testid="button-header-logout">
-            <LogOut className="h-4 w-4" />
-            Sign out
-          </button>
-        </div>
-      </aside>
-
-      <header className="tandem-mobile-header sticky top-0 z-30 border-b border-white/[0.08] bg-[#080808]/90 px-4 py-3 backdrop-blur-xl md:hidden">
-        <div className="flex items-center justify-between">
-          <TandemLogo />
-          <button type="button" onClick={() => setMenuOpen((open) => !open)} className="focus-house rounded-lg border border-white/10 p-2" aria-label={menuOpen ? 'Close menu' : 'Open menu'} data-testid="button-mobile-profile-menu">
-            {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
         </div>
         {menuOpen && (
-          <div className="mt-3 rounded-xl border border-white/10 bg-[#111111] p-2 shadow-2xl">
-            {[...mobileNav, ...roomNav].map((item) => {
+          <nav className="tandem-mobile-menu mx-auto max-w-[1180px] border-t border-white/[0.08] py-3 md:hidden" aria-label="Mobile navigation">
+            {allNav.map((item) => {
               const Icon = item.icon;
-              return <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium text-zinc-200 hover:bg-white/5" data-testid={`link-mobile-nav-${item.testId}`}><Icon className="h-4 w-4 text-zinc-500" />{item.label}</Link>;
+              const active = isActive(item.href);
+              return <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className={`tandem-mobile-link focus-house ${active ? 'is-active' : ''}`} data-testid={`link-mobile-nav-${item.testId}`}><Icon className="h-4 w-4" />{item.label}</Link>;
             })}
-            <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-medium text-zinc-400 hover:bg-white/5"><LogOut className="h-4 w-4" />Sign out</button>
-          </div>
+            <button type="button" onClick={logout} className="tandem-mobile-link focus-house mt-1 w-full text-left text-zinc-500"><LogOut className="h-4 w-4" />Sign out</button>
+          </nav>
         )}
       </header>
 
-      <div className="md:pl-[252px]">
-        <div className="tandem-private-topbar hidden h-14 items-center justify-between border-b border-white/[0.08] px-8 lg:flex">
-          <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-600">Tandem workspace</span>
-          <Link href="/profile" className="text-xs text-zinc-500 transition-colors hover:text-zinc-200">Account settings <span aria-hidden="true">↗</span></Link>
-        </div>
-        <main key={location} className="tandem-page mx-auto max-w-[1240px] px-5 py-8 pb-24 sm:px-8 lg:px-10 lg:py-12 lg:pb-16">{children}</main>
-      </div>
-
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.08] bg-[#080808]/95 px-3 pb-[max(0.65rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl md:hidden" aria-label="Mobile navigation">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-          {mobileNav.map((item) => {
-            const Icon = item.icon;
-            const active = location === item.href;
-            return <Link key={item.href} href={item.href} className={`focus-house flex flex-col items-center gap-1 rounded-lg py-1.5 text-[10px] font-medium ${active ? 'text-white' : 'text-zinc-500'}`} data-testid={`link-mobile-${item.testId}`}><Icon className={`h-4 w-4 ${active ? 'text-[#f973a8]' : ''}`} strokeWidth={active ? 2.1 : 1.7} />{item.label}</Link>;
-          })}
-        </div>
-      </nav>
+      <main key={location} className="tandem-page mx-auto min-h-[calc(100dvh-68px)] max-w-[1180px] px-4 py-8 pb-16 sm:px-6 lg:px-8 lg:py-12">{children}</main>
     </div>
   );
 }
