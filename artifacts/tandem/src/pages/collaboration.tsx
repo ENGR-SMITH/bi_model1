@@ -15,7 +15,7 @@ import { SectionEyebrow } from '@/components/protected-shell';
 
 function Frame({ children, eyebrow = 'Author collaboration / private room', title, intro }: { children: ReactNode; eyebrow?: string; title: string; intro?: string }) {
   return <div className="mx-auto max-w-[1180px]">
-    <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
+    <div className="tandem-page-header reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-9 md:flex-row md:items-end">
       <div><SectionEyebrow>{eyebrow}</SectionEyebrow><h1 className="mt-5 max-w-[12ch] text-6xl font-extrabold leading-[.86] tracking-[-0.08em] text-white sm:text-8xl">{title}</h1></div>
       {intro && <p className="max-w-sm border-l-2 border-white/10 pl-5 text-sm leading-[1.8] text-zinc-400">{intro}</p>}
     </div>{children}

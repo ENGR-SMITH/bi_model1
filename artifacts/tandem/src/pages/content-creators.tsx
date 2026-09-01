@@ -15,7 +15,7 @@ export default function ContentCreatorsPage() {
   const name = user?.firstName || user?.username || 'maker';
 
   return (
-    <div className="mx-auto flex max-w-[1180px] flex-col justify-between gap-5 lg:h-[calc(100dvh-170px)]">
+    <div className="tandem-room-page mx-auto flex max-w-[1180px] flex-col justify-between gap-5 lg:h-[calc(100dvh-170px)]">
       <div>
         <Link href="/dashboard" className="focus-house inline-flex items-center gap-2 rounded-full py-1 text-xs font-bold text-zinc-500 hover:text-white" data-testid="link-creators-back-dashboard">
           <ArrowUpRight className="h-3.5 w-3.5 rotate-[225deg]" />
@@ -34,7 +34,7 @@ export default function ContentCreatorsPage() {
           </div>
 
           <div className="flex items-center">
-            <div className="w-full rounded-[1.5rem] border border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent p-6" data-testid="card-open-creators-den">
+            <div className="tandem-room-hero w-full rounded-[1.5rem] border border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent p-6" data-testid="card-open-creators-den">
               <div className="flex items-center justify-between">
                 <span className="flex h-11 w-11 items-center justify-center rounded-full border border-current"><Clapperboard className="h-5 w-5" /></span>
                 <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-100">Your platform</span>
@@ -74,7 +74,7 @@ export default function ContentCreatorsPage() {
             {LEGS.map((leg) => {
               const Icon = leg.icon;
               return (
-                <div key={leg.number} className="soft-lift rounded-[1.25rem] card-surface p-4" data-testid={`card-door-leg-${leg.number}`}>
+                <div key={leg.number} className="tandem-room-feature soft-lift rounded-[1.25rem] card-surface p-4" data-testid={`card-door-leg-${leg.number}`}>
                   <div className="flex items-center justify-between">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#111111] text-[#3b82f6]"><Icon className="h-4 w-4" /></span>
                     <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-600">{leg.number} / 04</span>

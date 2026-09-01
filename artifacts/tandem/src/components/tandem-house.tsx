@@ -1,4 +1,4 @@
-import { ArrowUpRight, Compass, Menu, X } from 'lucide-react';
+import { ArrowUpRight, ChevronDown, Compass, Menu, X } from 'lucide-react';
 import { Show } from '@clerk/react';
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
@@ -16,16 +16,16 @@ export function TandemLogo({ light = false }: { light?: boolean }) {
   return (
     <Link
       href="/"
-      className="group inline-flex items-center gap-3"
+      className="group inline-flex items-center gap-2.5"
       data-testid="link-tandem-logo"
     >
       <span
-        className={`relative flex h-9 w-9 items-center justify-center rounded-full border ${light ? 'border-white/20' : 'border-white/10'}`}
+        className={`tandem-mark relative flex h-8 w-8 items-center justify-center rounded-lg border ${light ? 'border-white/20' : 'border-white/10'}`}
       >
-        <span className="h-2.5 w-2.5 rounded-full bg-[#3b82f6] glow-dot" />
-        <span className="absolute h-2.5 w-2.5 translate-x-2.5 rounded-full bg-[#8b5cf6]/70" />
+        <span className="h-2.5 w-2.5 rounded-[3px] bg-white transition-transform duration-300 group-hover:rotate-45" />
+        <span className="absolute h-2.5 w-2.5 translate-x-1.5 translate-y-1.5 rounded-[3px] bg-[#f973a8] transition-transform duration-300 group-hover:-translate-x-0.5 group-hover:-translate-y-0.5" />
       </span>
-      <span className={`text-[1.15rem] font-bold tracking-[-0.04em] ${light ? 'text-white' : 'text-white'}`}>
+      <span className={`text-[1.05rem] font-semibold tracking-[-0.04em] ${light ? 'text-white' : 'text-white'}`}>
         tandem
       </span>
     </Link>
@@ -54,33 +54,41 @@ export function HouseNav() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-md">
-      <div className="mx-auto flex h-[64px] w-full max-w-[1240px] items-center justify-between px-5 sm:px-8 lg:px-10">
+    <header className="sticky top-0 z-40 border-b border-white/[0.08] bg-[#050505]/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-[68px] w-full max-w-[1240px] items-center justify-between px-5 sm:px-8 lg:px-10">
         <TandemLogo />
         <nav className="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
-          <button type="button" onClick={goToRooms} className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-nav-rooms">
+          <button type="button" onClick={goToRooms} className="tandem-public-link rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-nav-rooms">
             Explore rooms
           </button>
-          <button type="button" onClick={goToMethod} className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-nav-method">
+          <button type="button" onClick={goToMethod} className="tandem-public-link rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-nav-method">
             The method
           </button>
-          <Link href="/room/engine" className="group flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white" data-testid="link-nav-engine">
-            Start at the Engine
-            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          <div className="group relative">
+            <button type="button" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white">
+              Tandem DNA <ChevronDown className="h-3.5 w-3.5 transition-transform group-hover:rotate-180" />
+            </button>
+            <div className="pointer-events-none absolute left-0 top-11 w-52 translate-y-1 rounded-xl border border-white/10 bg-[#111111] p-2 opacity-0 shadow-2xl transition-all group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
+              <Link href="/room/engine" className="flex items-center justify-between rounded-lg px-3 py-2.5 text-sm text-zinc-300 hover:bg-white/5 hover:text-white">The Engine <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+              <button type="button" onClick={goToMethod} className="flex w-full rounded-lg px-3 py-2.5 text-left text-sm text-zinc-400 hover:bg-white/5 hover:text-white">How it works</button>
+            </div>
+          </div>
+          <Link href="/room/engine" className="tandem-public-link group flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white" data-testid="link-nav-engine">
+            Start at the Engine <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </Link>
           <Show when="signed-out">
-            <div className="ml-4 flex items-center gap-2 border-l border-white/10 pl-5">
+            <div className="ml-3 flex items-center gap-2 border-l border-white/10 pl-4">
               <Link href="/sign-in" className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white" data-testid="link-nav-login">
                 Log in
               </Link>
-              <Link href="/sign-up" className="rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200" data-testid="link-nav-signup">
+              <Link href="/sign-up" className="tandem-button-primary rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200" data-testid="link-nav-signup">
                 Sign up
               </Link>
             </div>
           </Show>
           <Show when="signed-in">
-            <Link href="/dashboard" className="ml-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200" data-testid="link-nav-atrium">
-              Open your atrium
+            <Link href="/dashboard" className="tandem-button-primary ml-3 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-200" data-testid="link-nav-atrium">
+              Open workspace
             </Link>
           </Show>
         </nav>
@@ -96,13 +104,13 @@ export function HouseNav() {
       </div>
       {open && (
         <div className="absolute left-5 right-5 top-[76px] rounded-2xl border border-white/10 bg-[#111111] p-3 shadow-2xl md:hidden">
-          <button type="button" onClick={goToRooms} className="block w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 hover:bg-white/5" data-testid="button-mobile-rooms">
+           <button type="button" onClick={goToRooms} className="block w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 hover:bg-white/5" data-testid="button-mobile-rooms">
             Explore rooms
           </button>
           <button type="button" onClick={goToMethod} className="block w-full rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 hover:bg-white/5" data-testid="button-mobile-method">
             The method
           </button>
-          <Link href="/room/engine" onClick={() => setOpen(false)} className="block rounded-xl bg-[#3b82f6]/10 px-4 py-3 text-sm font-medium text-[#3b82f6]" data-testid="link-mobile-engine">
+           <Link href="/room/engine" onClick={() => setOpen(false)} className="block rounded-xl bg-white px-4 py-3 text-sm font-semibold text-black" data-testid="link-mobile-engine">
             Start at the Engine
           </Link>
           <Show when="signed-out">

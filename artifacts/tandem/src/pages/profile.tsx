@@ -29,10 +29,12 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-[900px]">
-      <SectionEyebrow>Your corner / profile</SectionEyebrow>
-      <h1 className="mt-5 text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">
-        Your place in the house.
-      </h1>
+      <div className="tandem-page-header">
+        <SectionEyebrow>Your corner / profile</SectionEyebrow>
+        <h1 className="mt-5 text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">
+          Your place in the house.
+        </h1>
+      </div>
       <div className="card-surface mt-12 overflow-hidden rounded-2xl">
         <div className="border-b border-white/5 bg-gradient-to-br from-[#3b82f6]/10 to-transparent p-7 sm:p-10">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center">

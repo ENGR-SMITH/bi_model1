@@ -57,31 +57,31 @@
   --foreground: 0 0% 98%;
   --border: 0 0% 100% / 0.08;
   --input: 0 0% 100% / 0.08;
-  --ring: 217 91% 60%;
+   --ring: 334 84% 70%;
   --card: 0 0% 7%;
   --card-foreground: 0 0% 98%;
   --card-border: 0 0% 100% / 0.08;
   --popover: 0 0% 7%;
   --popover-foreground: 0 0% 98%;
   --popover-border: 0 0% 100% / 0.08;
-  --primary: 217 91% 60%;
+   --primary: 334 84% 70%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 12%;
   --secondary-foreground: 0 0% 98%;
   --muted: 0 0% 10%;
   --muted-foreground: 0 0% 64%;
-  --accent: 217 91% 60%;
+   --accent: 334 84% 70%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 98%;
   --sidebar: 0 0% 6%;
   --sidebar-foreground: 0 0% 98%;
   --sidebar-border: 0 0% 100% / 0.08;
-  --sidebar-primary: 217 91% 60%;
+   --sidebar-primary: 334 84% 70%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 0 0% 12%;
   --sidebar-accent-foreground: 0 0% 98%;
-  --sidebar-ring: 217 91% 60%;
+   --sidebar-ring: 334 84% 70%;
   --app-font-sans: 'Inter', system-ui, sans-serif;
   --app-font-serif: 'Inter', system-ui, sans-serif;
   --app-font-mono: 'JetBrains Mono', monospace;
@@ -97,9 +97,9 @@
   --tandem-text: #fafafa;
   --tandem-text-muted: #a1a1aa;
   --tandem-text-dim: #71717a;
-  --tandem-accent: #3b82f6;
-  --tandem-accent-soft: rgba(59, 130, 246, 0.12);
-  --tandem-accent-border: rgba(59, 130, 246, 0.35);
+   --tandem-accent: #f973a8;
+   --tandem-accent-soft: rgba(249, 115, 168, 0.12);
+   --tandem-accent-border: rgba(249, 115, 168, 0.35);
   --tandem-success: #34d399;
   --tandem-warning: #fbbf24;
 }
@@ -109,31 +109,31 @@
   --foreground: 0 0% 98%;
   --border: 0 0% 100% / 0.08;
   --input: 0 0% 100% / 0.08;
-  --ring: 217 91% 60%;
+   --ring: 334 84% 70%;
   --card: 0 0% 7%;
   --card-foreground: 0 0% 98%;
   --card-border: 0 0% 100% / 0.08;
   --popover: 0 0% 7%;
   --popover-foreground: 0 0% 98%;
   --popover-border: 0 0% 100% / 0.08;
-  --primary: 217 91% 60%;
+   --primary: 334 84% 70%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 12%;
   --secondary-foreground: 0 0% 98%;
   --muted: 0 0% 10%;
   --muted-foreground: 0 0% 64%;
-  --accent: 217 91% 60%;
+   --accent: 334 84% 70%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 98%;
   --sidebar: 0 0% 6%;
   --sidebar-foreground: 0 0% 98%;
   --sidebar-border: 0 0% 100% / 0.08;
-  --sidebar-primary: 217 91% 60%;
+   --sidebar-primary: 334 84% 70%;
   --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 0 0% 12%;
   --sidebar-accent-foreground: 0 0% 98%;
-  --sidebar-ring: 217 91% 60%;
+   --sidebar-ring: 334 84% 70%;
 }
 
 @layer base {
@@ -248,4 +248,295 @@
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
+}
+
+/* Tandem application chrome — a quiet, dense workspace inspired by modern
+   developer tools. This layer is scoped to Tandem and does not affect either
+   of the separate Den applications. */
+.tandem-app,
+.tandem-public {
+  background:
+    radial-gradient(900px 420px at 50% -180px, rgba(249, 115, 168, 0.08), transparent 70%),
+    #050505;
+}
+
+.tandem-sidebar {
+  box-shadow: 18px 0 50px -42px rgba(0, 0, 0, 0.9);
+}
+
+.tandem-nav-label {
+  padding: 0 0.75rem;
+  color: #52525b;
+  font-family: var(--app-font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.tandem-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 36px;
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  color: #a1a1aa;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1;
+  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.tandem-sidebar-link:hover {
+  background: rgba(255, 255, 255, 0.045);
+  color: #f4f4f5;
+}
+
+.tandem-sidebar-link.is-active {
+  background: rgba(255, 255, 255, 0.085);
+  color: #fff;
+  box-shadow: inset 2px 0 0 #f973a8;
+}
+
+.tandem-sidebar-link.is-active svg {
+  color: #f973a8;
+}
+
+.tandem-workspace-switcher {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.tandem-private-topbar {
+  color: #71717a;
+}
+
+.tandem-page {
+  min-height: calc(100dvh - 56px);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 100% 48px;
+  animation: page-in 220ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.tandem-public {
+  animation: page-in 220ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.tandem-page > * {
+  position: relative;
+}
+
+.tandem-page-header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  padding-bottom: 2rem;
+}
+
+.tandem-page-header > div:last-child,
+.tandem-page-header > p {
+  border-left-color: rgba(249, 115, 168, 0.35);
+}
+
+.tandem-page h1,
+.tandem-public h1 {
+  font-weight: 650;
+  letter-spacing: -0.065em;
+}
+
+.tandem-page h2,
+.tandem-page h3,
+.tandem-public h2,
+.tandem-public h3 {
+  letter-spacing: -0.045em;
+}
+
+.tandem-page .card-surface,
+.tandem-page .public-card {
+  border-color: rgba(255, 255, 255, 0.09);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0) 28%),
+    #0b0b0b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 12px 35px -28px rgba(0, 0, 0, 0.9);
+}
+
+/* Keep the existing Tandem copy and routes intact while bringing legacy
+   blue utility classes onto the single pink accent used by the new chrome. */
+.tandem-page [class*="text-[#3b82f6]"],
+.tandem-public [class*="text-[#3b82f6]"] {
+  color: #f973a8 !important;
+}
+
+.tandem-page [class*="text-[#60a5fa]"],
+.tandem-public [class*="text-[#60a5fa]"] {
+  color: #f9a8d4 !important;
+}
+
+.tandem-page [class~="bg-[#3b82f6]"],
+.tandem-public [class~="bg-[#3b82f6]"] {
+  background-color: #f973a8 !important;
+}
+
+.tandem-page [class*="bg-[#3b82f6]/5"],
+.tandem-public [class*="bg-[#3b82f6]/5"] {
+  background-color: rgb(249 115 168 / 0.05) !important;
+}
+
+.tandem-page [class*="bg-[#3b82f6]/10"],
+.tandem-public [class*="bg-[#3b82f6]/10"] {
+  background-color: rgb(249 115 168 / 0.1) !important;
+}
+
+.tandem-page [class*="bg-[#3b82f6]/15"],
+.tandem-public [class*="bg-[#3b82f6]/15"] {
+  background-color: rgb(249 115 168 / 0.15) !important;
+}
+
+.tandem-page [class*="bg-[#3b82f6]/20"],
+.tandem-public [class*="bg-[#3b82f6]/20"] {
+  background-color: rgb(249 115 168 / 0.2) !important;
+}
+
+.tandem-page [class*="border-[#3b82f6]"],
+.tandem-public [class*="border-[#3b82f6]"] {
+  border-color: rgba(249, 115, 168, 0.42) !important;
+}
+
+.tandem-page [class*="from-[#3b82f6]"],
+.tandem-public [class*="from-[#3b82f6]"] {
+  --tw-gradient-from: #f973a8 var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(249 115 168 / 0) var(--tw-gradient-to-position) !important;
+}
+
+.tandem-page [class~="bg-[#e4f1eb]"],
+.tandem-public [class~="bg-[#e4f1eb]"] {
+  background-color: rgb(52 211 153 / 0.1) !important;
+}
+
+.tandem-page [class~="bg-[#2c2e4a]"],
+.tandem-public [class~="bg-[#2c2e4a]"] {
+  background-color: #151515 !important;
+}
+
+.tandem-page .soft-lift:hover,
+.tandem-public .soft-lift:hover {
+  border-color: rgba(249, 115, 168, 0.32);
+  box-shadow: 0 18px 45px -30px rgba(249, 115, 168, 0.32);
+}
+
+.tandem-room-hero {
+  background:
+    radial-gradient(440px 190px at 100% 0%, rgba(249, 115, 168, 0.13), transparent 70%),
+    linear-gradient(145deg, rgba(249, 115, 168, 0.1), rgba(255, 255, 255, 0.025) 56%, transparent);
+  border-color: rgba(249, 115, 168, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 22px 55px -42px rgba(249, 115, 168, 0.6);
+}
+
+.tandem-room-feature {
+  min-height: 9.25rem;
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.tandem-room-feature:hover {
+  transform: translateY(-2px);
+}
+
+.tandem-page input,
+.tandem-page textarea,
+.tandem-page select {
+  border-radius: 0.6rem;
+  background-color: #080808;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #fafafa;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.tandem-page input:hover,
+.tandem-page textarea:hover,
+.tandem-page select:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.tandem-page input:focus,
+.tandem-page textarea:focus,
+.tandem-page select:focus {
+  border-color: rgba(249, 115, 168, 0.75);
+  box-shadow: 0 0 0 3px rgba(249, 115, 168, 0.12);
+  outline: none;
+}
+
+.tandem-page button,
+.tandem-page a {
+  transition-property: color, background-color, border-color, box-shadow, transform, opacity;
+  transition-duration: 160ms;
+  transition-timing-function: ease;
+}
+
+.tandem-page button:disabled {
+  cursor: not-allowed;
+}
+
+.tandem-button-primary {
+  box-shadow: 0 8px 24px -12px rgba(255, 255, 255, 0.75);
+}
+
+.tandem-modal-backdrop {
+  background: rgba(0, 0, 0, 0.72);
+  animation: modal-backdrop-in 180ms ease-out both;
+}
+
+.tandem-modal {
+  background:
+    radial-gradient(520px 220px at 50% -100px, rgba(249, 115, 168, 0.1), transparent 72%),
+    #0b0b0b;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 30px 90px -38px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: modal-in 220ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.tandem-public-link {
+  transition: color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.tandem-public-link:hover {
+  transform: translateY(-1px);
+}
+
+@media (max-width: 767px) {
+  .tandem-page {
+    min-height: calc(100dvh - 56px);
+    background-size: 100% 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
