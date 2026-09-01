@@ -54,7 +54,7 @@ export const clerkAppearance = {
 
 export function AuthFrame({ children }: { children: React.ReactNode }) {
   return (
-    <main className="atrium-grid flex min-h-[100dvh] flex-col items-center px-5 py-7 sm:px-8 sm:py-10">
+    <main className="resend-site atrium-grid flex min-h-[100dvh] flex-col items-center px-5 py-7 sm:px-8 sm:py-10">
       <div className="flex w-full max-w-[1060px] items-center justify-between">
         <TandemLogo />
         <Link href="/" className="focus-house inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100" data-testid="link-auth-back-home">
