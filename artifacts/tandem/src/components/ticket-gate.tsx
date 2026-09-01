@@ -151,8 +151,8 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
       year: 'numeric',
     });
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-success">
-        <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-7 text-white shadow-2xl">
+      <div className="tandem-modal-backdrop fixed inset-0 z-50 grid place-items-center bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-success">
+        <div className="tandem-modal relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-7 text-white shadow-2xl">
           <div className="flex items-center justify-between">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#34d399]/10 text-[#34d399]">
               <PartyPopper className="h-6 w-6" />
@@ -198,8 +198,8 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-gate">
-      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] text-white shadow-2xl">
+    <div className="tandem-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-gate">
+      <div className="tandem-modal relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] text-white shadow-2xl">
         {/* Coupon stub header */}
         <div className="rounded-t-[1.35rem] p-6 pb-5">
           <div className="flex items-start justify-between">

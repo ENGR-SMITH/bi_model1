@@ -9,7 +9,7 @@ export default function RoomPage() {
 
   if (!room) {
     return (
-      <main className="min-h-[100dvh] bg-[#0a0a0a]">
+      <main className="tandem-public min-h-[100dvh] bg-[#0a0a0a]">
         <HouseNav />
         <section className="mx-auto flex min-h-[calc(100dvh-88px)] max-w-[650px] flex-col items-center justify-center px-5 py-20 text-center">
           <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">No such room on the plan</span>
@@ -26,7 +26,7 @@ export default function RoomPage() {
   const suggestions = rooms.filter((candidate) => candidate.slug !== room.slug).slice(0, 3);
 
   return (
-    <main className="min-h-[100dvh] overflow-hidden bg-[#0a0a0a]">
+    <main className="tandem-public min-h-[100dvh] overflow-hidden bg-[#0a0a0a]">
       <div className="hero-glow absolute inset-x-0 top-0 h-[600px]" />
       <HouseNav />
       <section className="relative mx-auto max-w-[1240px] px-5 pb-16 pt-12 sm:px-8 sm:pt-20 lg:px-10 lg:pb-24 lg:pt-24">
