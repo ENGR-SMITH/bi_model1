@@ -638,7 +638,7 @@ select optgroup {
   box-shadow: 0 0 0 4px hsl(var(--sidebar-primary) / .1), 0 6px 16px hsl(var(--sidebar-primary) / .28);
 }
 .brand-name { font-size: 16px; letter-spacing: -.03em; }
-.brand-sub { letter-spacing: .16em; color: hsl(var(--sidebar-foreground) / .42); }
+.brand-sub { letter-spacing: .16em; color: hsl(var(--sidebar-foreground) / .6); }
 
 /* ---- Workspace switch: a calmer, card-like control ----------------------- */
 .workspace-switch-wrap { margin-bottom: var(--sp-4); }
@@ -802,7 +802,7 @@ select optgroup {
 .cd-ledger-daymark { display: flex; align-items: center; gap: var(--sp-3); }
 .cd-ledger-daylabel { font: 600 11px var(--app-font-mono); letter-spacing: .12em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
 .cd-ledger-dayrule { flex: 1; height: 1px; background: linear-gradient(to right, hsl(var(--border)), hsl(var(--border) / 0)); }
-.cd-ledger-daycount { font: 600 10px var(--app-font-mono); color: hsl(var(--muted-foreground) / .8); padding: 2px 7px; border-radius: 999px; background: hsl(var(--muted)); }
+.cd-ledger-daycount { font: 600 10px var(--app-font-mono); color: hsl(var(--muted-foreground) / .95); padding: 2px 7px; border-radius: 999px; background: hsl(var(--muted)); }
 
 /* The strand: an absolute spine behind the beads; opaque dots punch through. */
 .cd-ledger-list { position: relative; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -821,7 +821,7 @@ select optgroup {
 .cd-ledger-content { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .cd-ledger-summary { margin: 0; font: 600 13px var(--app-font-sans); letter-spacing: -.01em; color: hsl(var(--foreground)); overflow-wrap: anywhere; }
 .cd-ledger-meta { margin: 0; display: flex; align-items: center; gap: var(--sp-2); font: 500 11px var(--app-font-mono); letter-spacing: .02em; color: hsl(var(--muted-foreground)); }
-.cd-ledger-actor { color: hsl(var(--foreground) / .72); }
+.cd-ledger-actor { color: hsl(var(--foreground) / .8); }
 .cd-ledger-dotsep { width: 3px; height: 3px; border-radius: 50%; background: hsl(var(--muted-foreground) / .55); flex: 0 0 auto; }
 .cd-ledger-leg { justify-self: end; font: 600 9px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); padding: 3px 8px; border-radius: 999px; background: hsl(var(--muted)); box-shadow: inset 0 0 0 1px hsl(var(--border) / .6); white-space: nowrap; }
 
@@ -1126,7 +1126,7 @@ select optgroup {
 .snake-card-id { border: 0; background: transparent; padding: 0; cursor: pointer; color: hsl(var(--muted-foreground)); transition: color .15s; }
 .snake-card-id:hover { color: hsl(var(--accent)); }
 .snake-card.is-upload .snake-card-id:hover { color: hsl(212 90% 70%); }
-.snake-card-person { color: hsl(var(--foreground) / .74); }
+.snake-card-person { color: hsl(var(--foreground) / .82); }
 .snake-card-avatar {
   width: 16px; height: 16px;
   border-radius: 999px;
@@ -1139,8 +1139,8 @@ select optgroup {
 }
 .snake-card-sep { width: 3px; height: 3px; border-radius: 50%; background: hsl(var(--muted-foreground) / .55); }
 .snake-card-time { color: hsl(var(--muted-foreground)); }
-.snake-card-size { color: hsl(var(--muted-foreground) / .85); }
-.snake-card-from { color: hsl(var(--muted-foreground) / .85); }
+.snake-card-size { color: hsl(var(--muted-foreground) / .95); }
+.snake-card-from { color: hsl(var(--muted-foreground) / .95); }
 .snake-card-from::before { content: "↳ "; color: hsl(var(--accent) / .8); }
 
 /* ---- Connectors --------------------------------------------------------- */
@@ -1308,9 +1308,9 @@ select optgroup {
   color: hsl(var(--foreground));
   box-shadow: var(--edge-hi);
 }
-.cd-topnav .top-workspace > span { color: hsl(var(--muted-foreground) / .8); font: 600 10px var(--app-font-mono); letter-spacing: .12em; text-transform: uppercase; }
+.cd-topnav .top-workspace > span { color: hsl(var(--muted-foreground) / .95); font: 600 10px var(--app-font-mono); letter-spacing: .12em; text-transform: uppercase; }
 .cd-topnav .top-workspace b { color: hsl(var(--foreground)); font-size: 13px; font-weight: 600; max-width: 200px; }
-.cd-topnav .top-workspace > svg { color: hsl(var(--muted-foreground) / .7); transition: transform .18s ease; }
+.cd-topnav .top-workspace > svg { color: hsl(var(--muted-foreground) / .85); transition: transform .18s ease; }
 .cd-topnav .top-workspace:hover > svg { transform: translateY(1px); }
 
 /* Account tile pinned right in the chrome — the avatar IS the profile link. */
@@ -1493,7 +1493,7 @@ select optgroup {
    Box metrics stay constant (transparent rim) so activating never reflows. */
 .cd-tab-num {
   font: 600 10px var(--app-font-mono); letter-spacing: .08em;
-  color: hsl(var(--muted-foreground) / .7);
+  color: hsl(var(--muted-foreground) / .8);
   padding: 2px 5px; border-radius: 5px;
   border: 1px solid transparent;
   background: transparent;
@@ -3969,7 +3969,7 @@ select optgroup {
   border-color: hsl(var(--accent) / .6);
   box-shadow: 0 0 0 3px hsl(var(--accent) / .08);
 }
-.grant-optional { font: 9px var(--app-font-mono); text-transform: none; letter-spacing: 0; color: hsl(var(--muted-foreground) / .7); font-style: normal; }
+.grant-optional { font: 9px var(--app-font-mono); text-transform: none; letter-spacing: 0; color: hsl(var(--muted-foreground) / .85); font-style: normal; }
 .grant-actions {
   grid-column: 1 / -1;
   display: flex;
@@ -4006,7 +4006,7 @@ select optgroup {
 }
 .grant-row-reason {
   font: 500 11px var(--app-font-sans);
-  color: hsl(var(--foreground) / .72);
+  color: hsl(var(--foreground) / .8);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4067,7 +4067,7 @@ select optgroup {
   background: hsl(var(--accent) / .14);
   color: hsl(var(--accent));
 }
-.grant-roles-hint { display: block; margin-top: 6px; font-size: 10px; color: hsl(var(--muted-foreground) / .8); }
+.grant-roles-hint { display: block; margin-top: 6px; font-size: 10px; color: hsl(var(--muted-foreground) / .95); }
 
 .member-role-editor {
   display: flex;
