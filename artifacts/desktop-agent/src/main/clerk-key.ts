@@ -9,9 +9,16 @@ export interface ParsedPublishableKey {
   instanceType: string;
 }
 
+/** Clerk terminates the domain inside the payload with "$"; it's a marker, not part of the hostname. */
+function stripTerminator(s: string): string {
+  return s.replace(/\$$/, "");
+}
+
 export function parsePublishableKey(key: string | undefined | null): ParsedPublishableKey | null {
   if (!key) return null;
-  const trimmed = key.trim();
+  // Some key formats append the "$" terminator as a literal suffix after the
+  // base64url payload rather than encoding it; drop it so the regex accepts it.
+  const trimmed = key.trim().replace(/\$$/, "");
   const testId = /^(pk_(test|live)_[a-zA-Z0-9]+)$/.exec(trimmed);
   if (!testId) return null;
   const payload = trimmed.split("_")[2];
@@ -25,14 +32,14 @@ export function parsePublishableKey(key: string | undefined | null): ParsedPubli
     const json = JSON.parse(decoded) as { d?: string; i?: string; t?: string };
     if (!json.d) return null;
     return {
-      frontendApi: json.d,
+      frontendApi: stripTerminator(json.d),
       publishableKey: trimmed,
       instanceType: json.t || "",
     };
   } catch {
     // fall back to the legacy `<instance>.clerk.accounts.dev` form
     return {
-      frontendApi: decoded,
+      frontendApi: stripTerminator(decoded),
       publishableKey: trimmed,
       instanceType: "production",
     };
