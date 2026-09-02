@@ -1,4 +1,5 @@
 import { BrowserWindow, session as electronSession } from "electron";
+import path from "node:path";
 import { clerkAccountsOrigin } from "./clerk-key";
 
 export interface AuthSession {
@@ -37,10 +38,14 @@ export async function signInWithClerk(publishableKey: string): Promise<AuthSessi
     modal: false,
   });
 
-  // Redirect after sign-in goes back to the Clerk origin root so the session
-  // cookie is set before we try to read it.
-  const signInUrl = `${origin}/sign-in?redirect_url=${encodeURIComponent(origin)}`;
-  await win.loadURL(signInUrl);
+  // Clerk no longer serves hosted pages at *.clerk.accounts.dev/sign-in (that
+  // URL returns 404), so we load our own page that mounts Clerk's SignIn
+  // component straight from the instance's Frontend API. The __session cookie
+  // is set on the Clerk origin within this session partition and picked up by
+  // the cookie polling below.
+  await win.loadFile(path.join(__dirname, "..", "renderer", "signin.html"), {
+    query: { fapi: origin, publishableKey },
+  });
 
   return new Promise<AuthSession | null>((resolve) => {
     let closed = false;
