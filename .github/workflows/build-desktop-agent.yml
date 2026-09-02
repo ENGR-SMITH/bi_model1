@@ -40,7 +40,7 @@ jobs:
         run: pnpm install
 
       - name: Download FFmpeg for bundling
-        run: npx tsx scripts/src/download-ffmpeg.ts
+        run: pnpm --filter @workspace/scripts exec tsx scripts/src/download-ffmpeg.ts
 
       - name: Build & package the agent
         working-directory: artifacts/desktop-agent
