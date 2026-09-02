@@ -87,3 +87,19 @@ jobs:
             --content-type "application/octet-stream"
 
           echo "Published to s3://${R2_BUCKET}/${DEST}"
+
+          # Auto-update feeds (latest.yml / latest-mac.yml) + blockmaps must sit
+          # next to the installers for electron-updater to find releases.
+          for META in artifacts/desktop-agent/dist-bundle/latest*.yml artifacts/desktop-agent/dist-bundle/*.blockmap; do
+            [ -f "$META" ] || continue
+            CT="application/octet-stream"
+            case "$META" in
+              *.yml) CT="text/yaml" ;;
+            esac
+            aws s3 cp "$META" "s3://${R2_BUCKET}/${R2_PREFIX}/$(basename "$META")" \
+              --endpoint-url "https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              --region auto \
+              --acl public-read \
+              --content-type "$CT"
+            echo "Published update metadata: $(basename "$META")"
+          done

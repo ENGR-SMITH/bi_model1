@@ -57,7 +57,7 @@
       }
       .row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
       .row:last-child { margin-bottom: 0; }
-      label {
+      .row > label {
         font: 600 10px var(--font-mono);
         text-transform: uppercase; letter-spacing: .1em;
         color: var(--muted-fg); width: 80px; flex-shrink: 0;
@@ -97,12 +97,46 @@
       .err { color: var(--destructive); font-size: 12px; }
       .ok { color: var(--ok); font-size: 12px; }
 
-      /* --- Progress bar --- */
-      .bar { height: 5px; border-radius: 5px; background: var(--muted); margin-top: 10px; overflow: hidden; }
-      .bar > div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+      /* --- Progress --- */
+      .bar { height: 5px; border-radius: 5px; background: var(--muted); margin-top: 10px; overflow: hidden; position: relative; }
+      .bar > div { height: 100%; background: linear-gradient(90deg, hsl(357 92% 42%), hsl(13 95% 55%)); width: 0; transition: width .2s ease; }
+      .bar > div.indeterminate { width: 34%; animation: slideBar 1.1s ease-in-out infinite; }
+      @keyframes slideBar { from { transform: translateX(-110%); } to { transform: translateX(320%); } }
+      .progress-label { margin-top: 7px; font-size: 11px; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
 
       /* --- Auth section --- */
       .auth-email { font: 500 12px var(--font-mono); color: var(--accent); }
+
+      /* --- Widget settings card --- */
+      .setting-row {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding: 8px 0;
+      }
+      .setting-row + .setting-row { border-top: 1px solid var(--muted); }
+      .setting-name { font: 600 13px var(--font-sans); display: block; }
+      .setting-desc { font-size: 11px; color: var(--muted-fg); line-height: 1.5; }
+      .widget-hint {
+        margin-top: 10px; padding: 8px 10px; border-radius: 6px;
+        background: var(--muted); border: 1px solid var(--border);
+        font-size: 11px; color: var(--muted-fg); line-height: 1.6;
+      }
+
+      .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+      label.switch { font: unset; text-transform: none; letter-spacing: normal; width: auto; }
+      .switch input { opacity: 0; width: 0; height: 0; }
+      .switch .slider {
+        position: absolute; inset: 0; cursor: pointer;
+        background: var(--input); border: 1px solid var(--border);
+        border-radius: 999px; transition: background .15s;
+      }
+      .switch .slider::before {
+        content: ""; position: absolute; left: 2px; top: 2px;
+        width: 16px; height: 16px; border-radius: 50%;
+        background: var(--muted-fg); transition: transform .15s, background .15s;
+      }
+      .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
+      .switch input:checked + .slider::before { transform: translateX(16px); background: #fff; }
+      .switch input:disabled + .slider { opacity: .4; cursor: not-allowed; }
 
       /* --- Footer row --- */
       .footer-row {
@@ -112,6 +146,7 @@
       .footer-row .version {
         font: 500 10px var(--font-mono); color: var(--muted-fg); letter-spacing: .06em;
       }
+      #update-status { margin-top: 10px; font-size: 11px; }
       .hidden { display: none !important; }
     </style>
   </head>
@@ -153,17 +188,47 @@
       <div class="card">
         <button id="upload" class="btn-primary" disabled>Generate proxy &amp; upload to R2</button>
         <div class="bar"><div id="barfill"></div></div>
+        <div id="progress-label" class="progress-label hidden"></div>
         <div id="status" class="status"></div>
+      </div>
+
+      <!-- Floating widget settings -->
+      <div class="card">
+        <div class="row" style="align-items:flex-start;">
+          <label>Widget</label>
+          <span class="status">A Grammarly-style floating bubble that appears while a video plays on your PC. <span id="platform-note"></span></span>
+        </div>
+        <div class="setting-row">
+          <div>
+            <span class="setting-name">Floating widget</span>
+            <span class="setting-desc">Show a draggable Tandem bubble over other apps</span>
+          </div>
+          <label class="switch"><input type="checkbox" id="widget-enable" /><span class="slider"></span></label>
+        </div>
+        <div class="setting-row">
+          <div>
+            <span class="setting-name">Auto-show while a video plays</span>
+            <span class="setting-desc">Pop the bubble up when Windows detects video playback</span>
+          </div>
+          <label class="switch"><input type="checkbox" id="widget-auto" /><span class="slider"></span></label>
+        </div>
+        <div class="widget-hint" id="widget-hint">
+          Click the bubble to open the agent. Drag it to reposition — it stays where you put it.
+          Press <b>Ctrl+Alt+T</b> or use the tray icon (red dot) to show/hide it anytime.
+          With the widget on, closing this window keeps the agent running in the tray
+          (tray menu → <b>Quit Tandem Agent</b> to exit).
+        </div>
       </div>
 
       <!-- Footer -->
       <div class="footer-row">
-        <span class="version">v0.0.1</span>
+        <span class="version">v<span id="version">0.0.0</span></span>
         <div style="display:flex;gap:8px;align-items:center;">
-          <button id="update-btn" class="btn-secondary hidden">Check for updates</button>
+          <button id="update-btn" class="btn-secondary">Check for updates</button>
           <button id="sign-out" class="btn-secondary hidden">Sign out</button>
         </div>
       </div>
+      <div id="update-status" class="status"></div>
     </div>
 
     <script src="./renderer.js"></script>

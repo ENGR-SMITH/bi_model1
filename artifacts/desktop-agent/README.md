@@ -42,7 +42,8 @@ or set environment variables:
   "apiBaseUrl": "https://your-api.example.com",
   "clerkPublishableKey": "pk_test_...",
   "ffmpegPath": "C:\\ffmpeg\\bin\\ffmpeg.exe",
-  "workDir": "C:\\Users\\you\\.tandem-agent\\work"
+  "workDir": "C:\\Users\\you\\.tandem-agent\\work",
+  "updateUrl": "https://media.example.com/desktop-agent"
 }
 ```
 
@@ -52,6 +53,7 @@ or set environment variables:
 | `TANDEM_CLERK_PUBLISHABLE_KEY` | Your Clerk **publishable** key. |
 | `TANDEM_FFMPEG_PATH`    | Path to the ffmpeg binary (optional; else on PATH). |
 | `TANDEM_AGENT_WORK_DIR` | Temp dir for staged proxies. |
+| `TANDEM_UPDATE_URL` / `updateUrl` | Auto-update feed base URL (`latest.yml` / `latest-mac.yml` location). Overrides the publish URL baked in at build time. |
 
 > Use the **publishable** key (safe to ship in a desktop app — it's public).
 > Never embed the **secret** key.
@@ -111,7 +113,39 @@ The Creator Den vault and the Tandem content-creators doorway show a
 in the app's `.env` (copy it from the root `.env.example`). Point it at the R2
 public URL above (or a GitHub Release URL) and the button appears for users.
 
-## Notes & current limits
+## Auto-update
+
+The installed app checks for updates on launch (and via the **Check for updates**
+button in the footer) and downloads them in the background; when a new version is
+ready the button becomes **Restart & update**. Releases are published by the
+`build-desktop-agent` CI workflow, which uploads the installer **plus the
+`latest*.yml` feed files and blockmaps** next to it — point `TANDEM_UPDATE_URL`
+(or the build-time `build.publish.url`) at that public directory.
+
+Update checks only run in the packaged app (`app.isPackaged`) because
+`electron-updater` needs the `app-update.yml` that electron-builder bakes into
+an installer build; running from source shows "Update checks only work in the
+installed app." instead.
+
+## Floating video widget (Windows)
+
+The agent can run a Grammarly-style floating bubble: a small always-on-top,
+draggable red circle that lives over whatever you're doing and opens the agent
+when clicked. Enable it from the **Widget** card in the app — no restart needed:
+
+- **Floating widget** — master on/off switch. When on, the app keeps running in
+  the tray after you close its window (click the tray icon to reopen, or **Quit
+  Tandem Agent** from its menu).
+- **Auto-show while a video plays** — when Windows reports a video playing in a
+  browser or media player (via the OS media-session feed), the bubble appears;
+  it disappears a few seconds after playback stops. Detection polls every ~3 s
+  and only matches apps it recognizes as video-capable, so plain music apps
+  don't summon it.
+- **Fallbacks** — press `Ctrl+Alt+T` or use the tray menu to show/hide the
+  bubble anytime. Drag it anywhere; its position is remembered.
+
+Clicking the bubble opens the agent window. Windows-only for now; on macOS/Linux
+the toggle is disabled and the app runs as a normal window.
 
 ## Signing in
 
@@ -127,6 +161,10 @@ GETs.
 
 ## Notes & current limits
 
+- The video widget's auto-show uses the Windows media-session feed, so it only
+  knows about apps that publish to it (browsers, VLC, Movies & TV, …).
+  Detection is best-effort and polls every ~3 s; use `Ctrl+Alt+T` / the tray
+  if it misses something.
 - The server endpoints the agent calls (`proxy-upload-url` / `proxy-ready`)
   only respond when R2 env vars are configured on the API server.
 - Only proxies upload via the agent today; originals, exports, and bundles are

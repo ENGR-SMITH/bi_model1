@@ -351,6 +351,7 @@ The desktop agent (`artifacts/desktop-agent`) reads its own config from
 | `TANDEM_CLERK_PUBLISHABLE_KEY` | Same Clerk publishable key as the web apps |
 | `TANDEM_FFMPEG_PATH` | Path to the ffmpeg binary (else it uses PATH) |
 | `TANDEM_AGENT_WORK_DIR` | Temp dir for staged proxies |
+| `TANDEM_UPDATE_URL` | Auto-update feed base URL (where `latest.yml` / `latest-mac.yml` live). Optional — overrides the publish URL baked in at build time. |
 
 The in-app **"Desktop agent for large files"** button (Creator Den vault +
 Tandem doorway) shows when the frontend `.env` sets:

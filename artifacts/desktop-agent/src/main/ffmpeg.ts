@@ -29,15 +29,27 @@ export function resolveFfmpeg(configured: string): string {
 }
 
 export interface Progress {
+  /** 0-100 once the input duration is known; -1 while it isn't yet. */
   percent: number;
-  frame?: number;
-  kbps?: number;
+}
+
+const DURATION_RE = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/;
+const TIME_RE = /time=(\d+):(\d+):(\d+(?:\.\d+)?)/g;
+const MIN_EMIT_INTERVAL_MS = 180;
+
+function parseHms(m: RegExpMatchArray): number {
+  return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
 }
 
 /**
  * Generates a 720p H.264 proxy (same profile as the server pipeline) from a
  * raw source file. Reports cumulative progress via the `onProgress` callback
  * parsed from ffmpeg's stderr, then emits `onEnd` with the output path.
+ *
+ * ffmpeg prints the input `Duration:` line before encoding starts and then a
+ * rolling `time=…` cursor, so we can compute real percentages. When the
+ * duration line hasn't appeared yet we emit `percent: -1` so the caller can
+ * show an indeterminate state.
  */
 export function makeProxy(opts: {
   ffmpegPath: string;
@@ -78,17 +90,40 @@ export function makeProxy(opts: {
       return;
     }
 
-    let stderr = "";
+    let durationSeconds: number | null = null;
+    let tail = "";
+    let lastEmit = 0;
+
+    const emit = (percent: number) => {
+      const now = Date.now();
+      if (now - lastEmit < MIN_EMIT_INTERVAL_MS) return;
+      lastEmit = now;
+      opts.onProgress({ percent });
+    };
+
     child.stderr?.on("data", (chunk: Buffer) => {
       const line = chunk.toString();
-      stderr += line;
-      const timeMatch = /time=(\d+):(\d+):(\d+\.\d+)/.exec(stderr);
-      if (timeMatch) {
-        const seconds =
-          Number(timeMatch[1]) * 3600 + Number(timeMatch[2]) * 60 + Number(timeMatch[3]);
-        // total duration isn't always known up front; emit raw progress anyway
-        opts.onProgress({ percent: -1, frame: undefined });
-        void seconds;
+      // Keep only a rolling tail; ffmpeg progress lines use \r so the full
+      // buffer would otherwise grow unboundedly for long encodes.
+      tail = (tail + line).slice(-8192);
+
+      if (durationSeconds === null) {
+        const duration = DURATION_RE.exec(tail);
+        if (duration) {
+          durationSeconds = parseHms(duration);
+        } else {
+          // Input duration not printed yet — nothing measurable so far.
+          emit(-1);
+          return;
+        }
+      }
+
+      const times = [...tail.matchAll(TIME_RE)];
+      const last = times[times.length - 1];
+      if (last && durationSeconds !== null && durationSeconds > 0) {
+        const seconds = parseHms(last);
+        const percent = Math.min(99, Math.floor((seconds / durationSeconds) * 100));
+        emit(percent);
       }
     });
 
@@ -98,7 +133,7 @@ export function makeProxy(opts: {
 
     child.on("close", (code) => {
       if (code !== 0) {
-        reject(new Error(`ffmpeg exited with code ${code}: ${stderr.slice(-1000)}`));
+        reject(new Error(`ffmpeg exited with code ${code}: ${tail.slice(-1000)}`));
         return;
       }
       const stat = fs.statSync(opts.outputPath);

@@ -1,4 +1,12 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { AgentSettings, AppInfo, JobProgress, UpdateEvent } from "../shared/types";
+
+/** Subscribe helper: returns an unsubscribe function. */
+function on<T>(channel: string, cb: (payload: T) => void): () => void {
+  const listener = (_e: Electron.IpcRendererEvent, payload: T) => cb(payload);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+}
 
 const api = {
   signIn: () => ipcRenderer.invoke("agent:sign-in"),
@@ -9,10 +17,26 @@ const api = {
   pickFile: () => ipcRenderer.invoke("agent:pick-file"),
   uploadProxy: (opts: { projectId: string; assetId: string; localFile: string }) =>
     ipcRenderer.invoke("agent:upload-proxy", opts),
+
+  // Live progress for the in-flight Generate proxy & upload job.
+  onJobProgress: (cb: (progress: JobProgress) => void) => on<JobProgress>("agent:job-progress", cb),
+
+  // App metadata.
+  appInfo: () => ipcRenderer.invoke("agent:app-info") as Promise<AppInfo>,
+
+  // Auto-update.
   checkUpdate: () => ipcRenderer.invoke("agent:check-update"),
   installUpdate: () => ipcRenderer.invoke("agent:install-update"),
-  onConfigError: (cb: (msg: string) => void) =>
-    ipcRenderer.on("agent:config-error", (_e, msg: string) => cb(msg)),
+  onUpdateEvent: (cb: (update: UpdateEvent) => void) => on<UpdateEvent>("agent:update-event", cb),
+
+  // Floating widget + settings.
+  getSettings: () => ipcRenderer.invoke("agent:get-settings") as Promise<AgentSettings>,
+  setWidget: (patch: Partial<AgentSettings>) =>
+    ipcRenderer.invoke("agent:set-widget", patch) as Promise<AgentSettings>,
+  widgetOpenApp: () => ipcRenderer.invoke("agent:widget-open-app"),
+  widgetHide: () => ipcRenderer.invoke("agent:widget-hide"),
+
+  onConfigError: (cb: (msg: string) => void) => on<string>("agent:config-error", cb),
 };
 
 contextBridge.exposeInMainWorld("tandemAgent", api);

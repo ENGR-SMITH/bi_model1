@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tandem widget</title>
+    <style>
+      :root {
+        --accent: hsl(357 92% 47%);
+        --accent-2: hsl(13 95% 55%);
+      }
+      * { box-sizing: border-box; margin: 0; user-select: none; }
+      html, body { background: transparent; overflow: hidden; }
+      body { width: 100vw; height: 100vh; }
+
+      /* The whole circle is the drag handle (frameless window needs an
+         -webkit-app-region: drag surface to be movable). */
+      .bubble {
+        -webkit-app-region: drag;
+        position: absolute; inset: 0;
+        display: grid; place-items: center;
+      }
+      .bubble::after {
+        content: "";
+        position: absolute; inset: 3px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 32% 28%, hsl(357 92% 62%), var(--accent) 46%, hsl(357 96% 36%) 100%);
+        box-shadow:
+          0 6px 22px hsl(357 96% 30% / .55),
+          inset 0 1px 0 hsl(0 0% 100% / .35);
+        border: 1.5px solid hsl(0 0% 100% / .28);
+        transition: transform .12s ease;
+      }
+      .bubble:hover::after { transform: scale(1.06); }
+
+      /* Clickable core — marked no-drag so clicks reach it. */
+      .core {
+        -webkit-app-region: no-drag;
+        position: relative; z-index: 2;
+        width: 44px; height: 44px; border-radius: 50%;
+        display: grid; place-items: center;
+        color: #fff; cursor: pointer;
+        font: 700 20px/1 "DM Sans", system-ui, sans-serif; font-style: italic;
+        text-shadow: 0 1px 2px hsl(357 96% 20% / .6);
+      }
+
+      /* Close affordance, revealed on hover. */
+      .close {
+        -webkit-app-region: no-drag;
+        position: absolute; z-index: 3;
+        top: 6px; right: 6px;
+        width: 18px; height: 18px; border-radius: 50%;
+        background: hsl(0 0% 10% / .85);
+        color: #fff; cursor: pointer;
+        display: none; place-items: center;
+        font: 600 12px/1 system-ui, sans-serif;
+        border: 1px solid hsl(0 0% 100% / .35);
+      }
+      .bubble:hover .close { display: grid; }
+      .close:hover { background: hsl(0 72% 45%); }
+    </style>
+  </head>
+  <body>
+    <div class="bubble" id="bubble">
+      <div class="core" id="core" title="Open Tandem Desktop Agent">T</div>
+      <button class="close" id="close" title="Hide widget" aria-label="Hide widget">✕</button>
+    </div>
+    <script src="./bubble.js"></script>
+  </body>
+</html>

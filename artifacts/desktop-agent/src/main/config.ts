@@ -15,6 +15,11 @@ export interface AgentConfig {
   ffmpegPath: string;
   /** Local temp dir for staging proxies before upload. */
   workDir: string;
+  /**
+   * Base URL of the auto-update feed (where latest.yml / latest-mac.yml live),
+   * no trailing slash. Overrides the publish URL baked in at build time.
+   */
+  updateUrl: string;
 }
 
 const DEFAULTS: AgentConfig = {
@@ -22,6 +27,7 @@ const DEFAULTS: AgentConfig = {
   clerkPublishableKey: "",
   ffmpegPath: "",
   workDir: path.join(os.homedir(), ".tandem-agent", "work"),
+  updateUrl: "",
 };
 
 function loadFileConfig(): Partial<AgentConfig> {
@@ -47,5 +53,6 @@ export function loadConfig(): AgentConfig {
     clerkPublishableKey: process.env.TANDEM_CLERK_PUBLISHABLE_KEY || file.clerkPublishableKey || DEFAULTS.clerkPublishableKey,
     ffmpegPath: process.env.TANDEM_FFMPEG_PATH || file.ffmpegPath || DEFAULTS.ffmpegPath,
     workDir: process.env.TANDEM_AGENT_WORK_DIR || file.workDir || DEFAULTS.workDir,
+    updateUrl: process.env.TANDEM_UPDATE_URL || file.updateUrl || DEFAULTS.updateUrl,
   };
 }
