@@ -650,7 +650,7 @@ export default function ContentCreatorsProjectPage() {
               <small>you are the {rolesLabel(myRoles)}</small>
             </span>
             {(import.meta.env.VITE_AGENT_DOWNLOAD_URL as string | undefined) && (() => {
-                const base = (import.meta.env.VITE_AGENT_DOWNLOAD_URL as string).replace(/\.exe$/, '');
+                const base = (import.meta.env.VITE_AGENT_DOWNLOAD_URL as string).trim().replace(/\.exe$/, '');
                 const ext = navigator.userAgent.includes('Mac') ? '.dmg' : '.exe';
                 return (
                   <a

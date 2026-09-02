@@ -9,6 +9,8 @@ const api = {
   pickFile: () => ipcRenderer.invoke("agent:pick-file"),
   uploadProxy: (opts: { projectId: string; assetId: string; localFile: string }) =>
     ipcRenderer.invoke("agent:upload-proxy", opts),
+  checkUpdate: () => ipcRenderer.invoke("agent:check-update"),
+  installUpdate: () => ipcRenderer.invoke("agent:install-update"),
   onConfigError: (cb: (msg: string) => void) =>
     ipcRenderer.on("agent:config-error", (_e, msg: string) => cb(msg)),
 };

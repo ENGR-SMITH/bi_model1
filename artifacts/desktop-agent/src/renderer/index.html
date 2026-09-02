@@ -4,55 +4,135 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Tandem Desktop Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
-      :root { color-scheme: light; }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-        background: #faf6ee;
-        color: #2b2620;
+      :root {
+        --bg: hsl(0 0% 7%);
+        --fg: hsl(0 0% 95%);
+        --border: hsl(0 0% 20%);
+        --input: hsl(0 0% 16%);
+        --card: hsl(0 0% 11%);
+        --card-fg: hsl(0 0% 95%);
+        --muted: hsl(0 0% 14%);
+        --muted-fg: hsl(0 0% 72%);
+        --accent: hsl(357 92% 47%);
+        --accent-fg: hsl(0 0% 100%);
+        --secondary: hsl(0 0% 15%);
+        --destructive: hsl(0 72% 51%);
+        --ok: hsl(164 33% 45%);
+        --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
+        --font-mono: 'DM Mono', ui-monospace, monospace;
+        color-scheme: dark;
       }
-      .shell { max-width: 640px; margin: 0 auto; padding: 28px 22px 40px; }
-      h1 { font-size: 20px; margin: 0 0 4px; }
-      .sub { color: #8a8277; font-size: 13px; margin-bottom: 24px; }
+      * { box-sizing: border-box; margin: 0; }
+      body {
+        font-family: var(--font-sans);
+        background: var(--bg);
+        color: var(--fg);
+        min-height: 100dvh;
+      }
+
+      /* --- Layout --- */
+      .shell { max-width: 600px; margin: 0 auto; padding: 36px 24px 52px; animation: fadeUp .35s ease both; }
+      @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+      .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+      .brand-mark {
+        width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--accent);
+        color: var(--accent); display: grid; place-items: center;
+        font: 700 16px var(--font-sans); font-style: italic;
+      }
+      h1 { font: 700 20px/1.1 var(--font-sans); letter-spacing: -.03em; margin: 0; }
+      .sub { color: var(--muted-fg); font-size: 12px; margin: 8px 0 28px; line-height: 1.6; }
+
+      /* --- Cards --- */
       .card {
-        background: #fff;
-        border: 1px solid #e4dccb;
-        border-radius: 14px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
         padding: 18px;
-        margin-bottom: 14px;
+        margin-bottom: 12px;
       }
       .row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-      label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #6f675b; width: 90px; }
-      select, button { font-size: 14px; padding: 8px 12px; border-radius: 8px; }
-      select { flex: 1; border: 1px solid #d8cfbc; background: #fff; }
+      .row:last-child { margin-bottom: 0; }
+      label {
+        font: 600 10px var(--font-mono);
+        text-transform: uppercase; letter-spacing: .1em;
+        color: var(--muted-fg); width: 80px; flex-shrink: 0;
+      }
+
+      /* --- Form controls --- */
+      select, button { font-size: 13px; padding: 8px 12px; border-radius: 6px; }
+      select {
+        flex: 1; border: 1px solid var(--input); background: var(--bg);
+        color: var(--fg); outline: none;
+      }
+      select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px hsl(357 92% 47% / .15); }
+      select option { background: var(--card); color: var(--fg); }
+
       button {
         border: 0; cursor: pointer; font-weight: 600;
-        background: #5b4a86; color: #fff;
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        transition: transform .15s, background .15s, border-color .15s;
       }
-      button:disabled { opacity: 0.5; cursor: default; }
-      button.secondary { background: #efe9db; color: #3a332b; }
-      .status { font-size: 13px; white-space: pre-wrap; color: #555; }
-      .err { color: #b3261e; font-size: 13px; }
-      .ok { color: #1e7d3a; font-size: 13px; }
-      .bar { height: 8px; border-radius: 4px; background: #eee; margin-top: 8px; overflow: hidden; }
-      .bar > div { height: 100%; background: #5b4a86; width: 0; }
+      button:active { transform: scale(.97); }
+      button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+      .btn-primary {
+        background: var(--accent); color: var(--accent-fg); width: 100%;
+        padding: 11px 16px; font-size: 13px; font-weight: 700;
+        border-radius: 6px;
+      }
+      .btn-primary:hover:not(:disabled) { filter: brightness(1.12); }
+      .btn-secondary {
+        background: var(--secondary); color: var(--fg);
+        border: 1px solid var(--border);
+      }
+      .btn-secondary:hover:not(:disabled) { border-color: hsl(357 92% 47% / .4); color: var(--accent); }
+
+      /* --- Status --- */
+      .status { font-size: 12px; white-space: pre-wrap; color: var(--muted-fg); }
+      .err { color: var(--destructive); font-size: 12px; }
+      .ok { color: var(--ok); font-size: 12px; }
+
+      /* --- Progress bar --- */
+      .bar { height: 5px; border-radius: 5px; background: var(--muted); margin-top: 10px; overflow: hidden; }
+      .bar > div { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+
+      /* --- Auth section --- */
+      .auth-email { font: 500 12px var(--font-mono); color: var(--accent); }
+
+      /* --- Footer row --- */
+      .footer-row {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+      }
+      .footer-row .version {
+        font: 500 10px var(--font-mono); color: var(--muted-fg); letter-spacing: .06em;
+      }
+      .hidden { display: none !important; }
     </style>
   </head>
   <body>
     <div class="shell">
-      <h1>Tandem Desktop Agent</h1>
+      <div class="brand">
+        <span class="brand-mark">T</span>
+        <h1>Tandem Desktop Agent</h1>
+      </div>
       <div class="sub">Make a 720p proxy with local FFmpeg and upload it straight to Cloudflare R2.</div>
 
+      <!-- Auth card -->
       <div class="card" id="auth-card">
         <div class="row">
           <label>Account</label>
           <span id="who" class="status">Checking…</span>
-          <button id="sign-in" class="secondary">Sign in</button>
+          <button id="sign-in" class="btn-secondary">Sign in</button>
         </div>
       </div>
 
+      <!-- Workspace card -->
       <div class="card">
         <div class="row">
           <label>Project</label>
@@ -64,18 +144,26 @@
         </div>
         <div class="row">
           <label>Source</label>
-          <button id="pick" class="secondary">Choose raw file…</button>
+          <button id="pick" class="btn-secondary">Choose raw file…</button>
           <span id="file" class="status"></span>
         </div>
       </div>
 
+      <!-- Upload card -->
       <div class="card">
-        <button id="upload" disabled>Generate proxy &amp; upload to R2</button>
+        <button id="upload" class="btn-primary" disabled>Generate proxy &amp; upload to R2</button>
         <div class="bar"><div id="barfill"></div></div>
         <div id="status" class="status"></div>
       </div>
 
-      <button id="sign-out" class="secondary">Sign out</button>
+      <!-- Footer -->
+      <div class="footer-row">
+        <span class="version">v0.0.1</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button id="update-btn" class="btn-secondary hidden">Check for updates</button>
+          <button id="sign-out" class="btn-secondary hidden">Sign out</button>
+        </div>
+      </div>
     </div>
 
     <script src="./renderer.js"></script>

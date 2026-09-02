@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 import { loadConfig } from "./config";
-import { signInWithClerk, type AuthSession } from "./auth";
+import { signInWithClerk, clearClerkSession, type AuthSession } from "./auth";
 import { ApiClient } from "./api";
 import { makeProxy, resolveFfmpeg } from "./ffmpeg";
 
@@ -42,8 +42,9 @@ ipcMain.handle("agent:sign-in", async () => {
   return sessionCache ? { ok: true, email: sessionCache.email } : { ok: false };
 });
 
-ipcMain.handle("agent:sign-out", () => {
+ipcMain.handle("agent:sign-out", async () => {
   sessionCache = null;
+  await clearClerkSession();
   return { ok: true };
 });
 
@@ -102,7 +103,46 @@ ipcMain.handle(
   },
 );
 
-app.whenReady().then(() => {
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit();
+});
+
+// ---------------------------------------------------------------------------
+// Auto-update (electron-updater, lazy-loaded so the app still works without it)
+// ---------------------------------------------------------------------------
+let autoUpdater: { checkForUpdates: () => void; quitAndInstall: () => void } | null = null;
+
+async function initAutoUpdate(): Promise<void> {
+  try {
+    // electron-updater is an optional dependency — only used when packaged.
+    // @ts-expect-error electron-updater types may not be available in dev
+    const { autoUpdater: updater } = await import("electron-updater");
+    autoUpdater = updater as typeof autoUpdater;
+    if (autoUpdater) {
+      autoUpdater.checkForUpdates();
+    }
+  } catch {
+    // Not packaged or electron-updater not installed — skip silently.
+  }
+}
+
+ipcMain.handle("agent:check-update", () => {
+  if (autoUpdater) {
+    autoUpdater.checkForUpdates();
+    return { ok: true };
+  }
+  return { ok: false, reason: "auto-updater not available" };
+});
+
+ipcMain.handle("agent:install-update", () => {
+  if (autoUpdater) {
+    autoUpdater.quitAndInstall();
+    return { ok: true };
+  }
+  return { ok: false };
+});
+
+app.whenReady().then(async () => {
   createWindow();
   const cfg = loadConfig();
   if (!cfg.clerkPublishableKey) {
@@ -111,10 +151,7 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
-});
-
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  await initAutoUpdate();
 });
 
 export { mainWindow, os };

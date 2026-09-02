@@ -7,10 +7,13 @@ export interface AuthSession {
   email: string | null;
 }
 
+// Clerk session cookie names (v2+ __session, legacy __client, and others)
+const CLERK_COOKIE_NAMES = ["__session", "__client"];
+
 /**
  * Opens the Clerk hosted sign-in page in a modal window. On successful sign-in
- * we read the `__session` cookie (Clerk's session JWT, short-lived) and hand it
- * back as a bearer token for API calls. Resolves null if the user cancels.
+ * we read the session cookie (Clerk's session JWT) and hand it back as a bearer
+ * token for API calls. Resolves null if the user cancels.
  */
 export async function signInWithClerk(publishableKey: string): Promise<AuthSession | null> {
   const origin = clerkAccountsOrigin(publishableKey);
@@ -34,11 +37,16 @@ export async function signInWithClerk(publishableKey: string): Promise<AuthSessi
     modal: false,
   });
 
+  // Redirect after sign-in goes back to the Clerk origin root so the session
+  // cookie is set before we try to read it.
   const signInUrl = `${origin}/sign-in?redirect_url=${encodeURIComponent(origin)}`;
   await win.loadURL(signInUrl);
 
   return new Promise<AuthSession | null>((resolve) => {
     let closed = false;
+    let pollCount = 0;
+    const MAX_POLL_COUNT = 120; // ~2 minutes at 1 s interval
+
     const finish = (value: AuthSession | null) => {
       if (closed) return;
       closed = true;
@@ -47,32 +55,51 @@ export async function signInWithClerk(publishableKey: string): Promise<AuthSessi
       resolve(value);
     };
 
-    const tryReadSession = async (): Promise<void> => {
+    /** Try every known Clerk cookie; return true once a valid session is found. */
+    const tryReadSession = async (): Promise<boolean> => {
       try {
-        const cookies = await ses.cookies.get({ name: "__session" });
-        const cookie = cookies[0];
-        if (cookie && cookie.value && cookie.value.length > 10) {
-          const claims = decodeJwt(cookie.value);
-          finish({
-            token: cookie.value,
-            userId: typeof claims?.sub === "string" ? claims.sub : "unknown",
-            email: typeof claims?.email === "string" ? claims.email : null,
-          });
+        for (const cookieName of CLERK_COOKIE_NAMES) {
+          const cookies = await ses.cookies.get({ name: cookieName });
+          const cookie = cookies.find((c) => c.value && c.value.length > 20);
+          if (cookie) {
+            const claims = decodeJwt(cookie.value);
+            if (claims) {
+              finish({
+                token: cookie.value,
+                userId: typeof claims.sub === "string" ? claims.sub : "unknown",
+                email:
+                  typeof claims.email === "string"
+                    ? claims.email
+                    : typeof claims.email_address === "string"
+                      ? claims.email_address
+                      : null,
+              });
+              return true;
+            }
+          }
         }
       } catch {
         // keep polling
       }
+      return false;
     };
 
-    const poll = setInterval(() => void tryReadSession(), 1200);
-
-    const handle = (_e: unknown, url: string) => {
-      // Signed-in redirects land back on the Clerk accounts origin; pick the
-      // session up as soon as the cookie is present.
-      void tryReadSession();
-      if (url.startsWith(origin) && url.includes("sign-in")) {
-        void tryReadSession();
+    const poll = setInterval(async () => {
+      pollCount++;
+      if (pollCount >= MAX_POLL_COUNT) {
+        finish(null);
+        return;
       }
+      await tryReadSession();
+    }, 1000);
+
+    // Watch all navigation events — after Clerk sign-in the browser redirects
+    // through several hops before landing on the redirect_url.
+    const onWillNavigate = (_e: unknown, _url: string) => {
+      void tryReadSession();
+    };
+    const onDidNavigate = (_e: unknown, _url: string) => {
+      void tryReadSession();
     };
 
     const onClosed = () => {
@@ -82,16 +109,37 @@ export async function signInWithClerk(publishableKey: string): Promise<AuthSessi
 
     const cleanup = () => {
       clearInterval(poll);
-      win.webContents.removeListener("will-navigate", handle as never);
+      win.webContents.removeListener("will-navigate", onWillNavigate as never);
+      win.webContents.removeListener("did-navigate", onDidNavigate as never);
       win.removeListener("closed", onClosed);
     };
 
-    // The token is set as a cookie on a Clerk-managed subdomain; watch all
-    // navigation so we catch the moment it appears.
-    win.webContents.on("will-navigate", handle);
+    win.webContents.on("will-navigate", onWillNavigate);
+    win.webContents.on("did-navigate", onDidNavigate as never);
     win.on("closed", onClosed);
     void tryReadSession();
   });
+}
+
+/**
+ * Clears all Clerk session cookies so the next sign-in shows the login form
+ * instead of auto-authenticating.
+ */
+export async function clearClerkSession(): Promise<void> {
+  const ses = electronSession.fromPartition("tandem-agent");
+  try {
+    const cookies = await ses.cookies.get({});
+    for (const cookie of cookies) {
+      if (CLERK_COOKIE_NAMES.includes(cookie.name)) {
+        // Construct the cookie URL from domain + path
+        const protocol = cookie.secure ? "https:" : "http:";
+        const cookieUrl = `${protocol}//${cookie.domain}${cookie.path}`;
+        await ses.cookies.remove(cookieUrl, cookie.name);
+      }
+    }
+  } catch {
+    // best-effort cleanup
+  }
 }
 
 function decodeJwt(token: string): Record<string, unknown> | null {

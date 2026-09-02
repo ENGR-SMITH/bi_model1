@@ -13,6 +13,8 @@ declare global {
         sizeBytes?: number;
         error?: string;
       }>;
+      checkUpdate: () => Promise<{ ok: boolean; reason?: string }>;
+      installUpdate: () => Promise<{ ok: boolean }>;
       onConfigError: (cb: (msg: string) => void) => void;
     };
   }
@@ -20,11 +22,31 @@ declare global {
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
+let signedIn = false;
+
 async function refreshWho() {
   const who = await window.tandemAgent.whoami();
+  signedIn = who.signedIn;
   const whoSpan = $("who");
-  whoSpan.textContent = who.signedIn ? `Signed in · ${who.email ?? who.userId}` : "Not signed in";
-  $("sign-in").textContent = who.signedIn ? "Switch account" : "Sign in";
+  if (who.signedIn) {
+    whoSpan.innerHTML = '<span class="auth-email">' + (who.email ?? who.userId) + '</span>';
+    $("sign-in").textContent = "Switch account";
+    // Show sign-out and update buttons
+    $("sign-out").classList.remove("hidden");
+    $("update-btn").classList.remove("hidden");
+    // Enable the workspace controls
+    ($("project") as HTMLSelectElement).removeAttribute("disabled");
+  } else {
+    whoSpan.textContent = "Not signed in";
+    $("sign-in").textContent = "Sign in";
+    // Hide sign-out and update buttons
+    $("sign-out").classList.add("hidden");
+    $("update-btn").classList.add("hidden");
+    // Disable workspace controls until signed in
+    ($("project") as HTMLSelectElement).setAttribute("disabled", "true");
+    ($("asset") as HTMLSelectElement).setAttribute("disabled", "true");
+    $("upload").setAttribute("disabled", "true");
+  }
 }
 
 async function loadProjects() {
@@ -96,20 +118,42 @@ function initListeners() {
     const res = await window.tandemAgent.signIn();
     setStatus(res.ok ? "Signed in." : "Sign-in cancelled.", res.ok ? "ok" : "status");
     await refreshWho();
+    if (res.ok) {
+      await loadProjects();
+    }
   });
 
   $("sign-out").addEventListener("click", async () => {
     await window.tandemAgent.signOut();
     chosenFile = null;
+    $("file").textContent = "";
+    // Clear project/asset selects
+    const sel = $("project") as HTMLSelectElement;
+    sel.length = 1;
+    ($("asset") as HTMLSelectElement).length = 0;
     await refreshWho();
+    setStatus("Signed out.", "status");
   });
 
   ($("project") as HTMLSelectElement).addEventListener("change", loadAssets);
   $("pick").addEventListener("click", async () => {
     chosenFile = await window.tandemAgent.pickFile();
     $("file").textContent = chosenFile ?? "";
+    if (chosenFile) {
+      $("upload").removeAttribute("disabled");
+    }
   });
   $("upload").addEventListener("click", runUpload);
+
+  // Auto-update
+  $("update-btn").addEventListener("click", async () => {
+    const res = await window.tandemAgent.checkUpdate();
+    if (!res.ok) {
+      setStatus(res.reason ?? "Update check unavailable.", "status");
+    } else {
+      setStatus("Checking for updates…", "status");
+    }
+  });
 }
 
 async function main() {
