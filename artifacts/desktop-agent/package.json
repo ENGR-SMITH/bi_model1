@@ -36,7 +36,15 @@
     ],
     "mac": { "target": ["dmg"], "category": "public.app-category.video" },
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }]
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "nsis": {
+        "oneClick": false,
+        "perMachine": false,
+        "allowToChangeInstallationDirectory": true,
+        "deleteAppDataOnUninstall": false,
+        "createDesktopShortcut": true,
+        "createStartMenuShortcut": true
+      }
     },
     "linux": { "target": ["AppImage"] }
   }
