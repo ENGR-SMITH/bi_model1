@@ -36,7 +36,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download FFmpeg for bundling
-        run: pnpm --filter @workspace/scripts exec tsx scripts/src/download-ffmpeg.ts
+        run: pnpm --filter @workspace/scripts exec tsx src/download-ffmpeg.ts
 
       - name: Build Windows installer
         run: pnpm --filter @workspace/desktop-agent run build

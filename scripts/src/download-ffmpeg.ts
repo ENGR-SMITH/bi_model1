@@ -15,7 +15,10 @@ import fs from "node:fs";
 import path from "node:path";
 import https from "node:https";
 import http from "node:http";
+import { fileURLToPath } from "node:url";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const FFMPEG_DIR = path.resolve(__dirname, "../../artifacts/desktop-agent/ffmpeg");
 
 // BtbN FFmpeg-Builds — latest gpl shared builds
