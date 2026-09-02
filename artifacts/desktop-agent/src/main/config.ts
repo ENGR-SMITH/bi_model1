@@ -24,7 +24,11 @@ export interface AgentConfig {
 
 const DEFAULTS: AgentConfig = {
   apiBaseUrl: "http://localhost:3000",
-  clerkPublishableKey: "",
+  // Clerk publishable key for the shared Tandem Clerk instance (novel-tortoise-61).
+  // Publishable keys are public by design — the web apps embed the same one in
+  // their client bundles — so it's safe to ship as the built-in default.
+  // Override per-machine with TANDEM_CLERK_PUBLISHABLE_KEY or a config file.
+  clerkPublishableKey: "pk_test_bm92ZWwtdG9ydG9pc2UtNjEuY2xlcmsuYWNjb3VudHMuZGV2JA",
   ffmpegPath: "",
   workDir: path.join(os.homedir(), ".tandem-agent", "work"),
   updateUrl: "",
