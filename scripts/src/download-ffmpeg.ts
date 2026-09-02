@@ -4,10 +4,8 @@
  *
  * Usage: npx tsx scripts/src/download-ffmpeg.ts
  *
- * Sources:
- *   Windows: https://github.com/BtbN/FFmpeg-Builds/releases
- *   macOS:   https://github.com/BtbN/FFmpeg-Builds/releases
- *   Linux:   https://github.com/BtbN/FFmpeg-Builds/releases
+ * Windows: Downloads from BtbN/FFmpeg-Builds (GPL static build)
+ * macOS/Linux: Skips (users can install via Homebrew/apt)
  */
 
 import { execSync } from "node:child_process";
@@ -21,50 +19,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const FFMPEG_DIR = path.resolve(__dirname, "../../artifacts/desktop-agent/ffmpeg");
 
-// BtbN FFmpeg-Builds — latest gpl shared builds
-const BUILDS_BASE = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest";
-
-const BUILDS: Record<string, { url: string; binaryName: string; extract: ( dest: string, tmp: string) => void }> = {
-  win32: {
-    url: `${BUILDS_BASE}/ffmpeg-master-latest-win64-gpl.zip`,
-    binaryName: "ffmpeg.exe",
-    extract: (dest, tmp) => {
-      execSync(`unzip -o "${tmp}" -d "${dest}"`, { stdio: "inherit" });
-      // The zip extracts to ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe
-      const extractedBin = path.join(dest, "ffmpeg-master-latest-win64-gpl", "bin", "ffmpeg.exe");
-      const finalBin = path.join(dest, "ffmpeg.exe");
-      fs.copyFileSync(extractedBin, finalBin);
-      // Clean up extracted directory
-      fs.rmSync(path.join(dest, "ffmpeg-master-latest-win64-gpl"), { recursive: true, force: true });
-    },
-  },
-  darwin: {
-    url: `${BUILDS_BASE}/ffmpeg-master-latest-macosarm64-gpl.zip`,
-    binaryName: "ffmpeg",
-    extract: (dest, tmp) => {
-      execSync(`unzip -o "${tmp}" -d "${dest}"`, { stdio: "inherit" });
-      // The zip extracts to ffmpeg-master-latest-macosarm64-gpl/bin/ffmpeg
-      const extractedBin = path.join(dest, "ffmpeg-master-latest-macosarm64-gpl", "bin", "ffmpeg");
-      const finalBin = path.join(dest, "ffmpeg");
-      fs.copyFileSync(extractedBin, finalBin);
-      fs.chmodSync(finalBin, 0o755);
-      // Clean up extracted directory
-      fs.rmSync(path.join(dest, "ffmpeg-master-latest-macosarm64-gpl"), { recursive: true, force: true });
-    },
-  },
-  linux: {
-    url: `${BUILDS_BASE}/ffmpeg-master-latest-linux64-gpl.tar.xz`,
-    binaryName: "ffmpeg",
-    extract: (dest, tmp) => {
-      execSync(`tar -xf "${tmp}" -C "${dest}"`, { stdio: "inherit" });
-      const extractedBin = path.join(dest, "ffmpeg-master-latest-linux64-gpl", "bin", "ffmpeg");
-      const finalBin = path.join(dest, "ffmpeg");
-      fs.copyFileSync(extractedBin, finalBin);
-      fs.chmodSync(finalBin, 0o755);
-      fs.rmSync(path.join(dest, "ffmpeg-master-latest-linux64-gpl"), { recursive: true, force: true });
-    },
-  },
-};
+// BtbN FFmpeg-Builds — latest gpl static build (Windows only)
+const WIN_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
 
 function download(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -112,22 +68,22 @@ function download(url: string, dest: string): Promise<void> {
 }
 
 async function main() {
-  const platform = process.platform as keyof typeof BUILDS;
-  const build = BUILDS[platform];
+  const platform = process.platform;
 
-  if (!build) {
-    console.error(`Unsupported platform: ${platform}`);
-    process.exit(1);
+  // Only bundle FFmpeg on Windows — macOS users can use Homebrew, Linux users apt
+  if (platform !== "win32") {
+    console.log(`Skipping FFmpeg download on ${platform} (users can install via Homebrew/apt).`);
+    return;
   }
 
-  console.log(`Platform: ${platform}`);
-  console.log(`FFmpeg URL: ${build.url}`);
+  console.log("Platform: win32");
+  console.log(`FFmpeg URL: ${WIN_URL}`);
 
   // Create output directory
   fs.mkdirSync(FFMPEG_DIR, { recursive: true });
 
   // Check if FFmpeg already exists
-  const finalBin = path.join(FFMPEG_DIR, build.binaryName);
+  const finalBin = path.join(FFMPEG_DIR, "ffmpeg.exe");
   if (fs.existsSync(finalBin)) {
     console.log(`FFmpeg already exists at ${finalBin}, skipping download.`);
     return;
@@ -136,13 +92,18 @@ async function main() {
   // Download
   const tmpFile = path.join(FFMPEG_DIR, "download.tmp");
   console.log("Downloading FFmpeg...");
-  await download(build.url, tmpFile);
+  await download(WIN_URL, tmpFile);
 
   // Extract
   console.log("Extracting...");
-  build.extract(FFMPEG_DIR, tmpFile);
+  execSync(`unzip -o "${tmpFile}" -d "${FFMPEG_DIR}"`, { stdio: "inherit" });
 
-  // Clean up temp file
+  // Move ffmpeg.exe from extracted directory to root
+  const extractedBin = path.join(FFMPEG_DIR, "ffmpeg-master-latest-win64-gpl", "bin", "ffmpeg.exe");
+  fs.copyFileSync(extractedBin, finalBin);
+
+  // Clean up
+  fs.rmSync(path.join(FFMPEG_DIR, "ffmpeg-master-latest-win64-gpl"), { recursive: true, force: true });
   if (fs.existsSync(tmpFile)) {
     fs.unlinkSync(tmpFile);
   }
