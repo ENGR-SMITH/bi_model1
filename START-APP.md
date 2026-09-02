@@ -20,6 +20,7 @@ to run them from. Paths are relative to the repo root (the folder that contains
 | **API server** | `artifacts/api-server` | `3000` | — | Express REST API + Socket.IO realtime + Clerk auth + AI (Story Oracle) + video job queue. |
 | **PostgreSQL** | — | `5432` | — | The database. Schema lives in `lib/db`. |
 | Oracle Admin *(optional)* | `artifacts/oracle-admin` | `5176` | `/oracle-admin/` | Private control room for AI model providers (login code `ADMIN_ACCESS_CODE`). |
+| Desktop Agent *(optional)* | `artifacts/desktop-agent` | — | — | Electron app for uploading large files via FFmpeg + R2 presigned URLs. Not part of the web server. |
 | Mockup sandbox *(optional)* | `artifacts/mockup-sandbox` | `5177` | `/` | Standalone UI sandbox, not part of the main flow. |
 
 > The Tandem dev server **proxies** the Author Den and Creator Den, so you can reach
@@ -48,6 +49,8 @@ Install these on your PC first:
   - Replit: `ffmpeg` is already listed under `[nix] packages` in `.replit`.
   - Linux: `sudo apt install ffmpeg` · macOS: `brew install ffmpeg` ·
     Windows: `winget install Gyan.FFmpeg`.
+  > **Note:** The production desktop agent installer bundles FFmpeg, so end users
+  > don't need to install it separately. Only developers need it locally.
 
 > **Windows (Git Bash / PowerShell) note:** prefix the dev-server commands with
 > `MSYS_NO_PATHCONV=1` (Git Bash) so Vite doesn't mangle the `BASE_PATH` value.
@@ -229,6 +232,43 @@ Redis is needed** for basic local use. If you want the BullMQ queue mode:
    ```
    (or one capability at a time: `worker:proxy`, `worker:transcribe`, `worker:sync`,
    `worker:render`, `worker:audio`, `worker:finish`, `worker:reference`).
+
+### Desktop Agent (large-file uploads via FFmpeg)
+
+The desktop agent is a **standalone Electron app** — not part of the web server.
+It runs locally on your machine and generates 720p H.264 proxies from raw video
+using FFmpeg, then uploads them directly to Cloudflare R2 via presigned URLs.
+
+You only need it if you want to upload large video files (bigger than ~2 GB)
+that the browser can't handle.
+
+**Directory:** `artifacts/desktop-agent`
+
+```bash
+cd artifacts/desktop-agent
+pnpm run dev
+```
+
+On first launch:
+1. Click **Sign in** — a Clerk window opens for authentication.
+2. Pick a **project** and an **asset** (a raw file already in the vault).
+3. Select a **source raw file** on disk.
+4. Click **Generate proxy & upload to R2**.
+
+**Configuration** (optional — create `~/.tandem-agent/config.json`):
+```json
+{
+  "apiBaseUrl": "http://localhost:3000",
+  "clerkPublishableKey": "pk_test_...",
+  "ffmpegPath": "C:\\ffmpeg\\bin\\ffmpeg.exe"
+}
+```
+
+> FFmpeg is bundled in the production installer but must be installed separately
+> in dev mode. Install it via:
+> - Windows: `winget install Gyan.FFmpeg`
+> - macOS: `brew install ffmpeg`
+> - Linux: `sudo apt install ffmpeg`
 
 ### Mockup sandbox (UI scratchpad)
 
