@@ -1,4 +1,6 @@
 import { BrowserWindow, session as electronSession } from "electron";
+import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import { clerkAccountsOrigin } from "./clerk-key";
 
@@ -39,13 +41,27 @@ export async function signInWithClerk(publishableKey: string): Promise<AuthSessi
   });
 
   // Clerk no longer serves hosted pages at *.clerk.accounts.dev/sign-in (that
-  // URL returns 404), so we load our own page that mounts Clerk's SignIn
-  // component straight from the instance's Frontend API. The __session cookie
-  // is set on the Clerk origin within this session partition and picked up by
-  // the cookie polling below.
-  await win.loadFile(path.join(__dirname, "..", "renderer", "signin.html"), {
-    query: { fapi: origin, publishableKey },
+  // URL returns 404), so we serve our own page over a loopback HTTP server. It
+  // mounts Clerk's SignIn component straight from the instance's Frontend API;
+  // the __session cookie lands in this session partition and is picked up by
+  // the cookie polling below. A real http://127.0.0.1 origin (rather than
+  // file://) is required for Clerk's FAPI requests to behave correctly.
+  const rendererDir = path.join(__dirname, "..", "renderer");
+  const pageServer = http.createServer((req, res) => {
+    const url = new URL(req.url ?? "/", "http://127.0.0.1");
+    const fileName = url.pathname === "/signin.js" ? "signin.js" : "signin.html";
+    const body = fs.readFileSync(path.join(rendererDir, fileName));
+    res.writeHead(200, {
+      "Content-Type": fileName.endsWith(".js") ? "text/javascript" : "text/html",
+    });
+    res.end(body);
   });
+  await new Promise<void>((resolve) => pageServer.listen(0, "127.0.0.1", resolve));
+  const port = (pageServer.address() as { port: number }).port;
+  win.on("closed", () => pageServer.close());
+  await win.loadURL(
+    `http://127.0.0.1:${port}/signin.html?fapi=${encodeURIComponent(origin)}&publishableKey=${encodeURIComponent(publishableKey)}`,
+  );
 
   return new Promise<AuthSession | null>((resolve) => {
     let closed = false;
