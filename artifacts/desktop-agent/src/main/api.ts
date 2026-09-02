@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { pipeline } from "node:stream/promises";
+import { Transform } from "node:stream";
 import type { Readable } from "node:stream";
 
 export interface Project {
@@ -88,9 +88,34 @@ export class ApiClient {
     await this.request("POST", `/video/projects/${projectId}/assets/${assetId}/proxy-ready`);
   }
 
-  /** PUT the proxy bytes straight to R2 via the presigned URL (no server hop). */
-  async putToPresigned(uploadUrl: string, localPath: string, mimeType: string): Promise<void> {
-    const fileStream = fs.createReadStream(localPath);
+  /**
+   * PUT the proxy bytes straight to R2 via the presigned URL (no server hop).
+   * Reports upload progress through `onProgress` by counting bytes as they are
+   * read off disk into the request body.
+   */
+  async putToPresigned(
+    uploadUrl: string,
+    localPath: string,
+    mimeType: string,
+    onProgress?: (sentBytes: number, totalBytes: number) => void,
+  ): Promise<void> {
+    const totalBytes = fs.statSync(localPath).size;
+    let sentBytes = 0;
+    let lastEmit = 0;
+
+    const counter = new Transform({
+      transform(chunk: Buffer, _enc: string, cb: (err?: Error | null, data?: Buffer) => void) {
+        sentBytes += chunk.length;
+        const now = Date.now();
+        if (onProgress && now - lastEmit > 150) {
+          lastEmit = now;
+          onProgress(Math.min(sentBytes, totalBytes), totalBytes);
+        }
+        cb(null, chunk);
+      },
+    });
+
+    const fileStream = fs.createReadStream(localPath).pipe(counter);
     const res = await fetch(uploadUrl, {
       method: "PUT",
       headers: { "Content-Type": mimeType },
@@ -98,10 +123,10 @@ export class ApiClient {
       body: fileStream as unknown as Readable,
       duplex: "half",
     });
-    void pipeline;
     if (!res.ok) {
       throw new Error(`R2 PUT failed (${res.status}): ${(await res.text()).slice(0, 300)}`);
     }
+    onProgress?.(totalBytes, totalBytes);
   }
 }
 

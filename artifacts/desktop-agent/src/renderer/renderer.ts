@@ -1,54 +1,44 @@
+import type { TandemAgentApi } from "../preload";
+import type { AgentSettings, AppInfo, JobProgress, UpdateEvent } from "../shared/types";
+
 declare global {
   interface Window {
-    tandemAgent: {
-      signIn: () => Promise<{ ok: boolean; email?: string }>;
-      signOut: () => Promise<{ ok: boolean }>;
-      whoami: () => Promise<{ signedIn: boolean; email?: string; userId?: string }>;
-      listProjects: () => Promise<Array<{ id: string; name: string }>>;
-      listAssets: (projectId: string) => Promise<Array<{ id: string; fileName: string }>>;
-      pickFile: () => Promise<string | null>;
-      uploadProxy: (opts: { projectId: string; assetId: string; localFile: string }) => Promise<{
-        ok: boolean;
-        storageKey?: string;
-        sizeBytes?: number;
-        error?: string;
-      }>;
-      checkUpdate: () => Promise<{ ok: boolean; reason?: string }>;
-      installUpdate: () => Promise<{ ok: boolean }>;
-      onConfigError: (cb: (msg: string) => void) => void;
-    };
+    tandemAgent: TandemAgentApi;
   }
 }
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 let signedIn = false;
+let appInfo: AppInfo = { version: "0.0.0", platform: "unknown", packaged: false };
+let updateReady = false;
 
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
 async function refreshWho() {
   const who = await window.tandemAgent.whoami();
   signedIn = who.signedIn;
   const whoSpan = $("who");
   if (who.signedIn) {
-    whoSpan.innerHTML = '<span class="auth-email">' + (who.email ?? who.userId) + '</span>';
+    whoSpan.innerHTML = '<span class="auth-email">' + (who.email ?? who.userId) + "</span>";
     $("sign-in").textContent = "Switch account";
-    // Show sign-out and update buttons
     $("sign-out").classList.remove("hidden");
-    $("update-btn").classList.remove("hidden");
-    // Enable the workspace controls
     ($("project") as HTMLSelectElement).removeAttribute("disabled");
+    ($("asset") as HTMLSelectElement).removeAttribute("disabled");
   } else {
     whoSpan.textContent = "Not signed in";
     $("sign-in").textContent = "Sign in";
-    // Hide sign-out and update buttons
     $("sign-out").classList.add("hidden");
-    $("update-btn").classList.add("hidden");
-    // Disable workspace controls until signed in
     ($("project") as HTMLSelectElement).setAttribute("disabled", "true");
     ($("asset") as HTMLSelectElement).setAttribute("disabled", "true");
     $("upload").setAttribute("disabled", "true");
   }
 }
 
+// ---------------------------------------------------------------------------
+// Projects / assets
+// ---------------------------------------------------------------------------
 async function loadProjects() {
   const sel = $("project") as HTMLSelectElement;
   const projects = await window.tandemAgent.listProjects();
@@ -75,16 +65,50 @@ async function loadAssets() {
       sel.appendChild(opt);
     }
   } catch (err) {
-    $("status").textContent = `Failed to load assets: ${(err as Error).message}`;
+    setStatus(`Failed to load assets: ${(err as Error).message}`);
   }
 }
 
+// ---------------------------------------------------------------------------
+// Proxy job + live progress
+// ---------------------------------------------------------------------------
 let chosenFile: string | null = null;
 
 function setStatus(line: string, cls = "status") {
   const el = $("status");
   el.className = cls;
   el.textContent = line;
+}
+
+function handleProgress(p: JobProgress) {
+  const fill = $("barfill");
+  const label = $("progress-label");
+  label.classList.remove("hidden");
+
+  if (p.phase === "proxy") {
+    label.textContent =
+      p.percent >= 0 ? `Encoding 720p proxy… ${p.percent}%` : "Encoding 720p proxy…";
+  } else {
+    const mb = (n?: number) => (n === undefined ? "—" : (n / 1048576).toFixed(1));
+    const pct = p.percent >= 0 ? ` (${p.percent}%)` : "";
+    label.textContent = `Uploading to R2… ${mb(p.sentBytes)} / ${mb(p.totalBytes)} MB${pct}`;
+  }
+
+  if (p.percent < 0) {
+    // Can't measure yet — animate an indeterminate shimmer.
+    fill.classList.add("indeterminate");
+    fill.style.width = "0";
+  } else {
+    fill.classList.remove("indeterminate");
+    fill.style.width = p.percent + "%";
+  }
+}
+
+function resetProgress() {
+  const fill = $("barfill");
+  fill.classList.remove("indeterminate");
+  fill.style.width = "0";
+  $("progress-label").classList.add("hidden");
 }
 
 async function runUpload() {
@@ -94,6 +118,7 @@ async function runUpload() {
     setStatus("Pick a project, asset, and raw file first.", "err");
     return;
   }
+  resetProgress();
   setStatus("Generating proxy with FFmpeg…");
   $("upload").setAttribute("disabled", "true");
   try {
@@ -103,16 +128,84 @@ async function runUpload() {
         `Done. Uploaded ${(result.sizeBytes ?? 0) / 1024 / 1024} MB proxy to R2 (${result.storageKey}).`,
         "ok",
       );
+      const fill = $("barfill");
+      fill.classList.remove("indeterminate");
+      fill.style.width = "100%";
     } else {
       setStatus(result.error ?? "Upload failed.", "err");
+      resetProgress();
     }
   } catch (err) {
     setStatus((err as Error).message, "err");
+    resetProgress();
   } finally {
     $("upload").removeAttribute("disabled");
   }
 }
 
+// ---------------------------------------------------------------------------
+// Auto-update UI
+// ---------------------------------------------------------------------------
+function handleUpdate(u: UpdateEvent) {
+  const status = $("update-status");
+  const btn = $("update-btn");
+  status.className = "status";
+  switch (u.type) {
+    case "checking":
+      status.textContent = "Checking for updates…";
+      break;
+    case "available":
+      status.textContent = `Update v${u.version} available — downloading…`;
+      break;
+    case "downloading":
+      status.textContent = `Downloading update… ${u.percent ?? 0}%`;
+      break;
+    case "downloaded":
+      updateReady = true;
+      status.className = "ok";
+      status.textContent = `Update v${u.version} downloaded. Restart to install it.`;
+      btn.textContent = "Restart & update";
+      break;
+    case "not-available":
+      status.textContent = "You're on the latest version.";
+      break;
+    case "error":
+      status.className = "err";
+      status.textContent = `Update check failed: ${u.error ?? "unknown error"}`;
+      break;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Floating widget settings
+// ---------------------------------------------------------------------------
+async function syncWidgetSettings(s: AgentSettings) {
+  const enable = $("widget-enable") as HTMLInputElement;
+  const auto = $("widget-auto") as HTMLInputElement;
+  const windows = appInfo.platform === "win32";
+  const note = $("platform-note");
+
+  note.textContent = windows
+    ? "Requires Windows."
+    : "Only available on Windows — on this platform the agent runs as a regular window.";
+
+  enable.checked = s.widgetEnabled && windows;
+  auto.checked = s.widgetAutoShow;
+  enable.disabled = !windows;
+  auto.disabled = !windows || !s.widgetEnabled;
+}
+
+async function loadWidgetSettings() {
+  try {
+    await syncWidgetSettings(await window.tandemAgent.getSettings());
+  } catch {
+    // preload not ready — settings card stays inert
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Listeners
+// ---------------------------------------------------------------------------
 function initListeners() {
   $("sign-in").addEventListener("click", async () => {
     const res = await window.tandemAgent.signIn();
@@ -127,12 +220,11 @@ function initListeners() {
     await window.tandemAgent.signOut();
     chosenFile = null;
     $("file").textContent = "";
-    // Clear project/asset selects
     const sel = $("project") as HTMLSelectElement;
     sel.length = 1;
     ($("asset") as HTMLSelectElement).length = 0;
     await refreshWho();
-    setStatus("Signed out.", "status");
+    setStatus("Signed out.");
   });
 
   ($("project") as HTMLSelectElement).addEventListener("change", loadAssets);
@@ -147,24 +239,56 @@ function initListeners() {
 
   // Auto-update
   $("update-btn").addEventListener("click", async () => {
+    if (updateReady) {
+      await window.tandemAgent.installUpdate();
+      return;
+    }
     const res = await window.tandemAgent.checkUpdate();
     if (!res.ok) {
-      setStatus(res.reason ?? "Update check unavailable.", "status");
-    } else {
-      setStatus("Checking for updates…", "status");
+      const status = $("update-status");
+      status.className = "status";
+      status.textContent = res.reason ?? "Update check unavailable.";
     }
+  });
+
+  // Widget toggles
+  ($("widget-enable") as HTMLInputElement).addEventListener("change", async () => {
+    const enabled = ($("widget-enable") as HTMLInputElement).checked;
+    const s = await window.tandemAgent.setWidget({ widgetEnabled: enabled });
+    await syncWidgetSettings(s);
+  });
+  ($("widget-auto") as HTMLInputElement).addEventListener("change", async () => {
+    const autoShow = ($("widget-auto") as HTMLInputElement).checked;
+    const s = await window.tandemAgent.setWidget({ widgetAutoShow: autoShow });
+    await syncWidgetSettings(s);
   });
 }
 
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
 async function main() {
   initListeners();
   window.tandemAgent.onConfigError((msg) => setStatus(msg, "err"));
+
+  try {
+    appInfo = await window.tandemAgent.appInfo();
+  } catch {
+    // keep defaults
+  }
+  const version = $("version");
+  if (version) version.textContent = appInfo.version;
+  await loadWidgetSettings();
+
   await refreshWho();
   try {
     await loadProjects();
   } catch {
     // stays empty until sign-in
   }
+
+  window.tandemAgent.onJobProgress(handleProgress);
+  window.tandemAgent.onUpdateEvent(handleUpdate);
 }
 
 void main();
