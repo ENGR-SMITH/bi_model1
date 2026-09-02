@@ -1,11 +1,8 @@
-import type { TandemAgentApi } from "../preload";
-import type { AgentSettings, AppInfo, JobProgress, UpdateEvent } from "../shared/types";
-
-declare global {
-  interface Window {
-    tandemAgent: TandemAgentApi;
-  }
-}
+// NOTE: keep this file free of import/export. It's loaded as a plain <script>
+// tag (no bundler), so module syntax would make tsc emit a CommonJS wrapper
+// that crashes the page — `exports` is undefined in the browser. All types
+// (AgentSettings, JobProgress, window.tandemAgent, …) come from the ambient
+// globals.d.ts in this directory.
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
@@ -333,5 +330,3 @@ async function main() {
 void main().catch((err) => {
   setStatus(`Failed to start: ${(err as Error).message}`, "err");
 });
-
-export {};
