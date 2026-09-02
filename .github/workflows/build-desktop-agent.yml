@@ -49,7 +49,7 @@ jobs:
       #   CF_ACCOUNT_ID, CF_R2_ACCESS_KEY, CF_R2_SECRET_KEY
       # and a repository variable: R2_BUCKET (defaults to tandem-media).
       - name: Upload installer to R2
-        if: ${{ secrets.CF_R2_ACCESS_KEY != '' }}
+        if: ${{ env.CF_R2_ACCESS_KEY != '' }}
         env:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           CF_R2_ACCESS_KEY: ${{ secrets.CF_R2_ACCESS_KEY }}
