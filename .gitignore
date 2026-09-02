@@ -2,6 +2,8 @@
 
 # compiled output
 dist
+# electron-builder output (never commit built binaries)
+artifacts/desktop-agent/dist-bundle
 tmp
 out-tsc
 *.tsbuildinfo

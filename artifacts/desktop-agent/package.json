@@ -26,6 +26,7 @@
     "productName": "Tandem Desktop Agent",
     "directories": { "output": "dist-bundle" },
     "files": ["dist/**/*"],
+    "compression": "normal",
     "mac": { "target": ["dmg"], "category": "public.app-category.video" },
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }]
