@@ -1,4 +1,8 @@
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[agent] unhandled rejection:", reason);
+});
 import type { AppUpdater } from "electron-updater";
 import path from "node:path";
 import fs from "node:fs";
@@ -15,6 +19,16 @@ let mainWindow: BrowserWindow | null = null;
 let sessionCache: AuthSession | null = null;
 let widgetController: WidgetController | null = null;
 let isQuitting = false;
+
+// Only one agent instance at a time — a second launch (e.g. from a leftover
+// installer or an old copy still running in the tray) just focuses the window
+// that's already there instead of silently competing for the same IPC channels.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => showMainWindow());
+}
 
 function showMainWindow(): void {
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -69,9 +83,20 @@ function sendJobProgress(progress: JobProgress): void {
 }
 
 ipcMain.handle("agent:sign-in", async () => {
+  try {
+    const cfg = loadConfig();
+    sessionCache = await signInWithClerk(cfg.clerkPublishableKey);
+    return sessionCache ? { ok: true, email: sessionCache.email } : { ok: false };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+});
+
+// Lets the renderer ask about missing config instead of relying on a one-shot
+// push that can be dropped if it's sent before the page has loaded.
+ipcMain.handle("agent:config-status", (): { clerkConfigured: boolean } => {
   const cfg = loadConfig();
-  sessionCache = await signInWithClerk(cfg.clerkPublishableKey);
-  return sessionCache ? { ok: true, email: sessionCache.email } : { ok: false };
+  return { clerkConfigured: Boolean(cfg.clerkPublishableKey) };
 });
 
 ipcMain.handle("agent:sign-out", async () => {
