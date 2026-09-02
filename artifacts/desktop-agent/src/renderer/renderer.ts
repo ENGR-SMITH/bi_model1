@@ -1,17 +1,24 @@
-import type { TandemAgentApi } from "../preload";
-import type { AgentSettings, AppInfo, JobProgress, UpdateEvent } from "../shared/types";
-
-declare global {
-  interface Window {
-    tandemAgent: TandemAgentApi;
-  }
-}
+// NOTE: keep this file free of import/export. It's loaded as a plain <script>
+// tag (no bundler), so module syntax would make tsc emit a CommonJS wrapper
+// that crashes the page — `exports` is undefined in the browser. All types
+// (AgentSettings, JobProgress, window.tandemAgent, …) come from the ambient
+// globals.d.ts in this directory.
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
 
 let signedIn = false;
 let appInfo: AppInfo = { version: "0.0.0", platform: "unknown", packaged: false };
 let updateReady = false;
+
+// Never fail silently: surface renderer crashes into the status line so a
+// broken build is obvious instead of looking like a dead UI.
+window.addEventListener("error", (e) => {
+  setStatus(`Renderer error: ${e.message}`, "err");
+});
+window.addEventListener("unhandledrejection", (e) => {
+  const r = e.reason as { message?: string } | undefined;
+  setStatus(`Error: ${r?.message ?? String(r)}`, "err");
+});
 
 // ---------------------------------------------------------------------------
 // Auth
@@ -172,6 +179,9 @@ function handleUpdate(u: UpdateEvent) {
     case "error":
       status.className = "err";
       status.textContent = `Update check failed: ${u.error ?? "unknown error"}`;
+      if (/enotfound|getaddrinfo|404/i.test(u.error ?? "")) {
+        status.textContent += " — point TANDEM_UPDATE_URL at your release feed (see README).";
+      }
       break;
   }
 }
@@ -208,11 +218,17 @@ async function loadWidgetSettings() {
 // ---------------------------------------------------------------------------
 function initListeners() {
   $("sign-in").addEventListener("click", async () => {
-    const res = await window.tandemAgent.signIn();
-    setStatus(res.ok ? "Signed in." : "Sign-in cancelled.", res.ok ? "ok" : "status");
-    await refreshWho();
-    if (res.ok) {
+    try {
+      const res = await window.tandemAgent.signIn();
+      if (!res.ok) {
+        setStatus(res.error ?? "Sign-in cancelled.", "err");
+        return;
+      }
+      setStatus("Signed in.", "ok");
+      await refreshWho();
       await loadProjects();
+    } catch (err) {
+      setStatus(`Sign-in failed: ${(err as Error).message}`, "err");
     }
   });
 
@@ -265,6 +281,25 @@ function initListeners() {
 }
 
 // ---------------------------------------------------------------------------
+// Config warning (pull-based, unlike the one-shot agent:config-error push)
+// ---------------------------------------------------------------------------
+async function checkConfig() {
+  try {
+    const st = await window.tandemAgent.configStatus();
+    if (!st.clerkConfigured) {
+      setStatus(
+        "Clerk publishable key is not configured. Create tandem-agent.json next to the app " +
+          "with { \"clerkPublishableKey\": \"pk_test_...\" } (or set TANDEM_CLERK_PUBLISHABLE_KEY) " +
+          "and relaunch before signing in.",
+        "err",
+      );
+    }
+  } catch {
+    // preload not available — the global error handler will surface it
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 async function main() {
@@ -280,6 +315,7 @@ async function main() {
   if (version) version.textContent = appInfo.version;
   await loadWidgetSettings();
 
+  await checkConfig();
   await refreshWho();
   try {
     await loadProjects();
@@ -291,6 +327,6 @@ async function main() {
   window.tandemAgent.onUpdateEvent(handleUpdate);
 }
 
-void main();
-
-export {};
+void main().catch((err) => {
+  setStatus(`Failed to start: ${(err as Error).message}`, "err");
+});

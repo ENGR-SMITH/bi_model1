@@ -23,6 +23,7 @@ const api = {
 
   // App metadata.
   appInfo: () => ipcRenderer.invoke("agent:app-info") as Promise<AppInfo>,
+  configStatus: () => ipcRenderer.invoke("agent:config-status") as Promise<{ clerkConfigured: boolean }>,
 
   // Auto-update.
   checkUpdate: () => ipcRenderer.invoke("agent:check-update"),
