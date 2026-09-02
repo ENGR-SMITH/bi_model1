@@ -8,10 +8,23 @@ export interface ProxyOutput {
 }
 
 export function resolveFfmpeg(configured: string): string {
+  // 1. User-configured path (env var or config file)
   if (configured) {
     if (fs.existsSync(configured)) return configured;
     return configured;
   }
+
+  // 2. Bundled FFmpeg (shipped with the app via extraResources)
+  const isWin = process.platform === "win32";
+  const bundledName = isWin ? "ffmpeg.exe" : "ffmpeg";
+  const bundledPath = path.join(
+    process.resourcesPath || path.join(__dirname, "../../../"),
+    "ffmpeg",
+    bundledName,
+  );
+  if (fs.existsSync(bundledPath)) return bundledPath;
+
+  // 3. Fall back to system PATH
   return "ffmpeg";
 }
 

@@ -649,17 +649,21 @@ export default function ContentCreatorsProjectPage() {
               <b>{p.assets.length} asset{p.assets.length === 1 ? '' : 's'} · {p.members.length} member{p.members.length === 1 ? '' : 's'}</b>
               <small>you are the {rolesLabel(myRoles)}</small>
             </span>
-            {(import.meta.env.VITE_AGENT_DOWNLOAD_URL as string | undefined) && (
-              <a
-                href={import.meta.env.VITE_AGENT_DOWNLOAD_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="cd-agent-link"
-                data-testid="link-download-desktop-agent"
-              >
-                <Download size={12} /> Desktop agent for large files
-              </a>
-            )}
+            {(import.meta.env.VITE_AGENT_DOWNLOAD_URL as string | undefined) && (() => {
+                const base = (import.meta.env.VITE_AGENT_DOWNLOAD_URL as string).replace(/\.exe$/, '');
+                const ext = navigator.userAgent.includes('Mac') ? '.dmg' : '.exe';
+                return (
+                  <a
+                    href={`${base}${ext}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="cd-agent-link"
+                    data-testid="link-download-desktop-agent"
+                  >
+                    <Download size={12} /> Desktop agent for large files
+                  </a>
+                );
+              })()}
           </div>
           {/* The whole crew — real avatars + roles, moved up from the chat. */}
           <div className="cd-roster" data-testid="vault-roster">

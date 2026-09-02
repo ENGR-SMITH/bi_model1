@@ -28,7 +28,8 @@ existing account. It talks to the same API the web apps use.
 
 ## Prerequisites on the user's machine
 
-- **FFmpeg** on PATH (or point `TANDEM_FFMPEG_PATH` at the binary).
+- **FFmpeg** — bundled in the installer (no extra install needed).
+  If you have a custom FFmpeg installation, set `TANDEM_FFMPEG_PATH` to use it instead.
 - Nothing else — no Node needed once packaged.
 
 ## Configuration

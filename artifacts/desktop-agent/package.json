@@ -27,6 +27,13 @@
     "directories": { "output": "dist-bundle" },
     "files": ["dist/**/*"],
     "compression": "normal",
+    "extraResources": [
+      {
+        "from": "ffmpeg",
+        "to": "ffmpeg",
+        "filter": ["ffmpeg*"]
+      }
+    ],
     "mac": { "target": ["dmg"], "category": "public.app-category.video" },
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }]

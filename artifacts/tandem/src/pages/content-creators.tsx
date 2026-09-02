@@ -47,18 +47,22 @@ export default function ContentCreatorsPage() {
                 Open Creators Den
                 <PiFilmSlateDuotone className="h-4 w-4" />
               </a>
-              {(import.meta.env.VITE_AGENT_DOWNLOAD_URL as string | undefined) && (
-                <a
-                  href={import.meta.env.VITE_AGENT_DOWNLOAD_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="focus-house mt-3 inline-flex items-center gap-3 rounded-full border border-white/15 bg-transparent px-5 py-2.5 text-sm font-bold text-zinc-100 transition-colors hover:bg-[#111111]/10"
-                  data-testid="link-download-desktop-agent"
-                >
-                  <PiDownloadSimpleDuotone className="h-4 w-4" />
-                  Desktop agent for large files
-                </a>
-              )}
+              {(import.meta.env.VITE_AGENT_DOWNLOAD_URL as string | undefined) && (() => {
+                const base = (import.meta.env.VITE_AGENT_DOWNLOAD_URL as string).replace(/\.exe$/, '');
+                const ext = navigator.userAgent.includes('Mac') ? '.dmg' : '.exe';
+                return (
+                  <a
+                    href={`${base}${ext}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="focus-house mt-3 inline-flex items-center gap-3 rounded-full border border-white/15 bg-transparent px-5 py-2.5 text-sm font-bold text-zinc-100 transition-colors hover:bg-[#111111]/10"
+                    data-testid="link-download-desktop-agent"
+                  >
+                    <PiDownloadSimpleDuotone className="h-4 w-4" />
+                    Desktop agent for large files
+                  </a>
+                );
+              })()}
             </div>
           </div>
         </div>
