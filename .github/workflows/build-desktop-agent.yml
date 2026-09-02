@@ -42,6 +42,11 @@ jobs:
       - name: Download FFmpeg for bundling
         run: pnpm --filter @workspace/scripts exec tsx src/download-ffmpeg.ts
 
+      # macOS/Linux don't bundle FFmpeg (users install via Homebrew/apt), but
+      # electron-builder needs the extraResources source dir to exist.
+      - name: Ensure bundled ffmpeg dir exists
+        run: mkdir -p artifacts/desktop-agent/ffmpeg
+
       - name: Build & package the agent
         working-directory: artifacts/desktop-agent
         run: pnpm run build

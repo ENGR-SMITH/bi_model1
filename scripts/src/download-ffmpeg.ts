@@ -32,7 +32,8 @@ function download(url: string, dest: string): Promise<void> {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         file.close();
         fs.unlinkSync(dest);
-        return download(res.headers.location, dest).then(resolve, reject);
+        void download(res.headers.location, dest).then(resolve, reject);
+        return;
       }
 
       if (res.statusCode !== 200) {
@@ -94,13 +95,16 @@ async function main() {
   console.log("Downloading FFmpeg...");
   await download(WIN_URL, tmpFile);
 
-  // Extract
-  console.log("Extracting...");
-  execSync(`unzip -o "${tmpFile}" -d "${FFMPEG_DIR}"`, { stdio: "inherit" });
+  // Extract ONLY the ffmpeg.exe binary (this is a statically-linked GPL build,
+  // so it needs no DLLs). Inflating the whole archive would unpack the docs and
+  // dev trees too — tens of thousands of tiny files that make the CI step slow
+  // enough to get canceled.
+  console.log("Extracting ffmpeg.exe only...");
+  execSync(`unzip -jo "${tmpFile}" "*/bin/ffmpeg.exe" -d "${FFMPEG_DIR}"`, { stdio: "inherit" });
 
-  // Move ffmpeg.exe from extracted directory to root
-  const extractedBin = path.join(FFMPEG_DIR, "ffmpeg-master-latest-win64-gpl", "bin", "ffmpeg.exe");
-  fs.copyFileSync(extractedBin, finalBin);
+  if (!fs.existsSync(finalBin)) {
+    throw new Error("Extraction did not produce ffmpeg.exe");
+  }
 
   // Clean up
   fs.rmSync(path.join(FFMPEG_DIR, "ffmpeg-master-latest-win64-gpl"), { recursive: true, force: true });
