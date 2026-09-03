@@ -449,6 +449,7 @@ export const tandemVideoNotificationsTable = sqliteTable("tandem_video_notificat
 
 export const tandemAccountQuotasTable = sqliteTable("tandem_account_quotas", {
   userId: text("user_id").primaryKey(),
+  // Mirrors the pg bigint: the 2 GB free tier (2^31) overflows a 32-bit int.
   storageLimitBytes: integer("storage_limit_bytes").notNull(),
   projectLimit: integer("project_limit").notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),

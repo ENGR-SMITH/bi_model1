@@ -1,5 +1,6 @@
 import { createInsertSchema } from "drizzle-zod";
 import {
+  bigint,
   integer,
   jsonb,
   pgTable,
@@ -32,7 +33,9 @@ export const tandemVideoAssetFilesTable = pgTable("tandem_video_asset_files", {
   // reference an already-stored file (Git-LFS-style pointer) without a copy.
   contentHash: text("content_hash"),
   mimeType: text("mime_type").notNull().default("application/octet-stream"),
-  sizeBytes: integer("size_bytes").notNull().default(0),
+  // bigint (not integer): derived artifacts (proxies/renders/exports) of raw
+  // footage can exceed 2 GB; a 32-bit integer maxes out at 2^31 - 1.
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull().default(0),
   // e.g. { width, height, fps, durationMs, model, degraded }
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
