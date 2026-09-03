@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { date, integer, pgTable, text, timestamp, unique } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
 // Account-level limits — the workspace storage bar (Creator Den) and the
@@ -7,6 +7,34 @@ import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 // quota (2 GB of project storage / 5 projects) and can extend it by buying a
 // plan; the applied limit lives here and grows as plans are purchased.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Daily storage snapshots — the metering ledger behind the storage bar.
+// R2 does not bill per account; a nightly job records how many physical bytes
+// each project (and thus each owner account) actually stores — originals +
+// derived artifacts, split by storage provider (R2 vs local processing disk).
+// ---------------------------------------------------------------------------
+export const tandemVideoStorageSnapshotsTable = pgTable(
+  "tandem_video_storage_snapshots",
+  {
+    projectId: text("project_id").notNull(),
+    ownerId: text("owner_id").notNull(),
+    day: date("day").notNull(),
+    // Total physical bytes stored for the project that day.
+    totalBytes: integer("total_bytes").notNull().default(0),
+    // Bytes held in R2 (billable at the R2 rate) vs local processing disk.
+    r2Bytes: integer("r2_bytes").notNull().default(0),
+    localBytes: integer("local_bytes").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    projectDayUnique: unique("tandem_video_storage_snapshot_project_day").on(table.projectId, table.day),
+  }),
+);
+
+export const insertTandemVideoStorageSnapshotSchema = createInsertSchema(tandemVideoStorageSnapshotsTable);
+
+export type TandemVideoStorageSnapshot = typeof tandemVideoStorageSnapshotsTable.$inferSelect;
 
 export const tandemAccountQuotasTable = pgTable("tandem_account_quotas", {
   userId: text("user_id").primaryKey(),

@@ -10,6 +10,22 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+export const tandemVideoStorageSnapshotsTable = sqliteTable(
+  "tandem_video_storage_snapshots",
+  {
+    projectId: text("project_id").notNull(),
+    ownerId: text("owner_id").notNull(),
+    day: text("day").notNull(),
+    totalBytes: integer("total_bytes").notNull().default(0),
+    r2Bytes: integer("r2_bytes").notNull().default(0),
+    localBytes: integer("local_bytes").notNull().default(0),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    projectDayUnique: unique("tandem_video_storage_snapshot_project_day").on(table.projectId, table.day),
+  }),
+);
+
 const require = createRequire(import.meta.url);
 
 // Mirrors the pg collaboration tables (lib/db/src/schema/*) using sqlite so the
@@ -812,6 +828,13 @@ export async function buildInMemoryDb() {
       clerk_subscription_id TEXT, promo_code TEXT, card_last_4 TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
+    CREATE TABLE tandem_video_storage_snapshots (
+      project_id TEXT NOT NULL, owner_id TEXT NOT NULL,
+      day TEXT NOT NULL, total_bytes INTEGER NOT NULL DEFAULT 0,
+      r2_bytes INTEGER NOT NULL DEFAULT 0, local_bytes INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      UNIQUE (project_id, day)
+    );
     CREATE TABLE tandem_account_quotas (
       user_id TEXT PRIMARY KEY NOT NULL,
       storage_limit_bytes INTEGER NOT NULL,
@@ -895,6 +918,7 @@ export async function buildInMemoryDb() {
     tandemTicketsTable,
     tandemPromoCodesTable,
     tandemSubscriptionsTable,
+    tandemVideoStorageSnapshotsTable,
   };
   return { db, tables, exports: { db, ...tables } };
 }

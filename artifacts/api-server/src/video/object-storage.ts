@@ -23,10 +23,18 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
   type PutObjectCommandInput,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { and, eq } from "drizzle-orm";
 import { uploadDir } from "./worker";
+import { logger } from "../lib/logger";
+import {
+  db,
+  tandemVideoAssetFilesTable as tandemAssetFilesTable,
+} from "@workspace/db";
 
 // ---------------------------------------------------------------------------
 // Storage key layout (mirrors the playbook) — the existing relative `storageKey`
@@ -66,6 +74,18 @@ export interface ObjectStore {
   putUrl(projectId: string, storageKey: string, contentType: string, contentLength: number): Promise<string | null>;
   /** Delete an object (best-effort). */
   delete(projectId: string, storageKey: string): Promise<void>;
+  /**
+   * Delete a set of objects by key (best-effort, batched). Returns the
+   * number actually removed. Used when an asset is deleted — the project
+   * survives, so only its own keys go.
+   */
+  deleteKeys(projectId: string, storageKeys: string[]): Promise<number>;
+  /**
+   * Delete every object whose key starts with the project namespace
+   * `projects/{projectId}/` — the full physical footprint of a deleted
+   * project (originals, proxies, renders, exports, bundles, thumbnails).
+   */
+  deleteProject(projectId: string): Promise<number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +176,60 @@ class R2Store implements ObjectStore {
       // best-effort
     }
   }
+
+  async deleteKeys(projectId: string, storageKeys: string[]): Promise<number> {
+    if (storageKeys.length === 0) return 0;
+    try {
+      const result = await this.client.send(
+        new DeleteObjectsCommand({
+          Bucket: this.bucket,
+          Delete: {
+            Objects: storageKeys.map((storageKey) => ({ Key: this.key(projectId, storageKey) })),
+            Quiet: true,
+          },
+        }),
+      );
+      return storageKeys.length - (result.Errors?.length ?? 0);
+    } catch (error) {
+      logger.warn({ projectId, err: error }, "R2 key deletion failed (best-effort)");
+      return 0;
+    }
+  }
+
+  async deleteProject(projectId: string): Promise<number> {
+    // R2 has no prefix delete — page through ListObjectsV2 and batch-delete.
+    const prefix = `projects/${projectId}/`;
+    let deleted = 0;
+    let continuationToken: string | undefined;
+    try {
+      do {
+        const listed = await this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: prefix,
+            ContinuationToken: continuationToken,
+          }),
+        );
+        const keys = (listed.Contents ?? []).map((object) => object.Key).filter((key): key is string => Boolean(key));
+        if (keys.length > 0) {
+          // Best-effort per object; a failure mid-batch re-runs next attempt.
+          await this.client.send(
+            new DeleteObjectsCommand({
+              Bucket: this.bucket,
+              Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
+            }),
+          );
+          deleted += keys.length;
+        }
+        continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+      } while (continuationToken);
+    } catch (error) {
+      // Best-effort — the DB rows are gone regardless; orphaned objects can be
+      // reclaimed by a later sweep.
+      logger.error({ projectId, err: error }, "R2 project cleanup failed");
+    }
+    return deleted;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +277,31 @@ class LocalDiskStore implements ObjectStore {
       // best-effort
     }
   }
+
+  async deleteKeys(projectId: string, storageKeys: string[]): Promise<number> {
+    let removed = 0;
+    for (const storageKey of storageKeys) {
+      try {
+        fs.unlinkSync(this.fileKey(projectId, storageKey));
+        removed += 1;
+      } catch {
+        // best-effort — missing file counts as nothing to reclaim
+      }
+    }
+    return removed;
+  }
+
+  async deleteProject(projectId: string): Promise<number> {
+    const dir = path.join(uploadDir(), "objects", projectId);
+    if (!fs.existsSync(dir)) return 0;
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return fs.existsSync(dir) ? 0 : 1;
+    } catch {
+      // best-effort
+      return 0;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -239,4 +338,96 @@ export async function persistArtifact(
   return "r2";
 }
 
+/**
+ * The object's key on the local processing disk. Derived artifacts are written
+ * here first (ffmpeg) and streamed from here when R2 is not configured; R2
+ * objects are also cached here while they are actively served / processed.
+ */
+export function localPathFor(storageKey: string): string {
+  return path.join(uploadDir(), storageKey);
+}
+
+/** True when the object exists locally on the processing disk. */
+export function existsLocally(storageKey: string): boolean {
+  return fs.existsSync(localPathFor(storageKey));
+}
+
+/**
+ * Make sure an R2-backed artifact has a local copy for streaming / processing.
+ * Ephemeral containers lose the disk copy on every restart while the R2 object
+ * survives — restoring from R2 is ~free (one GET) and avoids re-encoding the
+ * whole artifact just because the cache was dropped.
+ *
+ * Returns false when the artifact is local-only, already present, or the R2
+ * copy no longer exists (caller decides: re-encode or surface the error).
+ */
+export async function ensureLocalCopy(opts: {
+  projectId: string;
+  storageKey: string;
+  storageProvider: string | null;
+}): Promise<boolean> {
+  if (opts.storageProvider !== "r2" || existsLocally(opts.storageKey)) return true;
+  try {
+    await getStore().getToFile(opts.projectId, opts.storageKey, localPathFor(opts.storageKey));
+    return true;
+  } catch (error) {
+    logger.warn(
+      { projectId: opts.projectId, storageKey: opts.storageKey, err: error },
+      "Artifact missing locally and not restorable from R2",
+    );
+    return false;
+  }
+}
+
+
+
+/**
+ * Make sure a vault asset's ORIGINAL source file is present on the processing
+ * disk. Uploads keep their local multer file (the worker reads that path); a
+ * durable R2 copy may exist as an ORIGINAL asset-file row (recorded for
+ * browser uploads <500 MB). When the disk file is gone (ephemeral restart)
+ * but the R2 copy exists, restore it to the SAME local path the asset row
+ * names — so every processor's `path.join(uploadDir(), asset.storageKey)`
+ * read keeps working unchanged.
+ *
+ * Returns true when the file is present/restorable, false when the source is
+ * genuinely gone (caller decides: fail the job with a clear error).
+ */
+export async function ensureOriginalRestored(asset: {
+  id: string;
+  projectId: string;
+  storageKey: string;
+  storageProvider: string | null;
+}): Promise<boolean> {
+  const localPath = localPathFor(asset.storageKey);
+  if (fs.existsSync(localPath)) return true;
+
+  // Look for a durable R2 copy of this original (an ORIGINAL file row).
+  const rows = await db
+    .select({
+      storageKey: tandemAssetFilesTable.storageKey,
+      storageProvider: tandemAssetFilesTable.storageProvider,
+    })
+    .from(tandemAssetFilesTable)
+    .where(and(eq(tandemAssetFilesTable.assetId, asset.id), eq(tandemAssetFilesTable.kind, "ORIGINAL")))
+    .limit(1);
+  const row = rows[0];
+  if (!row || row.storageProvider !== "r2") return false;
+
+  try {
+    await getStore().getToFile(asset.projectId, row.storageKey, localPath);
+    return true;
+  } catch (error) {
+    logger.warn(
+      { assetId: asset.id, projectId: asset.projectId, storageKey: row.storageKey, err: error },
+      "Original not restorable from R2",
+    );
+    return false;
+  }
+}
+
 export { randomUUID };
+
+// ---------------------------------------------------------------------------
+// Fake object store for route tests (routes/video-storage.test.ts).
+// ---------------------------------------------------------------------------

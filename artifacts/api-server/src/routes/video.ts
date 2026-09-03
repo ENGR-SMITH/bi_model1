@@ -52,6 +52,7 @@ import { notify } from "./video-platform";
 import { upload } from "../video/upload";
 import { createAssetFromUpload } from "../video/content-address";
 import { ensureUploadFits } from "../video/quota";
+import { captureVaultStorage, reclaimDeletedVaultFiles } from "../video/storage-cleanup";
 import { recordVideoActivity } from "../video/activity";
 import { resolveProjectAccess } from "../video/access";
 import { resolveUserNames, resolveUserProfiles } from "../lib/user-names";
@@ -325,8 +326,10 @@ router.patch(
 );
 
 // DELETE /video/projects/:projectId — remove the project and everything in it
-// (Captain only). Files already on disk are intentionally left in place: the
-// vault is content-addressed, so a blob may be shared with another project.
+// (Captain only), then reclaim its physical storage. Local originals are
+// content-addressed and may be shared with another project, so a blob is only
+// unlinked when nothing left behind references it; R2 objects are wiped by
+// project prefix.
 router.delete(
   "/video/projects/:projectId",
   async (req: Request, res): Promise<void> => {
@@ -356,6 +359,10 @@ router.delete(
       res.status(403).json({ error: "Only the Captain can delete the project" });
       return;
     }
+
+    // Capture the physical keys BEFORE the rows that name them are deleted,
+    // so the survivor checks can tell shared blobs apart from orphans.
+    const storage = await captureVaultStorage(projectId);
 
     await db.transaction(async (tx) => {
       const assets = await tx
@@ -440,6 +447,17 @@ router.delete(
       await tx
         .delete(tandemVideoProjectsTable)
         .where(eq(tandemVideoProjectsTable.id, projectId));
+    });
+
+    // Physical reclaim (R2 prefix + orphaned local blobs). Best-effort and
+    // run after the DB delete so the survivor checks see the final state.
+    await reclaimDeletedVaultFiles({
+      projectId,
+      keys: storage.keys,
+      assetIds: storage.assetIds,
+      fileIds: storage.fileIds,
+      fileR2Keys: storage.fileR2Keys,
+      wholeProject: true,
     });
 
     res.status(204).end();
