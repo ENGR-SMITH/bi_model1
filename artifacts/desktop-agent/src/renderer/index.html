@@ -9,19 +9,20 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
       :root {
-        --bg: hsl(0 0% 7%);
-        --fg: hsl(0 0% 95%);
-        --border: hsl(0 0% 20%);
-        --input: hsl(0 0% 16%);
-        --card: hsl(0 0% 11%);
-        --card-fg: hsl(0 0% 95%);
-        --muted: hsl(0 0% 14%);
-        --muted-fg: hsl(0 0% 72%);
-        --accent: hsl(357 92% 47%);
-        --accent-fg: hsl(0 0% 100%);
-        --secondary: hsl(0 0% 15%);
-        --destructive: hsl(0 72% 51%);
-        --ok: hsl(164 33% 45%);
+        --bg: #0b0b0e;
+        --bg-2: #101014;
+        --fg: #f4f4f6;
+        --muted-fg: #9a9aa5;
+        --faint-fg: #6c6c77;
+        --border: rgba(255, 255, 255, 0.075);
+        --border-strong: rgba(255, 255, 255, 0.12);
+        --card: #141419;
+        --card-2: #18181e;
+        --input: #101015;
+        --accent: #e6150a;
+        --accent-2: #ff5f4d;
+        --accent-soft: rgba(230, 21, 10, 0.14);
+        --ok: #2fbf8f;
         --font-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
         --font-mono: 'DM Mono', ui-monospace, monospace;
         color-scheme: dark;
@@ -29,206 +30,438 @@
       * { box-sizing: border-box; margin: 0; }
       body {
         font-family: var(--font-sans);
-        background: var(--bg);
+        background:
+          radial-gradient(1200px 500px at 85% -12%, rgba(230, 21, 10, 0.09), transparent 60%),
+          radial-gradient(900px 420px at -10% -10%, rgba(255, 255, 255, 0.035), transparent 55%),
+          linear-gradient(180deg, var(--bg-2), var(--bg) 320px);
         color: var(--fg);
         min-height: 100dvh;
+        -webkit-font-smoothing: antialiased;
       }
+      ::selection { background: rgba(230, 21, 10, 0.4); }
 
       /* --- Layout --- */
-      .shell { max-width: 600px; margin: 0 auto; padding: 36px 24px 52px; animation: fadeUp .35s ease both; }
+      .shell {
+        max-width: 1020px;
+        margin: 0 auto;
+        padding: 26px 30px 34px;
+        animation: fadeUp 0.35s ease both;
+      }
       @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-      .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+      /* --- Header --- */
+      .app-header { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
       .brand-mark {
-        width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--accent);
-        color: var(--accent); display: grid; place-items: center;
-        font: 700 16px var(--font-sans); font-style: italic;
+        width: 44px; height: 44px; border-radius: 13px; flex-shrink: 0;
+        display: grid; place-items: center;
+        font: italic 700 20px var(--font-sans);
+        color: #fff;
+        background: linear-gradient(140deg, var(--accent-2), var(--accent) 70%);
+        box-shadow: 0 6px 18px rgba(230, 21, 10, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
       }
-      h1 { font: 700 20px/1.1 var(--font-sans); letter-spacing: -.03em; margin: 0; }
-      .sub { color: var(--muted-fg); font-size: 12px; margin: 8px 0 28px; line-height: 1.6; }
+      .app-header h1 { font: 700 21px/1.15 var(--font-sans); letter-spacing: -0.02em; }
+      .app-header .sub { color: var(--muted-fg); font-size: 12.5px; line-height: 1.45; margin-top: 2px; }
+      .header-chip {
+        margin-left: auto; flex-shrink: 0;
+        display: inline-flex; align-items: center; gap: 7px;
+        font: 500 10px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase;
+        color: var(--muted-fg);
+        border: 1px solid var(--border); background: rgba(255, 255, 255, 0.02);
+        padding: 6px 10px; border-radius: 999px;
+      }
+      .header-chip .dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--accent-2), var(--accent));
+        box-shadow: 0 0 8px rgba(230, 21, 10, 0.7);
+      }
 
       /* --- Cards --- */
       .card {
-        background: var(--card);
+        background: linear-gradient(180deg, var(--card-2), var(--card));
         border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 18px;
-        margin-bottom: 12px;
+        border-radius: 16px;
+        padding: 18px 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.035);
       }
-      .row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
-      .row:last-child { margin-bottom: 0; }
-      .row > label {
+      .card-title {
+        display: flex; align-items: center; gap: 9px;
+        margin-bottom: 15px;
+        font: 600 11px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase;
+        color: var(--muted-fg);
+      }
+      .card-title::before {
+        content: ""; width: 3px; height: 13px; border-radius: 2px;
+        background: linear-gradient(180deg, var(--accent-2), var(--accent));
+        box-shadow: 0 0 8px rgba(230, 21, 10, 0.5);
+      }
+
+      .stack { display: grid; gap: 14px; align-content: start; }
+
+      /* Signed-in feature area: two columns once auth is done */
+      .feature-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 330px;
+        gap: 14px;
+        align-items: start;
+      }
+      @media (max-width: 800px) {
+        .feature-grid { grid-template-columns: minmax(0, 1fr); }
+      }
+
+      /* --- Form rows --- */
+      .field { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; align-items: center; }
+      .field + .field { margin-top: 12px; }
+      .field > label {
         font: 600 10px var(--font-mono);
-        text-transform: uppercase; letter-spacing: .1em;
-        color: var(--muted-fg); width: 80px; flex-shrink: 0;
+        text-transform: uppercase; letter-spacing: 0.12em;
+        color: var(--muted-fg);
       }
 
-      /* --- Form controls --- */
-      select, button { font-size: 13px; padding: 8px 12px; border-radius: 6px; }
+      select, input[type="text"], input[type="url"] {
+        font: 500 13px var(--font-sans);
+        color: var(--fg);
+        background: var(--input);
+        border: 1px solid var(--border-strong);
+        border-radius: 9px;
+        padding: 10px 12px;
+        outline: none;
+        width: 100%;
+        transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      }
       select {
-        flex: 1; border: 1px solid var(--input); background: var(--bg);
-        color: var(--fg); outline: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23868691' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        padding-right: 34px;
       }
-      select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px hsl(357 92% 47% / .15); }
-      select option { background: var(--card); color: var(--fg); }
+      select option { background: #18181e; color: var(--fg); }
+      select:focus, input[type="text"]:focus, input[type="url"]:focus {
+        border-color: rgba(230, 21, 10, 0.65);
+        box-shadow: 0 0 0 3px rgba(230, 21, 10, 0.14);
+      }
+      select:disabled { opacity: 0.5; cursor: not-allowed; }
 
+      /* --- Buttons --- */
       button {
-        border: 0; cursor: pointer; font-weight: 600;
-        display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-        transition: transform .15s, background .15s, border-color .15s;
+        font-family: var(--font-sans);
+        border: 0; cursor: pointer; font-weight: 600; font-size: 13px;
+        display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+        border-radius: 9px;
+        padding: 9px 14px;
+        transition: transform 0.12s, background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
       }
-      button:active { transform: scale(.97); }
-      button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+      button:active { transform: scale(0.97); }
+      button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
       .btn-primary {
-        background: var(--accent); color: var(--accent-fg); width: 100%;
-        padding: 11px 16px; font-size: 13px; font-weight: 700;
-        border-radius: 6px;
+        color: #fff;
+        background: linear-gradient(135deg, var(--accent-2), var(--accent) 75%);
+        box-shadow: 0 4px 16px rgba(230, 21, 10, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+        font-size: 13.5px; font-weight: 700;
+        padding: 11px 16px;
       }
-      .btn-primary:hover:not(:disabled) { filter: brightness(1.12); }
+      .btn-primary:hover:not(:disabled) {
+        filter: brightness(1.1);
+        box-shadow: 0 6px 22px rgba(230, 21, 10, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+        transform: translateY(-1px);
+      }
+      .btn-primary:disabled {
+        background: #232329; color: #7c7c86;
+        box-shadow: none; border: 1px solid var(--border);
+      }
       .btn-secondary {
-        background: var(--secondary); color: var(--fg);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--fg);
+        border: 1px solid var(--border-strong);
+      }
+      .btn-secondary:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 95, 77, 0.45);
+        color: #fff;
+      }
+      .btn-ghost {
+        background: transparent; color: var(--muted-fg);
         border: 1px solid var(--border);
       }
-      .btn-secondary:hover:not(:disabled) { border-color: hsl(357 92% 47% / .4); color: var(--accent); }
+      .btn-ghost:hover:not(:disabled) { color: #fff; border-color: var(--border-strong); background: rgba(255,255,255,0.04); }
 
-      /* --- Status --- */
-      .status { font-size: 12px; white-space: pre-wrap; color: var(--muted-fg); }
-      .err { color: var(--destructive); font-size: 12px; }
+      /* --- Status text --- */
+      .status { font-size: 12px; white-space: pre-wrap; color: var(--muted-fg); line-height: 1.55; }
+      .err { color: #ff6b5e; font-size: 12px; }
       .ok { color: var(--ok); font-size: 12px; }
 
-      /* --- Progress --- */
-      .bar { height: 5px; border-radius: 5px; background: var(--muted); margin-top: 10px; overflow: hidden; position: relative; }
-      .bar > div { height: 100%; background: linear-gradient(90deg, hsl(357 92% 42%), hsl(13 95% 55%)); width: 0; transition: width .2s ease; }
+      /* --- Auth card --- */
+      .auth-card { padding: 16px 20px; }
+      .auth-main { display: flex; align-items: center; gap: 14px; }
+      .auth-avatar {
+        width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+        display: grid; place-items: center;
+        font: 700 14px var(--font-sans); text-transform: uppercase;
+        color: var(--faint-fg);
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border-strong);
+        transition: all 0.25s;
+      }
+      .auth-card.signed-in .auth-avatar {
+        color: #fff;
+        background: linear-gradient(140deg, var(--accent-2), var(--accent) 75%);
+        border-color: transparent;
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+      .auth-id { min-width: 0; flex: 1; }
+      .auth-id #who { font: 600 14px var(--font-sans); color: var(--fg); display: block; }
+      .auth-id #who .auth-email { font: 500 13.5px var(--font-mono); color: var(--accent-2); }
+      .auth-sub { font-size: 11.5px; color: var(--muted-fg); margin-top: 2px; display: block; }
+      .auth-actions { display: flex; gap: 8px; flex-shrink: 0; }
+      #sign-in.btn-primary { min-width: 118px; }
+      .auth-card.signed-in #sign-in {
+        background: transparent; color: var(--muted-fg);
+        border: 1px solid var(--border-strong); font-weight: 600; font-size: 12.5px;
+        box-shadow: none;
+        padding: 8px 13px;
+      }
+      .auth-card.signed-in #sign-in:hover { color: #fff; border-color: rgba(255,95,77,0.45); background: rgba(255,255,255,0.04); }
+      .auth-note { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); }
+
+      /* Sign-up link panel */
+      .signin-panel-inner { padding-top: 14px; }
+      .signin-title { font: 700 15px var(--font-sans); margin-bottom: 5px; display: flex; align-items: center; gap: 9px; }
+      .signin-sub { font-size: 12.5px; color: var(--muted-fg); line-height: 1.6; margin-bottom: 14px; max-width: 56ch; }
+      .signin-url-row { display: flex; gap: 8px; margin-bottom: 12px; }
+      .signin-url {
+        flex: 1 1 0; min-width: 0;
+        font: 500 11.5px var(--font-mono) !important; color: var(--muted-fg) !important;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .signin-url:focus { color: var(--fg) !important; }
+      .signin-actions { display: flex; gap: 8px; }
+      .signin-actions button { flex: 1; }
+      .signin-actions .btn-primary { width: auto; }
+      .signin-wait {
+        margin-top: 12px; font-size: 12px; color: var(--muted-fg);
+        display: flex; align-items: center; gap: 9px;
+      }
+      .signin-wait::before {
+        content: ""; width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+        border: 2px solid var(--border-strong); border-top-color: var(--accent-2);
+        animation: spinDot 0.9s linear infinite;
+      }
+      @keyframes spinDot { to { transform: rotate(360deg); } }
+
+      /* --- Workspace / upload --- */
+      .source-row { display: flex; gap: 8px; align-items: center; }
+      .source-row .status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #upload { width: 100%; margin-top: 4px; }
+      .bar {
+        height: 7px; border-radius: 999px;
+        background: rgba(255, 255, 255, 0.06);
+        margin-top: 14px; overflow: hidden; position: relative;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+      }
+      .bar > div {
+        height: 100%; border-radius: 999px;
+        background: linear-gradient(90deg, var(--accent-2), var(--accent));
+        box-shadow: 0 0 12px rgba(230, 21, 10, 0.5);
+        width: 0; transition: width 0.25s ease;
+      }
       .bar > div.indeterminate { width: 34%; animation: slideBar 1.1s ease-in-out infinite; }
       @keyframes slideBar { from { transform: translateX(-110%); } to { transform: translateX(320%); } }
-      .progress-label { margin-top: 7px; font-size: 11px; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
-
-      /* --- Auth section --- */
-      .auth-email { font: 500 12px var(--font-mono); color: var(--accent); }
+      .progress-label {
+        margin-top: 8px; font-size: 11px; color: var(--muted-fg);
+        font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+      }
+      #status { margin-top: 10px; }
 
       /* --- Widget settings card --- */
-      .setting-row {
-        display: flex; align-items: center; justify-content: space-between; gap: 12px;
-        padding: 8px 0;
-      }
-      .setting-row + .setting-row { border-top: 1px solid var(--muted); }
+      .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 0; }
+      .setting-row + .setting-row { border-top: 1px solid var(--border); }
       .setting-name { font: 600 13px var(--font-sans); display: block; }
-      .setting-desc { font-size: 11px; color: var(--muted-fg); line-height: 1.5; }
+      .setting-desc { font-size: 11.5px; color: var(--muted-fg); line-height: 1.55; margin-top: 2px; }
       .widget-hint {
-        margin-top: 10px; padding: 8px 10px; border-radius: 6px;
-        background: var(--muted); border: 1px solid var(--border);
-        font-size: 11px; color: var(--muted-fg); line-height: 1.6;
+        margin-top: 13px; padding: 11px 13px; border-radius: 10px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border);
+        font-size: 11.5px; color: var(--muted-fg); line-height: 1.7;
       }
+      .widget-hint b { color: var(--fg); font-weight: 600; }
 
-      .switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
-      label.switch { font: unset; text-transform: none; letter-spacing: normal; width: auto; }
+      /* --- Toggle switch --- */
+      .switch { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+      label.switch { font: unset; text-transform: none; letter-spacing: normal; width: 46px; height: 26px; }
       .switch input { opacity: 0; width: 0; height: 0; }
       .switch .slider {
         position: absolute; inset: 0; cursor: pointer;
-        background: var(--input); border: 1px solid var(--border);
-        border-radius: 999px; transition: background .15s;
+        background: #26262d;
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
       }
       .switch .slider::before {
-        content: ""; position: absolute; left: 2px; top: 2px;
-        width: 16px; height: 16px; border-radius: 50%;
-        background: var(--muted-fg); transition: transform .15s, background .15s;
+        content: ""; position: absolute; left: 3px; top: 3px;
+        width: 18px; height: 18px; border-radius: 50%;
+        background: linear-gradient(180deg, #f0f0f2, #c9c9cf);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.45);
+        transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1), background 0.2s;
       }
-      .switch input:checked + .slider { background: var(--accent); border-color: var(--accent); }
-      .switch input:checked + .slider::before { transform: translateX(16px); background: #fff; }
-      .switch input:disabled + .slider { opacity: .4; cursor: not-allowed; }
+      .switch input:checked + .slider {
+        background: linear-gradient(135deg, var(--accent-2), var(--accent) 80%);
+        border-color: transparent;
+        box-shadow: 0 0 0 3px rgba(230, 21, 10, 0.18), inset 0 1px 2px rgba(0, 0, 0, 0.25);
+      }
+      .switch input:checked + .slider::before {
+        transform: translateX(20px);
+        background: linear-gradient(180deg, #fff, #ffe3de);
+      }
+      .switch input:focus-visible + .slider { outline: 2px solid var(--accent-2); outline-offset: 2px; }
+      .switch input:disabled + .slider { opacity: 0.4; cursor: not-allowed; }
+      .switch input:disabled:checked + .slider { filter: grayscale(0.7); }
 
-      /* --- Footer row --- */
-      .footer-row {
-        display: flex; align-items: center; justify-content: space-between;
-        margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+      /* --- Footer --- */
+      .footer {
+        margin-top: 20px; padding-top: 16px;
+        border-top: 1px solid var(--border);
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
       }
-      .footer-row .version {
-        font: 500 10px var(--font-mono); color: var(--muted-fg); letter-spacing: .06em;
+      .footer .version {
+        font: 500 10.5px var(--font-mono); color: var(--faint-fg); letter-spacing: 0.08em;
       }
-      #update-status { margin-top: 10px; font-size: 11px; }
+      .footer-actions { display: flex; gap: 8px; align-items: center; min-width: 0; }
+      .footer-account {
+        max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font: 500 11.5px var(--font-mono); color: var(--muted-fg);
+        border: 1px solid var(--border); background: rgba(255,255,255,0.03);
+        padding: 5px 10px; border-radius: 999px;
+      }
+      #update-status { margin-top: 12px; font-size: 11.5px; text-align: right; }
+      button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+        outline: 2px solid rgba(255, 95, 77, 0.7); outline-offset: 2px;
+      }
       .hidden { display: none !important; }
     </style>
   </head>
   <body>
     <div class="shell">
-      <div class="brand">
+      <!-- Header -->
+      <header class="app-header">
         <span class="brand-mark">T</span>
-        <h1>Tandem Desktop Agent</h1>
-      </div>
-      <div class="sub">Make a 720p proxy with local FFmpeg and upload it straight to Cloudflare R2.</div>
+        <div>
+          <h1>Tandem Desktop Agent</h1>
+          <p class="sub">Make a 720p proxy with local FFmpeg and upload it straight to Cloudflare R2.</p>
+        </div>
+        <span class="header-chip"><span class="dot"></span>Desktop agent</span>
+      </header>
 
       <!-- Auth card -->
-      <div class="card" id="auth-card">
-        <div class="row">
-          <label>Account</label>
-          <span id="who" class="status">Checking…</span>
-          <button id="sign-in" class="btn-secondary">Sign in</button>
-        </div>
-      </div>
-
-      <!-- Workspace card -->
-      <div class="card">
-        <div class="row">
-          <label>Project</label>
-          <select id="project"><option>— load a project —</option></select>
-        </div>
-        <div class="row">
-          <label>Asset</label>
-          <select id="asset"></select>
-        </div>
-        <div class="row">
-          <label>Source</label>
-          <button id="pick" class="btn-secondary">Choose raw file…</button>
-          <span id="file" class="status"></span>
-        </div>
-      </div>
-
-      <!-- Upload card -->
-      <div class="card">
-        <button id="upload" class="btn-primary" disabled>Generate proxy &amp; upload to R2</button>
-        <div class="bar"><div id="barfill"></div></div>
-        <div id="progress-label" class="progress-label hidden"></div>
-        <div id="status" class="status"></div>
-      </div>
-
-      <!-- Floating widget settings -->
-      <div class="card">
-        <div class="row" style="align-items:flex-start;">
-          <label>Widget</label>
-          <span class="status">A Grammarly-style floating bubble that appears while a video plays on your PC. <span id="platform-note"></span></span>
-        </div>
-        <div class="setting-row">
-          <div>
-            <span class="setting-name">Floating widget</span>
-            <span class="setting-desc">Show a draggable Tandem bubble over other apps</span>
+      <div class="card auth-card" id="auth-card">
+        <div class="auth-main" id="auth-row">
+          <span class="auth-avatar" id="auth-avatar"></span>
+          <div class="auth-id">
+            <span id="who">Checking…</span>
+            <span class="auth-sub" id="auth-sub">Checking your session…</span>
           </div>
-          <label class="switch"><input type="checkbox" id="widget-enable" /><span class="slider"></span></label>
-        </div>
-        <div class="setting-row">
-          <div>
-            <span class="setting-name">Auto-show while a video plays</span>
-            <span class="setting-desc">Pop the bubble up when Windows detects video playback</span>
+          <div class="auth-actions">
+            <button id="sign-in" class="btn-primary">Sign up</button>
           </div>
-          <label class="switch"><input type="checkbox" id="widget-auto" /><span class="slider"></span></label>
         </div>
-        <div class="widget-hint" id="widget-hint">
-          Click the bubble to open the agent. Drag it to reposition — it stays where you put it.
-          Press <b>Ctrl+Alt+T</b> or use the tray icon (red dot) to show/hide it anytime.
-          With the widget on, closing this window keeps the agent running in the tray
-          (tray menu → <b>Quit Tandem Agent</b> to exit).
+        <div id="auth-note" class="auth-note status hidden"></div>
+
+        <!-- Browser sign-in panel: the sign-up link opens in the user's browser -->
+        <div id="signin-panel" class="hidden">
+          <div class="signin-panel-inner">
+            <p class="signin-title">Sign up to Tandem</p>
+            <p class="signin-sub">
+              Open the link below in your browser to create your account — or sign in if you
+              already have one. It's tied to this sign-in and works only once.
+            </p>
+            <div class="signin-url-row">
+              <input id="signin-url" class="signin-url" type="text" readonly spellcheck="false" />
+              <button id="copy-link" class="btn-secondary">Copy link</button>
+            </div>
+            <div class="signin-actions">
+              <button id="open-browser" class="btn-primary">Open in browser</button>
+              <button id="cancel-signin" class="btn-secondary">Cancel</button>
+            </div>
+            <p id="signin-wait" class="signin-wait">Waiting for you to finish signing in…</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Signed-in feature area (hidden until auth completes) -->
+      <div id="feature-cards" class="hidden" style="margin-top: 14px;">
+        <div class="feature-grid">
+          <!-- Left column: workspace + upload -->
+          <div class="stack">
+            <div class="card">
+              <p class="card-title">Workspace</p>
+              <div class="field">
+                <label for="project">Project</label>
+                <select id="project"><option>— load a project —</option></select>
+              </div>
+              <div class="field">
+                <label for="asset">Asset</label>
+                <select id="asset"></select>
+              </div>
+              <div class="field">
+                <label for="pick">Source</label>
+                <div class="source-row">
+                  <button id="pick" class="btn-secondary">Choose raw file…</button>
+                  <span id="file" class="status"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <p class="card-title">Generate &amp; upload</p>
+              <button id="upload" class="btn-primary" disabled>Generate proxy &amp; upload to R2</button>
+              <div class="bar"><div id="barfill"></div></div>
+              <div id="progress-label" class="progress-label hidden"></div>
+              <div id="status" class="status"></div>
+            </div>
+          </div>
+
+          <!-- Right column: floating widget -->
+          <div class="card">
+            <p class="card-title">Floating widget</p>
+            <p class="widget-desc" style="font-size:12px;color:var(--muted-fg);line-height:1.6;margin-bottom:2px;">
+              A Grammarly-style bubble that appears while a video plays on your PC.
+              <span id="platform-note" style="color:var(--faint-fg);"></span>
+            </p>
+            <div class="setting-row">
+              <div>
+                <span class="setting-name">Floating widget</span>
+                <span class="setting-desc">Show a draggable Tandem bubble over other apps</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="widget-enable" /><span class="slider"></span></label>
+            </div>
+            <div class="setting-row">
+              <div>
+                <span class="setting-name">Auto-show while a video plays</span>
+                <span class="setting-desc">Pop the bubble up when Windows detects video playback</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="widget-auto" /><span class="slider"></span></label>
+            </div>
+            <div class="widget-hint" id="widget-hint">
+              Click the bubble to open the agent. Drag it to reposition — it stays where you put it.
+              Press <b>Ctrl+Alt+T</b> or use the tray icon (red dot) to show/hide it anytime.
+              With the widget on, closing this window keeps the agent running in the tray
+              (tray menu → <b>Quit Tandem Agent</b> to exit).
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Footer -->
-      <div class="footer-row">
-        <span class="version">v<span id="version">0.0.0</span></span>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <button id="update-btn" class="btn-secondary">Check for updates</button>
+      <footer class="footer">
+        <span class="version">v<span id="version">0.0.0</span> · Tandem Desktop Agent</span>
+        <div class="footer-actions">
+          <button id="update-btn" class="btn-ghost">Check for updates</button>
+          <span id="footer-account" class="footer-account hidden"></span>
           <button id="sign-out" class="btn-secondary hidden">Sign out</button>
         </div>
-      </div>
-      <div id="update-status" class="status"></div>
+      </footer>
+      <div id="update-status" class="status" style="text-align:right;"></div>
     </div>
 
     <script src="./renderer.js"></script>

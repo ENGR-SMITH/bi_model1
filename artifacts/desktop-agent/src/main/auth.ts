@@ -1,4 +1,31 @@
-import { BrowserWindow, session as electronSession } from "electron";
+// Browser-based Clerk sign-in for the desktop agent.
+//
+// Google OAuth (the only sign-in strategy this Clerk instance enables) needs
+// the real OS browser: an embedded Electron window can't reliably show Google's
+// passkey/WebAuthn UX and split sessions. So instead of opening an in-app
+// window, the agent hands the user a link that completes in *their* browser.
+//
+// The flow:
+//
+//  1. The user clicks "Sign up" -> beginBrowserSignIn() starts a tiny
+//     http://127.0.0.1 server on a random port and returns a link that
+//     carries a random, unguessable per-attempt `state`.
+//  2. The user opens that link in their normal browser (click or copy). The
+//     page is served by the agent and mounts Clerk's sign-up UI directly from
+//     the instance's Frontend API (Clerk no longer serves hosted pages from
+//     *.clerk.accounts.dev/sign-up — that URL 404s, so we serve the page).
+//  3. After the user completes authentication, the page has a live Clerk
+//     session *in that browser*. It posts the session JWT back to the loopback
+//     server (same origin) along with the `state`.
+//  4. The main process matches `state`, decodes the JWT, and the app is signed
+//     in. Each link is tied to exactly one attempt: only the request carrying
+//     that attempt's `state` can complete it, and only the first completion
+//     wins. The token never travels through any third party.
+//
+// Security notes: the server binds 127.0.0.1 only; `state` is 32 random bytes;
+// the link expires after SIGN_IN_TTL_MS; the reported token must be a Clerk
+// session JWT for this instance's Frontend API origin and not yet expired.
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -10,15 +37,27 @@ export interface AuthSession {
   email: string | null;
 }
 
-// Clerk session cookie names (v2+ __session, legacy __client, and others)
-const CLERK_COOKIE_NAMES = ["__session", "__client"];
+const SIGN_IN_TTL_MS = 10 * 60 * 1000; // how long a sign-in link stays valid
+const MAX_BODY_BYTES = 64 * 1024;
+
+export interface BrowserSignInAttempt {
+  /** Link to open in the system browser (http://127.0.0.1:<port>/signin.html?...). */
+  url: string;
+  /**
+   * Resolves with the session once the browser page reports a completed Clerk
+   * sign-in, or null if the attempt is cancelled or expires first.
+   */
+  done: Promise<AuthSession | null>;
+  /** Abort the attempt (closes the loopback server; any open link stops working). */
+  cancel: () => void;
+}
 
 /**
- * Opens the Clerk hosted sign-in page in a modal window. On successful sign-in
- * we read the session cookie (Clerk's session JWT) and hand it back as a bearer
- * token for API calls. Resolves null if the user cancels.
+ * Starts a browser sign-in attempt. Resolves (via the returned `done`) when
+ * the sign-in page, opened in the user's browser, reports the Clerk session
+ * back.
  */
-export async function signInWithClerk(publishableKey: string): Promise<AuthSession | null> {
+export async function beginBrowserSignIn(publishableKey: string): Promise<BrowserSignInAttempt> {
   const origin = clerkAccountsOrigin(publishableKey);
   if (!origin) {
     throw new Error(
@@ -26,141 +65,128 @@ export async function signInWithClerk(publishableKey: string): Promise<AuthSessi
     );
   }
 
-  const ses = electronSession.fromPartition("tandem-agent");
-  const win = new BrowserWindow({
-    width: 520,
-    height: 640,
-    title: "Sign in to Tandem",
-    webPreferences: {
-      session: ses,
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-    parent: undefined,
-    modal: false,
-  });
-
-  // Clerk no longer serves hosted pages at *.clerk.accounts.dev/sign-in (that
-  // URL returns 404), so we serve our own page over a loopback HTTP server. It
-  // mounts Clerk's SignIn component straight from the instance's Frontend API;
-  // the __session cookie lands in this session partition and is picked up by
-  // the cookie polling below. A real http://127.0.0.1 origin (rather than
-  // file://) is required for Clerk's FAPI requests to behave correctly.
+  const state = randomBytes(32).toString("hex");
   const rendererDir = path.join(__dirname, "..", "renderer");
-  const pageServer = http.createServer((req, res) => {
+
+  let settleFn: (session: AuthSession | null) => void = () => {};
+  const done = new Promise<AuthSession | null>((resolve) => {
+    settleFn = resolve;
+  });
+
+  let settled = false;
+  let server: http.Server | null = null;
+
+  const settle = (session: AuthSession | null) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(ttlTimer);
+    if (server) server.close();
+    settleFn(session);
+  };
+
+  const ttlTimer = setTimeout(() => settle(null), SIGN_IN_TTL_MS);
+
+  server = http.createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
-    const fileName = url.pathname === "/signin.js" ? "signin.js" : "signin.html";
-    const body = fs.readFileSync(path.join(rendererDir, fileName));
-    res.writeHead(200, {
-      "Content-Type": fileName.endsWith(".js") ? "text/javascript" : "text/html",
-    });
-    res.end(body);
-  });
-  await new Promise<void>((resolve) => pageServer.listen(0, "127.0.0.1", resolve));
-  const port = (pageServer.address() as { port: number }).port;
-  win.on("closed", () => pageServer.close());
-  await win.loadURL(
-    `http://127.0.0.1:${port}/signin.html?fapi=${encodeURIComponent(origin)}&publishableKey=${encodeURIComponent(publishableKey)}`,
-  );
 
-  return new Promise<AuthSession | null>((resolve) => {
-    let closed = false;
-    let pollCount = 0;
-    const MAX_POLL_COUNT = 120; // ~2 minutes at 1 s interval
-
-    const finish = (value: AuthSession | null) => {
-      if (closed) return;
-      closed = true;
-      cleanup();
-      if (!win.isDestroyed()) win.close();
-      resolve(value);
-    };
-
-    /** Try every known Clerk cookie; return true once a valid session is found. */
-    const tryReadSession = async (): Promise<boolean> => {
-      try {
-        for (const cookieName of CLERK_COOKIE_NAMES) {
-          const cookies = await ses.cookies.get({ name: cookieName });
-          const cookie = cookies.find((c) => c.value && c.value.length > 20);
-          if (cookie) {
-            const claims = decodeJwt(cookie.value);
-            if (claims) {
-              finish({
-                token: cookie.value,
-                userId: typeof claims.sub === "string" ? claims.sub : "unknown",
-                email:
-                  typeof claims.email === "string"
-                    ? claims.email
-                    : typeof claims.email_address === "string"
-                      ? claims.email_address
-                      : null,
-              });
-              return true;
-            }
-          }
+    // The browser page reports the completed sign-in here. Only the attempt
+    // that issued `state` may finish, and only once.
+    if (req.method === "POST" && url.pathname === "/complete") {
+      let body = "";
+      req.on("data", (chunk: Buffer) => {
+        body += chunk;
+        if (body.length > MAX_BODY_BYTES) req.destroy();
+      });
+      req.on("end", () => {
+        let parsed: { state?: unknown; token?: unknown };
+        try {
+          parsed = JSON.parse(body) as { state?: unknown; token?: unknown };
+        } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "Invalid request body." }));
+          return;
         }
-      } catch {
-        // keep polling
-      }
-      return false;
-    };
+        const session = completeFromPost(parsed, state, origin);
+        if (!session) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: false, error: "This sign-in link is no longer valid." }));
+          return;
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+        settle(session);
+      });
+      return;
+    }
 
-    const poll = setInterval(async () => {
-      pollCount++;
-      if (pollCount >= MAX_POLL_COUNT) {
-        finish(null);
-        return;
-      }
-      await tryReadSession();
-    }, 1000);
-
-    // Watch all navigation events — after Clerk sign-in the browser redirects
-    // through several hops before landing on the redirect_url.
-    const onWillNavigate = (_e: unknown, _url: string) => {
-      void tryReadSession();
-    };
-    const onDidNavigate = (_e: unknown, _url: string) => {
-      void tryReadSession();
-    };
-
-    const onClosed = () => {
-      clearInterval(poll);
-      finish(null);
-    };
-
-    const cleanup = () => {
-      clearInterval(poll);
-      win.webContents.removeListener("will-navigate", onWillNavigate as never);
-      win.webContents.removeListener("did-navigate", onDidNavigate as never);
-      win.removeListener("closed", onClosed);
-    };
-
-    win.webContents.on("will-navigate", onWillNavigate);
-    win.webContents.on("did-navigate", onDidNavigate as never);
-    win.on("closed", onClosed);
-    void tryReadSession();
+    // Static page files for the sign-in UI.
+    const fileName =
+      url.pathname === "/signin.js" ? "signin.js" : url.pathname === "/" || url.pathname === "/signin.html" ? "signin.html" : null;
+    if (!fileName) {
+      res.writeHead(404);
+      res.end();
+      return;
+    }
+    try {
+      const body = fs.readFileSync(path.join(rendererDir, fileName));
+      res.writeHead(200, {
+        "Content-Type": fileName.endsWith(".js") ? "text/javascript" : "text/html",
+      });
+      res.end(body);
+    } catch {
+      res.writeHead(404);
+      res.end();
+    }
   });
+
+  await new Promise<void>((resolve) => server?.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+
+  return {
+    url: `http://127.0.0.1:${port}/signin.html?fapi=${encodeURIComponent(origin)}&publishableKey=${encodeURIComponent(publishableKey)}&state=${state}`,
+    done,
+    cancel: () => settle(null),
+  };
 }
 
 /**
- * Clears all Clerk session cookies so the next sign-in shows the login form
- * instead of auto-authenticating.
+ * Validates a /complete POST and turns it into an AuthSession. Rejects wrong
+ * states, non-JWT tokens, tokens not issued for this instance's Frontend API,
+ * and expired tokens.
  */
-export async function clearClerkSession(): Promise<void> {
-  const ses = electronSession.fromPartition("tandem-agent");
-  try {
-    const cookies = await ses.cookies.get({});
-    for (const cookie of cookies) {
-      if (CLERK_COOKIE_NAMES.includes(cookie.name)) {
-        // Construct the cookie URL from domain + path
-        const protocol = cookie.secure ? "https:" : "http:";
-        const cookieUrl = `${protocol}//${cookie.domain}${cookie.path}`;
-        await ses.cookies.remove(cookieUrl, cookie.name);
-      }
-    }
-  } catch {
-    // best-effort cleanup
-  }
+function completeFromPost(
+  body: { state?: unknown; token?: unknown },
+  expectedState: string,
+  expectedIss: string,
+): AuthSession | null {
+  if (body.state !== expectedState || typeof body.token !== "string") return null;
+  const claims = decodeSessionJwt(body.token, expectedIss);
+  if (!claims) return null;
+  return {
+    token: body.token,
+    userId: typeof claims.sub === "string" ? claims.sub : "unknown",
+    email:
+      typeof claims.email === "string"
+        ? claims.email
+        : typeof claims.email_address === "string"
+          ? claims.email_address
+          : null,
+  };
+}
+
+/**
+ * Decodes a Clerk session JWT and sanity-checks it: it must be three
+ * dot-separated parts, issued by this instance's Frontend API origin, and not
+ * yet expired. (We can't cryptographically verify the signature without the
+ * secret key — the API server rejects bad tokens on the first API call.)
+ */
+function decodeSessionJwt(token: string, expectedIss: string): Record<string, unknown> | null {
+  const claims = decodeJwt(token);
+  if (!claims) return null;
+  if (claims.iss !== expectedIss) return null;
+  const exp = claims.exp;
+  if (typeof exp === "number" && exp * 1000 < Date.now()) return null;
+  return claims;
 }
 
 function decodeJwt(token: string): Record<string, unknown> | null {

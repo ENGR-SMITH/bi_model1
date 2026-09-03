@@ -250,10 +250,13 @@ pnpm run dev
 ```
 
 On first launch:
-1. Click **Sign in** — a Clerk window opens for authentication.
-2. Pick a **project** and an **asset** (a raw file already in the vault).
-3. Select a **source raw file** on disk.
-4. Click **Generate proxy & upload to R2**.
+1. Click **Sign up** — the app shows a sign-up link tied to that sign-in.
+2. Click **Open in browser** (or copy the link) to finish sign-up/sign-in with
+   your Tandem (Clerk) account in your normal browser; the app signs you in
+   automatically when you're done.
+3. Pick a **project** and an **asset** (a raw file already in the vault).
+4. Select a **source raw file** on disk.
+5. Click **Generate proxy & upload to R2**.
 
 **Configuration** (optional — create `~/.tandem-agent/config.json`):
 ```json

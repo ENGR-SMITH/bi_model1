@@ -23,8 +23,10 @@ Your machine                 Your API server                       Cloudflare R2
    │  (asset → PROCESSED)           │   proxy streams via presigned GET
 ```
 
-The agent signs in with **Clerk** in a bundled browser window and reuses your
-existing account. It talks to the same API the web apps use.
+The agent signs in with **Clerk** through your **system browser**: it hands you a
+one-time sign-up link (served locally by the app, tied to that sign-in), you open
+it in your normal browser, and once you finish the app signs you in automatically.
+It reuses your existing Tandem account and talks to the same API the web apps use.
 
 ## Prerequisites on the user's machine
 
@@ -149,15 +151,30 @@ the toggle is disabled and the app runs as a normal window.
 
 ## Signing in
 
-1. Launch the app → click **Sign in** → the Clerk window opens.
-2. Sign in with your Tandem/Clerk account.
-3. Pick a **project**, an **asset** (a raw file already in the vault), and a
-   **source raw file** on disk.
-4. Click **Generate proxy & upload to R2**.
+Sign-in runs in your own browser (Google OAuth + passkeys need it), device-flow
+style:
+
+1. Launch the app → click **Sign up**. The Account card shows a **sign-up link**
+   (plus **Copy link** and **Open in browser** buttons).
+2. Open the link in your normal browser on this machine — it opens the Tandem
+   sign-up page (powered by the same Clerk instance as the web apps). Sign up,
+   or switch to **Sign in** inside the page if you already have an account.
+3. When you finish, the page confirms and the app signs you in automatically.
+   The link is one-time: it's tied to the sign-in you started and expires after
+   10 minutes.
+
+Until you're signed in, only the Account card is visible — the project/upload
+and widget cards stay hidden. Then pick a **project**, an **asset** (a raw file
+already in the vault), and a **source raw file** on disk, and click **Generate
+proxy & upload to R2**.
 
 The vault then shows the asset as processed, and its `PROXY` row is stored in
 R2 with `storage_provider = "r2"`, streamed back to browsers via presigned
 GETs.
+
+> Signing out only signs the **agent** out. The Clerk session lives in your
+> browser, so signing in again completes instantly with the account active
+> there (it reuses whichever Tandem account that browser is signed into).
 
 ## Notes & current limits
 
@@ -170,5 +187,7 @@ GETs.
 - Only proxies upload via the agent today; originals, exports, and bundles are
   uploaded by the web/worker path. Extending the agent to upload originals is a
   small follow-up (same presigned flow, different key prefix).
-- The Clerk session token is captured from the `__session` cookie and reused as
-  a bearer token. It's short-lived; re-request it per sign-in.
+- The Clerk session token is handed back to the agent over a loopback
+  `127.0.0.1` server the app starts per attempt; the link carries a random
+  per-attempt `state` so only that sign-in can complete. The token is reused
+  as a bearer token and is short-lived; re-request it per sign-in.

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { AgentSettings, AppInfo, JobProgress, UpdateEvent } from "../shared/types";
+import type { AgentSettings, AppInfo, AuthEvent, JobProgress, UpdateEvent } from "../shared/types";
 
 /** Subscribe helper: returns an unsubscribe function. */
 function on<T>(channel: string, cb: (payload: T) => void): () => void {
@@ -9,7 +9,14 @@ function on<T>(channel: string, cb: (payload: T) => void): () => void {
 }
 
 const api = {
-  signIn: () => ipcRenderer.invoke("agent:sign-in"),
+  // Browser sign-in (device flow): begin returns the sign-in link to show in
+  // the UI; completion/failure arrives via onAuthEvent.
+  signInBegin: () => ipcRenderer.invoke("agent:sign-in:begin"),
+  signInCancel: () => ipcRenderer.invoke("agent:sign-in:cancel"),
+  openExternal: (url: string) => ipcRenderer.invoke("agent:open-external", url),
+  copyText: (text: string) => ipcRenderer.invoke("agent:copy-text", text),
+  onAuthEvent: (cb: (event: AuthEvent) => void) => on<AuthEvent>("agent:auth-event", cb),
+
   signOut: () => ipcRenderer.invoke("agent:sign-out"),
   whoami: () => ipcRenderer.invoke("agent:whoami"),
   listProjects: () => ipcRenderer.invoke("agent:list-projects"),
