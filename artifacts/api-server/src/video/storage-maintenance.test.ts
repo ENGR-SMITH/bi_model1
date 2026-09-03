@@ -27,6 +27,7 @@ vi.mock("@workspace/db", async () => {
 });
 
 import { runStorageMetering, runStorageRetention } from "./storage-maintenance";
+import { storageUsedBytes } from "./quota";
 import { localPathFor } from "./object-storage";
 import { tandemUid } from "../lib/tandem-uid";
 
@@ -99,6 +100,83 @@ describe("storage metering snapshots", () => {
     await runStorageMetering("2026-09-03");
     const rows = await state.db.select().from(t.tandemVideoStorageSnapshotsTable).where(eq(t.tandemVideoStorageSnapshotsTable.projectId, projectId));
     expect(rows).toHaveLength(1);
+  });
+
+  it("storageUsedBytes is LIVE: uploads after the nightly snapshot are counted immediately", async () => {
+    const t = state.tables;
+    const projectId = tandemUid("p");
+    await state.db.insert(t.tandemVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering3" });
+
+    // Night 1: 500 bytes stored → snapshot row says 500.
+    const assetId = tandemUid("a");
+    const insertAsset = async (id: string, sizeBytes: number) => {
+      await state.db.insert(t.tandemVideoAssetsTable).values({
+        id,
+        projectId,
+        uploaderId: "captain-1",
+        kind: "RAW_VIDEO",
+        fileName: `${id}.mp4`,
+        mimeType: "video/mp4",
+        sizeBytes,
+        storageKey: `raw/${id}.mp4`,
+        storageProvider: "local",
+        status: "UPLOADED",
+      });
+    };
+    await insertAsset(assetId, 500);
+    await runStorageMetering("2026-09-01");
+
+    // During the day the user uploads another 300 bytes. Even though the
+    // snapshot still says 500, the gate must see 800 — otherwise they could
+    // keep uploading past their quota until the next nightly run.
+    await insertAsset(tandemUid("a2"), 300);
+    expect(await storageUsedBytes([projectId])).toBe(800);
+  });
+
+  it("storageUsedBytes counts every owned project live, ignoring snapshots entirely", async () => {
+    const t = state.tables;
+    const projectId = tandemUid("p");
+    await state.db.insert(t.tandemVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering4" });
+    const assetId = tandemUid("a");
+    const insertAsset = async (id: string, sizeBytes: number) => {
+      await state.db.insert(t.tandemVideoAssetsTable).values({
+        id,
+        projectId,
+        uploaderId: "captain-1",
+        kind: "RAW_VIDEO",
+        fileName: `${id}.mp4`,
+        mimeType: "video/mp4",
+        sizeBytes,
+        storageKey: `raw/${id}.mp4`,
+        storageProvider: "local",
+        status: "UPLOADED",
+      });
+    };
+    await insertAsset(assetId, 1000);
+    await state.db.insert(t.tandemVideoAssetFilesTable).values({
+      id: tandemUid("f"),
+      assetId,
+      kind: "ORIGINAL",
+      storageKey: "originals/durable.mp4",
+      storageProvider: "r2",
+      mimeType: "video/mp4",
+      sizeBytes: 1000,
+    });
+
+    // A stale snapshot exists (says 1000 from before the proxy), but the live
+    // read must reflect the real current state: original 1000 (ORIGINAL row is
+    // its mirror — not double counted) + r2 proxy 300 = 1300.
+    await runStorageMetering("2026-09-01");
+    await state.db.insert(t.tandemVideoAssetFilesTable).values({
+      id: tandemUid("f2"),
+      assetId,
+      kind: "PROXY",
+      storageKey: "proxies/p.mp4",
+      storageProvider: "r2",
+      mimeType: "video/mp4",
+      sizeBytes: 300,
+    });
+    expect(await storageUsedBytes([projectId])).toBe(1300);
   });
 });
 

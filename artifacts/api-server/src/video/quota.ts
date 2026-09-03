@@ -1,11 +1,10 @@
-import { and, desc, eq, inArray, sum } from "drizzle-orm";
+import { and, eq, inArray, sum } from "drizzle-orm";
 import {
   db,
   tandemAccountQuotasTable,
   tandemVideoAssetFilesTable,
   tandemVideoAssetsTable,
   tandemVideoMembersTable,
-  tandemVideoStorageSnapshotsTable,
   type TandemAccountQuota,
 } from "@workspace/db";
 
@@ -92,31 +91,22 @@ export async function ownedProjectIds(userId: string): Promise<string[]> {
 }
 
 /**
- * The account's ACTUAL stored bytes across its projects: every original
- * (asset rows) plus every derived artifact (asset_files rows — proxies,
- * renders, exports, thumbnails, stems, bundles). ORIGINAL-kind file rows
- * mirror the asset's own durable copy and are not double-counted.
+ * The account's ACTUAL stored bytes across its projects, computed LIVE from
+ * the database on every call: every original (asset rows) plus every derived
+ * artifact (asset_files rows — proxies, renders, exports, thumbnails, stems,
+ * bundles). ORIGINAL-kind file rows mirror the asset's own durable copy and
+ * are not double-counted.
  *
- * The nightly storage snapshots are the billing-grade number; this is the
- * live fallback so the bar and upload gate are right even before the first
- * snapshot (or when snapshots are stale).
+ * Deliberately NOT the nightly snapshot: this number feeds the upload gate
+ * and the profile bar, and a snapshot is up to 24h stale — a user could keep
+ * uploading past their quota all day until the next run recorded it. The
+ * storage snapshots table remains the nightly billing/history ledger; live
+ * enforcement reads the truth.
  */
 export async function storageUsedBytes(projectIds: string[]): Promise<number> {
   if (projectIds.length === 0) return 0;
 
-  // Latest snapshot per project wins when present (one row per project/day).
-  const snapshots = await db
-    .select({
-      projectId: tandemVideoStorageSnapshotsTable.projectId,
-      totalBytes: tandemVideoStorageSnapshotsTable.totalBytes,
-    })
-    .from(tandemVideoStorageSnapshotsTable)
-    .where(inArray(tandemVideoStorageSnapshotsTable.projectId, projectIds))
-    .orderBy(desc(tandemVideoStorageSnapshotsTable.day));
-  const snapshotTotal = snapshots.reduce((acc, row) => acc + row.totalBytes, 0);
-  if (snapshotTotal > 0) return snapshotTotal;
-
-  // Live fallback: sum the originals (asset rows) plus every derived artifact
+  // Live: sum the originals (asset rows) plus every derived artifact
   // (asset_files rows) that belongs to one of the projects. ORIGINAL-kind
   // rows mirror the asset's own durable copy — excluded to avoid double count.
   const [assetsRow] = await db

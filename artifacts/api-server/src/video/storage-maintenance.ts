@@ -3,9 +3,11 @@
 // playbook's "you must meter and enforce limits or you run a charity" advice.
 //
 //   1. Metering (daily): record each project's ACTUAL stored bytes (originals
-//      + derived artifacts, split r2 vs local) into storage snapshots, so the
-//      quota bar and billing reflect the real bill — R2 consumption is not the
-//      same as the DB's nominal original sizes.
+//      + derived artifacts, split r2 vs local) into storage snapshots — the
+//      billing/history ledger. NOTE: quota ENFORCEMENT (the upload gate and
+//      profile bar) does NOT read these rows; it computes live bytes on every
+//      call so a user cannot overshoot between nightly runs. Snapshots are the
+//      billing-grade record for day-over-day reporting and future invoices.
 //   2. Retention (daily): originals are only needed locally while their proxy
 //      pipeline runs. Once the proxy exists AND a durable R2 copy of the
 //      original is in place, the local copy of an old original can be dropped
