@@ -6,8 +6,9 @@
     <title>Tandem widget</title>
     <style>
       :root {
-        --accent: hsl(357 92% 47%);
-        --accent-2: hsl(13 95% 55%);
+        --accent: #e6150a;
+        --accent-2: #ff5f4d;
+        --accent-deep: #8f0c02;
       }
       * { box-sizing: border-box; margin: 0; user-select: none; }
       html, body { background: transparent; overflow: hidden; }
@@ -19,45 +20,65 @@
         -webkit-app-region: drag;
         position: absolute; inset: 0;
         display: grid; place-items: center;
+        cursor: default;
       }
+
+      /* The sphere itself. Layered gradients fake a glossy orb: a soft
+         highlight, then the brand red body fading darker toward the rim,
+         finished with a bright rim + outer glow (kept inside the window). */
       .bubble::after {
         content: "";
-        position: absolute; inset: 3px;
+        position: absolute; inset: 4px;
         border-radius: 50%;
-        background: radial-gradient(circle at 32% 28%, hsl(357 92% 62%), var(--accent) 46%, hsl(357 96% 36%) 100%);
+        background:
+          radial-gradient(circle at 31% 24%, rgba(255, 255, 255, 0.35), transparent 24%),
+          radial-gradient(circle at 35% 30%, var(--accent-2), var(--accent) 48%, var(--accent-deep) 96%);
         box-shadow:
-          0 6px 22px hsl(357 96% 30% / .55),
-          inset 0 1px 0 hsl(0 0% 100% / .35);
-        border: 1.5px solid hsl(0 0% 100% / .28);
-        transition: transform .12s ease;
+          0 8px 22px rgba(230, 21, 10, 0.45),
+          0 2px 5px rgba(0, 0, 0, 0.35),
+          inset 0 1px 1px rgba(255, 255, 255, 0.4),
+          inset 0 -2px 5px rgba(0, 0, 0, 0.22);
+        transition: transform 0.14s ease, filter 0.14s ease;
       }
-      .bubble:hover::after { transform: scale(1.06); }
+      .bubble:hover::after { transform: scale(1.05); filter: brightness(1.06); }
+      .bubble:active::after { transform: scale(0.98); }
 
       /* Clickable core — marked no-drag so clicks reach it. */
       .core {
         -webkit-app-region: no-drag;
         position: relative; z-index: 2;
-        width: 44px; height: 44px; border-radius: 50%;
+        width: 40px; height: 40px; border-radius: 50%;
         display: grid; place-items: center;
         color: #fff; cursor: pointer;
-        font: 700 20px/1 "DM Sans", system-ui, sans-serif; font-style: italic;
-        text-shadow: 0 1px 2px hsl(357 96% 20% / .6);
+        font: italic 700 19px/1 "DM Sans", system-ui, -apple-system, sans-serif;
+        text-shadow:
+          0 1px 2px rgba(60, 0, 0, 0.65),
+          0 0 12px rgba(255, 255, 255, 0.25);
+        transition: transform 0.1s ease;
       }
+      .core:hover { transform: scale(1.08); }
+      .core:active { transform: scale(0.92); }
 
-      /* Close affordance, revealed on hover. */
+      /* Close affordance, revealed (and animated in) on hover. */
       .close {
         -webkit-app-region: no-drag;
         position: absolute; z-index: 3;
-        top: 6px; right: 6px;
-        width: 18px; height: 18px; border-radius: 50%;
-        background: hsl(0 0% 10% / .85);
+        top: 3px; right: 3px;
+        width: 20px; height: 20px; border-radius: 50%;
+        background: rgba(12, 12, 14, 0.82);
         color: #fff; cursor: pointer;
-        display: none; place-items: center;
-        font: 600 12px/1 system-ui, sans-serif;
-        border: 1px solid hsl(0 0% 100% / .35);
+        display: grid; place-items: center;
+        font: 600 11px/1 system-ui, sans-serif;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        opacity: 0; visibility: hidden; transform: scale(0.5);
+        transition: opacity 0.16s ease, transform 0.16s ease, background 0.15s ease, visibility 0.16s;
       }
-      .bubble:hover .close { display: grid; }
-      .close:hover { background: hsl(0 72% 45%); }
+      .bubble:hover .close { opacity: 1; visibility: visible; transform: scale(1); }
+      .close:hover {
+        background: var(--accent);
+        border-color: rgba(255, 255, 255, 0.65);
+        box-shadow: 0 0 10px rgba(230, 21, 10, 0.6);
+      }
     </style>
   </head>
   <body>

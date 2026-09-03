@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, clipboard, Menu, shell } from "electron";
 
 process.on("unhandledRejection", (reason) => {
   console.error("[agent] unhandled rejection:", reason);
@@ -8,12 +8,12 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 import { loadConfig } from "./config";
-import { signInWithClerk, clearClerkSession, type AuthSession } from "./auth";
+import { beginBrowserSignIn, type AuthSession, type BrowserSignInAttempt } from "./auth";
 import { ApiClient } from "./api";
 import { makeProxy, resolveFfmpeg } from "./ffmpeg";
 import { WidgetController } from "./widget";
 import { loadSettings } from "./settings";
-import type { AgentSettings, AppInfo, JobProgress, UpdateEvent } from "../shared/types";
+import type { AgentSettings, AppInfo, AuthEvent, JobProgress, UpdateEvent } from "../shared/types";
 
 let mainWindow: BrowserWindow | null = null;
 let sessionCache: AuthSession | null = null;
@@ -41,9 +41,14 @@ function showMainWindow(): void {
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 860,
-    height: 680,
+    width: 880,
+    height: 720,
+    minWidth: 720,
+    minHeight: 560,
     title: "Tandem Desktop Agent",
+    // The agent has no File/Edit/View/Window/Help chrome — those menus belong
+    // to document editors, not to this app, and only confuse users.
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload", "index.js"),
       contextIsolation: true,
@@ -82,14 +87,64 @@ function sendJobProgress(progress: JobProgress): void {
   }
 }
 
-ipcMain.handle("agent:sign-in", async () => {
+// ---------------------------------------------------------------------------
+// Sign-in (browser device flow)
+// ---------------------------------------------------------------------------
+// Signing in happens in the user's own browser: the renderer asks for a link
+// (agent:sign-in:begin), shows it with Copy/Open buttons, and the main process
+// reports back through agent:auth-event once the browser page finishes the
+// Clerk sign-in and hands the session JWT over.
+let activeSignIn: BrowserSignInAttempt | null = null;
+
+function sendAuthEvent(event: AuthEvent): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("agent:auth-event", event);
+  }
+}
+
+ipcMain.handle("agent:sign-in:begin", async () => {
+  // A new attempt supersedes any in-flight one (its link stops working).
+  activeSignIn?.cancel();
+  activeSignIn = null;
   try {
     const cfg = loadConfig();
-    sessionCache = await signInWithClerk(cfg.clerkPublishableKey);
-    return sessionCache ? { ok: true, email: sessionCache.email } : { ok: false };
+    const attempt = await beginBrowserSignIn(cfg.clerkPublishableKey);
+    activeSignIn = attempt;
+    void attempt.done.then((session) => {
+      if (activeSignIn !== attempt) return; // superseded or cancelled
+      activeSignIn = null;
+      if (session) {
+        sessionCache = session;
+        sendAuthEvent({ type: "signed-in", email: session.email });
+      } else {
+        sendAuthEvent({ type: "expired" });
+      }
+    });
+    return { ok: true, url: attempt.url } as const;
   } catch (err) {
-    return { ok: false, error: (err as Error).message };
+    return { ok: false, error: (err as Error).message } as const;
   }
+});
+
+ipcMain.handle("agent:sign-in:cancel", () => {
+  activeSignIn?.cancel();
+  activeSignIn = null;
+  return { ok: true };
+});
+
+// Opens a link in the user's default browser (used for the sign-in link).
+ipcMain.handle("agent:open-external", async (_e, url: string) => {
+  if (typeof url !== "string" || !/^https?:\/\//.test(url)) {
+    return { ok: false, error: "Only http(s) links can be opened." };
+  }
+  await shell.openExternal(url);
+  return { ok: true };
+});
+
+// Copies text to the system clipboard (used for the sign-in link).
+ipcMain.handle("agent:copy-text", (_e, text: string) => {
+  clipboard.writeText(typeof text === "string" ? text : "");
+  return { ok: true };
 });
 
 // Lets the renderer ask about missing config instead of relying on a one-shot
@@ -99,9 +154,10 @@ ipcMain.handle("agent:config-status", (): { clerkConfigured: boolean } => {
   return { clerkConfigured: Boolean(cfg.clerkPublishableKey) };
 });
 
-ipcMain.handle("agent:sign-out", async () => {
+ipcMain.handle("agent:sign-out", () => {
+  activeSignIn?.cancel();
+  activeSignIn = null;
   sessionCache = null;
-  await clearClerkSession();
   return { ok: true };
 });
 
@@ -290,6 +346,14 @@ app.on("before-quit", () => {
 });
 
 app.whenReady().then(async () => {
+  // Drop the default File/Edit/View/Window/Help menu bar — it's not relevant
+  // to the agent. Windows/Linux get no menu at all; macOS keeps a minimal app
+  // menu so standard shortcuts (Cmd+C/V/Q, window management) keep working.
+  if (process.platform === "darwin") {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]));
+  } else {
+    Menu.setApplicationMenu(null);
+  }
   widgetController = new WidgetController({
     openMainWindow: showMainWindow,
     isMainWindowFocused: () => !!mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused(),

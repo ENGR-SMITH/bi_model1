@@ -34,6 +34,17 @@ export interface UpdateEvent {
   error?: string;
 }
 
+/**
+ * Sign-in lifecycle events pushed to the renderer while a browser sign-in
+ * attempt is in flight (or once it completes). The actual link + waiting UI
+ * lives in the renderer; the main process only reports what happened.
+ */
+export type AuthEvent =
+  | { type: "signed-in"; email: string | null }
+  | { type: "expired"; error?: string }
+  | { type: "cancelled" }
+  | { type: "error"; error: string };
+
 export interface AppInfo {
   version: string;
   platform: string;

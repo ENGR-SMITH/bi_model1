@@ -9,37 +9,86 @@ const $ = (id: string): HTMLElement => document.getElementById(id)!;
 let signedIn = false;
 let appInfo: AppInfo = { version: "0.0.0", platform: "unknown", packaged: false };
 let updateReady = false;
+let pendingSignInUrl = "";
 
-// Never fail silently: surface renderer crashes into the status line so a
-// broken build is obvious instead of looking like a dead UI.
+// Never fail silently: surface renderer crashes into the note under the
+// Account card so a broken build is obvious instead of looking like a dead UI.
 window.addEventListener("error", (e) => {
-  setStatus(`Renderer error: ${e.message}`, "err");
+  setAuthNote(`Renderer error: ${e.message}`, "err");
 });
 window.addEventListener("unhandledrejection", (e) => {
   const r = e.reason as { message?: string } | undefined;
-  setStatus(`Error: ${r?.message ?? String(r)}`, "err");
+  setAuthNote(`Error: ${r?.message ?? String(r)}`, "err");
 });
 
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
+function setAuthNote(line: string, cls = "status"): void {
+  const el = $("auth-note");
+  el.className = `auth-note ${cls}`;
+  el.textContent = line;
+  el.classList.toggle("hidden", !line);
+}
+
 async function refreshWho() {
   const who = await window.tandemAgent.whoami();
   signedIn = who.signedIn;
   const whoSpan = $("who");
+  const accountLabel = who.email ?? who.userId ?? "";
+  const authCard = $("auth-card");
+  const avatar = $("auth-avatar");
   if (who.signedIn) {
-    whoSpan.innerHTML = '<span class="auth-email">' + (who.email ?? who.userId) + "</span>";
+    authCard.classList.add("signed-in");
+    whoSpan.innerHTML = '<span class="auth-email">' + accountLabel + "</span>";
+    avatar.textContent = (accountLabel.trim().charAt(0) || "T").toUpperCase();
+    $("auth-sub").textContent = "Session active on this device";
+    const footerAccount = $("footer-account");
+    footerAccount.textContent = accountLabel;
+    footerAccount.classList.remove("hidden");
     $("sign-in").textContent = "Switch account";
     $("sign-out").classList.remove("hidden");
-    ($("project") as HTMLSelectElement).removeAttribute("disabled");
-    ($("asset") as HTMLSelectElement).removeAttribute("disabled");
+    $("feature-cards").classList.remove("hidden");
   } else {
+    authCard.classList.remove("signed-in");
     whoSpan.textContent = "Not signed in";
-    $("sign-in").textContent = "Sign in";
+    avatar.textContent = "";
+    $("auth-sub").textContent = "Sign up (or sign in) to unlock the project and widget cards.";
+    $("footer-account").classList.add("hidden");
+    $("sign-in").textContent = "Sign up";
     $("sign-out").classList.add("hidden");
-    ($("project") as HTMLSelectElement).setAttribute("disabled", "true");
-    ($("asset") as HTMLSelectElement).setAttribute("disabled", "true");
-    $("upload").setAttribute("disabled", "true");
+    $("feature-cards").classList.add("hidden");
+  }
+}
+
+// The sign-up link panel replaces the Account row while a sign-in is pending.
+function openSigninPanel(url: string): void {
+  pendingSignInUrl = url;
+  $("auth-row").classList.add("hidden");
+  $("signin-panel").classList.remove("hidden");
+  const urlInput = $("signin-url") as HTMLInputElement;
+  urlInput.value = url;
+  $("copy-link").textContent = "Copy link";
+  $("signin-wait").textContent = "Waiting for you to finish signing in…";
+  setAuthNote("");
+}
+
+function closeSigninPanel(): void {
+  pendingSignInUrl = "";
+  $("signin-panel").classList.add("hidden");
+  $("auth-row").classList.remove("hidden");
+}
+
+async function beginSignIn(): Promise<void> {
+  try {
+    const res = await window.tandemAgent.signInBegin();
+    if (!res.ok) {
+      setAuthNote(res.error ?? "Could not start sign-in.", "err");
+      return;
+    }
+    openSigninPanel(res.url);
+  } catch (err) {
+    setAuthNote(`Sign-in failed: ${(err as Error).message}`, "err");
   }
 }
 
@@ -72,7 +121,7 @@ async function loadAssets() {
       sel.appendChild(opt);
     }
   } catch (err) {
-    setStatus(`Failed to load assets: ${(err as Error).message}`);
+    setAuthNote(`Failed to load assets: ${(err as Error).message}`, "err");
   }
 }
 
@@ -119,6 +168,7 @@ function resetProgress() {
 }
 
 async function runUpload() {
+  if (!signedIn) return;
   const projectId = ($("project") as HTMLSelectElement).value;
   const assetId = ($("asset") as HTMLSelectElement).value;
   if (!projectId || !assetId || !chosenFile) {
@@ -217,18 +267,46 @@ async function loadWidgetSettings() {
 // Listeners
 // ---------------------------------------------------------------------------
 function initListeners() {
-  $("sign-in").addEventListener("click", async () => {
-    try {
-      const res = await window.tandemAgent.signIn();
-      if (!res.ok) {
-        setStatus(res.error ?? "Sign-in cancelled.", "err");
-        return;
-      }
-      setStatus("Signed in.", "ok");
-      await refreshWho();
-      await loadProjects();
-    } catch (err) {
-      setStatus(`Sign-in failed: ${(err as Error).message}`, "err");
+  $("sign-in").addEventListener("click", () => void beginSignIn());
+
+  // Browser sign-in link panel
+  $("copy-link").addEventListener("click", async () => {
+    if (!pendingSignInUrl) return;
+    const res = await window.tandemAgent.copyText(pendingSignInUrl);
+    if (res.ok) {
+      const btn = $("copy-link");
+      btn.textContent = "Copied ✓";
+      setTimeout(() => {
+        if (!pendingSignInUrl) btn.textContent = "Copy link";
+      }, 1500);
+    }
+  });
+
+  $("open-browser").addEventListener("click", async () => {
+    if (!pendingSignInUrl) return;
+    const res = await window.tandemAgent.openExternal(pendingSignInUrl);
+    if (!res.ok) {
+      setAuthNote(res.error ?? "Could not open the browser.", "err");
+    }
+  });
+
+  $("cancel-signin").addEventListener("click", async () => {
+    await window.tandemAgent.signInCancel();
+    closeSigninPanel();
+  });
+
+  // Main process reports when the browser page finished (or the link expired).
+  window.tandemAgent.onAuthEvent((evt) => {
+    if (evt.type === "signed-in") {
+      closeSigninPanel();
+      setAuthNote("Signed in.", "ok");
+      void refreshWho().then(() => loadProjects());
+    } else if (evt.type === "expired") {
+      closeSigninPanel();
+      setAuthNote("The sign-in link expired. Click Sign up for a fresh one.", "err");
+    } else if (evt.type === "error") {
+      closeSigninPanel();
+      setAuthNote(evt.error, "err");
     }
   });
 
@@ -240,18 +318,21 @@ function initListeners() {
     sel.length = 1;
     ($("asset") as HTMLSelectElement).length = 0;
     await refreshWho();
-    setStatus("Signed out.");
+    setAuthNote("Signed out.");
+    setStatus("");
   });
 
-  ($("project") as HTMLSelectElement).addEventListener("change", loadAssets);
+  ($("project") as HTMLSelectElement).addEventListener("change", () => void loadAssets());
   $("pick").addEventListener("click", async () => {
     chosenFile = await window.tandemAgent.pickFile();
     $("file").textContent = chosenFile ?? "";
     if (chosenFile) {
       $("upload").removeAttribute("disabled");
+    } else {
+      $("upload").setAttribute("disabled", "true");
     }
   });
-  $("upload").addEventListener("click", runUpload);
+  $("upload").addEventListener("click", () => void runUpload());
 
   // Auto-update
   $("update-btn").addEventListener("click", async () => {
@@ -287,7 +368,7 @@ async function checkConfig() {
   try {
     const st = await window.tandemAgent.configStatus();
     if (!st.clerkConfigured) {
-      setStatus(
+      setAuthNote(
         "Clerk publishable key is not configured. Create tandem-agent.json next to the app " +
           "with { \"clerkPublishableKey\": \"pk_test_...\" } (or set TANDEM_CLERK_PUBLISHABLE_KEY) " +
           "and relaunch before signing in.",
@@ -304,7 +385,7 @@ async function checkConfig() {
 // ---------------------------------------------------------------------------
 async function main() {
   initListeners();
-  window.tandemAgent.onConfigError((msg) => setStatus(msg, "err"));
+  window.tandemAgent.onConfigError((msg) => setAuthNote(msg, "err"));
 
   try {
     appInfo = await window.tandemAgent.appInfo();
@@ -317,10 +398,12 @@ async function main() {
 
   await checkConfig();
   await refreshWho();
-  try {
-    await loadProjects();
-  } catch {
-    // stays empty until sign-in
+  if (signedIn) {
+    try {
+      await loadProjects();
+    } catch (err) {
+      setAuthNote(`Failed to load projects: ${(err as Error).message}`, "err");
+    }
   }
 
   window.tandemAgent.onJobProgress(handleProgress);
@@ -328,5 +411,5 @@ async function main() {
 }
 
 void main().catch((err) => {
-  setStatus(`Failed to start: ${(err as Error).message}`, "err");
+  setAuthNote(`Failed to start: ${(err as Error).message}`, "err");
 });

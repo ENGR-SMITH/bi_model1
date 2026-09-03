@@ -9,7 +9,7 @@ import path from "node:path";
 export interface AgentConfig {
   /** Base URL of the Tandem API server, no trailing slash. */
   apiBaseUrl: string;
-  /** Clerk publishable key for the sign-in window. */
+  /** Clerk publishable key for the browser sign-in page. */
   clerkPublishableKey: string;
   /** Path to the ffmpeg binary. When blank, we look on PATH. */
   ffmpegPath: string;

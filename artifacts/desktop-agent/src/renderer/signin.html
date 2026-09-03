@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sign in to Tandem</title>
+    <title>Sign up to Tandem</title>
     <style>
       :root {
         --bg: hsl(0 0% 7%);
@@ -43,6 +43,20 @@
       }
       #signin-state { color: var(--muted-fg); font-size: 13px; text-align: center; padding: 40px 12px; }
       #signin-state.err { color: hsl(0 72% 60%); }
+      .hidden { display: none !important; }
+
+      /* Success panel shown once the app confirms the sign-in. */
+      #signedin { text-align: center; padding: 46px 16px; }
+      #signedin .check {
+        width: 46px; height: 46px; margin: 0 auto 16px;
+        border-radius: 50%; background: hsl(164 33% 45% / .15);
+        border: 1.5px solid hsl(164 33% 45%);
+        color: hsl(164 33% 60%);
+        display: grid; place-items: center;
+        font-size: 22px; font-weight: 700;
+      }
+      #signedin h2 { font: 700 18px/1.2 var(--font-sans); margin-bottom: 8px; }
+      #signedin p { color: var(--muted-fg); font-size: 13px; line-height: 1.7; max-width: 30ch; margin: 0 auto; }
       .spinner {
         width: 22px; height: 22px; border-radius: 50%;
         border: 2px solid var(--border);
@@ -58,12 +72,18 @@
       <div class="brand">
         <span class="brand-mark">T</span>
         <span class="brand-name">Tandem Desktop Agent</span>
+      <span id="page-hint" style="color:var(--muted-fg);font-size:11px;margin-left:10px;">Sign up or sign in to continue in the app</span>
       </div>
       <div id="signin-root">
         <div id="signin-state">
           <div class="spinner"></div>
           Loading sign-in…
         </div>
+      </div>
+      <div id="signedin" class="hidden">
+        <div class="check">✓</div>
+        <h2>You're signed in</h2>
+        <p>Return to Tandem Desktop Agent — you can close this tab.</p>
       </div>
     </div>
     <script src="./signin.js"></script>
