@@ -48,6 +48,7 @@ import type { VideoTranscriptSegment } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
 import { pollWhileProcessing } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
+import { AgentUploadModal, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 import {
   findScriptMark,
   parseScriptRange,
@@ -236,6 +237,8 @@ export default function RoleScriptPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadName, setUploadName] = useState('');
   const [uploadAssetId, setUploadAssetId] = useState<string | null>(null);
+  // A picked transcribe file that is too big for the browser path.
+  const [blockedFile, setBlockedFile] = useState<File | null>(null);
   const pickedDetail = useGetVideoAsset(projectId, pickerId, {
     query: { queryKey: getGetVideoAssetQueryKey(projectId, pickerId), enabled: Boolean(pickerId) },
   });
@@ -391,6 +394,11 @@ export default function RoleScriptPage() {
   };
 
   const startTranscribeUpload = (file: File) => {
+    // Files at/over the cap need the desktop agent, never a browser POST.
+    if (exceedsBrowserUploadCap(file)) {
+      setBlockedFile(file);
+      return;
+    }
     setUploadProgress(0);
     setUploadName(file.name);
     setUploadPhase('uploading');
@@ -648,6 +656,16 @@ export default function RoleScriptPage() {
               </button>
               <button type="button" onClick={() => command('removeFormat')} aria-label="Clear formatting" title="Clear formatting"><Eraser size={15} /></button>
             </div>
+
+            {/* Too big for the browser path — download + use the desktop agent. */}
+            {blockedFile && (
+              <AgentUploadModal
+                fileName={blockedFile.name}
+                fileSizeBytes={blockedFile.size}
+                context="media file"
+                onClose={() => setBlockedFile(null)}
+              />
+            )}
 
             {(uploadPhase === 'uploading' || uploadPhase === 'transcribing') && (
               <div className="pv-script-upload">

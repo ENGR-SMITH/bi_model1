@@ -371,6 +371,15 @@ select optgroup {
 .cd-card-badge { position: absolute; top: 8px; left: 8px; padding: 3px 8px; border-radius: 4px; background: hsl(0 0% 0% / .72); color: #fff; font: 700 8px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; }
 .cd-card-badge.is-accent { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
 .cd-card-badge.right { left: auto; right: 8px; }
+/* Vault card delete — top-right ghost button; click once to arm (becomes a
+   confirm), again to remove the file. Clicking anywhere else on the card
+   disarms. */
+.cd-card-delete { position: absolute; top: 8px; right: 8px; z-index: 3; width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(0 0% 0% / .68); color: hsl(var(--muted-foreground)); backdrop-filter: blur(6px); box-shadow: 0 2px 8px rgba(0, 0, 0, .45); cursor: pointer; transition: color .15s, border-color .15s, background .15s, transform .12s; opacity: 0; }
+.cd-card:hover .cd-card-delete, .cd-card-delete:focus-visible, .cd-card-delete.armed { opacity: 1; }
+.cd-card-delete:hover { color: hsl(var(--destructive)); border-color: hsl(var(--destructive) / .5); }
+.cd-card-delete.armed { color: #fff; background: hsl(var(--destructive)); border-color: hsl(var(--destructive)); }
+.cd-card.is-deleting { border-color: hsl(var(--destructive) / .6); box-shadow: 0 0 0 1px hsl(var(--destructive) / .4); }
+.cd-card.is-deleting .cd-card-delete { opacity: 1; }
 .cd-card-body { display: flex; flex-direction: column; gap: 4px; padding: 12px 13px 14px; }
 .cd-card-title { font: 700 14px var(--app-font-sans); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cd-card-meta { display: flex; align-items: center; gap: 8px; color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }
@@ -4324,3 +4333,185 @@ select optgroup {
 .buy-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 .buy-error { color: hsl(var(--destructive)); font-size: 12px; margin-top: 6px; }
 .plan-pending { display: flex; align-items: center; gap: 7px; color: hsl(var(--muted-foreground)); font-size: 11px; margin: 14px 0 0; }
+
+/* ---- Desktop-agent upload modal (files at/over the browser cap) ---- */
+.agent-upload-backdrop { z-index: 55; }
+.agent-upload-modal {
+  width: min(880px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: 16px;
+  padding: 0;
+  background:
+    radial-gradient(560px 320px at 8% -6%, hsl(var(--accent) / .14), transparent 65%),
+    hsl(var(--card));
+}
+.agent-upload-left,
+.agent-upload-right { padding: 30px 30px 26px; min-width: 0; }
+.agent-upload-left { display: flex; flex-direction: column; }
+.agent-upload-alert {
+  width: 54px; height: 54px;
+  display: grid; place-items: center;
+  border-radius: 16px;
+  margin-bottom: 15px;
+  color: hsl(var(--accent));
+  background: hsl(var(--accent) / .13);
+  border: 1px solid hsl(var(--accent) / .28);
+  box-shadow: inset 0 1px 0 hsl(var(--accent) / .18);
+}
+.agent-upload-left .eyebrow { color: hsl(var(--accent)); }
+.agent-upload-modal h2 {
+  font: 700 27px/1.1 var(--app-font-serif);
+  letter-spacing: -.04em;
+  margin: 9px 0 12px;
+  max-width: 22ch;
+}
+.agent-upload-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  align-self: flex-start;
+  margin: 0 0 13px;
+  padding: 7px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--secondary) / .55);
+}
+.agent-upload-file b {
+  font: 600 12px var(--app-font-sans);
+  color: hsl(var(--foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 230px;
+}
+.agent-upload-file em {
+  flex: 0 0 auto;
+  font: 500 10px var(--app-font-mono);
+  font-style: normal;
+  color: hsl(var(--accent));
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: hsl(var(--accent) / .13);
+}
+.agent-upload-copy {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 0 0 20px;
+}
+.agent-upload-copy b { color: hsl(var(--foreground)); }
+.agent-upload-cta { margin-top: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.agent-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 0;
+  text-decoration: none;
+  font: 700 13px var(--app-font-sans);
+  color: #fff;
+  background: linear-gradient(120deg, hsl(357 88% 52%), hsl(357 92% 44%));
+  box-shadow: 0 8px 22px hsl(357 92% 40% / .35), inset 0 1px 0 rgba(255, 255, 255, .22);
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.agent-download-btn:hover { transform: translateY(-1px); box-shadow: 0 11px 26px hsl(357 92% 40% / .45), inset 0 1px 0 rgba(255, 255, 255, .22); filter: brightness(1.06); }
+.agent-download-btn:active { transform: translateY(0); }
+.agent-download-btn::after {
+  /* Download-triggered sheen sweep (the download animation). */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: agentSheen 1.3s ease forwards;
+  pointer-events: none;
+}
+.agent-download-btn.downloading::after { animation: agentSheen 1.25s ease infinite; }
+.agent-download-btn.started { background: linear-gradient(120deg, hsl(152 58% 34%), hsl(152 64% 27%)); box-shadow: 0 8px 22px hsl(152 50% 25% / .35), inset 0 1px 0 rgba(255, 255, 255, .18); }
+.agent-download-btn.started:hover { filter: brightness(1.06); }
+@keyframes agentSheen { to { transform: translateX(120%); } }
+.agent-download-note {
+  font: 10px var(--app-font-mono);
+  letter-spacing: .04em;
+  color: hsl(var(--muted-foreground));
+  padding-left: 3px;
+}
+.agent-download-unavailable {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: hsl(var(--muted-foreground));
+  border: 1px dashed hsl(var(--border));
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.agent-upload-right {
+  background: hsl(0 0% 0% / .16);
+  border-left: 1px solid hsl(var(--border) / .8);
+  display: flex;
+  flex-direction: column;
+}
+.agent-upload-right .eyebrow { color: hsl(var(--muted-foreground)); }
+.agent-upload-steps { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 0; }
+.agent-upload-steps li {
+  display: flex;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid hsl(var(--border) / .7);
+}
+.agent-step-icon {
+  flex: 0 0 auto;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  color: hsl(var(--accent));
+  background: hsl(var(--accent) / .1);
+  border: 1px solid hsl(var(--accent) / .2);
+}
+.agent-upload-steps li > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.agent-upload-steps b { display: inline-flex; align-items: center; gap: 7px; font: 700 12.5px var(--app-font-sans); color: hsl(var(--foreground)); }
+.agent-step-num {
+  font: 500 8px var(--app-font-mono);
+  font-style: normal;
+  color: hsl(var(--accent));
+  border: 1px solid hsl(var(--accent) / .4);
+  border-radius: 999px;
+  width: 16px; height: 16px;
+  display: inline-grid; place-items: center;
+}
+.agent-upload-steps li > div > span { font-size: 11px; line-height: 1.55; color: hsl(var(--muted-foreground)); }
+.agent-upload-foot { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+.agent-browser-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.agent-browser-ok svg { color: hsl(152 45% 45%); flex: 0 0 auto; }
+.agent-upload-dismiss {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font: 700 12px var(--app-font-sans);
+  padding: 4px 0;
+  cursor: pointer;
+  transition: color .15s, gap .15s ease;
+}
+.agent-upload-dismiss:hover { color: hsl(var(--accent)); gap: 9px; }
+.agent-upload-close { top: 14px; right: 14px; }
+@media (max-width: 720px) {
+  .agent-upload-modal { grid-template-columns: 1fr; max-height: 92dvh; overflow: auto; }
+  .agent-upload-right { border-left: 0; border-top: 1px solid hsl(var(--border) / .8); }
+}

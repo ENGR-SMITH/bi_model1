@@ -46,6 +46,7 @@ import type { StudioLeg } from '@/components/role-oracle';
 import { formatClock, proxyUrlFor } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
 import { geometryKey, parseGeometry, reviewerColor, reviewerLabel } from '@/lib/annotations';
+import { AgentUploadModal, BROWSER_UPLOAD_MAX_LABEL, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 
 /** Green used to mark a resolved comment / annotation as solved. */
 export const RESOLVED_GREEN = 'hsl(150 52% 42%)';
@@ -539,6 +540,8 @@ export function RoleUploadCard({
   const [progress, setProgress] = useState(0);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  // A picked file that is too big for the browser path — the agent modal.
+  const [blockedFile, setBlockedFile] = useState<File | null>(null);
 
   useEffect(
     () => () => {
@@ -551,6 +554,12 @@ export function RoleUploadCard({
     const invalid = checkFormat(file);
     if (invalid) {
       setError(invalid);
+      return;
+    }
+    // Files at/over the cap go through the desktop agent, never the browser.
+    if (exceedsBrowserUploadCap(file)) {
+      setError('');
+      setBlockedFile(file);
       return;
     }
     setError('');
@@ -649,6 +658,15 @@ export function RoleUploadCard({
           {phase === 'uploading' ? `${progress}%` : 'Upload'}
         </button>
       </div>
+      {/* Too big for the browser path — download + use the desktop agent. */}
+      {blockedFile && (
+        <AgentUploadModal
+          fileName={blockedFile.name}
+          fileSizeBytes={blockedFile.size}
+          context={label}
+          onClose={() => setBlockedFile(null)}
+        />
+      )}
       <div
         className={`role-upload-drop ${drag ? 'drag' : ''}`}
         role="button"
@@ -698,6 +716,11 @@ export function RoleUploadCard({
       )}
       {phase === 'idle' && error && (
         <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-error">{error}</span>
+      )}
+      {phase === 'idle' && blockedFile && (
+        <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-too-big">
+          {blockedFile.name} is over the {BROWSER_UPLOAD_MAX_LABEL} browser limit — use the desktop agent to upload it.
+        </span>
       )}
     </div>
   );
