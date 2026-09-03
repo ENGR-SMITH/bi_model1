@@ -4515,3 +4515,87 @@ select optgroup {
   .agent-upload-modal { grid-template-columns: 1fr; max-height: 92dvh; overflow: auto; }
   .agent-upload-right { border-left: 0; border-top: 1px solid hsl(var(--border) / .8); }
 }
+
+/* ---------------------------------------------------------------------------
+ * Hosted desktop-agent sign-in (/agent-signin) — device flow.
+ * Rendered outside the app shell (main.tsx bypasses ClerkGate for it), so it
+ * owns its full-page layout.
+ * --------------------------------------------------------------------------- */
+.agent-signin-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--app-font-sans);
+}
+.agent-signin-brand {
+  position: absolute;
+  top: 28px;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.agent-signin-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid hsl(var(--accent));
+  color: hsl(var(--accent));
+  display: grid;
+  place-items: center;
+  font: italic 700 14px var(--app-font-sans);
+}
+.agent-signin-name { font: 700 15px/1 var(--app-font-sans); letter-spacing: -.02em; }
+.agent-signin-card {
+  width: 100%;
+  max-width: 420px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  min-height: 420px;
+}
+.agent-signin-state {
+  padding: 40px 24px;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  line-height: 1.7;
+}
+.agent-signin-state h2 {
+  font: 700 18px/1.2 var(--app-font-sans);
+  letter-spacing: -.01em;
+  color: hsl(var(--foreground));
+  margin-bottom: 8px;
+}
+.agent-signin-state p { margin: 0 auto; max-width: 34ch; }
+.agent-signin-hint { margin-bottom: 18px !important; }
+.agent-signin-error h2 { color: hsl(0 72% 62%); }
+.agent-signin-check {
+  width: 46px;
+  height: 46px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: hsl(152 45% 45% / .12);
+  border: 1.5px solid hsl(152 45% 45%);
+  color: hsl(152 55% 55%);
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+.agent-signin-spinner {
+  display: block;
+  width: 22px;
+  height: 22px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--border));
+  border-top-color: hsl(var(--accent));
+  animation: agent-signin-spin .8s linear infinite;
+}
+@keyframes agent-signin-spin { to { transform: rotate(360deg); } }
