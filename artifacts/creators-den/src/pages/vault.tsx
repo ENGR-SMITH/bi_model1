@@ -7,16 +7,19 @@ import {
   FileVideo2,
   Film,
   History,
+  Loader2,
   LockKeyhole,
   Mic2,
   Image,
   Palette,
   Scissors,
   Sparkles,
+  Trash2,
   UserPlus,
   X,
 } from 'lucide-react';
 import { Link, useParams } from 'wouter';
+import { useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetVideoProjectQueryKey,
@@ -74,7 +77,7 @@ const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
 
 const INVITE_ROLES = CONTENT_ROLES;
 
-type AssetSummary = { id: string; fileName: string; kind: string; status: string; sizeBytes: number; version: number; durationMs: number | null; contentHash?: string | null };
+type AssetSummary = { id: string; uploaderId: string; fileName: string; kind: string; status: string; sizeBytes: number; version: number; durationMs: number | null; contentHash?: string | null };
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -100,15 +103,36 @@ function isDuplicateContent(assets: Array<{ contentHash?: string | null }>, inde
 // decoded.
 // ---------------------------------------------------------------------------
 
-function PosterCard({ projectId, asset, deduplicated }: { projectId: string; asset: AssetSummary; deduplicated: boolean }) {
+function PosterCard({
+  projectId,
+  asset,
+  deduplicated,
+  canDelete,
+  deleting,
+  onDelete,
+}: {
+  projectId: string;
+  asset: AssetSummary;
+  deduplicated: boolean;
+  /** The viewer is the uploader or the Captain — the vault shows the delete affordance. */
+  canDelete: boolean;
+  deleting: boolean;
+  onDelete: () => void;
+}) {
   const [broken, setBroken] = useState(false);
+  const [armed, setArmed] = useState(false);
   const processed = asset.status === 'PROCESSED';
   const audio = isAudioKind(asset.kind);
   const image = IMAGE_KINDS.has(asset.kind);
   const proxy = proxyUrlFor(projectId, asset.id);
 
+  // Click once to arm the confirm state, again to actually delete. Clicking
+  // anywhere else on the card cancels the arm (a stray second click on the
+  // card body must not delete a file).
+  const onCardClick = () => setArmed(false);
+
   return (
-    <div className="cd-card" data-testid={`card-asset-${asset.id}`}>
+    <div className={`cd-card ${armed ? 'is-deleting' : ''}`} onClick={onCardClick} data-testid={`card-asset-${asset.id}`}>
       <div className="cd-card-thumb">
         {audio ? <Mic2 size={26} /> : <FileVideo2 size={26} />}
         {processed && !broken && (image ? (
@@ -118,6 +142,25 @@ function PosterCard({ projectId, asset, deduplicated }: { projectId: string; ass
         ) : null)}
         <span className="cd-card-badge">{KIND_LABELS[asset.kind] ?? asset.kind}</span>
         {!processed && <span className="cd-card-badge right">processing…</span>}
+        {canDelete && (
+          <button
+            type="button"
+            className={`cd-card-delete ${armed ? 'armed' : ''}`}
+            title={armed ? 'Click again to remove this file from the vault' : 'Remove this file from the vault'}
+            aria-label={`Delete ${asset.fileName}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              if (!armed) {
+                setArmed(true);
+                return;
+              }
+              onDelete();
+            }}
+            data-testid={`button-delete-asset-${asset.id}`}
+          >
+            {deleting ? <Loader2 size={13} className="spin" /> : armed ? <Check size={13} /> : <Trash2 size={13} />}
+          </button>
+        )}
       </div>
       <div className="cd-card-body">
         <span className="cd-card-title">{asset.fileName}</span>
@@ -588,6 +631,9 @@ function SubmissionsPanel({ projectId, myRoles }: { projectId: string; myRoles: 
 
 export default function ContentCreatorsProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
+  const queryClient = useQueryClient();
+  const { user } = useUser();
+  const viewerId = user?.id ?? '';
   // Live: jobs, submissions, grants, and asset processing stream in.
   useProjectRealtime(projectId, null);
   const project = useGetVideoProject(projectId, {
@@ -602,6 +648,41 @@ export default function ContentCreatorsProjectPage() {
       },
     },
   });
+
+  // Vault file deletion (the DELETE /assets/:id route). The web app has no
+  // generated client fn for it yet, so this calls the route directly — the
+  // browser sends the Clerk session cookie, same as every other request.
+  const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState('');
+  const deleteAsset = async (assetId: string) => {
+    setDeleteError('');
+    setDeletingAssetId(assetId);
+    try {
+      const response = await fetch(`/api/video/projects/${projectId}/assets/${assetId}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) {
+        let message = 'The file could not be deleted. Try once more.';
+        try {
+          const data = (await response.json()) as { error?: string };
+          if (typeof data?.error === 'string' && data.error) message = data.error;
+        } catch {
+          // Non-JSON body — keep the generic message.
+        }
+        setDeleteError(message);
+        setDeletingAssetId(null);
+        return;
+      }
+      // The vault refetches; the deleted asset (and its freed storage)
+      // disappears from the rails.
+      await queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+    } catch {
+      setDeleteError('The file could not be deleted — your connection dropped.');
+    } finally {
+      setDeletingAssetId(null);
+    }
+  };
 
   const assets = (project.data?.assets ?? []) as AssetSummary[];
 
@@ -743,6 +824,9 @@ export default function ContentCreatorsProjectPage() {
                     projectId={p.id}
                     asset={asset}
                     deduplicated={isDuplicateContent(assets, assets.findIndex((a) => a.id === asset.id))}
+                    canDelete={captain || Boolean(viewerId && asset.uploaderId === viewerId)}
+                    deleting={deletingAssetId === asset.id}
+                    onDelete={() => void deleteAsset(asset.id)}
                   />
                 ))}
               </div>
@@ -756,6 +840,11 @@ export default function ContentCreatorsProjectPage() {
         </div>
       </div>
 
+      {deleteError && (
+        <p className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="vault-delete-error">
+          {deleteError}
+        </p>
+      )}
       <p className="den-footnote mt-8">
         <LockKeyhole size={13} />
         Private by design · raw files never leave the vault · the relay begins once footage lands

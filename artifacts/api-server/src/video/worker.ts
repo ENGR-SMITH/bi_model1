@@ -37,7 +37,7 @@ import os from "node:os";
 import path from "node:path";
 import { logger } from "../lib/logger";
 import { emitJobProgress, emitToProject } from "../realtime";
-import { persistArtifact } from "./object-storage";
+import { ensureLocalCopy, ensureOriginalRestored, persistArtifact } from "./object-storage";
 import { attachQueueEventBridge, bullmqEnabled, enqueueBullMqJob } from "./queues";
 import { buildCheckout } from "./checkout";
 import { buildZip, type ZipEntry } from "./zip";
@@ -665,6 +665,9 @@ async function processSync(asset: TandemVideoAsset, job: TandemVideoJob): Promis
   if (!target) {
     throw new Error(`Sync target asset ${targetAssetId} no longer exists`);
   }
+  // Both cameras' originals must be on disk to extract PCM (runJob already
+  // restored the primary; the secondary needs the same pull after a restart).
+  await ensureOriginalRestored(target);
 
   const tools = detectTools();
   let offsetMs = 0;
@@ -768,6 +771,9 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
         .where(eq(tandemVideoAssetsTable.id, clip.assetId ?? ""))
         .limit(1);
       if (!src) continue;
+      // A render reads every referenced clip's original — restore any that
+      // were evicted from the processing disk (durable R2 copy only).
+      await ensureOriginalRestored(src);
       const inSec = (clip.inMs ?? 0) / 1000;
       const durSec = ((clip.outMs ?? 0) - (clip.inMs ?? 0)) / 1000;
       if (durSec <= 0) continue;
@@ -1117,6 +1123,9 @@ async function processThumbnail(asset: TandemVideoAsset, job: TandemVideoJob): P
   if (!source) {
     throw new Error("Thumbnail source asset no longer exists");
   }
+  // The thumbnail is cut from the chosen master clip — restore its original
+  // when only the R2 copy survived a restart.
+  await ensureOriginalRestored(source);
   const sourcePath = path.join(uploadDir(), source.storageKey);
 
   if (tools.ffmpeg) {
@@ -1309,6 +1318,21 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
 
     if (!asset) {
       const message = "Asset no longer exists";
+      await db
+        .update(tandemVideoJobsTable)
+        .set({ status: "FAILED", error: message, finishedAt: new Date() })
+        .where(eq(tandemVideoJobsTable.id, job.id));
+      emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "FAILED", error: message });
+      throw new Error(message);
+    }
+
+    // Every processor reads the original from the local processing disk. An
+    // ephemeral-container restart wipes that disk; when a durable R2 copy of
+    // the original exists (ORIGINAL asset-file row), pull it back before
+    // dispatching (one GET) rather than failing the job with a missing source.
+    const restored = await ensureOriginalRestored(asset);
+    if (!restored) {
+      const message = "Source file is missing locally and no R2 copy could be restored";
       await db
         .update(tandemVideoJobsTable)
         .set({ status: "FAILED", error: message, finishedAt: new Date() })

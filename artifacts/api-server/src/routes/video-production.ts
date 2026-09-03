@@ -16,6 +16,7 @@ import {
   tandemVideoTimelineVersionsTable,
   tandemVideoTranscriptSegmentsTable,
   tandemVideoTranscriptsTable,
+  tandemVideoReferencesTable,
   tandemVideoJobsTable,
   collaborationActivityEventsTable,
   type TandemVideoAsset,
@@ -96,7 +97,7 @@ import {
   requeueProxyJob,
   uploadDir,
 } from "../video/worker";
-import { getStore, r2Configured } from "../video/object-storage";
+import { ensureLocalCopy, getStore, r2Configured } from "../video/object-storage";
 import {
   parseTimelineEdl,
   resolveEdlEvents,
@@ -117,6 +118,7 @@ import { buildCheckout } from "../video/checkout";
 import { upload } from "../video/upload";
 import { createAssetFromUpload } from "../video/content-address";
 import { ensureUploadFits } from "../video/quota";
+import { captureVaultStorage, reclaimDeletedVaultFiles } from "../video/storage-cleanup";
 import { recordVideoActivity } from "../video/activity";
 import { resolveProjectAccess } from "../video/access";
 import { resolveUserNames } from "../lib/user-names";
@@ -308,6 +310,94 @@ router.get(
   },
 );
 
+// DELETE /video/projects/:projectId/assets/:assetId — remove one vault file
+// (and its derived proxy/transcript) and reclaim its physical storage. The
+// uploader or the Captain can delete; the Lock never blocks removing your own
+// upload. Local blobs shared with other assets (content-addressed) survive;
+// R2 objects are removed by key.
+router.delete(
+  "/video/projects/:projectId/assets/:assetId",
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = GetVideoAssetParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "Invalid asset id" });
+      return;
+    }
+
+    const [project] = await db
+      .select({ id: tandemVideoProjectsTable.id, ownerId: tandemVideoProjectsTable.ownerId })
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+
+    const [asset] = await db
+      .select()
+      .from(tandemVideoAssetsTable)
+      .where(eq(tandemVideoAssetsTable.id, params.data.assetId))
+      .limit(1);
+    if (!asset || asset.projectId !== params.data.projectId) {
+      res.status(404).json({ error: "Asset not found" });
+      return;
+    }
+
+    const member = await requireMember(params.data.projectId, userId);
+    const isCaptain = member?.roles?.includes("CAPTAIN") ?? false;
+    if (!member || (!isCaptain && asset.uploaderId !== userId)) {
+      res.status(403).json({ error: "Only the uploader or the Captain can delete this file" });
+      return;
+    }
+
+    // Capture physical keys before the rows that name them are deleted.
+    const storage = await captureVaultStorage(params.data.projectId, asset.id);
+
+    await db.transaction(async (tx) => {
+      const [transcript] = await tx
+        .select({ id: tandemVideoTranscriptsTable.id })
+        .from(tandemVideoTranscriptsTable)
+        .where(eq(tandemVideoTranscriptsTable.assetId, asset.id))
+        .limit(1);
+      if (transcript) {
+        await tx
+          .delete(tandemVideoTranscriptSegmentsTable)
+          .where(eq(tandemVideoTranscriptSegmentsTable.transcriptId, transcript.id));
+        await tx.delete(tandemVideoTranscriptsTable).where(eq(tandemVideoTranscriptsTable.id, transcript.id));
+      }
+      await tx.delete(tandemVideoAssetFilesTable).where(eq(tandemVideoAssetFilesTable.assetId, asset.id));
+      await tx.delete(tandemVideoReferencesTable).where(eq(tandemVideoReferencesTable.assetId, asset.id));
+      await tx.delete(tandemVideoSyncsTable).where(eq(tandemVideoSyncsTable.primaryAssetId, asset.id));
+      await tx.delete(tandemVideoSyncsTable).where(eq(tandemVideoSyncsTable.targetAssetId, asset.id));
+      // Comments pinned to this file go with it; timecode notes on the legs
+      // stay (they review the cut, not the file).
+      await tx.delete(tandemVideoCommentsTable).where(eq(tandemVideoCommentsTable.assetId, asset.id));
+      await tx.delete(tandemVideoAssetsTable).where(eq(tandemVideoAssetsTable.id, asset.id));
+    });
+
+    // Physical reclaim — the asset's own R2 keys + the local original when
+    // no other asset shares the blob. Best-effort, after the DB delete.
+    await reclaimDeletedVaultFiles({
+      projectId: params.data.projectId,
+      keys: storage.keys,
+      assetIds: storage.assetIds,
+      fileIds: storage.fileIds,
+      fileR2Keys: storage.fileR2Keys,
+      wholeProject: false,
+    });
+
+    emitToProject(params.data.projectId, "asset.deleted", { projectId: params.data.projectId, assetId: asset.id });
+    res.status(204).end();
+  },
+);
+
 // GET /video/projects/:projectId/assets/:assetId/proxy — stream the low-res
 // proxy. The Lock: only proxies leave the server, never originals. PUBLIC
 // projects may stream proxies to non-members in read-only preview.
@@ -365,19 +455,29 @@ router.get(
         res.redirect(302, url);
         return;
       }
+      // Presigning fell through (e.g. transient R2 outage) — fall back to the
+      // cached local copy below instead of failing the playback request.
     }
 
     const filePath = path.join(uploadDir(), proxy.storageKey);
     if (!fs.existsSync(filePath)) {
-      // The proxy record exists in the DB but the file is gone from disk
-      // (common after a container restart on ephemeral storage). Clean up
-      // the stale record, re-queue the proxy job, and let the frontend
-      // polling loop pick up the regenerated file.
-      await db.delete(tandemVideoAssetFilesTable).where(eq(tandemVideoAssetFilesTable.id, proxy.id));
-      await requeueProxyJob(asset.projectId, asset.id);
-      await db.update(tandemVideoAssetsTable).set({ status: "UPLOADED" }).where(eq(tandemVideoAssetsTable.id, asset.id));
-      res.status(409).json({ error: "Proxy file is missing — regenerating" });
-      return;
+      // The row exists but the file is gone from disk — common after a
+      // container restart on ephemeral storage. If the proxy is R2-hosted,
+      // restore the cached copy from R2 (one GET) instead of burning an
+      // ffmpeg re-encode; only re-encode when there is genuinely nothing to
+      // restore from.
+      if (proxy.storageProvider === "r2" && (await ensureLocalCopy({ projectId: asset.projectId, storageKey: proxy.storageKey, storageProvider: proxy.storageProvider }))) {
+        logger.info({ assetId: asset.id, storageKey: proxy.storageKey }, "Restored proxy from R2 after local cache miss");
+      } else {
+        // No R2 copy (or restore failed) — the source of truth is gone; clean
+        // up the stale record, re-queue the proxy job, and let the frontend
+        // polling loop pick up the regenerated file.
+        await db.delete(tandemVideoAssetFilesTable).where(eq(tandemVideoAssetFilesTable.id, proxy.id));
+        await requeueProxyJob(asset.projectId, asset.id);
+        await db.update(tandemVideoAssetsTable).set({ status: "UPLOADED" }).where(eq(tandemVideoAssetsTable.id, asset.id));
+        res.status(409).json({ error: "Proxy file is missing — regenerating" });
+        return;
+      }
     }
 
     // Stream the file directly instead of using res.sendFile — Express 5's

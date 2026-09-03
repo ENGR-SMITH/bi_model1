@@ -80,6 +80,24 @@ class FakeR2Store implements ObjectStore {
     return `https://presigned.r2.example/put/${projectId}/${encodeURIComponent(storageKey)}`;
   }
   async delete(): Promise<void> {}
+  async deleteKeys(projectId: string, storageKeys: string[]): Promise<number> {
+    let removed = 0;
+    for (const storageKey of storageKeys) {
+      if (this.objects.delete(`projects/${projectId}/${storageKey}`)) removed += 1;
+    }
+    return removed;
+  }
+  async deleteProject(projectId: string): Promise<number> {
+    const prefix = `projects/${projectId}/`;
+    let removed = 0;
+    for (const key of [...this.objects.keys()]) {
+      if (key.startsWith(prefix)) {
+        this.objects.delete(key);
+        removed += 1;
+      }
+    }
+    return removed;
+  }
 }
 
 const fake = new FakeR2Store();

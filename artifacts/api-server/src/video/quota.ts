@@ -2,6 +2,7 @@ import { and, eq, inArray, sum } from "drizzle-orm";
 import {
   db,
   tandemAccountQuotasTable,
+  tandemVideoAssetFilesTable,
   tandemVideoAssetsTable,
   tandemVideoMembersTable,
   type TandemAccountQuota,
@@ -89,14 +90,47 @@ export async function ownedProjectIds(userId: string): Promise<string[]> {
     .map((member) => member.projectId);
 }
 
-/** Sum of vault asset bytes across the given projects. */
+/**
+ * The account's ACTUAL stored bytes across its projects, computed LIVE from
+ * the database on every call: every original (asset rows) plus every derived
+ * artifact (asset_files rows — proxies, renders, exports, thumbnails, stems,
+ * bundles). ORIGINAL-kind file rows mirror the asset's own durable copy and
+ * are not double-counted.
+ *
+ * Deliberately NOT the nightly snapshot: this number feeds the upload gate
+ * and the profile bar, and a snapshot is up to 24h stale — a user could keep
+ * uploading past their quota all day until the next run recorded it. The
+ * storage snapshots table remains the nightly billing/history ledger; live
+ * enforcement reads the truth.
+ */
 export async function storageUsedBytes(projectIds: string[]): Promise<number> {
   if (projectIds.length === 0) return 0;
-  const [row] = await db
+
+  // Live: sum the originals (asset rows) plus every derived artifact
+  // (asset_files rows) that belongs to one of the projects. ORIGINAL-kind
+  // rows mirror the asset's own durable copy — excluded to avoid double count.
+  const [assetsRow] = await db
     .select({ total: sum(tandemVideoAssetsTable.sizeBytes) })
     .from(tandemVideoAssetsTable)
     .where(inArray(tandemVideoAssetsTable.projectId, projectIds));
-  return Number(row?.total ?? 0);
+  const originals = Number(assetsRow?.total ?? 0);
+
+  const fileRows = await db
+    .select({ sizeBytes: tandemVideoAssetFilesTable.sizeBytes, kind: tandemVideoAssetFilesTable.kind })
+    .from(tandemVideoAssetFilesTable)
+    .where(
+      inArray(
+        tandemVideoAssetFilesTable.assetId,
+        db
+          .select({ id: tandemVideoAssetsTable.id })
+          .from(tandemVideoAssetsTable)
+          .where(inArray(tandemVideoAssetsTable.projectId, projectIds)),
+      ),
+    );
+  const derived = fileRows
+    .filter((file) => file.kind !== "ORIGINAL")
+    .reduce((acc, file) => acc + (file.sizeBytes || 0), 0);
+  return originals + derived;
 }
 
 export interface AccountUsage {

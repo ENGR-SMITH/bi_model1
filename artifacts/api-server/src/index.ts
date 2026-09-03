@@ -4,6 +4,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { initRealtime } from "./realtime";
 import { startVideoWorker } from "./video/worker";
+import { startStorageMaintenance } from "./video/storage-maintenance-runner";
 
 const rawPort = process.env["PORT"];
 
@@ -32,4 +33,5 @@ server.listen(port, () => {
   // job progress, comments, submissions, notifications, and presence.
   initRealtime(server);
   startVideoWorker();
+  startStorageMaintenance();
 });
