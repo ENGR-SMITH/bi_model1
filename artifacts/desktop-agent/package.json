@@ -6,7 +6,7 @@
   "main": "dist/main/index.js",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "compile": "tsc -p tsconfig.json && node -e \"const fs=require('fs');['index','bubble','signin'].forEach(n=>fs.copyFileSync('src/renderer/'+n+'.html','dist/renderer/'+n+'.html'));\"",
+    "compile": "tsc -p tsconfig.json && node -e \"const fs=require('fs');['index','bubble'].forEach(n=>fs.copyFileSync('src/renderer/'+n+'.html','dist/renderer/'+n+'.html'));\"",
     "build": "pnpm run compile && electron-builder --publish never",
     "build:dir": "pnpm run compile && electron-builder --dir --publish never",
     "dev": "pnpm run compile && electron .",

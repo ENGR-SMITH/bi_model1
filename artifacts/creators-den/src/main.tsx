@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { RealtimeProvider } from '@/lib/realtime';
+import AgentSignInPage from '@/pages/agent-signin';
 
 import './index.css';
 import './creators.css';
@@ -94,6 +95,11 @@ function ClerkGate({ children }: { children: React.ReactNode }) {
   );
 }
 
+// The desktop agent opens /agent-signin in the user's browser to complete a
+// device-flow sign-in. It must render pre-auth (it IS the sign-in page), so it
+// bypasses ClerkGate but stays inside ClerkProvider.
+const isAgentSignInPath = window.location.pathname.replace(/\/+$/, '').endsWith('/agent-signin');
+
 createRoot(document.getElementById('root')!, {
   // Keeps caught errors off reportError(), which would raise the dev overlay.
   onCaughtError: (error, errorInfo) => {
@@ -107,9 +113,13 @@ createRoot(document.getElementById('root')!, {
   >
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
-        <ClerkGate>
-          <App />
-        </ClerkGate>
+        {isAgentSignInPath ? (
+          <AgentSignInPage />
+        ) : (
+          <ClerkGate>
+            <App />
+          </ClerkGate>
+        )}
       </ErrorBoundary>
     </QueryClientProvider>
   </ClerkProvider>,

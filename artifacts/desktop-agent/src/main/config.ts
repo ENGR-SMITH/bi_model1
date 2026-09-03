@@ -9,6 +9,13 @@ import path from "node:path";
 export interface AgentConfig {
   /** Base URL of the Tandem API server, no trailing slash. */
   apiBaseUrl: string;
+  /**
+   * Public origin of the Tandem web app (creators-den), no trailing slash.
+   * The sign-in link points at its hosted /agent-signin page — Clerk only
+   * initialises on origins registered for the instance, so the page must run
+   * on the web app's domain rather than on a loopback server.
+   */
+  webAppUrl: string;
   /** Clerk publishable key for the browser sign-in page. */
   clerkPublishableKey: string;
   /** Path to the ffmpeg binary. When blank, we look on PATH. */
@@ -24,6 +31,9 @@ export interface AgentConfig {
 
 const DEFAULTS: AgentConfig = {
   apiBaseUrl: "http://localhost:3000",
+  // Local dev creators-den (replit.md: PORT=5175, BASE_PATH=/creators-den/).
+  // Production installs must set TANDEM_WEB_URL to the deployed web app.
+  webAppUrl: "http://localhost:5175",
   // Clerk publishable key for the shared Tandem Clerk instance (novel-tortoise-61).
   // Publishable keys are public by design — the web apps embed the same one in
   // their client bundles — so it's safe to ship as the built-in default.
@@ -54,6 +64,7 @@ export function loadConfig(): AgentConfig {
   const file = loadFileConfig();
   return {
     apiBaseUrl: process.env.TANDEM_API_URL || file.apiBaseUrl || DEFAULTS.apiBaseUrl,
+    webAppUrl: process.env.TANDEM_WEB_URL || file.webAppUrl || DEFAULTS.webAppUrl,
     clerkPublishableKey: process.env.TANDEM_CLERK_PUBLISHABLE_KEY || file.clerkPublishableKey || DEFAULTS.clerkPublishableKey,
     ffmpegPath: process.env.TANDEM_FFMPEG_PATH || file.ffmpegPath || DEFAULTS.ffmpegPath,
     workDir: process.env.TANDEM_AGENT_WORK_DIR || file.workDir || DEFAULTS.workDir,

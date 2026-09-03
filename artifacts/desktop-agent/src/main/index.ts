@@ -108,7 +108,7 @@ ipcMain.handle("agent:sign-in:begin", async () => {
   activeSignIn = null;
   try {
     const cfg = loadConfig();
-    const attempt = await beginBrowserSignIn(cfg.clerkPublishableKey);
+    const attempt = await beginBrowserSignIn(cfg.clerkPublishableKey, cfg.webAppUrl);
     activeSignIn = attempt;
     void attempt.done.then((session) => {
       if (activeSignIn !== attempt) return; // superseded or cancelled
