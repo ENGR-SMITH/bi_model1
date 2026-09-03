@@ -27,10 +27,12 @@ CREATE TABLE IF NOT EXISTS "tandem_video_storage_snapshots" (
   "owner_id"    text                     NOT NULL,
   "day"         date                     NOT NULL,
   -- Total physical bytes stored for the project that day.
-  "total_bytes" integer                  NOT NULL DEFAULT 0,
+  -- bigint: project storage routinely exceeds 2 GB, and a 32-bit integer
+  -- maxes out at 2^31 - 1.
+  "total_bytes" bigint                   NOT NULL DEFAULT 0,
   -- Bytes held in R2 (billable at the R2 rate) vs local processing disk.
-  "r2_bytes"    integer                  NOT NULL DEFAULT 0,
-  "local_bytes" integer                  NOT NULL DEFAULT 0,
+  "r2_bytes"    bigint                   NOT NULL DEFAULT 0,
+  "local_bytes" bigint                   NOT NULL DEFAULT 0,
   "created_at"  timestamp with time zone NOT NULL DEFAULT now()
 );
 

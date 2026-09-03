@@ -1,5 +1,6 @@
 import { createInsertSchema } from "drizzle-zod";
 import {
+  bigint,
   integer,
   jsonb,
   pgTable,
@@ -63,7 +64,9 @@ export const tandemVideoAssetsTable = pgTable("tandem_video_assets", {
   kind: text("kind").notNull().default("RAW_VIDEO"),
   fileName: text("file_name").notNull(),
   mimeType: text("mime_type").notNull().default("application/octet-stream"),
-  sizeBytes: integer("size_bytes").notNull().default(0),
+  // bigint (not integer): raw footage exceeds 2 GB; a 32-bit integer maxes out
+  // at 2^31 - 1 and the multer cap is 10 GB.
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull().default(0),
   durationMs: integer("duration_ms"),
   storageKey: text("storage_key").notNull(),
   // local (disk under VIDEO_UPLOAD_DIR) | r2 (Cloudflare R2 object storage).
