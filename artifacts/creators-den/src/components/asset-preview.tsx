@@ -128,7 +128,14 @@ export function AssetPlayer({
   } else if (streamStatus === 409) {
     errorMessage = 'The proxy is being regenerated. This page will update automatically.';
   } else if (streamStatus === 404) {
-    errorMessage = 'The proxy file is missing on the server. Re-upload the asset and wait for processing to finish.';
+    // A submit-for-review upload streams its staged ORIGINAL (it has no proxy
+    // yet) — a 404 there means the held file itself is gone from the server
+    // (a dev restart on ephemeral storage is the usual cause), not a missing
+    // proxy, so the recovery advice is different.
+    errorMessage =
+      detail?.status === 'PENDING_REVIEW'
+        ? 'The submitted file is no longer on the server — files held for review are lost when the server restarts. Reject this review so the submitter can hand the file in again.'
+        : 'The proxy file is missing on the server. Re-upload the asset and wait for processing to finish.';
   } else if (demoProxy) {
     errorMessage = 'The server is in demo mode (no ffmpeg detected), so the preview is your original file — browsers can only play H.264 MP4 or WebM here.';
   } else {

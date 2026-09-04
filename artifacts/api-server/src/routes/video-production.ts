@@ -477,6 +477,20 @@ router.get(
         }
         const stagedPath = path.join(uploadDir(), asset.storageKey);
         if (!fs.existsSync(stagedPath)) {
+          // The held file's bytes are gone (a dev restart on ephemeral
+          // storage wipes the staged uploads) — log exactly where it was
+          // expected so the cause is visible in the server log, not just a
+          // 404 in the browser.
+          logger.warn(
+            {
+              assetId: asset.id,
+              projectId: asset.projectId,
+              storageKey: asset.storageKey,
+              stagedPath,
+              uploadDir: uploadDir(),
+            },
+            "Pending review file missing on disk — the Captain cannot preview it",
+          );
           res.status(404).json({ error: "The submitted file is no longer available on the server" });
           return;
         }
