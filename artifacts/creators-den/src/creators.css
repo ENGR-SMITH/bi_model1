@@ -2552,6 +2552,73 @@ select optgroup {
 .role-upload-status .mono-label { white-space: nowrap; }
 .role-upload-card .primary-btn { flex: 0 0 auto; white-space: nowrap; }
 
+/* ---- Desktop-agent launch (the second upload method on the upload cards) ----
+   The row wraps so the agent's status note can take its own line under the
+   format select + Upload + Desktop agent buttons. */
+.role-upload-row { flex-wrap: wrap; }
+.agent-launch-btn {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.agent-launch-btn:hover:not(:disabled) { border-color: hsl(var(--accent) / .55); color: hsl(var(--foreground)); }
+.agent-launch-btn:disabled { opacity: .65; cursor: default; }
+.agent-flow-note {
+  flex: 1 1 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.5;
+}
+.agent-flow-note b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-flow-note .link-btn { flex: 0 0 auto; }
+.agent-flow-note.is-done { color: hsl(152 58% 40%); }
+.agent-flow-note.is-error { color: hsl(var(--destructive)); }
+
+/* Script desk — the agent upload option sits in a slim row under the header
+   (below the transcribe toolbar), so it never crowds the editor tools. */
+.pv-script-agent-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  border-bottom: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary) / .25);
+}
+.pv-script-agent-row .agent-launch-btn { height: 28px; }
+.pv-script-agent-row .agent-flow-note { flex: 1 1 auto; }
+
+/* The modal's secondary "already have it?" launch link. */
+.agent-upload-open-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin-top: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: hsl(var(--accent));
+  cursor: pointer;
+}
+.agent-upload-open-link:hover { text-decoration: underline; }
+
 /* ---- Role oracle (third column, first row) ----
    The oracle fills the top cell and scrolls its message list internally. */
 .role-notes-main .den-oracle {

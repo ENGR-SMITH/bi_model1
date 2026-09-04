@@ -18,3 +18,4 @@ type AgentSettings = import("../shared/types").AgentSettings;
 type AppInfo = import("../shared/types").AppInfo;
 type JobProgress = import("../shared/types").JobProgress;
 type UpdateEvent = import("../shared/types").UpdateEvent;
+type LaunchContext = import("../shared/types").LaunchContext;

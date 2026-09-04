@@ -115,6 +115,27 @@ The Creator Den vault and the Tandem content-creators doorway show a
 in the app's `.env` (copy it from the root `.env.example`). Point it at the R2
 public URL above (or a GitHub Release URL) and the button appears for users.
 
+## Launching from Creator Den (control server + deep link)
+
+Every upload section in Creator Den also offers **"Desktop agent"** as a second
+upload method, so users pick between the browser and the agent any time. For
+that hand-off the agent runs a tiny loopback control server (bound to
+`127.0.0.1:<port>`, default `41737`, override with `TANDEM_AGENT_CONTROL_PORT`
+— the web app must match with `VITE_AGENT_CONTROL_PORT`):
+
+- `GET /health` — the web app detects whether the agent is running.
+- `POST /launch` — receives `{ projectId, returnUrl }`, focuses the window and
+  preselects the project.
+- `GET /job-status` — the web app polls this; when the upload job is `done` it
+  refreshes the page, and the agent reopens the `returnUrl` so the user lands
+  back on Creator Den automatically.
+
+The installer registers the `tandem-agent://` URL scheme (build-time
+`protocols` entry + runtime `setAsDefaultProtocolClient`), so a deep link
+(`tandem-agent://launch?projectId=…&returnUrl=…`) starts an installed-but-idle
+agent too. The agent only ever opens `returnUrl` values that point back at the
+configured `TANDEM_WEB_URL` origin.
+
 ## Auto-update
 
 The installed app checks for updates on launch (and via the **Check for updates**

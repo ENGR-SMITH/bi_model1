@@ -50,3 +50,26 @@ export interface AppInfo {
   platform: string;
   packaged: boolean;
 }
+
+/**
+ * Context handed to the agent when Creator Den launches it for an upload:
+ * which project to preselect, and the page to reopen once the upload lands
+ * (so the user is automatically back on Creator Den).
+ */
+export interface LaunchContext {
+  projectId?: string;
+  returnUrl?: string;
+}
+
+/**
+ * The agent's most recent upload job, as reported to Creator Den's control
+ * server so the web page knows when to refresh / redirect back.
+ */
+export interface AgentJobStatus {
+  running: boolean;
+  done: boolean;
+  error?: string;
+  projectId?: string;
+  fileName?: string;
+  returnUrl?: string;
+}

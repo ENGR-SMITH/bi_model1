@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { AgentSettings, AppInfo, AuthEvent, JobProgress, UpdateEvent } from "../shared/types";
+import type { AgentSettings, AppInfo, AuthEvent, JobProgress, LaunchContext, UpdateEvent } from "../shared/types";
 
 /** Subscribe helper: returns an unsubscribe function. */
 function on<T>(channel: string, cb: (payload: T) => void): () => void {
@@ -27,6 +27,10 @@ const api = {
 
   // Live progress for the in-flight Generate proxy & upload job.
   onJobProgress: (cb: (progress: JobProgress) => void) => on<JobProgress>("agent:job-progress", cb),
+
+  // Creator Den opened the app for an upload: project to preselect + the page
+  // to reopen once the upload lands.
+  onLaunchContext: (cb: (ctx: LaunchContext) => void) => on<LaunchContext>("agent:launch-context", cb),
 
   // App metadata.
   appInfo: () => ipcRenderer.invoke("agent:app-info") as Promise<AppInfo>,

@@ -46,7 +46,7 @@ import type { StudioLeg } from '@/components/role-oracle';
 import { formatClock, proxyUrlFor } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
 import { geometryKey, parseGeometry, reviewerColor, reviewerLabel } from '@/lib/annotations';
-import { AgentUploadModal, BROWSER_UPLOAD_MAX_LABEL, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
+import { AgentLaunchButton, AgentUploadModal, BROWSER_UPLOAD_MAX_LABEL, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 
 /** Green used to mark a resolved comment / annotation as solved. */
 export const RESOLVED_GREEN = 'hsl(150 52% 42%)';
@@ -657,6 +657,15 @@ export function RoleUploadCard({
           <Upload size={13} />
           {phase === 'uploading' ? `${progress}%` : 'Upload'}
         </button>
+        {/* The second method — upload through the desktop agent instead. The
+            user picks between the two any time; oversized files still land
+            here via the modal below. */}
+        <AgentLaunchButton
+          projectId={projectId}
+          label="Desktop agent"
+          context={label}
+          onDone={() => queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) })}
+        />
       </div>
       {/* Too big for the browser path — download + use the desktop agent. */}
       {blockedFile && (
@@ -664,6 +673,8 @@ export function RoleUploadCard({
           fileName={blockedFile.name}
           fileSizeBytes={blockedFile.size}
           context={label}
+          projectId={projectId}
+          onAgentDone={() => queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) })}
           onClose={() => setBlockedFile(null)}
         />
       )}
