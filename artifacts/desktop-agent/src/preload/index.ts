@@ -35,7 +35,7 @@ const api = {
   /** Resolve the absolute path of a file dropped onto the window (webUtils). */
   droppedFilePath: (file: File) => webUtils.getPathForFile(file),
   /** Upload a local raw file into the vault as a NEW asset (no asset needed). */
-  uploadRaw: (opts: { projectId: string; localFile: string }) =>
+  uploadRaw: (opts: { projectId: string; localFile: string; note?: string }) =>
     ipcRenderer.invoke("agent:upload-raw", opts),
   uploadProxy: (opts: { projectId: string; assetId: string; localFile: string }) =>
     ipcRenderer.invoke("agent:upload-proxy", opts),

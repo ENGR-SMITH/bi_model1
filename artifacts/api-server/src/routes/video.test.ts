@@ -916,3 +916,216 @@ describe("content-addressed media (Git LFS)", () => {
     expect(jobs.map((job: any) => job.type).sort()).toEqual(["PROXY", "TRANSCRIBE"]);
   });
 });
+
+describe("submit-for-review uploads (review = true)", () => {
+  async function uploadForReview(opts: {
+    projectId: string;
+    kind: string;
+    fileName: string;
+    bytes?: string;
+    note?: string;
+    asUser?: string;
+  }) {
+    state.userId = opts.asUser ?? "captain-1";
+    let req = request(API)
+      .post(`/api/video/projects/${opts.projectId}/assets`)
+      .field("kind", opts.kind)
+      .field("review", "true");
+    if (opts.note !== undefined) req = req.field("note", opts.note);
+    return req.attach("file", Buffer.from(opts.bytes ?? "pending upload bytes"), opts.fileName);
+  }
+
+  it("holds the file back as PENDING_REVIEW and puts it on the Captain's queue", async () => {
+    const project = await createProject();
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+
+    const res = await uploadForReview({
+      projectId: project.id,
+      kind: "RAW_VIDEO",
+      fileName: "golden-take-a.mp4",
+      note: "Best angle of the hero shot.",
+      asUser: "user-2",
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.review).toBe(true);
+    expect(res.body.status).toBe("PENDING_REVIEW");
+    expect(res.body.submissionId).toBeTruthy();
+
+    // One staged row, still PENDING_REVIEW — invisible to the vault/project.
+    const [pending] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+    expect(pending.status).toBe("PENDING_REVIEW");
+    expect(pending.storageKey).toBeTruthy();
+
+    state.userId = "user-2";
+    const detail = await request(API).get(`/api/video/projects/${project.id}`);
+    expect(detail.body.assets).toHaveLength(0);
+
+    // The Captain's review queue carries it with the file name + note.
+    state.userId = "captain-1";
+    const queue = await request(API).get("/api/video/review/queue");
+    expect(queue.status).toBe(200);
+    const row = queue.body.find((s: any) => s.id === res.body.submissionId);
+    expect(row).toBeTruthy();
+    expect(row.status).toBe("SUBMITTED");
+    expect(row.leg).toBe("SELECTS");
+    expect(row.note).toBe("golden-take-a.mp4 — Best angle of the hero shot.");
+    expect(row.submittedById).toBe("user-2");
+  });
+
+  it("approving the submission lands the file in the vault and starts processing", async () => {
+    const project = await createProject();
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+
+    const upload = await uploadForReview({
+      projectId: project.id,
+      kind: "RAW_VIDEO",
+      fileName: "golden-take-a.mp4",
+      note: "Best angle of the hero shot.",
+      asUser: "user-2",
+    });
+    expect(upload.status).toBe(201);
+    const [pendingRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+    const stagedPath = path.join(process.env.VIDEO_UPLOAD_DIR!, pendingRow.storageKey);
+    expect(fs.existsSync(stagedPath)).toBe(true);
+
+    // Rejecting is only open to the owning Captain.
+    state.userId = "user-2";
+    const forbidden = await request(API)
+      .post(`/api/video/projects/${project.id}/submissions/${upload.body.submissionId}/approve`)
+      .send({});
+    expect(forbidden.status).toBe(403);
+
+    // The Captain approves — the staged placeholder becomes a live vault
+    // asset (jobs enqueued), and the submission points at the real row.
+    state.userId = "captain-1";
+    const approve = await request(API)
+      .post(`/api/video/projects/${project.id}/submissions/${upload.body.submissionId}/approve`)
+      .send({});
+    expect(approve.status).toBe(200);
+    expect(approve.body.status).toBe("APPROVED");
+
+    const assets = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+    expect(assets).toHaveLength(1);
+    expect(assets[0].id).not.toBe(upload.body.id);
+    expect(assets[0].status).not.toBe("PENDING_REVIEW");
+    expect(assets[0].fileName).toBe("golden-take-a.mp4");
+    expect(assets[0].contentHash).toBeTruthy();
+
+    // RAW_VIDEO enqueues proxy + transcription and keeps the file on disk.
+    const jobs = await state.db
+      .select()
+      .from(state.tables.tandemVideoJobsTable)
+      .where(eq(state.tables.tandemVideoJobsTable.assetId, assets[0].id));
+    expect(jobs.map((job: any) => job.type).sort()).toEqual(["PROXY", "TRANSCRIBE"]);
+
+    const [submissionRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoSubmissionsTable)
+      .where(eq(state.tables.tandemVideoSubmissionsTable.id, upload.body.submissionId));
+    expect(submissionRow.status).toBe("APPROVED");
+    expect(submissionRow.timelineVersionId).toBe(`ASSET:${assets[0].id}`);
+
+    // The approved file now shows in the project vault for members.
+    state.userId = "user-2";
+    const detail = await request(API).get(`/api/video/projects/${project.id}`);
+    expect(detail.body.assets).toHaveLength(1);
+    expect(detail.body.assets[0].id).toBe(assets[0].id);
+
+    // No timeline leg was touched — nothing was merged into a stage.
+    const timelines = await state.db
+      .select()
+      .from(state.tables.tandemVideoTimelinesTable)
+      .where(eq(state.tables.tandemVideoTimelinesTable.projectId, project.id));
+    expect(timelines).toHaveLength(0);
+  });
+
+  it("lets the Captain's own uploads skip the queue and land straight in the vault", async () => {
+    const project = await createProject(); // captain-1 owns it
+
+    const res = await uploadForReview({
+      projectId: project.id,
+      kind: "RAW_VIDEO",
+      fileName: "captain-footage.mp4",
+      note: "A couple of hero shots.",
+      asUser: "captain-1",
+    });
+    expect(res.status).toBe(201);
+    // No review hand-off: the file went through the normal upload pipeline.
+    expect(res.body.review).toBeFalsy();
+    expect(res.body.submissionId).toBeUndefined();
+    expect(res.body.status).not.toBe("PENDING_REVIEW");
+    expect(res.body.contentHash).toBeTruthy();
+
+    // No submission was created, and the vault shows the file immediately.
+    const subs = await state.db
+      .select()
+      .from(state.tables.tandemVideoSubmissionsTable)
+      .where(eq(state.tables.tandemVideoSubmissionsTable.projectId, project.id));
+    expect(subs).toHaveLength(0);
+    const queue = await request(API).get("/api/video/review/queue");
+    expect(queue.body).toHaveLength(0);
+
+    state.userId = "captain-1";
+    const detail = await request(API).get(`/api/video/projects/${project.id}`);
+    expect(detail.body.assets).toHaveLength(1);
+    expect(detail.body.assets[0].fileName).toBe("captain-footage.mp4");
+  });
+
+  it("rejecting the submission deletes the staged file and frees the vault", async () => {
+    const project = await createProject();
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "AUDIO" });
+
+    const upload = await uploadForReview({
+      projectId: project.id,
+      kind: "RAW_AUDIO",
+      fileName: "boom-mic.wav",
+      note: "Room tone from the shoot.",
+      asUser: "user-2",
+    });
+    expect(upload.status).toBe(201);
+
+    const [pending] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+    const stagedPath = path.join(process.env.VIDEO_UPLOAD_DIR!, pending.storageKey);
+    expect(fs.existsSync(stagedPath)).toBe(true);
+
+    state.userId = "captain-1";
+    const reject = await request(API)
+      .post(`/api/video/projects/${project.id}/submissions/${upload.body.submissionId}/reject`)
+      .send({ note: "Too hissy — re-record with the lav closer." });
+    expect(reject.status).toBe(200);
+    expect(reject.body.status).toBe("REJECTED");
+
+    // The staged row + its bytes are gone; the submission keeps the note.
+    const assets = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+    expect(assets).toHaveLength(0);
+    expect(fs.existsSync(stagedPath)).toBe(false);
+
+    const [submissionRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoSubmissionsTable)
+      .where(eq(state.tables.tandemVideoSubmissionsTable.id, upload.body.submissionId));
+    expect(submissionRow.status).toBe("REJECTED");
+    expect(submissionRow.decisionNote).toBe("Too hissy — re-record with the lav closer.");
+  });
+});

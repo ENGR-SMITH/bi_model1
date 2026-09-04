@@ -2394,6 +2394,10 @@ select optgroup {
   grid-row: 1;
   grid-template-rows: minmax(0, 68fr) minmax(0, 32fr);
 }
+.role-col-2--solo {
+  /* No direct-upload bar on role pages anymore — the canvas fills the column. */
+  grid-template-rows: minmax(0, 1fr);
+}
 .role-col-3 {
   grid-column: 3;
   grid-row: 1;
@@ -2481,10 +2485,53 @@ select optgroup {
   min-height: 0;
   overflow-y: auto;
 }
-.role-notes-bar > .pv-notes {
+/* After the crew-first swap, the comment wall (top row) scrolls and the
+   "Hand this stage in" card (bottom row) fills + scrolls internally. */
+.role-notes-main > .pv-notes {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+.role-notes-bar > .stage-submit-card {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Role pages stack on narrow screens instead of squeezing three fixed
+   columns into a fixed-height viewport. */
+@media (max-width: 1180px) {
+  .role-page {
+    height: auto;
+    overflow: visible;
+  }
+  .role-grid {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .role-versions-col {
+    max-height: 42vh;
+  }
+  .role-col-2,
+  .role-col-3 {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .role-canvas-main .pv-stage {
+    min-height: 58vh;
+  }
+  .role-notes-main > .pv-notes {
+    max-height: 50vh;
+  }
+  .role-notes-bar > .stage-submit-card {
+    overflow: visible;
+    max-height: none;
+  }
+  .role-canvas-bar {
+    min-height: 0;
+  }
 }
 
 /* ---- Role upload card (second column, second row) ----

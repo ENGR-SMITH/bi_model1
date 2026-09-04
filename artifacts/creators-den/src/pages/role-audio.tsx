@@ -2,11 +2,12 @@
 // Audio role page — the sound studio.
 //
 // Column one: a vertical scrolling shelf mixing the project's SOUND versions
-// with the vault's audio uploads. Column two, row 1: the big canvas — the
-// selected version's audio (or the picked vault file) plays as a wavelength
-// bar view with a red tick at the playhead; pins drop straight on the wave.
-// Column two, row 2: the upload card. Column three, row 1: the pin / comment
-// wall; row 2: the Sound Designer's oracle.
+// with the vault's audio files. Column two: the big canvas — the selected
+// version's audio (or the picked vault file) plays as a wavelength bar view
+// with a red tick at the playhead; pins drop straight on the wave. Column
+// three, row 1: the pin / comment wall; row 2: the Sound Designer's "Hand
+// this stage in" card. Vault files only arrive here via submit-for-review
+// (approved by the Captain) — there is no direct upload on this page.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -30,7 +31,6 @@ import {
   FullscreenButton,
   PreviewNotesPanel,
   RoleLayout,
-  RoleUploadCard,
   VAULT_KIND_LABELS,
   WaveformPlayer,
   type PreviewVersion,
@@ -41,16 +41,6 @@ import { hasRole } from '@/lib/roles';
 import type { StudioLeg } from '@/components/role-oracle';
 
 const AUDIO_KINDS = new Set(['RAW_AUDIO', 'VO_PICKUP']);
-const AUDIO_UPLOAD_KINDS = ['RAW_AUDIO', 'VO_PICKUP'].map((value) => ({ value, label: VAULT_KIND_LABELS[value] }));
-
-// This role page accepts audio files only — the accept list and the client
-// check below reject anything else (no video / image / script files here).
-const AUDIO_ACCEPT = 'audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.aif,.aiff,.opus';
-const AUDIO_FILE_RE = /\.(wav|mp3|m4a|aac|flac|ogg|aif|aiff|opus)$/i;
-const checkAudioFile = (file: File): string | null =>
-  file.type.startsWith('audio/') || AUDIO_FILE_RE.test(file.name)
-    ? null
-    : 'Only audio files can be uploaded here (.wav, .mp3, .m4a, .flac, .ogg).';
 
 // ---------------------------------------------------------------------------
 // AudioCanvas — the wave canvas for one selected SOUND version. Falls back to
@@ -292,7 +282,7 @@ export default function RoleAudioPage() {
           items={shelfItems}
           activeKey={activeKey}
           onSelect={onShelfSelect}
-          emptyText="No versions or vault files yet — save a snapshot in the Sound studio, or upload audio above."
+          emptyText="Nothing here yet — save a snapshot in the Sound studio. Files you hand in for review reach the vault once the Captain approves them."
         />
       }
       canvas={
@@ -317,16 +307,6 @@ export default function RoleAudioPage() {
           projectId={p.id}
           legs={['SOUND']}
           roleName="Audio Editor"
-        />
-      }
-      upload={
-        <RoleUploadCard
-          projectId={p.id}
-          label="audio file"
-          kinds={AUDIO_UPLOAD_KINDS}
-          defaultKind="RAW_AUDIO"
-          accept={AUDIO_ACCEPT}
-          checkFormat={checkAudioFile}
         />
       }
     />

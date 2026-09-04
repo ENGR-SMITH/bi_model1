@@ -53,6 +53,32 @@ function rolesHeld(): string[] {
   return projectRoles.status === "ready" ? projectRoles.roles : [];
 }
 
+/** The signed-in viewer is the Captain of the selected project — their own
+ * uploads skip the review queue and land straight in the vault (the server
+ * makes the same decision), so the app drops the "note to the Captain" step. */
+function isCaptain(): boolean {
+  return rolesHeld().includes("CAPTAIN");
+}
+
+/** Resting label of the primary action: direct upload for the Captain,
+ * submit-for-review for everyone else. */
+function uploadButtonLabel(): string {
+  return isCaptain() ? "Upload to vault" : "Submit for review";
+}
+
+/** Toggle the captain-facing copy: no note field, no review hand-off. */
+function renderUploadMode(): void {
+  const captain = isCaptain();
+  ($("note-field") as HTMLElement).style.display = captain ? "none" : "";
+  $("review-card-title").textContent = captain ? "Upload to the vault" : "Submit for review";
+  $("review-copy").textContent = captain
+    ? "You're the Captain — files you add go straight into the vault, no review needed."
+    : "The file and your note go to the Captain's review desk — the vault only changes once it is approved.";
+  const btn = $("upload") as HTMLButtonElement;
+  btn.textContent = uploadButtonLabel();
+  updateUploadEnabled();
+}
+
 /** The uploadable file families the held roles own (empty = nothing). */
 function fileFamiliesForRoles(roles: string[]): FileFamily[] {
   if (roles.some((role) => role === "CAPTAIN" || role === "UPLOADER")) {
@@ -379,6 +405,7 @@ async function loadRolesFor(projectId: string): Promise<void> {
   }
   renderRoles();
   setFileChip();
+  renderUploadMode();
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +536,7 @@ function handleProgress(p: JobProgress) {
   } else {
     const mb = (n?: number) => (n === undefined ? "—" : (n / 1048576).toFixed(1));
     const pct = p.percent >= 0 ? ` (${p.percent}%)` : "";
-    label.textContent = `Uploading to the vault… ${mb(p.sentBytes)} / ${mb(p.totalBytes)} MB${pct}`;
+    label.textContent = `Sending for review… ${mb(p.sentBytes)} / ${mb(p.totalBytes)} MB${pct}`;
   }
 
   if (p.percent < 0) {
@@ -543,16 +570,20 @@ async function runUpload() {
   uploading = true;
   updateUploadEnabled();
   resetProgress();
-  setStatus(`Uploading “${chosenFile.name}” to the vault…`);
+  setStatus(`Sending “${chosenFile.name}” to the Captain for review…`);
   const btn = $("upload") as HTMLButtonElement;
-  btn.textContent = "Uploading…";
+  btn.textContent = "Submitting…";
+  const note = ($("upload-note") as HTMLTextAreaElement).value.trim();
   try {
-    const result = await window.tandemAgent.uploadRaw({ projectId, localFile: chosenFile.path });
+    const result = await window.tandemAgent.uploadRaw({ projectId, localFile: chosenFile.path, note });
     const fill = $("barfill");
     fill.classList.remove("indeterminate");
     fill.style.width = "100%";
+    ($("upload-note") as HTMLTextAreaElement).value = "";
     setStatus(
-      `“${result.fileName}” is in the vault — its proxy and preview are being prepared in the background.`,
+      result.review
+        ? `“${result.fileName}” was submitted for review — the Captain approves it on Creator Den before it reaches the project vault.`
+        : `“${result.fileName}” is in the vault — its proxy and preview are being prepared in the background.`,
       "ok",
     );
   } catch (err) {
@@ -560,7 +591,7 @@ async function runUpload() {
     resetProgress();
   } finally {
     uploading = false;
-    btn.textContent = "Upload to project vault";
+    btn.textContent = uploadButtonLabel();
     updateUploadEnabled();
   }
 }

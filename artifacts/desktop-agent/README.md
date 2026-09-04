@@ -1,11 +1,13 @@
 # Tandem Desktop Agent
 
-A small Windows/macOS desktop app that gets footage **from your PC into the
-vault** — drag a raw file in (or click to choose it) and it streams straight to
-your Tandem API, which runs the normal pipeline (hashing, proxy, preview) just
-like a browser upload. No asset dropdown, no size cap: the agent exists because
-a browser tab is the wrong tool for multi-GB footage, and the web app caps
-uploads at 500 MB.
+A small Windows/macOS desktop app that hands files **from your PC to the
+Captain for review** — drag a raw file in (or click to choose it), write a note
+describing it, and both stream to your Tandem API as a **review submission**.
+The file stays private (a pending entry on the Captain's review desk) until the
+Captain approves it — only then does it land in the project vault and start the
+normal pipeline (hashing, proxy, preview). No asset dropdown, no size cap: the
+agent exists because a browser tab is the wrong tool for multi-GB footage, and
+the web app caps uploads at 500 MB.
 
 It is the "large-file / desktop agent" half of the Cloudflare R2 integration.
 The browser handles files under 500 MB; anything bigger (and, for lower CPU
@@ -14,12 +16,14 @@ load, typical media too) is best pushed by this agent.
 ## How it works
 
 ```
-Your machine                 Your API server                       Vault storage
+Your machine                 Your API server                     Captain's review desk
    │ drop/choose raw file           │
-   │ POST …/projects/:id/assets ───▶│  checks auth (Clerk JWT),
-   │   (multipart, streamed)        │  writes the file, runs the normal
-   │                                │  pipeline (dedupe, proxy, preview)
-   │ ◀── asset id + status ─────────│
+   │ POST …/projects/:id/assets ───▶│  checks auth (Clerk JWT) + roles,
+   │  (multipart + note, review=true)│  holds the file as PENDING_REVIEW,
+   │                                │  adds a submission to the review queue
+   │ ◀── submission id ─────────────│  ──▶ approve ──▶ file enters the vault
+   │                                │                 and runs the pipeline
+   │                                │  ──▶ reject ───▶ file deleted, sent back
 ```
 
 The agent signs in with **Clerk** through your **system browser**: it hands you a
@@ -191,18 +195,28 @@ file, upload, and widget cards stay hidden. Once signed in:
    roles may upload.
 2. **Drag & drop** the file into the Source file card — or click it to choose
    from disk. The card shows the file's name and size.
-3. Click **Upload to project vault** — the file streams from your PC to the
-   vault with a live progress bar. No asset dropdown: the file itself *is* the
-   upload, and the normal pipeline (proxy, preview) runs in the background.
+3. (Optional) Write a **note to the Captain** describing the file — what it is
+   and what it is for.
+4. Click **Submit for review** — the file and your note stream from your PC
+   with a live progress bar, and land as a pending entry on the Captain's
+   review desk in Creator Den. Nothing reaches the vault until the Captain
+   clicks **Accept** (the file then enters the vault and its proxy/preview are
+   built in the background); a **Reject** deletes the file and sends it back
+   with the Captain's improvement note.
 
-**Uploads are role-gated.** The file types you can upload follow the roles you
+**The Captain adds directly.** When the signed-in viewer *is* the Captain of
+the selected project, the note field and review hand-off disappear and the
+button becomes **Upload to vault**: the file goes straight in with no
+self-approval (the server applies the same rule to every client).
+
+**Uploads are role-gated.** The file types you can submit follow the roles you
 were assigned on the selected project (the same rule the Creator Den role
 pages use): VIDEO members can add footage, AUDIO members sound, THUMBNAIL
 members images, and the Captain/Uploader can add any of them. A member with
 several roles may upload every kind those roles own. The picker only offers
 your roles' file types, anything else dropped in is rejected with an
-explanation, and the API server enforces the same gate on every upload — so a
-Video member can't push images into the vault from any client. SCRIPT and
+explanation, and the API server enforces the same gate on every submission — so
+a Video member can't push images into the vault from any client. SCRIPT and
 VIEWER members are read-only here: scripts live in Creator Den, and a Viewer
 has no upload rights.
 
@@ -216,8 +230,11 @@ has no upload rights.
   knows about apps that publish to it (browsers, VLC, Movies & TV, …).
   Detection is best-effort and polls every ~3 s; use `Ctrl+Alt+T` / the tray
   if it misses something.
-- The agent uploads originals straight into the vault (the same
-  `POST …/assets` multipart endpoint the browser uses, minus the size cap).
+- The agent submits files **for review** (the same `POST …/assets` multipart
+  endpoint the browser uses, with `review=true` and a note) — the Captain's
+  approval is what moves a file into the vault, so nothing bypasses the review
+  desk. The web Script desk's direct uploads (raw audio/video for
+  transcription) are the one exception, and stay direct by design.
 - Uploads are checked against the project roles the signed-in viewer holds
   (server-side gate in the assets route, mirrored by the agent's picker and
   drop-zone filters). A SCRIPT member may still add raw audio/video to the

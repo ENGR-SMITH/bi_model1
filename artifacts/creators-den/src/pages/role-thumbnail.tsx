@@ -2,11 +2,12 @@
 // Thumbnail role page — the cover studio.
 //
 // Column one: a vertical scrolling shelf mixing the project's THUMBNAIL
-// versions with the vault's image uploads. Column two, row 1: the big canvas
-// — the selected version's chosen design (or the picked vault file) rendered
-// at its natural aspect, with spatial pins and a full-screen expand button.
-// Column two, row 2: the upload card. Column three, row 1: the pin / comment
-// wall; row 2: the Thumbnail Designer's oracle.
+// versions with the vault's design images. Column two: the big canvas — the
+// selected version's chosen design (or the picked vault file) rendered at its
+// natural aspect, with spatial pins and a full-screen expand button. Column
+// three, row 1: the pin / comment wall; row 2: the Thumbnail Designer's
+// "Hand this stage in" card. Design files only arrive here via submit-for-
+// review (approved by the Captain) — no direct upload on this page.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -27,7 +28,6 @@ import {
   FullscreenButton,
   PreviewNotesPanel,
   RoleLayout,
-  RoleUploadCard,
   VAULT_KIND_LABELS,
   type PreviewVersion,
 } from '@/components/preview-shared';
@@ -36,16 +36,6 @@ import { RoleAccessDenied } from '@/components/role-access-denied';
 import { hasRole } from '@/lib/roles';
 
 const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
-const IMAGE_UPLOAD_KINDS = ['THUMBNAIL_DESIGN', 'GRAPHIC'].map((value) => ({ value, label: VAULT_KIND_LABELS[value] }));
-
-// This role page accepts image files only — the accept list and the client
-// check below reject anything else (no video / audio / script files here).
-const IMAGE_ACCEPT = 'image/*,.png,.jpg,.jpeg,.webp,.gif,.avif';
-const IMAGE_FILE_RE = /\.(png|jpe?g|webp|gif|avif)$/i;
-const checkImageFile = (file: File): string | null =>
-  file.type.startsWith('image/') || IMAGE_FILE_RE.test(file.name)
-    ? null
-    : 'Only image files can be uploaded here (.png, .jpg, .webp).';
 
 // ---------------------------------------------------------------------------
 // ThumbnailCanvas — the design canvas for one selected THUMBNAIL version.
@@ -242,7 +232,7 @@ export default function RoleThumbnailPage() {
           items={shelfItems}
           activeKey={activeKey}
           onSelect={onShelfSelect}
-          emptyText="No versions or vault files yet — save a snapshot in the Thumbnail studio, or upload a design above."
+          emptyText="Nothing here yet — save a snapshot in the Thumbnail studio. Files you hand in for review reach the vault once the Captain approves them."
         />
       }
       canvas={
@@ -266,16 +256,6 @@ export default function RoleThumbnailPage() {
           projectId={p.id}
           legs={['THUMBNAIL']}
           roleName="Thumbnail Designer"
-        />
-      }
-      upload={
-        <RoleUploadCard
-          projectId={p.id}
-          label="thumbnail design"
-          kinds={IMAGE_UPLOAD_KINDS}
-          defaultKind="THUMBNAIL_DESIGN"
-          accept={IMAGE_ACCEPT}
-          checkFormat={checkImageFile}
         />
       }
     />

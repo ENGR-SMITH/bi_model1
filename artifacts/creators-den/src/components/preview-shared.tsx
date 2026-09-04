@@ -445,10 +445,11 @@ export function VersionCarousel({
 // RoleLayout — the three role pages (Video / Audio / Thumbnail).
 // Three columns at 10 : 50 : 40. Column one (the version & vault shelf)
 // spans the full height. Columns two and three each split into their own
-// two-row grid, so each column keeps its own proportions: column two stays
-// 68 : 32 (big canvas on top, upload card below), while column three is
-// 32 : 68 (the oracle is the short panel on top, the pin / comment wall the
-// tall one on the bottom).
+// two-row grid, so each column keeps its own proportions: column three is
+// 32 : 68 (the comment wall short panel on top, the "Hand this stage in"
+// card in the tall row below). Column two holds the big canvas — a single
+// full-height stage now that role pages no longer upload straight to the
+// vault (files come in through submit-for-review instead).
 // ---------------------------------------------------------------------------
 
 export function RoleLayout({
@@ -464,22 +465,26 @@ export function RoleLayout({
   canvas: ReactNode;
   /** Column three, row two — the pin / comment wall. */
   notes: ReactNode;
-  /** Column three, row one — the role oracle. */
+  /** Column three, row one — the role oracle / submit card. */
   oracle: ReactNode;
-  /** Column two, row two — the upload card. */
-  upload: ReactNode;
+  /** Column two, row two — optional direct-upload card. Role pages no longer
+      add files straight to the vault: files arrive through submit-for-review
+      (approve moves them into the vault), so this slot is unused today. */
+  upload?: ReactNode;
 }) {
   return (
     <div className="page pv-page role-page" data-testid="role-page">
       <div className="role-grid">
         <div className="role-versions-col">{versions}</div>
-        <div className="role-col-2">
+        <div className={`role-col-2${upload ? '' : ' role-col-2--solo'}`}>
           <div className="role-canvas-main">{canvas}</div>
-          <div className="role-canvas-bar">{upload}</div>
+          {upload && <div className="role-canvas-bar">{upload}</div>}
         </div>
         <div className="role-col-3">
-          <div className="role-notes-main">{oracle}</div>
-          <div className="role-notes-bar">{notes}</div>
+          {/* Crew-first: the comment wall sits on top (short row), the
+              "Hand this stage in" card takes the tall row below it. */}
+          <div className="role-notes-main">{notes}</div>
+          <div className="role-notes-bar">{oracle}</div>
         </div>
       </div>
     </div>

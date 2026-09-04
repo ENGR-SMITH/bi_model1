@@ -33,9 +33,10 @@ import {
   useGetVideoProject,
   useListVideoComments,
   useListVideoSubmissions,
+  useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import type { StudioLeg } from '@/components/role-oracle';
-import { RELAY_LEGS } from '@/components/shell';
+import { legHint, RELAY_LEGS } from '@/components/shell';
 
 /** The role that owns each relay leg (mirrors the server's LEG_ROLES). */
 const LEG_ROLE: Record<StudioLeg, string> = {
@@ -94,6 +95,10 @@ export function StageSubmitCard({
   const [leg, setLeg] = useState<StudioLeg>(legs[0]);
   const [description, setDescription] = useState('');
   const [includeResolved, setIncludeResolved] = useState(true);
+  // The server pins the stage's current head snapshot — with none saved there
+  // is nothing to hand in yet.
+  const versions = useListVideoTimelineVersions(projectId, leg);
+  const hasSnapshot = (versions.data?.length ?? 0) > 0;
 
   const canSubmit =
     project.data?.myRoles?.includes('CAPTAIN') ||
@@ -181,6 +186,7 @@ export function StageSubmitCard({
               aria-selected={leg === option}
               className={`stage-leg-btn ${leg === option ? 'active' : ''}`}
               onClick={() => setLeg(option)}
+              title={legHint(option)}
               data-testid={`stage-leg-${option.toLowerCase()}`}
             >
               {legLabel(option)}
@@ -274,7 +280,13 @@ export function StageSubmitCard({
           type="button"
           className="primary-btn"
           onClick={onSubmit}
-          disabled={submit.isPending || Boolean(pending) || !canSubmit || (!description.trim() && resolvedNotes.length === 0)}
+          disabled={
+            submit.isPending ||
+            Boolean(pending) ||
+            !canSubmit ||
+            !hasSnapshot ||
+            (!description.trim() && resolvedNotes.length === 0)
+          }
           data-testid="stage-submit-button"
         >
           {submit.isPending ? <Clock3 size={13} className="spin" /> : <Send size={13} />}
@@ -285,6 +297,12 @@ export function StageSubmitCard({
           timeline or Reject sends it back with their note.
         </span>
       </div>
+      {!hasSnapshot && !pending && (
+        <p className="setting-copy" role="status" data-testid="stage-submit-no-snapshot">
+          This stage has no saved snapshot yet — save a version of the {legLabel(leg)} in the preview
+          studio first, then hand it in here.
+        </p>
+      )}
       {submit.isError && (
         <p className="setting-copy mt-2" role="alert">
           {submitError?.response?.data?.error || 'The submission could not be created.'}

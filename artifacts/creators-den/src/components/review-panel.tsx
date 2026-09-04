@@ -12,7 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import { useMemo, useRef, useState } from 'react';
-import { Check, Clapperboard, GitPullRequest, Play, X } from 'lucide-react';
+import { Check, Clapperboard, FileUp, GitPullRequest, Play, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetVideoAssetQueryKey,
@@ -58,11 +58,24 @@ export function ReviewPanel({
 
   const leg = submission.leg as StudioLeg;
   const isPending = submission.status === 'SUBMITTED';
+  // A file handed in for review (submit-for-review uploads — the desktop agent
+  // or any review upload) carries an `ASSET:<assetId>` sentinel instead of a
+  // pinned timeline version: there is no snapshot to play or diff yet. The
+  // file stays private until the Captain decides — approve moves it into the
+  // vault and starts processing; reject deletes it and sends it back.
+  const isAssetSubmission = submission.timelineVersionId.startsWith('ASSET:');
+  const submissionFileName = isAssetSubmission
+    ? submission.note.split(' — ')[0] || 'File submission'
+    : null;
+  const submissionMessage =
+    isAssetSubmission && submission.note.includes(' — ')
+      ? submission.note.slice(submission.note.indexOf(' — ') + 3).trim()
+      : null;
 
   const version = useGetVideoTimelineVersion(projectId, leg, submission.timelineVersionId, {
     query: {
       queryKey: getGetVideoTimelineVersionQueryKey(projectId, leg, submission.timelineVersionId),
-      enabled: true,
+      enabled: !isAssetSubmission,
     },
   });
   const project = useGetVideoProject(projectId);
@@ -71,12 +84,14 @@ export function ReviewPanel({
   const clips = useMemo(() => (Array.isArray(snapshot?.clips) ? snapshot!.clips! : []), [snapshot]);
   // The THUMBNAIL leg's "clips" are its chosen design image(s).
   const design = Array.isArray(snapshot?.designs) ? snapshot!.designs![0] ?? null : null;
-  const assetId = clips[0]?.assetId ?? design?.assetId ?? project.data?.assets[0]?.id ?? '';
+  const assetId = isAssetSubmission
+    ? ''
+    : clips[0]?.assetId ?? design?.assetId ?? project.data?.assets[0]?.id ?? '';
 
   const detail = useGetVideoAsset(projectId, assetId, {
     query: {
       queryKey: getGetVideoAssetQueryKey(projectId, assetId),
-      enabled: Boolean(assetId),
+      enabled: Boolean(assetId) && !isAssetSubmission,
       refetchInterval: (query) => pollWhileProcessing(query.state.data),
     },
   });
@@ -141,7 +156,7 @@ export function ReviewPanel({
   return (
     <div className="paper-card accent-card mt-4" data-testid="review-panel">
       <div className="inline-heading">
-        <span className="eyebrow"><GitPullRequest size={13} /> Pull request — {leg.toLowerCase()} v{version.data?.version ?? '…'}</span>
+        <span className="eyebrow"><GitPullRequest size={13} /> Pull request — {isAssetSubmission ? 'file upload' : `${leg.toLowerCase()} v${version.data?.version ?? '…'}`}</span>
         <span className="flex items-center gap-2">
           <span className={`den-tag ${submission.status === 'APPROVED' ? 'teal' : submission.status === 'REJECTED' ? 'danger' : 'gold'}`}>
             {submission.status}
@@ -152,10 +167,39 @@ export function ReviewPanel({
         </span>
       </div>
       {submission.note && (
-        <p className="setting-copy">“{submission.note}” — by {submission.submittedById.slice(0, 8)}</p>
+        <p className="setting-copy">
+          {isAssetSubmission ? (
+            <>
+              “{submissionMessage ?? submissionFileName}”{' '}
+              <span className="den-footnote">by {submission.submittedById.slice(0, 8)}</span>
+            </>
+          ) : (
+            <>“{submission.note}” — by {submission.submittedById.slice(0, 8)}</>
+          )}
+        </p>
       )}
 
-      {!assetId ? (
+      {isAssetSubmission ? (
+        <div className="mt-3" data-testid="review-asset">
+          <div className="inline-heading">
+            <span className="eyebrow"><FileUp size={13} /> {submissionFileName}</span>
+            <span className="den-tag gold">awaiting your decision</span>
+          </div>
+          <p className="setting-copy mt-2">
+            A file was handed in for review — it is held back from the vault until you decide.
+          </p>
+          <p className="setting-copy">
+            <b>Accept</b> — moves the file into the project vault and starts processing it (proxy,
+            transcription, previews) so the {leg.toLowerCase()} stage can use it.
+          </p>
+          <p className="setting-copy">
+            <b>Reject</b> — deletes the file and sends it back to the submitter with your improvement note.
+          </p>
+          <p className="den-footnote mt-2">
+            There is nothing to preview or diff yet: the file stays private until your decision.
+          </p>
+        </div>
+      ) : !assetId ? (
         <p className="setting-copy mt-3">This version has no clips or designs to preview — open the diff below to review the pull request itself.</p>
       ) : (
         <div className="mt-3">
@@ -220,7 +264,9 @@ export function ReviewPanel({
       )}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <CommentsPanel projectId={projectId} leg={leg} submissionId={submission.id} timelineVersionId={submission.timelineVersionId} />
+        {!isAssetSubmission && (
+          <CommentsPanel projectId={projectId} leg={leg} submissionId={submission.id} timelineVersionId={submission.timelineVersionId} />
+        )}
         {!hideDecision && (
           <div className="paper-card">
             <div className="inline-heading">
@@ -252,7 +298,7 @@ export function ReviewPanel({
         )}
       </div>
 
-      {headVersionId && (
+      {headVersionId && !isAssetSubmission && (
         <DiffView
           key={`${submission.id}-diff`}
           projectId={projectId}

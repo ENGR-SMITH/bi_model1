@@ -69,6 +69,8 @@ export interface UploadRawOptions {
   projectId: string;
   /** Absolute path of the local raw file. */
   filePath: string;
+  /** Optional note to the Captain — travels with the submission for review. */
+  note?: string;
   onProgress?: (sentBytes: number, totalBytes: number) => void;
 }
 
@@ -77,6 +79,10 @@ export interface UploadRawResult {
   assetId: string;
   fileName: string;
   status: string;
+  /** Set on submit-for-review uploads: the review submission now on the
+      Captain's queue (approve lands the file in the vault). */
+  submissionId?: string;
+  review?: boolean;
 }
 
 /** Multipart header bytes for one part. */
@@ -99,10 +105,25 @@ export async function uploadRawMultipart(opts: UploadRawOptions): Promise<Upload
   const url = new URL(`${opts.apiBaseUrl.replace(/\/+$/, "")}/api/video/projects/${opts.projectId}/assets`);
   const transport = url.protocol === "https:" ? https : http;
 
+  // Submit-for-review: the agent never writes straight to the vault anymore —
+  // the file + note are handed to the Captain as a review submission and only
+  // an approval moves them into the vault.
+  const note = (opts.note ?? "").slice(0, 2000);
   const kindHeader = partHeader("kind", null, "");
+  const reviewHeader = partHeader("review", null, "");
+  const noteHeader = partHeader("note", null, "");
   const fileHeader = partHeader("file", fileName, mimeType);
   const footer = Buffer.from(`${CRLF}--${BOUNDARY}--${CRLF}`, "utf8");
-  const bodyLength = kindHeader.length + Buffer.byteLength(kind) + fileHeader.length + fileSize + footer.length;
+  const bodyLength =
+    kindHeader.length +
+    Buffer.byteLength(kind) +
+    reviewHeader.length +
+    Buffer.byteLength("true") +
+    noteHeader.length +
+    Buffer.byteLength(note) +
+    fileHeader.length +
+    fileSize +
+    footer.length;
 
   let sent = 0;
   let lastEmit = 0;
@@ -137,6 +158,10 @@ export async function uploadRawMultipart(opts: UploadRawOptions): Promise<Upload
 
     req.write(kindHeader);
     req.write(kind);
+    req.write(reviewHeader);
+    req.write("true");
+    req.write(noteHeader);
+    req.write(note);
     req.write(fileHeader);
 
     // Stream the file from disk, honoring backpressure, then close the body.
@@ -171,13 +196,26 @@ export async function uploadRawMultipart(opts: UploadRawOptions): Promise<Upload
     throw error;
   }
 
-  let root: { id?: string; asset?: { id?: string }; status?: string } = {};
+  let root: { id?: string; asset?: { id?: string }; status?: string; submissionId?: string; review?: boolean } = {};
   try {
-    root = JSON.parse(responseBody.text) as { id?: string; asset?: { id?: string }; status?: string };
+    root = JSON.parse(responseBody.text) as {
+      id?: string;
+      asset?: { id?: string };
+      status?: string;
+      submissionId?: string;
+      review?: boolean;
+    };
   } catch {
     throw new Error("The upload returned an unreadable response.");
   }
   const assetId = root.asset?.id ?? root.id ?? "";
   if (!assetId) throw new Error("The upload did not return a vault asset id.");
-  return { ok: true, assetId, fileName, status: root.status ?? "UPLOADED" };
+  return {
+    ok: true,
+    assetId,
+    fileName,
+    status: root.status ?? "UPLOADED",
+    submissionId: root.submissionId,
+    review: Boolean(root.review),
+  };
 }
