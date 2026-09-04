@@ -5,8 +5,6 @@
 // submits the current snapshot for the Captain's review.
 //
 //   - Description field — what was done in this pass.
-//   - "Improve writing" — the AI polishes grammar + phrasing ONLY (never
-//     changes the substance, timecodes, or instructions).
 //   - Resolved review notes — comments other people left on previous versions
 //     that the member marked done are listed here and auto-included with the
 //     submission, so the Captain sees what was addressed.
@@ -21,7 +19,6 @@ import {
   Clock3,
   FileUp,
   Send,
-  Sparkles,
   XCircle,
 } from 'lucide-react';
 import {
@@ -30,7 +27,6 @@ import {
   getListVideoCommentsQueryKey,
   getListVideoSubmissionsQueryKey,
   getUploadVideoAssetUrl,
-  oracleChat,
   useCreateVideoSubmission,
   useGetVideoProject,
   useListVideoComments,
@@ -50,17 +46,6 @@ const LEG_ROLE: Record<StudioLeg, string> = {
   FINISH: 'CAPTAIN',
   THUMBNAIL: 'THUMBNAIL',
 };
-
-// The oracle's rephrase-only system prompt: grammar + clarity + phrasing.
-// Every specific point, timecode, and instruction must survive verbatim; the
-// AI is explicitly forbidden from adding suggestions or changing meaning.
-const IMPROVE_PROMPT = [
-  "You are the Editor's oracle in a video relay (Creators Den).",
-  'A crew member has described the work they did on their stage before submitting it for review.',
-  'Improve the description\'s grammar, spelling, clarity, and phrasing ONLY.',
-  'Keep every specific point, timecode, file reference, and instruction exactly as written — do not add new details, invent work, or change the meaning.',
-  'Return ONLY the improved description text, with no preamble, quotes, or commentary.',
-].join(' ');
 
 function timeAgo(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -151,18 +136,9 @@ export function StageSubmitCard({
     (submission) => submission.status === 'APPROVED' || submission.status === 'REJECTED',
   );
 
-  const enhance = useMutation({
-    mutationFn: () =>
-      oracleChat({
-        messages: [
-          { role: 'system', content: IMPROVE_PROMPT },
-          { role: 'user', content: (description.trim() || 'The description is empty.').slice(0, 4000) },
-        ],
-        context: null,
-        temperature: 0.2,
-      }),
-    onSuccess: (result) => setDescription(result.content.trim()),
-  });
+  // While a hand-in is awaiting the Captain's review the whole card is locked:
+  // every control stays visible but disabled until the review is decided.
+  const locked = Boolean(pending);
 
   const submit = useCreateVideoSubmission();
 
@@ -254,7 +230,10 @@ export function StageSubmitCard({
   const submitting = submit.isPending || submitFile.isPending;
 
   return (
-    <div className="paper-card stage-submit-card" data-testid="stage-submit-card">
+    <div
+      className={`paper-card stage-submit-card ${locked ? 'is-locked' : ''}`}
+      data-testid="stage-submit-card"
+    >
       <div className="inline-heading">
         <span className="eyebrow"><Send size={13} /> Hand this stage in</span>
         <span className="den-tag gold">submit for review</span>
@@ -284,7 +263,7 @@ export function StageSubmitCard({
           <Clock3 size={14} />
           <span>
             <b>{legLabel(leg)} is awaiting the Captain&apos;s review</b> — submitted {timeAgo(pending.createdAt)}.
-            You&apos;ll be able to hand in another pass once it&apos;s decided.
+            Handing this stage in again is disabled until the Captain accepts or rejects it.
           </span>
         </div>
       )}
@@ -315,24 +294,10 @@ export function StageSubmitCard({
           placeholder={`Describe what you did in this ${roleName.toLowerCase()} pass before handing it to the Captain — the cut, the mix, the design, and what you changed since the last review.`}
           rows={4}
           maxLength={2000}
-          disabled={Boolean(pending) || !canSubmit}
+          disabled={locked || !canSubmit}
           data-testid="stage-submit-description"
         />
         <div className="stage-desc-tools">
-          <button
-            type="button"
-            className="link-btn"
-            onClick={() => enhance.mutate()}
-            disabled={enhance.isPending || !description.trim() || Boolean(pending) || !canSubmit}
-            title="Polish grammar and phrasing only — the substance stays yours"
-            data-testid="stage-submit-enhance"
-          >
-            {enhance.isPending ? <Sparkles size={12} className="spin" /> : <Sparkles size={12} />}
-            {enhance.isPending ? 'Polishing…' : 'Improve writing'}
-          </button>
-          {enhance.isError && (
-            <span className="setting-copy" role="alert">The oracle could not polish it right now — your draft is unchanged.</span>
-          )}
           {!canSubmit && <span className="setting-copy">Only the {legLabel(leg)} role (or the Captain) can hand this stage in.</span>}
         </div>
       </div>
@@ -344,6 +309,7 @@ export function StageSubmitCard({
               type="checkbox"
               checked={includeResolved}
               onChange={(event) => setIncludeResolved(event.target.checked)}
+              disabled={locked}
               data-testid="stage-resolved-toggle"
             />
             <span>
@@ -379,7 +345,7 @@ export function StageSubmitCard({
           onClick={onSubmit}
           disabled={
             submitting ||
-            Boolean(pending) ||
+            locked ||
             !canSubmit ||
             pendingFileOverCap ||
             (!hasSnapshot && !pendingFile) ||
@@ -398,11 +364,11 @@ export function StageSubmitCard({
                 ? 'Submit file for review'
                 : 'Submit for review'}
         </button>
-        <span className="setting-copy">
-          {pendingFile
-            ? 'Sends the file and your description to the Captain — Accept adds it to the vault, Reject deletes it and sends it back with their note.'
-            : `Pins the current ${legLabel(leg)} snapshot — the Captain reviews it, then Accept merges it to the timeline or Reject sends it back with their note.`}
-        </span>
+        {pendingFile && (
+          <span className="setting-copy">
+            Sends the file and your description to the Captain — Accept adds it to the vault, Reject deletes it and sends it back with their note.
+          </span>
+        )}
       </div>
       {fileResult && !pending && (
         <div
