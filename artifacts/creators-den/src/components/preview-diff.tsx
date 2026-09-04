@@ -106,7 +106,14 @@ export function predecessorOf(
     );
   }
 
-  // Assets: the immediately older file of the same media (by recency).
+  // Assets: the immediately older file of the same media (by recency). A
+  // caller that built an explicit pair (e.g. the review desk comparing a
+  // pending hand-in against a picked vault baseline) names its partner via
+  // `parentVersionId`, which wins over the recency rule.
+  if (selected.parentVersionId) {
+    const paired = sameLeg.find((s) => s.kind === 'asset' && s.id === selected.parentVersionId);
+    if (paired) return paired;
+  }
   return (
     sameLeg
       .filter((s) => s.kind === 'asset' && new Date(s.createdAt).getTime() < new Date(selected.createdAt).getTime())

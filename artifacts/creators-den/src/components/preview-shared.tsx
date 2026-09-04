@@ -341,6 +341,12 @@ export type CarouselItem =
       media: 'video' | 'audio' | 'image';
       /** Proxy stream for the thumbnail — present once the asset is PROCESSED. */
       thumbUrl?: string;
+      /** Optional override for the right-hand chip (e.g. "held for review"
+       * for a pending hand-in) — replaces the processing chip. */
+      statusTag?: string;
+      /** Optional override for the bottom line (e.g. "awaiting your review")
+       * — replaces the in-the-vault / processing caption. */
+      statusLine?: string;
     };
 
 export function VersionCarousel({
@@ -420,10 +426,12 @@ export function VersionCarousel({
                           )}
                         </span>
                         <span className="pv-version-leg">{item.kindLabel}</span>
-                        {item.status !== 'PROCESSED' && <span className="den-tag gold">processing</span>}
+                        {item.statusTag
+                          ? <span className="den-tag gold">{item.statusTag}</span>
+                          : item.status !== 'PROCESSED' && <span className="den-tag gold">processing</span>}
                       </span>
                       <b className="pv-version-msg truncate">{item.fileName}</b>
-                      <span className="pv-version-date">{item.status === 'PROCESSED' ? 'in the vault' : 'processing…'}</span>
+                      <span className="pv-version-date">{item.statusLine ?? (item.status === 'PROCESSED' ? 'in the vault' : 'processing…')}</span>
                     </>
                   )}
                 </button>
