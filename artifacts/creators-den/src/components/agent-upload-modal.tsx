@@ -195,7 +195,7 @@ export function AgentLaunchButton({
         className="agent-launch-btn"
         onClick={() => void begin()}
         disabled={busy}
-        title="Pick the desktop agent for this upload — it encodes a proxy locally and uploads in the background"
+        title="Open the desktop agent for this upload — drop your file in and it streams from your PC to the vault"
         data-testid="agent-launch-btn"
       >
         {phase === 'launching' ? <Loader2 size={13} className="spin" /> : <Laptop size={13} />}
@@ -303,8 +303,8 @@ export function AgentUploadModal({
   const instructions = [
     { icon: MonitorDown, title: 'Download the agent', text: 'Install and open Tandem Desktop Agent on this computer.' },
     { icon: Projector, title: 'Pick the project', text: 'Sign in with the same account, then select this project in the Workspace card.' },
-    { icon: FolderOpen, title: 'Choose the file', text: `Pick "${fileName}" as the source, and choose where it should land in the vault.` },
-    { icon: UploadCloud, title: 'It uploads itself', text: 'The agent encodes a proxy and uploads it to R2 in the background — no browser tab to babysit.' },
+    { icon: FolderOpen, title: 'Drop in the file', text: `Drag & drop "${fileName}" into the app — it goes straight into this project's vault.` },
+    { icon: UploadCloud, title: 'It uploads itself', text: 'The agent streams the whole file from your PC in the background — no browser tab to babysit.' },
   ];
 
   const flowActive = flow.phase === 'launching' || flow.phase === 'waiting';
@@ -335,7 +335,7 @@ export function AgentUploadModal({
           </p>
           <p className="agent-upload-copy">
             Files under <b>{BROWSER_UPLOAD_MAX_LABEL}</b> upload straight from the browser. For anything
-            bigger, use the desktop agent — it encodes a lightweight proxy locally and uploads in the
+            bigger, use the desktop agent — it streams the file from your PC into the vault in the
             background without choking your browser tab.
           </p>
 

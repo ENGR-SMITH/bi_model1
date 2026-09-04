@@ -10,6 +10,9 @@ let signedIn = false;
 let appInfo: AppInfo = { version: "0.0.0", platform: "unknown", packaged: false };
 let updateReady = false;
 let pendingSignInUrl = "";
+let pendingLaunchProjectId: string | null = null;
+let chosenFile: { path: string; name: string; sizeBytes: number } | null = null;
+let uploading = false;
 
 // Never fail silently: surface renderer crashes into the note under the
 // Account card so a broken build is obvious instead of looking like a dead UI.
@@ -22,7 +25,7 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 // ---------------------------------------------------------------------------
-// Auth
+// Auth + profile
 // ---------------------------------------------------------------------------
 function setAuthNote(line: string, cls = "status"): void {
   const el = $("auth-note");
@@ -31,34 +34,70 @@ function setAuthNote(line: string, cls = "status"): void {
   el.classList.toggle("hidden", !line);
 }
 
+function setAvatar(label: string, imageUrl?: string | null): void {
+  const el = $("auth-avatar");
+  el.innerHTML = "";
+  el.textContent = (label.trim().charAt(0) || "T").toUpperCase();
+  if (imageUrl) {
+    const img = document.createElement("img");
+    img.className = "auth-avatar-img";
+    img.src = imageUrl;
+    img.alt = "";
+    img.addEventListener("error", () => img.remove());
+    el.appendChild(img);
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+type WhoAmI = {
+  signedIn: boolean;
+  email?: string | null;
+  name?: string | null;
+  imageUrl?: string | null;
+  userId?: string;
+};
+
 async function refreshWho() {
-  const who = await window.tandemAgent.whoami();
+  const who = (await window.tandemAgent.whoami()) as WhoAmI;
   signedIn = who.signedIn;
-  const whoSpan = $("who");
-  const accountLabel = who.email ?? who.userId ?? "";
   const authCard = $("auth-card");
   const avatar = $("auth-avatar");
+  const whoSpan = $("who");
+  const accountLabel = (who.name || who.email || "").trim();
+
   if (who.signedIn) {
     authCard.classList.add("signed-in");
-    whoSpan.innerHTML = '<span class="auth-email">' + accountLabel + "</span>";
-    avatar.textContent = (accountLabel.trim().charAt(0) || "T").toUpperCase();
-    $("auth-sub").textContent = "Session active on this device";
-    const footerAccount = $("footer-account");
-    footerAccount.textContent = accountLabel;
-    footerAccount.classList.remove("hidden");
+    whoSpan.textContent = accountLabel || who.userId || "Signed in";
+    setAvatar(accountLabel || who.email || who.userId || "T", who.imageUrl);
+    const sub = $("auth-sub");
+    if (who.name && who.email) {
+      sub.textContent = who.email;
+    } else {
+      sub.textContent = "Session active on this device";
+    }
+    $("footer-account").textContent = accountLabel;
+    $("footer-account").classList.remove("hidden");
     $("sign-in").textContent = "Switch account";
     $("sign-out").classList.remove("hidden");
     $("feature-cards").classList.remove("hidden");
   } else {
     authCard.classList.remove("signed-in");
     whoSpan.textContent = "Not signed in";
+    setAvatar("", null);
     avatar.textContent = "";
-    $("auth-sub").textContent = "Sign up (or sign in) to unlock the project and widget cards.";
+    $("auth-sub").textContent = "Sign up (or sign in) to unlock the workspace.";
     $("footer-account").classList.add("hidden");
     $("sign-in").textContent = "Sign up";
     $("sign-out").classList.add("hidden");
     $("feature-cards").classList.add("hidden");
   }
+  updateUploadEnabled();
 }
 
 // The sign-up link panel replaces the Account row while a sign-in is pending.
@@ -114,12 +153,8 @@ async function beginAutoReSignIn(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Projects / assets
+// Projects
 // ---------------------------------------------------------------------------
-// Project preselected by a Creator Den hand-off (waits for loadProjects to
-// populate the dropdown, then selects it and loads its assets).
-let pendingLaunchProjectId: string | null = null;
-
 async function loadProjects() {
   const sel = $("project") as HTMLSelectElement;
   const projects = await window.tandemAgent.listProjects();
@@ -131,6 +166,7 @@ async function loadProjects() {
     sel.appendChild(opt);
   }
   if (pendingLaunchProjectId) preselectProject(pendingLaunchProjectId);
+  updateUploadEnabled();
 }
 
 function preselectProject(projectId: string): void {
@@ -138,36 +174,89 @@ function preselectProject(projectId: string): void {
   if (sel.querySelector(`option[value="${projectId}"]`)) {
     sel.value = projectId;
     pendingLaunchProjectId = null;
-    void loadAssets();
   } else {
     // The project list may not be loaded yet — apply it once it populates.
     pendingLaunchProjectId = projectId;
   }
+  updateUploadEnabled();
 }
 
-async function loadAssets() {
-  const projectId = ($("project") as HTMLSelectElement).value;
-  const sel = $("asset") as HTMLSelectElement;
-  sel.length = 0;
-  if (!projectId) return;
-  try {
-    const assets = await window.tandemAgent.listAssets(projectId);
-    for (const a of assets) {
-      const opt = document.createElement("option");
-      opt.value = a.id;
-      opt.textContent = a.fileName;
-      sel.appendChild(opt);
-    }
-  } catch (err) {
-    setAuthNote(`Failed to load assets: ${(err as Error).message}`, "err");
+// ---------------------------------------------------------------------------
+// Source file (drag & drop / choose)
+// ---------------------------------------------------------------------------
+function setFileChip(): void {
+  const dz = $("dropzone");
+  const title = $("dz-title");
+  const sub = $("dz-sub");
+  const change = $("dz-change");
+  if (chosenFile) {
+    dz.classList.add("has-file");
+    title.textContent = chosenFile.name;
+    sub.textContent = formatBytes(chosenFile.sizeBytes);
+    change.style.display = "";
+  } else {
+    dz.classList.remove("has-file");
+    title.textContent = "Drag & drop your file here";
+    sub.innerHTML = "or <b>click to choose</b> — footage, audio, or media from your PC";
+    change.style.display = "none";
   }
+  updateUploadEnabled();
+}
+
+async function adoptPath(filePath: string | null | undefined): Promise<void> {
+  if (!filePath) return;
+  const info = await window.tandemAgent.fileInfo(filePath);
+  if (!info) {
+    setStatus("That file could not be read — pick another one.", "err");
+    return;
+  }
+  chosenFile = { path: info.path, name: info.name, sizeBytes: info.sizeBytes };
+  setStatus("");
+  setFileChip();
+}
+
+function updateUploadEnabled(): void {
+  const btn = $("upload") as HTMLButtonElement;
+  const projectReady = ($("project") as HTMLSelectElement).value !== "";
+  const ready = signedIn && projectReady && Boolean(chosenFile) && !uploading;
+  if (ready) btn.removeAttribute("disabled");
+  else btn.setAttribute("disabled", "true");
+}
+
+function wireDropzone(): void {
+  const dz = $("dropzone");
+
+  const openPicker = () => {
+    void window.tandemAgent.pickFile().then((p) => adoptPath(p));
+  };
+  dz.addEventListener("click", openPicker);
+  dz.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openPicker();
+    }
+  });
+  ["dragenter", "dragover"].forEach((name) =>
+    dz.addEventListener(name, (e) => {
+      e.preventDefault();
+      dz.classList.add("drag");
+    }),
+  );
+  dz.addEventListener("dragleave", () => dz.classList.remove("drag"));
+  dz.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dz.classList.remove("drag");
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    // Electron: resolve the dropped File back to its real absolute path.
+    const filePath = window.tandemAgent.droppedFilePath(file);
+    void adoptPath(filePath || null);
+  });
 }
 
 // ---------------------------------------------------------------------------
-// Proxy job + live progress
+// Vault upload + live progress
 // ---------------------------------------------------------------------------
-let chosenFile: string | null = null;
-
 function setStatus(line: string, cls = "status") {
   const el = $("status");
   el.className = cls;
@@ -180,16 +269,14 @@ function handleProgress(p: JobProgress) {
   label.classList.remove("hidden");
 
   if (p.phase === "proxy") {
-    label.textContent =
-      p.percent >= 0 ? `Encoding 720p proxy… ${p.percent}%` : "Encoding 720p proxy…";
+    label.textContent = p.percent >= 0 ? `Encoding 720p proxy… ${p.percent}%` : "Encoding 720p proxy…";
   } else {
     const mb = (n?: number) => (n === undefined ? "—" : (n / 1048576).toFixed(1));
     const pct = p.percent >= 0 ? ` (${p.percent}%)` : "";
-    label.textContent = `Uploading to R2… ${mb(p.sentBytes)} / ${mb(p.totalBytes)} MB${pct}`;
+    label.textContent = `Uploading to the vault… ${mb(p.sentBytes)} / ${mb(p.totalBytes)} MB${pct}`;
   }
 
   if (p.percent < 0) {
-    // Can't measure yet — animate an indeterminate shimmer.
     fill.classList.add("indeterminate");
     fill.style.width = "0";
   } else {
@@ -206,35 +293,34 @@ function resetProgress() {
 }
 
 async function runUpload() {
-  if (!signedIn) return;
+  if (!signedIn || uploading) return;
   const projectId = ($("project") as HTMLSelectElement).value;
-  const assetId = ($("asset") as HTMLSelectElement).value;
-  if (!projectId || !assetId || !chosenFile) {
-    setStatus("Pick a project, asset, and raw file first.", "err");
+  if (!projectId || !chosenFile) {
+    setStatus("Pick a project and a source file first.", "err");
     return;
   }
+  uploading = true;
+  updateUploadEnabled();
   resetProgress();
-  setStatus("Generating proxy with FFmpeg…");
-  $("upload").setAttribute("disabled", "true");
+  setStatus(`Uploading “${chosenFile.name}” to the vault…`);
+  const btn = $("upload") as HTMLButtonElement;
+  btn.textContent = "Uploading…";
   try {
-    const result = await window.tandemAgent.uploadProxy({ projectId, assetId, localFile: chosenFile });
-    if (result.ok) {
-      setStatus(
-        `Done. Uploaded ${(result.sizeBytes ?? 0) / 1024 / 1024} MB proxy to R2 (${result.storageKey}).`,
-        "ok",
-      );
-      const fill = $("barfill");
-      fill.classList.remove("indeterminate");
-      fill.style.width = "100%";
-    } else {
-      setStatus(result.error ?? "Upload failed.", "err");
-      resetProgress();
-    }
+    const result = await window.tandemAgent.uploadRaw({ projectId, localFile: chosenFile.path });
+    const fill = $("barfill");
+    fill.classList.remove("indeterminate");
+    fill.style.width = "100%";
+    setStatus(
+      `“${result.fileName}” is in the vault — its proxy and preview are being prepared in the background.`,
+      "ok",
+    );
   } catch (err) {
     setStatus((err as Error).message, "err");
     resetProgress();
   } finally {
-    $("upload").removeAttribute("disabled");
+    uploading = false;
+    btn.textContent = "Upload to project vault";
+    updateUploadEnabled();
   }
 }
 
@@ -349,10 +435,9 @@ function initListeners() {
       // browser still holds the real Clerk session, so the new link completes
       // in one click without re-entering credentials.
       chosenFile = null;
-      $("file").textContent = "";
-      const projSel = $("project") as HTMLSelectElement;
-      projSel.length = 1;
-      ($("asset") as HTMLSelectElement).length = 0;
+      setFileChip();
+      uploading = false;
+      setStatus("", "status");
       setAuthNote("Your sign-in expired — getting you a fresh one…", "err");
       await refreshWho();
       if (!signedIn) await beginAutoReSignIn();
@@ -365,25 +450,13 @@ function initListeners() {
   $("sign-out").addEventListener("click", async () => {
     await window.tandemAgent.signOut();
     chosenFile = null;
-    $("file").textContent = "";
-    const sel = $("project") as HTMLSelectElement;
-    sel.length = 1;
-    ($("asset") as HTMLSelectElement).length = 0;
+    setFileChip();
+    setStatus("");
     await refreshWho();
     setAuthNote("Signed out.");
-    setStatus("");
   });
 
-  ($("project") as HTMLSelectElement).addEventListener("change", () => void loadAssets());
-  $("pick").addEventListener("click", async () => {
-    chosenFile = await window.tandemAgent.pickFile();
-    $("file").textContent = chosenFile ?? "";
-    if (chosenFile) {
-      $("upload").removeAttribute("disabled");
-    } else {
-      $("upload").setAttribute("disabled", "true");
-    }
-  });
+  ($("project") as HTMLSelectElement).addEventListener("change", updateUploadEnabled);
   $("upload").addEventListener("click", () => void runUpload());
 
   // Auto-update
@@ -437,6 +510,7 @@ async function checkConfig() {
 // ---------------------------------------------------------------------------
 async function main() {
   initListeners();
+  wireDropzone();
   window.tandemAgent.onConfigError((msg) => setAuthNote(msg, "err"));
 
   try {
@@ -467,8 +541,8 @@ async function main() {
     if (ctx.projectId) preselectProject(ctx.projectId);
     setStatus(
       ctx.projectId
-        ? "Opened from Creator Den — pick your raw file and upload."
-        : "Opened from Creator Den — pick a project and your raw file, then upload.",
+        ? "Opened from Creator Den — drop your file and upload."
+        : "Opened from Creator Den — pick a project, drop your file, and upload.",
       "status",
     );
   });

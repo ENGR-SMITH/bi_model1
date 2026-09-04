@@ -13,7 +13,7 @@
 // stashed in sessionStorage as well as read from the URL — that way they
 // survive Clerk's own query-param juggling during the flow.
 import { useEffect, useMemo, useState } from 'react';
-import { SignIn, useAuth } from '@clerk/react';
+import { SignIn, useAuth, useUser } from '@clerk/react';
 
 const ATTEMPT_KEY = 'tandem-agent-signin-attempt';
 
@@ -71,6 +71,7 @@ function readAttempt(): Attempt | null {
 export default function AgentSignInPage() {
   const attempt = useMemo(readAttempt, []);
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { user } = useUser();
   const [phase, setPhase] = useState<Phase>('loading');
   const [error, setError] = useState('');
 
@@ -108,10 +109,19 @@ export default function AgentSignInPage() {
         return;
       }
       try {
+        // The desktop agent has no access to Clerk's user API, so it takes the
+        // display profile (name + avatar) from here — the page that owns the
+        // session — and shows it in the app's account card.
+        const fullName = [user?.firstName ?? '', user?.lastName ?? ''].filter(Boolean).join(' ').trim();
         const res = await fetch(`${attempt.loopback}/complete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state: attempt.state, token }),
+          body: JSON.stringify({
+            state: attempt.state,
+            token,
+            name: fullName || null,
+            imageUrl: user?.imageUrl || null,
+          }),
         });
         if (cancelled) return;
         if (res.ok) {
@@ -138,7 +148,7 @@ export default function AgentSignInPage() {
     return () => {
       cancelled = true;
     };
-  }, [phase, attempt, getToken]);
+  }, [phase, attempt, getToken, user?.firstName, user?.lastName, user?.imageUrl]);
 
   return (
     <div className="agent-signin-page">

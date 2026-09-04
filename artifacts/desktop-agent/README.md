@@ -1,38 +1,38 @@
 # Tandem Desktop Agent
 
-A small Windows/macOS desktop app that generates a 720p H.264 proxy from a raw
-video using **local FFmpeg**, then uploads it **directly to Cloudflare R2**
-through presigned URLs — no raw bytes ever touch your server (and no egress
-cost, since R2 serves from the edge).
+A small Windows/macOS desktop app that gets footage **from your PC into the
+vault** — drag a raw file in (or click to choose it) and it streams straight to
+your Tandem API, which runs the normal pipeline (hashing, proxy, preview) just
+like a browser upload. No asset dropdown, no size cap: the agent exists because
+a browser tab is the wrong tool for multi-GB footage, and the web app caps
+uploads at 500 MB.
 
 It is the "large-file / desktop agent" half of the Cloudflare R2 integration.
-The browser handles files up to ~2 GB; anything bigger (and, for lower CPU
-load, typical proxies too) is best pushed by this agent.
+The browser handles files under 500 MB; anything bigger (and, for lower CPU
+load, typical media too) is best pushed by this agent.
 
 ## How it works
 
 ```
-Your machine                 Your API server                       Cloudflare R2
-   │ pick raw file                  │
-   │ FFmpeg → 720p proxy            │
-   │ POST …/proxy-upload-url ──────▶│  checks access + quota,
-   │                                │  mints 15-min presigned PUT
-   │ PUT proxy bytes ◀──────────────┼─────────────────────────────▶
-   │                                │   (server never touches bytes)
-   │ POST …/proxy-ready ──────────▶│  verifies via object HEAD,
-   │  (asset → PROCESSED)           │   proxy streams via presigned GET
+Your machine                 Your API server                       Vault storage
+   │ drop/choose raw file           │
+   │ POST …/projects/:id/assets ───▶│  checks auth (Clerk JWT),
+   │   (multipart, streamed)        │  writes the file, runs the normal
+   │                                │  pipeline (dedupe, proxy, preview)
+   │ ◀── asset id + status ─────────│
 ```
 
 The agent signs in with **Clerk** through your **system browser**: it hands you a
-one-time sign-up link (served locally by the app, tied to that sign-in), you open
-it in your normal browser, and once you finish the app signs you in automatically.
-It reuses your existing Tandem account and talks to the same API the web apps use.
+one-time sign-up link, you open it in your normal browser, and once you finish
+the app signs you in automatically — showing your account **name and avatar** in
+the app. It reuses your existing Tandem account and talks to the same API the
+web apps use. If your session token ever goes stale (Clerk tokens are
+short-lived by design), the agent signs itself back in automatically.
 
 ## Prerequisites on the user's machine
 
-- **FFmpeg** — bundled in the installer (no extra install needed).
-  If you have a custom FFmpeg installation, set `TANDEM_FFMPEG_PATH` to use it instead.
-- Nothing else — no Node needed once packaged.
+- Nothing — the file streams from disk to the API with no local encoding step
+  and no extra installs.
 
 ## Configuration
 
@@ -43,8 +43,6 @@ or set environment variables:
 {
   "apiBaseUrl": "https://your-api.example.com",
   "clerkPublishableKey": "pk_test_...",
-  "ffmpegPath": "C:\\ffmpeg\\bin\\ffmpeg.exe",
-  "workDir": "C:\\Users\\you\\.tandem-agent\\work",
   "updateUrl": "https://media.example.com/desktop-agent"
 }
 ```
@@ -53,8 +51,7 @@ or set environment variables:
 | ----------------------- | -------------------------------------- |
 | `TANDEM_API_URL`        | API base, no trailing slash. Default `http://localhost:3000` |
 | `TANDEM_CLERK_PUBLISHABLE_KEY` | Your Clerk **publishable** key. |
-| `TANDEM_FFMPEG_PATH`    | Path to the ffmpeg binary (optional; else on PATH). |
-| `TANDEM_AGENT_WORK_DIR` | Temp dir for staged proxies. |
+| `TANDEM_AGENT_WORK_DIR` | Temp dir for staged uploads. |
 | `TANDEM_UPDATE_URL` / `updateUrl` | Auto-update feed base URL (`latest.yml` / `latest-mac.yml` location). Overrides the publish URL baked in at build time. |
 
 > Use the **publishable** key (safe to ship in a desktop app — it's public).
@@ -154,7 +151,8 @@ installed app." instead.
 
 The agent can run a Grammarly-style floating bubble: a small always-on-top,
 draggable red circle that lives over whatever you're doing and opens the agent
-when clicked. Enable it from the **Widget** card in the app — no restart needed:
+when clicked. Enable it from the **Floating widget** card at the bottom of the
+app — the bubble appears **immediately** (no restart needed):
 
 - **Floating widget** — master on/off switch. When on, the app keeps running in
   the tray after you close its window (click the tray icon to reopen, or **Quit
@@ -180,18 +178,20 @@ style:
 2. Open the link in your normal browser on this machine — it opens the Tandem
    sign-up page (powered by the same Clerk instance as the web apps). Sign up,
    or switch to **Sign in** inside the page if you already have an account.
-3. When you finish, the page confirms and the app signs you in automatically.
-   The link is one-time: it's tied to the sign-in you started and expires after
-   10 minutes.
+3. When you finish, the page confirms, **auto-redirects you back to the app**
+   via the `tandem-agent://` deep link, and the app signs you in automatically —
+   your account **name and avatar** appear in the Account card. The link is
+   one-time: it's tied to the sign-in you started and expires after 10 minutes.
 
-Until you're signed in, only the Account card is visible — the project/upload
-and widget cards stay hidden. Then pick a **project**, an **asset** (a raw file
-already in the vault), and a **source raw file** on disk, and click **Generate
-proxy & upload to R2**.
+Until you're signed in, only the Account card is visible — the project, source
+file, upload, and widget cards stay hidden. Once signed in:
 
-The vault then shows the asset as processed, and its `PROXY` row is stored in
-R2 with `storage_provider = "r2"`, streamed back to browsers via presigned
-GETs.
+1. Pick the **project** you're uploading into (Workspace card).
+2. **Drag & drop** the file into the Source file card — or click it to choose
+   from disk. The card shows the file's name and size.
+3. Click **Upload to project vault** — the file streams from your PC to the
+   vault with a live progress bar. No asset dropdown: the file itself *is* the
+   upload, and the normal pipeline (proxy, preview) runs in the background.
 
 > Signing out only signs the **agent** out. The Clerk session lives in your
 > browser, so signing in again completes instantly with the account active
@@ -203,11 +203,8 @@ GETs.
   knows about apps that publish to it (browsers, VLC, Movies & TV, …).
   Detection is best-effort and polls every ~3 s; use `Ctrl+Alt+T` / the tray
   if it misses something.
-- The server endpoints the agent calls (`proxy-upload-url` / `proxy-ready`)
-  only respond when R2 env vars are configured on the API server.
-- Only proxies upload via the agent today; originals, exports, and bundles are
-  uploaded by the web/worker path. Extending the agent to upload originals is a
-  small follow-up (same presigned flow, different key prefix).
+- The agent uploads originals straight into the vault (the same
+  `POST …/assets` multipart endpoint the browser uses, minus the size cap).
 - The Clerk session token is handed back to the agent over a loopback
   `127.0.0.1` server the app starts per attempt; the link carries a random
   per-attempt `state` so only that sign-in can complete. Clerk session tokens

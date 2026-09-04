@@ -40,7 +40,7 @@ export interface UpdateEvent {
  * lives in the renderer; the main process only reports what happened.
  */
 export type AuthEvent =
-  | { type: "signed-in"; email: string | null }
+  | { type: "signed-in"; email: string | null; name?: string | null; imageUrl?: string | null }
   | { type: "expired"; error?: string }
   | { type: "cancelled" }
   | { type: "error"; error: string }

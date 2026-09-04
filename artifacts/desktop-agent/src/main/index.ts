@@ -11,6 +11,7 @@ import { loadConfig } from "./config";
 import { beginBrowserSignIn, type AuthSession, type BrowserSignInAttempt } from "./auth";
 import { ApiClient } from "./api";
 import { makeProxy, resolveFfmpeg } from "./ffmpeg";
+import { uploadRawMultipart } from "./upload-raw";
 import { WidgetController } from "./widget";
 import { loadSettings } from "./settings";
 import {
@@ -201,7 +202,7 @@ ipcMain.handle("agent:sign-in:begin", async () => {
       activeSignIn = null;
       if (session) {
         sessionCache = session;
-        sendAuthEvent({ type: "signed-in", email: session.email });
+        sendAuthEvent({ type: "signed-in", email: session.email, name: session.name, imageUrl: session.imageUrl });
       } else {
         sendAuthEvent({ type: "expired" });
       }
@@ -249,7 +250,13 @@ ipcMain.handle("agent:sign-out", () => {
 
 ipcMain.handle("agent:whoami", () => {
   return sessionCache
-    ? { signedIn: true, email: sessionCache.email, userId: sessionCache.userId }
+    ? {
+        signedIn: true,
+        email: sessionCache.email,
+        name: sessionCache.name,
+        imageUrl: sessionCache.imageUrl,
+        userId: sessionCache.userId,
+      }
     : { signedIn: false };
 });
 
@@ -267,10 +274,26 @@ ipcMain.handle("agent:list-assets", async (_e, projectId: string) => {
 ipcMain.handle("agent:pick-file", async () => {
   const result = await dialog.showOpenDialog({
     properties: ["openFile"],
-    filters: [{ name: "Video", extensions: ["mp4", "mov", "mxf", "mkv", "avi", "m4v"] }],
+    filters: [
+      { name: "Media", extensions: ["mp4", "mov", "mxf", "mkv", "avi", "m4v", "webm", "mts", "m2ts", "mp3", "wav", "m4a", "aac", "flac", "aif", "aiff"] },
+    ],
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0];
+});
+
+// Metadata for a file the user picked or dropped: the renderer shows name +
+// size on the dropzone chip. Kept in main so the renderer never needs fs.
+ipcMain.handle("agent:file-info", (_e, filePath: string) => {
+  const p = String(filePath ?? "");
+  if (!p) return null;
+  try {
+    const stat = fs.statSync(p);
+    if (!stat.isFile()) return null;
+    return { path: p, name: path.basename(p), sizeBytes: stat.size };
+  } catch {
+    return null;
+  }
 });
 
 // The core job: generate a proxy with local FFmpeg and push it straight to R2.
@@ -330,6 +353,63 @@ ipcMain.handle(
       // is short-lived — when the API answers 401 the token is stale, so drop
       // the session and ask for a fresh sign-in instead of a cryptic failure.
       const message = (err as Error).message ?? "";
+      if (/failed \(401\)|Authentication required/i.test(message)) {
+        sessionCache = null;
+        sendAuthEvent({ type: "session-expired", error: "Your sign-in expired. Sign in again to upload." });
+      }
+      throw err;
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Raw vault upload (drag & drop / choose from the PC)
+// ---------------------------------------------------------------------------
+// The agent streams the picked raw file into the vault as a NEW asset — no
+// asset dropdown: the file itself is the upload. Progress streams back as
+// agent:job-progress (phase "upload"), and the job record (control server)
+// is marked so a Creator Den page that launched the agent can refresh + the
+// agent reopens its return URL when the file lands.
+ipcMain.handle(
+  "agent:upload-raw",
+  async (_e, opts: { projectId: string; localFile: string }) => {
+    const cfg = loadConfig();
+    ensureAuthenticated(); // fail fast when not signed in
+    const launchCtx = getLaunchContext();
+    const fileName = path.basename(String(opts.localFile ?? ""));
+    if (!opts.projectId || !opts.localFile || !fileName) {
+      throw new Error("Pick a project and a file first.");
+    }
+    if (!fs.existsSync(opts.localFile)) {
+      throw new Error("That file no longer exists on this computer.");
+    }
+
+    markJobStart({ projectId: opts.projectId, fileName, returnUrl: launchCtx.returnUrl });
+    try {
+      sendJobProgress({ phase: "upload", percent: -1 });
+      const result = await uploadRawMultipart({
+        apiBaseUrl: cfg.apiBaseUrl,
+        token: sessionCache!.token,
+        projectId: opts.projectId,
+        filePath: opts.localFile,
+        onProgress: (sentBytes, totalBytes) =>
+          sendJobProgress({
+            phase: "upload",
+            percent: totalBytes > 0 ? Math.round((sentBytes / totalBytes) * 100) : -1,
+            sentBytes,
+            totalBytes,
+          }),
+      });
+      markJobDone();
+      if (launchCtx.returnUrl && isAllowedReturnUrl(launchCtx.returnUrl, cfg.webAppUrl)) {
+        void shell.openExternal(launchCtx.returnUrl);
+      }
+      return { ok: true, assetId: result.assetId, fileName: result.fileName } as const;
+    } catch (err) {
+      const message = (err as Error).message ?? "";
+      markJobDone(message);
+      // Same short-lived-token handling as the proxy job: drop the session and
+      // auto re-sign-in when the API rejects our bearer token.
       if (/failed \(401\)|Authentication required/i.test(message)) {
         sessionCache = null;
         sendAuthEvent({ type: "session-expired", error: "Your sign-in expired. Sign in again to upload." });
