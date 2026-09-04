@@ -13,7 +13,8 @@
 // launched with the current project + a return URL, and the page polls the
 // agent's loopback control server until the job finishes — then the agent
 // reopens the Creator Den page (return URL) and the page refreshes its data,
-// so the user is automatically back on Creator Den with the file in the vault.
+// so the user is automatically back on Creator Den with the file handed in
+// for the Captain's review.
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -195,7 +196,7 @@ export function AgentLaunchButton({
         className="agent-launch-btn"
         onClick={() => void begin()}
         disabled={busy}
-        title="Open the desktop agent for this upload — drop your file in and it streams from your PC to the vault"
+        title="Open the desktop agent for this upload — drop your file in and submit it for the Captain's review"
         data-testid="agent-launch-btn"
       >
         {phase === 'launching' ? <Loader2 size={13} className="spin" /> : <Laptop size={13} />}
@@ -211,7 +212,7 @@ export function AgentLaunchButton({
       {phase === 'done' && (
         <span className="agent-flow-note is-done" data-testid="agent-flow-done">
           <Check size={12} />
-          Upload complete — {fileName ? <b className="truncate">{fileName}</b> : 'your file'} is in the vault.
+          Submitted for review — {fileName ? <b className="truncate">{fileName}</b> : 'your file'} is waiting on the Captain.
         </span>
       )}
       {phase === 'unavailable' && (
@@ -303,7 +304,7 @@ export function AgentUploadModal({
   const instructions = [
     { icon: MonitorDown, title: 'Download the agent', text: 'Install and open Tandem Desktop Agent on this computer.' },
     { icon: Projector, title: 'Pick the project', text: 'Sign in with the same account, then select this project in the Workspace card.' },
-    { icon: FolderOpen, title: 'Drop in the file', text: `Drag & drop "${fileName}" into the app — it goes straight into this project's vault.` },
+    { icon: FolderOpen, title: 'Drop in the file', text: `Drag & drop "${fileName}" into the app and submit it — the Captain's approval moves it into this project's vault.` },
     { icon: UploadCloud, title: 'It uploads itself', text: 'The agent streams the whole file from your PC in the background — no browser tab to babysit.' },
   ];
 
@@ -335,8 +336,8 @@ export function AgentUploadModal({
           </p>
           <p className="agent-upload-copy">
             Files under <b>{BROWSER_UPLOAD_MAX_LABEL}</b> upload straight from the browser. For anything
-            bigger, use the desktop agent — it streams the file from your PC into the vault in the
-            background without choking your browser tab.
+            bigger, use the desktop agent — it streams the file from your PC and hands it to the
+            Captain&apos;s review desk in the background without choking your browser tab.
           </p>
 
           <div className="agent-upload-cta">
@@ -344,10 +345,11 @@ export function AgentUploadModal({
               <>
                 <button type="button" className="agent-download-btn started" onClick={onClose} data-testid="agent-open-done">
                   <Check size={16} />
-                  <span>Upload complete — back to the project</span>
+                  <span>Submitted for review — back to the project</span>
                 </button>
                 <span className="agent-download-note">
-                  {flow.fileName ? <b>{flow.fileName}</b> : 'Your file'} is in the vault.
+                  {flow.fileName ? <b>{flow.fileName}</b> : 'Your file'} is waiting on the Captain&apos;s review —
+                  approval moves it into the vault.
                 </span>
               </>
             ) : flowActive ? (
