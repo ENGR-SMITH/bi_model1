@@ -187,6 +187,9 @@ export function StageSubmitCard({
       setDescription('');
       queryClient.invalidateQueries({ queryKey: getListVideoSubmissionsQueryKey(projectId) });
       queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+      // The crew's own /review list ("Your submissions") should show the new
+      // hand-in immediately, without waiting for its next poll tick.
+      queryClient.invalidateQueries({ queryKey: ['my-video-submissions'] });
       onFileSubmitted?.();
     },
   });
@@ -216,6 +219,9 @@ export function StageSubmitCard({
           queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
           queryClient.invalidateQueries({ queryKey: getGetVideoTimelineQueryKey(projectId, leg) });
           queryClient.invalidateQueries({ queryKey: getListVideoCommentsQueryKey(projectId) });
+          // The crew's own /review list ("Your submissions") should show the
+          // new hand-in immediately, without waiting for its next poll tick.
+          queryClient.invalidateQueries({ queryKey: ['my-video-submissions'] });
         },
       },
     );

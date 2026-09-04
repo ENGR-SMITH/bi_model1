@@ -4765,6 +4765,15 @@ select optgroup {
 .stage-submit-banner.is-approved { background: hsl(155 55% 38% / .1); border-color: hsl(155 55% 38% / .3); }
 .stage-submit-banner.is-approved b { color: hsl(155 55% 38%); }
 .stage-submit-banner span { color: hsl(var(--muted-foreground)); }
+.panel-warning {
+  display: flex; gap: 10px; align-items: center;
+  padding: 10px 14px; border-radius: 10px;
+  font-size: 12.5px; line-height: 1.55;
+  background: hsl(38 92% 50% / .1);
+  border: 1px solid hsl(38 92% 50% / .3);
+  color: hsl(var(--muted-foreground));
+}
+.panel-warning .link-btn { font-size: inherit; }
 .stage-desc-wrap { display: flex; flex-direction: column; gap: 8px; }
 .stage-desc-input {
   width: 100%; min-height: 96px; resize: vertical;
