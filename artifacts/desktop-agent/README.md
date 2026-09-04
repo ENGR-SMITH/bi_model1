@@ -186,12 +186,25 @@ style:
 Until you're signed in, only the Account card is visible — the project, source
 file, upload, and widget cards stay hidden. Once signed in:
 
-1. Pick the **project** you're uploading into (Workspace card).
+1. Pick the **project** you're uploading into (Workspace card). The card then
+   shows **your roles on that project** (e.g. Video · Audio) and what those
+   roles may upload.
 2. **Drag & drop** the file into the Source file card — or click it to choose
    from disk. The card shows the file's name and size.
 3. Click **Upload to project vault** — the file streams from your PC to the
    vault with a live progress bar. No asset dropdown: the file itself *is* the
    upload, and the normal pipeline (proxy, preview) runs in the background.
+
+**Uploads are role-gated.** The file types you can upload follow the roles you
+were assigned on the selected project (the same rule the Creator Den role
+pages use): VIDEO members can add footage, AUDIO members sound, THUMBNAIL
+members images, and the Captain/Uploader can add any of them. A member with
+several roles may upload every kind those roles own. The picker only offers
+your roles' file types, anything else dropped in is rejected with an
+explanation, and the API server enforces the same gate on every upload — so a
+Video member can't push images into the vault from any client. SCRIPT and
+VIEWER members are read-only here: scripts live in Creator Den, and a Viewer
+has no upload rights.
 
 > Signing out only signs the **agent** out. The Clerk session lives in your
 > browser, so signing in again completes instantly with the account active
@@ -205,6 +218,10 @@ file, upload, and widget cards stay hidden. Once signed in:
   if it misses something.
 - The agent uploads originals straight into the vault (the same
   `POST …/assets` multipart endpoint the browser uses, minus the size cap).
+- Uploads are checked against the project roles the signed-in viewer holds
+  (server-side gate in the assets route, mirrored by the agent's picker and
+  drop-zone filters). A SCRIPT member may still add raw audio/video to the
+  vault through the web Script desk for transcription.
 - The Clerk session token is handed back to the agent over a loopback
   `127.0.0.1` server the app starts per attempt; the link carries a random
   per-attempt `state` so only that sign-in can complete. Clerk session tokens

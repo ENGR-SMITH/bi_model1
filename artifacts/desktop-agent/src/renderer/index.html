@@ -131,6 +131,45 @@
       }
       select:disabled { opacity: 0.5; cursor: not-allowed; }
 
+      /* --- Roles on the selected project --- */
+      .roles-row {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+        margin-top: 12px; padding-top: 12px;
+        border-top: 1px dashed var(--border);
+      }
+      .role-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+      .role-chip {
+        font: 600 10px var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em;
+        padding: 4px 9px; border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--fg);
+      }
+      .role-chip-role-captain, .role-chip-role-uploader {
+        border-color: rgba(255, 95, 77, 0.5);
+        background: var(--accent-soft);
+        color: #ffd9d4;
+      }
+      .role-chip-role-video { border-color: rgba(255, 95, 77, 0.35); color: #ffc4bd; }
+      .role-chip-role-audio { border-color: rgba(47, 191, 143, 0.35); color: #a9ecda; }
+      .role-chip-role-thumbnail { border-color: rgba(255, 196, 87, 0.4); color: #ffe3ad; }
+      .role-chip-role-script, .role-chip-role-viewer { opacity: 0.75; }
+      .roles-note {
+        font-size: 11.5px; color: var(--muted-fg); line-height: 1.55;
+        flex: 1 1 100%;
+      }
+      .roles-note.is-blocked { color: #ffb4ab; }
+      .roles-note:not(.is-blocked)::before { content: ""; }
+      .roles-note:not(.is-blocked) { font-family: var(--font-mono); font-size: 10.5px; }
+
+      .dropzone.is-disabled { cursor: not-allowed; opacity: 0.6; }
+      .dropzone.is-disabled:hover, .dropzone.is-disabled.drag {
+        border-color: var(--border-strong);
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .dropzone.is-disabled .dz-title { color: var(--muted-fg); }
+      .dropzone.is-disabled .dz-sub b { color: var(--muted-fg); }
+
       /* --- Buttons --- */
       button {
         font-family: var(--font-sans);
@@ -428,6 +467,10 @@
               <div class="project-row">
                 <select id="project"><option>— load a project —</option></select>
               </div>
+            </div>
+            <div class="roles-row hidden" id="roles-row">
+              <span id="role-chips" class="role-chips"></span>
+              <span id="roles-note" class="roles-note"></span>
             </div>
           </div>
 

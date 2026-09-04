@@ -9,6 +9,14 @@ export interface Project {
   status: string;
 }
 
+export interface ProjectDetail {
+  id: string;
+  name: string;
+  status: string;
+  /** The viewer's roles in this project, e.g. ["VIDEO", "THUMBNAIL"]. */
+  myRoles: string[];
+}
+
 export interface Asset {
   id: string;
   fileName: string;
@@ -58,6 +66,11 @@ export class ApiClient {
 
   async listProjects(): Promise<Project[]> {
     return this.request<Project[]>("GET", "/video/projects");
+  }
+
+  /** Project detail — includes the viewer's own roles (`myRoles`). */
+  async getProject(projectId: string): Promise<ProjectDetail> {
+    return this.request<ProjectDetail>("GET", `/video/projects/${projectId}`);
   }
 
   async listAssets(projectId: string): Promise<Asset[]> {

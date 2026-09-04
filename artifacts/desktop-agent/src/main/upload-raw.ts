@@ -20,7 +20,8 @@ const BOUNDARY = `----tandem-agent-${randomBytes(12).toString("hex")}`;
 const CRLF = "\r\n";
 
 const AUDIO_EXTS = new Set([".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".aif", ".aiff", ".opus"]);
-const VIDEO_EXTS = new Set([".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".mxf", ".mts", ".m2ts", ".ts"]);
+const VIDEO_EXTS = new Set([".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".mpg", ".mpeg"]);
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"]);
 
 const MIME_BY_EXT: Record<string, string> = {
   ".mp4": "video/mp4",
@@ -29,6 +30,8 @@ const MIME_BY_EXT: Record<string, string> = {
   ".mkv": "video/x-matroska",
   ".webm": "video/webm",
   ".avi": "video/x-msvideo",
+  ".mpg": "video/mpeg",
+  ".mpeg": "video/mpeg",
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
   ".m4a": "audio/mp4",
@@ -37,12 +40,22 @@ const MIME_BY_EXT: Record<string, string> = {
   ".ogg": "audio/ogg",
   ".aif": "audio/aiff",
   ".aiff": "audio/aiff",
+  ".opus": "audio/opus",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".avif": "image/avif",
 };
 
+// The vault kind a dropped file lands under: audio -> RAW_AUDIO, images ->
+// THUMBNAIL_DESIGN (the Thumbnail desk's default), everything else ->
+// RAW_VIDEO. The role gate decides who may actually upload each kind.
 export function kindForFile(fileName: string): string {
   const ext = path.extname(fileName).toLowerCase();
   if (AUDIO_EXTS.has(ext)) return "RAW_AUDIO";
-  if (VIDEO_EXTS.has(ext)) return "RAW_VIDEO";
+  if (IMAGE_EXTS.has(ext)) return "THUMBNAIL_DESIGN";
   return "RAW_VIDEO";
 }
 

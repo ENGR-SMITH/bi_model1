@@ -36,6 +36,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { getFFmpegPath, uploadDir } from "../video/worker";
 import { getStore, r2Configured } from "../video/object-storage";
+import { roleForKind } from "../video/roles";
 import { logger } from "../lib/logger";
 import { emitJobProgress } from "../realtime";
 
@@ -58,24 +59,8 @@ const LEG_ROLES: Record<string, string> = {
 } as const;
 
 // The vault kind a file belongs to maps to the role that owns it — used to
-// decide which role grants unlock a download.
-const ROLE_KINDS: Record<string, string[]> = {
-  VIDEO: ["RAW_VIDEO", "SCREEN_REC", "B_ROLL", "REFERENCE"],
-  AUDIO: ["RAW_AUDIO", "VO_PICKUP"],
-  THUMBNAIL: ["THUMBNAIL_DESIGN", "GRAPHIC"],
-  // Scripts live in the browser (the script desk), not the vault — the SCRIPT
-  // role owns no physical files today, so its grants unlock nothing until
-  // script files exist.
-  SCRIPT: [],
-};
-
-/** The owning role of a vault asset kind, or null when no role owns it. */
-function roleForKind(kind: string): string | null {
-  for (const [role, kinds] of Object.entries(ROLE_KINDS)) {
-    if (kinds.includes(kind)) return role;
-  }
-  return null;
-}
+// decide which role grants unlock a download (the map itself lives in
+// src/video/roles.ts, shared with the upload role gate).
 
 async function requireMember(
   projectId: string,

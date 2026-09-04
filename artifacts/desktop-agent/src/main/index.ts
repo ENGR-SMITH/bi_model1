@@ -271,15 +271,33 @@ ipcMain.handle("agent:list-assets", async (_e, projectId: string) => {
   return api.listAssets(String(projectId));
 });
 
-ipcMain.handle("agent:pick-file", async () => {
+// Extensions the agent can put into the vault (fallback when the renderer
+// doesn't narrow the picker to the member's roles).
+const DEFAULT_PICK_EXTENSIONS = [
+  "mp4", "mov", "m4v", "mkv", "webm", "avi", "mpg", "mpeg",
+  "wav", "mp3", "m4a", "aac", "flac", "ogg", "aif", "aiff", "opus",
+  "png", "jpg", "jpeg", "webp", "gif", "avif",
+];
+
+// The renderer passes the file extensions its roles allow (e.g. a Video role
+// sends only video extensions) so the OS picker can't offer cross-role files.
+ipcMain.handle("agent:pick-file", async (_e, extensions?: string[]) => {
+  const allowed = Array.isArray(extensions) && extensions.length > 0 ? extensions : DEFAULT_PICK_EXTENSIONS;
   const result = await dialog.showOpenDialog({
     properties: ["openFile"],
-    filters: [
-      { name: "Media", extensions: ["mp4", "mov", "mxf", "mkv", "avi", "m4v", "webm", "mts", "m2ts", "mp3", "wav", "m4a", "aac", "flac", "aif", "aiff"] },
-    ],
+    filters: [{ name: "Allowed files", extensions: allowed }],
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   return result.filePaths[0];
+});
+
+// The roles the signed-in viewer holds on a project — the renderer uses them
+// to show which roles it can upload for and to restrict file types to the
+// kinds those roles own (the API enforces the same rule on every upload).
+ipcMain.handle("agent:project-roles", async (_e, projectId: string) => {
+  const api = ensureAuthenticated();
+  const detail = await api.getProject(String(projectId));
+  return { myRoles: detail.myRoles ?? [] };
 });
 
 // Metadata for a file the user picked or dropped: the renderer shows name +

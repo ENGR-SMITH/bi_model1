@@ -21,7 +21,10 @@ const api = {
   whoami: () => ipcRenderer.invoke("agent:whoami"),
   listProjects: () => ipcRenderer.invoke("agent:list-projects"),
   listAssets: (projectId: string) => ipcRenderer.invoke("agent:list-assets", projectId),
-  pickFile: () => ipcRenderer.invoke("agent:pick-file"),
+  /** Roles the signed-in viewer holds on a project (drives the upload gate). */
+  projectRoles: (projectId: string) =>
+    ipcRenderer.invoke("agent:project-roles", projectId) as Promise<{ myRoles: string[] }>,
+  pickFile: (extensions?: string[]) => ipcRenderer.invoke("agent:pick-file", extensions),
   /** Metadata (path/name/size) for a picked or dropped file — stat happens in main. */
   fileInfo: (filePath: string) =>
     ipcRenderer.invoke("agent:file-info", filePath) as Promise<{
