@@ -4,6 +4,7 @@ import { publishableKeyFromHost } from '@clerk/react/internal';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import App from './App';
+import { DenTourGate } from '@/components/den-tour-gate';
 import { ErrorBoundary } from '@/components/error-boundary';
 
 import './index.css';
@@ -101,7 +102,10 @@ createRoot(document.getElementById('root')!, {
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
         <ClerkGate>
-          <App />
+          {/* The one-time 10-minute preview tour / pass gate for this den. */}
+          <DenTourGate category="authors">
+            <App />
+          </DenTourGate>
         </ClerkGate>
       </ErrorBoundary>
     </QueryClientProvider>

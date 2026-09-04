@@ -217,6 +217,26 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <p className="mt-4 text-sm leading-relaxed text-zinc-400">
             A ticket unlocks the whole {name.toLowerCase()} category — <b>{weeks} weeks</b> of access. Renew anytime; a renewal extends the pass.
           </p>
+          {/* The one-time preview tour — a new visitor may look around the den
+              free for 10 minutes before buying. The den app starts the tour
+              (server-granted once per user per den) and returns them here when
+              it expires. */}
+          <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-white">New here? Preview it first.</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+                Take a free 10-minute tour of the {slug === 'authors' ? 'Authors Den' : 'Creators Den'} — no card needed.
+              </p>
+            </div>
+            <a
+              href={slug === 'authors' ? '/authors-den/' : '/creators-den/'}
+              className="focus-house inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#3b82f6]/50 px-3.5 py-2 text-xs font-bold text-[#60a5fa] transition-colors hover:border-[#3b82f6] hover:bg-[#3b82f6]/10"
+              data-testid="link-start-free-tour"
+            >
+              <PiTicketDuotone className="h-3.5 w-3.5" />
+              Tour it free
+            </a>
+          </div>
         </div>
 
         {/* Perforation */}

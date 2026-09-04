@@ -22,7 +22,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   Clock3,
-  FileUp,
   Send,
   XCircle,
 } from 'lucide-react';
@@ -40,8 +39,7 @@ import {
 } from '@workspace/api-client-react';
 import type { StudioLeg } from '@/components/role-oracle';
 import { RELAY_LEGS } from '@/components/shell';
-import { VAULT_KIND_LABELS } from '@/components/preview-shared';
-import { BROWSER_UPLOAD_MAX_LABEL, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
+import { exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 
 /** The role that owns each relay leg (mirrors the server's LEG_ROLES). */
 const LEG_ROLE: Record<StudioLeg, string> = {
@@ -336,19 +334,6 @@ export function StageSubmitCard({
             </div>
           )}
 
-          {pendingFile && (
-            <div className="stage-file-chip" data-testid="stage-file-chip">
-              <FileUp size={13} />
-              <span>
-                <b>{pendingFile.file.name}</b>
-                <small>
-                  {VAULT_KIND_LABELS[pendingFile.kind] ?? pendingFile.kind} — travels with your description
-                  {pendingFileOverCap ? ` · over the ${BROWSER_UPLOAD_MAX_LABEL} browser limit, use the Desktop agent button` : ''}
-                </small>
-              </span>
-            </div>
-          )}
-
           <div className="stage-submit-row">
             <button
               type="button"
@@ -402,12 +387,6 @@ export function StageSubmitCard({
                 )}
               </span>
             </div>
-          )}
-          {!hasSnapshot && !pendingFile && (
-            <p className="setting-copy" role="status" data-testid="stage-submit-no-snapshot">
-              This stage has no saved snapshot yet — save a version of the {legLabel(leg)} in the preview
-              studio first, then hand it in here.
-            </p>
           )}
           {submit.isError && (
             <p className="setting-copy mt-2" role="alert">

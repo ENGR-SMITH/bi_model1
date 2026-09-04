@@ -52,6 +52,7 @@ async function seedPromo(code: string, kind: "FREE" | "PERCENT" | "FLAT", value:
 async function resetDb() {
   const t = state.tables;
   await state.db.delete(t.tandemTicketsTable);
+  await state.db.delete(t.tandemToursTable);
   await state.db.delete(t.tandemPromoCodesTable);
   state.userId = null;
 }
@@ -211,5 +212,85 @@ describe("promo codes", () => {
   it("requires authentication for promo validation", async () => {
     state.userId = null;
     expect((await request(API).post("/api/tickets/promo/validate").send({ code: "HALFPASS" })).status).toBe(401);
+  });
+});
+
+describe("den access tours", () => {
+  it("reports no pass, no tour, and a grantable tour for a new visitor", async () => {
+    state.userId = "user-1";
+    const res = await request(API).get("/api/tickets/access/content-creators");
+    expect(res.status).toBe(200);
+    expect(res.body.category).toBe("content-creators");
+    expect(res.body.tourMinutes).toBe(10);
+    expect(res.body.passActive).toBe(false);
+    expect(res.body.tourActive).toBe(false);
+    expect(res.body.tourEndsAt).toBeNull();
+    expect(res.body.tourUsed).toBe(false);
+    expect(res.body.canStartTour).toBe(true);
+  });
+
+  it("starts a 10-minute tour, reports it active, and refuses a second one", async () => {
+    state.userId = "user-1";
+    const start = await request(API).post("/api/tickets/tour/start").send({ category: "authors" });
+    expect(start.status).toBe(201);
+    const endsAt = new Date(start.body.tour.endsAt).getTime();
+    expect(endsAt).toBeGreaterThan(Date.now() + 10 * 60 * 1000 - 5000);
+    expect(endsAt).toBeLessThanOrEqual(Date.now() + 10 * 60 * 1000 + 5000);
+
+    const access = await request(API).get("/api/tickets/access/authors");
+    expect(access.body.passActive).toBe(false);
+    expect(access.body.tourActive).toBe(true);
+    expect(access.body.tourUsed).toBe(false);
+    expect(access.body.canStartTour).toBe(false);
+
+    const again = await request(API).post("/api/tickets/tour/start").send({ category: "authors" });
+    expect(again.status).toBe(409);
+    expect(again.body.error).toMatch(/already running/i);
+  });
+
+  it("treats a lapsed tour as used — no second tour, ever", async () => {
+    state.userId = "user-1";
+    // Grant a tour, then backdate it so it has clearly expired.
+    await request(API).post("/api/tickets/tour/start").send({ category: "content-creators" });
+    await state.db
+      .update(state.tables.tandemToursTable)
+      .set({ endsAt: new Date(Date.now() - 60_000) })
+      .where(eq(state.tables.tandemToursTable.userId, "user-1"));
+
+    const access = await request(API).get("/api/tickets/access/content-creators");
+    expect(access.body.tourActive).toBe(false);
+    expect(access.body.tourUsed).toBe(true);
+    expect(access.body.canStartTour).toBe(false);
+
+    const again = await request(API).post("/api/tickets/tour/start").send({ category: "content-creators" });
+    expect(again.status).toBe(409);
+    expect(again.body.error).toMatch(/already been used/i);
+  });
+
+  it("an active pass unlocks the den and blocks starting a tour", async () => {
+    state.userId = "user-1";
+    await request(API).post("/api/tickets/purchase").send({ category: "authors", card: VALID_CARD });
+
+    const access = await request(API).get("/api/tickets/access/authors");
+    expect(access.body.passActive).toBe(true);
+    expect(access.body.canStartTour).toBe(false);
+
+    const start = await request(API).post("/api/tickets/tour/start").send({ category: "authors" });
+    expect(start.status).toBe(400);
+    expect(start.body.error).toMatch(/active pass/i);
+  });
+
+  it("tours are independent per category", async () => {
+    state.userId = "user-1";
+    await request(API).post("/api/tickets/tour/start").send({ category: "authors" });
+    const creators = await request(API).get("/api/tickets/access/content-creators");
+    expect(creators.body.canStartTour).toBe(true);
+    expect(creators.body.tourUsed).toBe(false);
+  });
+
+  it("requires authentication for access and start", async () => {
+    state.userId = null;
+    expect((await request(API).get("/api/tickets/access/authors")).status).toBe(401);
+    expect((await request(API).post("/api/tickets/tour/start").send({ category: "authors" })).status).toBe(401);
   });
 });

@@ -4403,7 +4403,7 @@ select optgroup {
    rails. */
 .review-page {
   max-width: none;
-  padding: 2px clamp(2px, .3vw, 4px) 4px;
+  padding: 2px clamp(12px, 1.5vw, 24px) 4px;
   gap: 8px;
 }
 .review-page .pv-top { gap: 8px; }
@@ -4499,37 +4499,95 @@ select optgroup {
   color: hsl(var(--muted-foreground));
   font: 11px/1.5 var(--app-font-sans);
 }
+/* Accept / Reject — a glassmorphism pair: translucent frosted fill with a
+   light rim, a slow breathing glow in the button's own hue, and a soft sheen
+   that sweeps across the glass on a loop. */
 .review-decision-approve,
 .review-decision-reject {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 9px;
-  padding: 12px 30px;
+  padding: 13px 34px;
   border-radius: 999px;
   font: 700 15px var(--app-font-sans);
   letter-spacing: .01em;
   color: #fff;
-  border: 0;
+  border: 1px solid hsl(0 0% 100% / .18);
   cursor: pointer;
-  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease, opacity .15s ease;
+  overflow: hidden;
+  isolation: isolate;
+  -webkit-backdrop-filter: blur(10px) saturate(1.35);
+  backdrop-filter: blur(10px) saturate(1.35);
+  text-shadow: 0 1px 2px hsl(0 0% 0% / .28);
+  transition: transform .15s ease, filter .15s ease, opacity .15s ease, border-color .15s ease;
 }
+/* The glass sheen sweeping across the pill. */
+.review-decision-approve::before,
+.review-decision-reject::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 25%, hsl(0 0% 100% / .16) 42%, hsl(0 0% 100% / .34) 50%, hsl(0 0% 100% / .16) 58%, transparent 75%);
+  transform: translateX(-130%) skewX(-12deg);
+  animation: review-sheen 3.6s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+.review-decision-approve > svg,
+.review-decision-reject > svg { z-index: 2; }
+@keyframes review-sheen {
+  0%, 52% { transform: translateX(-130%) skewX(-12deg); }
+  92%, 100% { transform: translateX(130%) skewX(-12deg); }
+}
+
 .review-decision-approve {
-  background: linear-gradient(135deg, hsl(155 58% 43%), hsl(155 60% 32%));
-  box-shadow: 0 8px 20px hsl(155 58% 32% / .35), inset 0 1px 0 hsl(155 58% 75% / .4);
+  background: linear-gradient(135deg, hsl(155 58% 42% / .68), hsl(155 62% 26% / .72));
+  border-color: hsl(155 75% 68% / .4);
+  box-shadow: 0 0 16px hsl(155 58% 45% / .45), 0 0 40px hsl(155 58% 45% / .12), inset 0 1px 0 hsl(0 0% 100% / .35), inset 0 0 18px hsl(155 70% 60% / .18);
+  animation: review-glow-approve 2.8s ease-in-out infinite;
 }
-.review-decision-approve:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-2px); box-shadow: 0 12px 24px hsl(155 58% 32% / .42), inset 0 1px 0 hsl(155 58% 75% / .4); }
+.review-decision-approve:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-2px);
+  border-color: hsl(155 80% 72% / .6);
+}
 .review-decision-reject {
-  background: linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--destructive) / .82));
-  box-shadow: 0 8px 20px hsl(var(--destructive) / .3), inset 0 1px 0 hsl(0 0% 100% / .2);
+  background: linear-gradient(135deg, hsl(var(--destructive) / .58), hsl(var(--destructive) / .62));
+  border-color: hsl(var(--destructive) / .38);
+  box-shadow: 0 0 16px hsl(var(--destructive) / .5), 0 0 40px hsl(var(--destructive) / .14), inset 0 1px 0 hsl(0 0% 100% / .3), inset 0 0 18px hsl(var(--destructive) / .22);
+  animation: review-glow-reject 2.8s ease-in-out infinite;
 }
-.review-decision-reject:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 12px 24px hsl(var(--destructive) / .36), inset 0 1px 0 hsl(0 0% 100% / .2); }
+.review-decision-reject:hover:not(:disabled) {
+  filter: brightness(1.12);
+  transform: translateY(-2px);
+  border-color: hsl(var(--destructive) / .6);
+}
+/* The breathing outer glow. */
+@keyframes review-glow-approve {
+  0%, 100% { box-shadow: 0 0 14px hsl(155 58% 45% / .35), 0 0 34px hsl(155 58% 45% / .1), inset 0 1px 0 hsl(0 0% 100% / .35), inset 0 0 18px hsl(155 70% 60% / .15); }
+  50% { box-shadow: 0 0 24px hsl(155 60% 52% / .75), 0 0 56px hsl(155 60% 52% / .28), inset 0 1px 0 hsl(0 0% 100% / .42), inset 0 0 26px hsl(155 70% 62% / .28); }
+}
+@keyframes review-glow-reject {
+  0%, 100% { box-shadow: 0 0 14px hsl(var(--destructive) / .38), 0 0 34px hsl(var(--destructive) / .12), inset 0 1px 0 hsl(0 0% 100% / .3), inset 0 0 18px hsl(var(--destructive) / .18); }
+  50% { box-shadow: 0 0 24px hsl(var(--destructive) / .78), 0 0 56px hsl(var(--destructive) / .3), inset 0 1px 0 hsl(0 0% 100% / .38), inset 0 0 26px hsl(var(--destructive) / .28); }
+}
 .review-decision-approve:active:not(:disabled),
-.review-decision-reject:active:not(:disabled) { transform: translateY(1px) scale(.99); box-shadow: none; }
+.review-decision-reject:active:not(:disabled) { transform: translateY(1px) scale(.98); animation-play-state: paused; }
 .review-decision-approve:focus-visible,
-.review-decision-reject:focus-visible { outline: 2px solid hsl(var(--accent)); outline-offset: 2px; }
+.review-decision-reject:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .review-decision-approve:disabled,
-.review-decision-reject:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.review-decision-reject:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  filter: saturate(.4);
+  box-shadow: none;
+  animation: none;
+}
+.review-decision-approve:disabled::before,
+.review-decision-reject:disabled::before { animation: none; opacity: 0; }
 .review-decision-error { margin: 0; color: hsl(var(--destructive)); }
 
 /* The REMARK note field. */
@@ -4926,19 +4984,6 @@ select optgroup {
 }
 .stage-submit-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .stage-submit-row .setting-copy { flex: 1 1 220px; margin: 0; }
-.stage-file-chip {
-  display: flex; gap: 10px; align-items: center;
-  padding: 9px 12px; border-radius: 10px;
-  border: 1px solid hsl(var(--accent) / .4);
-  background: hsl(var(--accent) / .08);
-  color: hsl(var(--accent));
-  font-size: 12px;
-  min-width: 0;
-}
-.stage-file-chip svg { flex: 0 0 auto; }
-.stage-file-chip span { min-width: 0; }
-.stage-file-chip b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stage-file-chip small { display: block; color: hsl(var(--muted-foreground)); font-size: 11px; }
 /* Pending review — while a hand-in awaits the Captain, the card collapses to
    the status line alone (the description box / resolved notes / submit row are
    hidden entirely until the review is decided). */
