@@ -38,12 +38,32 @@ export function SectionEyebrow({ children }: { children: ReactNode }) {
 }
 
 export const RELAY_LEGS = [
-  { slug: 'selects', leg: 'SELECTS', number: '01', label: 'Selects', role: 'Video', icon: Film },
-  { slug: 'cut', leg: 'CUT', number: '02', label: 'Cut', role: 'Video', icon: Scissors },
-  { slug: 'sound', leg: 'SOUND', number: '03', label: 'Sound', role: 'Audio', icon: Mic2 },
-  { slug: 'finish', leg: 'FINISH', number: '04', label: 'Finish', role: 'Captain', icon: Palette },
-  { slug: 'thumbnail', leg: 'THUMBNAIL', number: '05', label: 'Thumbnail', role: 'Thumbnail', icon: Image },
+  {
+    slug: 'selects', leg: 'SELECTS', number: '01', label: 'Selects', role: 'Video', icon: Film,
+    hint: 'Selects — the first video pass: pick the golden takes from the raw footage and lay out the rough narrative (Hook → Setup → Core → Payoff → CTA).',
+  },
+  {
+    slug: 'cut', leg: 'CUT', number: '02', label: 'Cut', role: 'Video', icon: Scissors,
+    hint: 'Cut — the second video pass: trim the selected takes into the finished edit — camera switches, B-roll placement, pacing — up to picture lock.',
+  },
+  {
+    slug: 'sound', leg: 'SOUND', number: '03', label: 'Sound', role: 'Audio', icon: Mic2,
+    hint: 'Sound — the audio pass: clean the captured sound, place the music, duck it under speech, and schedule pickup voiceover.',
+  },
+  {
+    slug: 'finish', leg: 'FINISH', number: '04', label: 'Finish', role: 'Captain', icon: Palette,
+    hint: 'Finish — the Captain\'s stage: colour and motion, captions, exports, and releasing the lock so downloads open.',
+  },
+  {
+    slug: 'thumbnail', leg: 'THUMBNAIL', number: '05', label: 'Thumbnail', role: 'Thumbnail', icon: Image,
+    hint: 'Thumbnail — the cover pass: pick the frame or design, title text, and style that pops at small sizes.',
+  },
 ] as const;
+
+/** Hover hint for a relay stage (what Selects / Cut / … mean). */
+export function legHint(leg: string): string | undefined {
+  return RELAY_LEGS.find((relay) => relay.leg === leg)?.hint;
+}
 
 // The account tile IS the profile link: the user's real account image (or
 // initials fallback), full name, and email. No separate "Profile" button.
@@ -306,13 +326,14 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
               <div className="cd-tab-group">
                 {/* A public (non-member) viewer only gets PREVIEW + TIMELINE. */}
                 {!readOnly && tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
-                {/* The Review desk moved onto the nav as a Captain-only tab,
-                    sitting right beside the Vault. */}
-                {!readOnly && isCaptain && (
+                {/* One Review tab for everyone: Captains land on their review
+                    desk (with the pending-count badge), the crew land on their
+                    own submissions + the timeline tree. */}
+                {!readOnly && (
                   <Link href="/review" className={`cd-tab ${location === '/review' ? 'active' : ''}`} data-testid="nav-review">
                     <GitPullRequest size={15} />
                     <span>Review</span>
-                    {pendingReviews > 0 && (
+                    {isCaptain && pendingReviews > 0 && (
                       <b className="cd-topnav-review-badge cd-nav-badge" data-testid="nav-review-badge">{pendingReviews}</b>
                     )}
                   </Link>

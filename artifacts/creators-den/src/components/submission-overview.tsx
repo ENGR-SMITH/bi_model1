@@ -23,7 +23,7 @@ import {
   useListVideoProjects,
 } from '@workspace/api-client-react';
 import type { VideoSubmission } from '@workspace/api-client-react';
-import { RELAY_LEGS } from '@/components/shell';
+import { legHint, RELAY_LEGS } from '@/components/shell';
 import type { StudioLeg } from '@/components/role-oracle';
 
 /** A submission enriched with its project's name for the overview list. */
@@ -132,7 +132,9 @@ export function TimelineTree({
               className={`relay-stage ${index < RELAY_LEGS.length - 1 ? 'has-next' : ''}`}
               data-testid={`relay-stage-${leg.toLowerCase()}`}
             >
-              <span className={`relay-stage-head den-tag ${LEG_TONES[leg] ?? 'muted'}`}>{relay.label}</span>
+              <span className={`relay-stage-head den-tag ${LEG_TONES[leg] ?? 'muted'}`} title={relay.hint}>
+                {relay.label}
+              </span>
               {badge && (
                 <span className={`relay-stage-badge den-tag ${badge.cls}`} title={`Latest submission: ${badge.label}`}>
                   {latest?.status === 'SUBMITTED' ? <Clock3 size={9} /> : latest?.status === 'APPROVED' ? <CheckCircle2 size={9} /> : <XCircle size={9} />}
@@ -292,7 +294,10 @@ export function SubmissionOverview() {
                         aria-expanded={expanded}
                         data-testid={`submission-row-${row.id}`}
                       >
-                        <span className={`den-tag ${LEG_TONES[row.leg] ?? 'muted'}`}>
+                        <span
+                          className={`den-tag ${LEG_TONES[row.leg] ?? 'muted'}`}
+                          title={legHint(row.leg)}
+                        >
                           {legLabel(row.leg)}
                         </span>
                         <span className="min-w-0 flex-1 text-left">

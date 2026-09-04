@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { ChevronDown, ChevronUp, FileVideo2, Image as ImageIcon, Mic2 } from 'lucide-react';
+import { legHint } from '@/components/shell';
 
 export type ShelfItem =
   | {
@@ -224,7 +225,7 @@ export function VersionShelf({
                       <>
                         <span className="vs-item-head">
                           <span className="den-tag accent">v{item.version}</span>
-                          <span className="vs-leg">{item.leg}</span>
+                          <span className="vs-leg" title={legHint(item.leg)}>{item.leg}</span>
                           {item.isHead && <span className="den-tag teal">head</span>}
                         </span>
                         <span className={`vs-title ${item.message ? '' : 'muted'}`}>{item.message || 'no message'}</span>

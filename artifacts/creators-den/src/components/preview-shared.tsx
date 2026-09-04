@@ -464,7 +464,7 @@ export function RoleLayout({
   canvas: ReactNode;
   /** Column three, row two — the pin / comment wall. */
   notes: ReactNode;
-  /** Column three, row one — the role oracle. */
+  /** Column three, row one — the role oracle / submit card. */
   oracle: ReactNode;
   /** Column two, row two — the upload card. */
   upload: ReactNode;
@@ -478,8 +478,10 @@ export function RoleLayout({
           <div className="role-canvas-bar">{upload}</div>
         </div>
         <div className="role-col-3">
-          <div className="role-notes-main">{oracle}</div>
-          <div className="role-notes-bar">{notes}</div>
+          {/* Crew-first: the comment wall sits on top (short row), the
+              "Hand this stage in" card takes the tall row below it. */}
+          <div className="role-notes-main">{notes}</div>
+          <div className="role-notes-bar">{oracle}</div>
         </div>
       </div>
     </div>

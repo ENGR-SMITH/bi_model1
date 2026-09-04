@@ -143,7 +143,7 @@ export default function ReviewPage() {
                   }}
                   data-testid={`review-item-${item.id}`}
                 >
-                  <span className={`den-tag ${LEG_TONES[item.leg] ?? 'muted'}`}>
+                  <span className={`den-tag ${LEG_TONES[item.leg] ?? 'muted'}`} title={legMeta?.hint}>
                     {legMeta?.label ?? item.leg}
                   </span>
                   <span className="min-w-0 flex-1 text-left">
