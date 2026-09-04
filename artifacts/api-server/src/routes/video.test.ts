@@ -925,12 +925,15 @@ describe("submit-for-review uploads (review = true)", () => {
     bytes?: string;
     note?: string;
     asUser?: string;
+    /** Owner override: route the Captain's own upload through review too. */
+    forceReview?: boolean;
   }) {
     state.userId = opts.asUser ?? "captain-1";
     let req = request(API)
       .post(`/api/video/projects/${opts.projectId}/assets`)
       .field("kind", opts.kind)
       .field("review", "true");
+    if (opts.forceReview) req = req.field("forceReview", "true");
     if (opts.note !== undefined) req = req.field("note", opts.note);
     return req.attach("file", Buffer.from(opts.bytes ?? "pending upload bytes"), opts.fileName);
   }
@@ -1082,6 +1085,45 @@ describe("submit-for-review uploads (review = true)", () => {
     const detail = await request(API).get(`/api/video/projects/${project.id}`);
     expect(detail.body.assets).toHaveLength(1);
     expect(detail.body.assets[0].fileName).toBe("captain-footage.mp4");
+  });
+
+  it("routes the Captain's upload through review when forceReview is set", async () => {
+    const project = await createProject(); // captain-1 owns it
+
+    const res = await uploadForReview({
+      projectId: project.id,
+      kind: "RAW_VIDEO",
+      fileName: "captain-own-hand-in.mp4",
+      note: "Testing the desk with my own file.",
+      asUser: "captain-1",
+      forceReview: true,
+    });
+    expect(res.status).toBe(201);
+    // The explicit override creates a real review hand-off for the owner.
+    expect(res.body.review).toBe(true);
+    expect(res.body.status).toBe("PENDING_REVIEW");
+    expect(res.body.submissionId).toBeTruthy();
+
+    // The file is held back from the vault until the Captain approves.
+    state.userId = "captain-1";
+    const detail = await request(API).get(`/api/video/projects/${project.id}`);
+    expect(detail.body.assets).toHaveLength(0);
+
+    // And it is on the review queue for the Captain to decide.
+    const queue = await request(API).get("/api/video/review/queue");
+    expect(queue.body).toHaveLength(1);
+    expect(queue.body[0].id).toBe(res.body.submissionId);
+    expect(queue.body[0].note).toContain("captain-own-hand-in.mp4");
+
+    // Approving it lands the file in the vault like any other submission.
+    const approve = await request(API).post(
+      `/api/video/projects/${project.id}/submissions/${res.body.submissionId}/approve`,
+    );
+    expect(approve.status).toBe(200);
+    state.userId = "captain-1";
+    const after = await request(API).get(`/api/video/projects/${project.id}`);
+    expect(after.body.assets).toHaveLength(1);
+    expect(after.body.assets[0].fileName).toBe("captain-own-hand-in.mp4");
   });
 
   it("rejecting the submission deletes the staged file and frees the vault", async () => {
