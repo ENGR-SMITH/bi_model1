@@ -103,9 +103,6 @@ export function StageSubmitCard({
   // What the server actually answered on the last file hand-in — the card must
   // not wait for a list refetch to tell the member what happened to their file.
   const [fileResult, setFileResult] = useState<{ fileName: string; review: boolean } | null>(null);
-  // The server pins the stage's current head snapshot — with none saved there
-  // is nothing to hand in yet.
-  const hasSnapshot = (legVersionQueries.find((entry) => entry.leg === leg)?.query.data?.length ?? 0) > 0;
 
   // The leg the card hands in, resolved from the data: a pending review keeps
   // its status banner visible; otherwise the leg whose snapshot was most
@@ -128,6 +125,9 @@ export function StageSubmitCard({
     return newest?.leg ?? legs[0];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [legs, legVersionQueries, submissions.data]);
+  // The server pins the stage's current head snapshot — with none saved there
+  // is nothing to hand in yet.
+  const hasSnapshot = (legVersionQueries.find((entry) => entry.leg === leg)?.query.data?.length ?? 0) > 0;
 
   const canSubmit =
     project.data?.myRoles?.includes('CAPTAIN') ||
