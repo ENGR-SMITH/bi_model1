@@ -146,6 +146,9 @@ export function DiffMap({
   // The second (hidden) media loads independently — track its readiness so
   // the diff redraws the moment it arrives instead of staying blank on open.
   const [secondReady, setSecondReady] = useState(false);
+  // Set when the canvas readback throws (a cross-origin media stream taints
+  // the canvas) — the diff can't render, but the column must not crash.
+  const [readbackError, setReadbackError] = useState<string | null>(null);
 
   const newerVideoRef = useRef<HTMLVideoElement>(null);
   const olderVideoRef = useRef<HTMLVideoElement>(null);
@@ -158,8 +161,12 @@ export function DiffMap({
   const draggingRef = useRef(false);
   const computeSeqRef = useRef(0);
 
-  const olderUrl = proxyUrlFor(projectId, olderAssetId);
-  const newerUrl = proxyUrlFor(projectId, newerAssetId);
+  // The diff needs to READ media back into a canvas, so the streams must be
+  // same-origin bytes: `?readable=1` makes the proxy route serve the cached
+  // copy instead of redirecting to cross-origin object storage (which taints
+  // the canvas with a SecurityError on getImageData).
+  const olderUrl = `${proxyUrlFor(projectId, olderAssetId)}?readable=1`;
+  const newerUrl = `${proxyUrlFor(projectId, newerAssetId)}?readable=1`;
 
   const isImage = kind === 'image';
 
@@ -170,6 +177,7 @@ export function DiffMap({
   useEffect(() => {
     setReady(false);
     setSecondReady(false);
+    setReadbackError(null);
     if (isImage) {
       if (olderImgRef.current?.complete && newerImgRef.current?.complete) {
         setReady(true);
@@ -189,9 +197,10 @@ export function DiffMap({
 
   // The diff map for the current shared playhead (video) or once (image).
   const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const media = isImage
+    try {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const media = isImage
       ? {
           newer: { el: newerImgRef.current, w: newerImgRef.current?.naturalWidth ?? 0, h: newerImgRef.current?.naturalHeight ?? 0 },
           older: { el: olderImgRef.current, w: olderImgRef.current?.naturalWidth ?? 0, h: olderImgRef.current?.naturalHeight ?? 0 },
@@ -255,6 +264,17 @@ export function DiffMap({
     out.strokeStyle = '#123c4d';
     out.lineWidth = 2;
     out.stroke();
+    } catch (error) {
+      // Canvas readback throws a SecurityError when the media element was
+      // served cross-origin without CORS (e.g. an object-storage redirect) —
+      // surface a clear notice instead of crashing the whole canvas column.
+      const message = error instanceof Error ? error.message : String(error);
+      setReadbackError(
+        message.toLowerCase().includes('tainted')
+          ? "This media streamed from another origin, so the browser won't let the diff canvas read its pixels. The diff needs media that streams from this server — check the proxy storage setup."
+          : message,
+      );
+    }
   }, [isImage, sensitivity, wipePos]);
 
   const drawRef = useRef(draw);
@@ -357,21 +377,26 @@ export function DiffMap({
 
   return (
     <section className="df-surf" ref={surfRef} data-testid="diff-map">
+      {readbackError && (
+        <div className="df-error" role="alert" data-testid="df-readback-error">
+          <AlertTriangle size={12} /> {readbackError}
+        </div>
+      )}
       <div className="df-stage">
         {!isImage && (
-          <video ref={newerVideoRef} src={newerUrl} muted playsInline preload="auto" className="df-hidden" onLoadedMetadata={() => setSecondReady(true)} onCanPlay={() => setSecondReady(true)} data-testid="df-video-newer" />
+          <video ref={newerVideoRef} src={newerUrl} crossOrigin="anonymous" muted playsInline preload="auto" className="df-hidden" onLoadedMetadata={() => setSecondReady(true)} onCanPlay={() => setSecondReady(true)} data-testid="df-video-newer" />
         )}
         {isImage && (
-          <img ref={newerImgRef} src={newerUrl} alt="" className="df-hidden" onLoad={() => setSecondReady(true)} data-testid="df-img-newer" />
+          <img ref={newerImgRef} src={newerUrl} crossOrigin="anonymous" alt="" className="df-hidden" onLoad={() => setSecondReady(true)} data-testid="df-img-newer" />
         )}
         <div className="df-split">
           {/* Left pane — the older reference media (labeled OLDEST). */}
           <div className="df-pane" ref={olderPaneRef}>
             <span className="df-pane-label" data-testid="df-pane-label-oldest">OLDEST</span>
             {isImage ? (
-              <img ref={olderImgRef} src={olderUrl} alt={olderLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-older" />
+              <img ref={olderImgRef} src={olderUrl} crossOrigin="anonymous" alt={olderLabel} className="df-pane-media" onLoad={() => setReady(true)} data-testid="df-pane-older" />
             ) : (
-              <video ref={olderVideoRef} src={olderUrl} muted={!playing} playsInline preload="auto" autoPlay={undefined} className="df-pane-media" onLoadedMetadata={() => {
+              <video ref={olderVideoRef} src={olderUrl} crossOrigin="anonymous" muted={!playing} playsInline preload="auto" autoPlay={undefined} className="df-pane-media" onLoadedMetadata={() => {
                 const v = olderVideoRef.current;
                 if (v && Number.isFinite(v.duration) && v.duration > 0) setDuration(v.duration);
                 setReady(true);

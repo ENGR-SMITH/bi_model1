@@ -115,8 +115,12 @@ export function AudioDiffMap({
   const newerLaneRef = useRef<HTMLDivElement>(null);
   const surfRef = useRef<HTMLElement>(null);
 
-  const olderUrl = proxyUrlFor(projectId, olderAssetId);
-  const newerUrl = proxyUrlFor(projectId, newerAssetId);
+  // The audio must be fetched + decoded in the browser, so the streams need
+  // to be same-origin bytes: `?readable=1` makes the proxy route serve the
+  // cached copy instead of redirecting to cross-origin object storage (a
+  // cross-origin fetch would fail CORS and never decode).
+  const olderUrl = `${proxyUrlFor(projectId, olderAssetId)}?readable=1`;
+  const newerUrl = `${proxyUrlFor(projectId, newerAssetId)}?readable=1`;
 
   // Load + decode both proxies into mono PCM at the shared analysis rate.
   useEffect(() => {
