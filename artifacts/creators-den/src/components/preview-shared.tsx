@@ -44,7 +44,7 @@ import type { StudioLeg } from '@/components/role-oracle';
 import { formatClock, proxyUrlFor } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
 import { geometryKey, parseGeometry, reviewerColor, reviewerLabel } from '@/lib/annotations';
-import { AgentLaunchButton, BROWSER_UPLOAD_MAX_LABEL, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
+import { AgentLaunchButton, AgentUploadModal, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 
 /** Green used to mark a resolved comment / annotation as solved. */
 export const RESOLVED_GREEN = 'hsl(150 52% 42%)';
@@ -465,9 +465,9 @@ export function RoleLayout({
   notes: ReactNode;
   /** Column three, row one — the role oracle / submit card. */
   oracle: ReactNode;
-  /** Column two, row two — optional direct-upload card. Role pages no longer
-      add files straight to the vault: files arrive through submit-for-review
-      (approve moves them into the vault), so this slot is unused today. */
+  /** Column two, row two — the source-file picker card (format dropdown +
+      drop zone, no direct upload). The "Hand this stage in" card submits the
+      picked file with the description for review. */
   upload?: ReactNode;
 }) {
   return (
@@ -550,6 +550,9 @@ export function RoleUploadCard({
   const [kind, setKind] = useState(selected?.kind ?? defaultKind);
   const [drag, setDrag] = useState(false);
   const [error, setError] = useState('');
+  // A picked file that is too big for the browser path — the agent modal
+  // (download + instructions + hand-off) steps in, exactly as before.
+  const [blockedFile, setBlockedFile] = useState<File | null>(null);
 
   const pickFile = (file: File | undefined | null) => {
     if (!file) return;
@@ -559,6 +562,12 @@ export function RoleUploadCard({
       return;
     }
     setError('');
+    // Files at/over the cap go through the desktop agent, never the browser
+    // submit — open the download/instructions modal instead of picking it.
+    if (exceedsBrowserUploadCap(file)) {
+      setBlockedFile(file);
+      return;
+    }
     onPick(file, kind);
     if (fileRef.current) fileRef.current.value = '';
   };
@@ -576,8 +585,6 @@ export function RoleUploadCard({
     setDrag(false);
     pickFile(event.dataTransfer.files?.[0]);
   };
-
-  const overCap = selected ? exceedsBrowserUploadCap(selected.file) : false;
 
   return (
     <div className="paper-card role-upload-card" data-testid="role-upload">
@@ -636,6 +643,21 @@ export function RoleUploadCard({
         className="hidden"
         data-testid="role-upload-input"
       />
+      {/* Too big for the browser path — download + instructions + hand-off to
+          the running agent, the same over-500 MB experience as before. */}
+      {blockedFile && (
+        <AgentUploadModal
+          fileName={blockedFile.name}
+          fileSizeBytes={blockedFile.size}
+          context={label}
+          projectId={projectId}
+          onAgentDone={() => {
+            onClear();
+            queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+          }}
+          onClose={() => setBlockedFile(null)}
+        />
+      )}
       <div className="role-upload-actions">
         {selected ? (
           <button type="button" className="link-btn" onClick={onClear} data-testid="role-upload-clear">
@@ -644,11 +666,6 @@ export function RoleUploadCard({
         ) : null}
         {error && (
           <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-error">{error}</span>
-        )}
-        {overCap && (
-          <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-too-big">
-            {selected!.file.name} is over the {BROWSER_UPLOAD_MAX_LABEL} browser limit — use the desktop agent for this one.
-          </span>
         )}
       </div>
     </div>
