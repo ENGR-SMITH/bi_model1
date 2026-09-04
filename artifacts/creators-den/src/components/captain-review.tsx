@@ -9,19 +9,18 @@
 //       studios render (VideoStageCanvas / AudioStageCanvas /
 //       ThumbnailStageCanvas from preview-canvas), so the desk's media can
 //       never behave differently from the studios; above it sits the same
-//       Preview | Diff map toggle, comparing the submitted version against a
-//       chosen baseline. A FILE hand-in (a submit-for-review upload held as
+//       Preview | Diff map toggle, comparing the submitted item against a
+//       baseline. A FILE hand-in (a submit-for-review upload held as
 //       PENDING_REVIEW) runs through the very same shared canvas in its
 //       direct mode and diffs against the leg's vault media — exactly like a
 //       studio previewing its newest upload.
 //     · right column, split 50 : 50 — the submitter's DESCRIPTION (the
 //       message they wrote when handing the stage in) on top, and the
 //       Captain's REMARK note directly below it.
-//   Bottom rows: the big Accept / Reject decision as two bare centered
-//   buttons under the canvas (no card), then the same timeline-versions strip
-//   the preview studios run under their canvas — clicking a version there
-//   switches the diff baseline the submission is compared against (for a file
-//   hand-in the strip lists the leg's vault media instead of versions).
+//   Bottom: the big Accept / Reject decision as two bare centered buttons
+//   under the canvas (no card). Version submissions diff against the leg's
+//   head version; a FILE hand-in diffs against the newest processed vault
+//   file of the leg.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -33,7 +32,6 @@ import {
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import type { VideoSubmission } from '@workspace/api-client-react';
-import { proxyUrlFor } from '@/components/asset-preview';
 import {
   AudioStageCanvas,
   ThumbnailStageCanvas,
@@ -44,9 +42,6 @@ import {
   DEFAULT_AUDIO_DIFF_SETTINGS,
   DEFAULT_DIFF_SETTINGS,
   PreviewCanvasColumn,
-  VAULT_KIND_LABELS,
-  VersionCarousel,
-  type CarouselItem,
   type DiffSettings,
   type PreviewView,
 } from '@/components/preview-shared';
@@ -69,13 +64,6 @@ const LEG_TONES: Record<string, string> = {
 
 function legLabel(leg: string): string {
   return RELAY_LEGS.find((relay) => relay.leg === leg)?.label ?? leg;
-}
-
-/** The media flavour a leg's canvas + vault cards render (drives thumbnails). */
-function mediaKindFor(leg: StudioLeg): 'video' | 'audio' | 'image' {
-  if (leg === 'SOUND') return 'audio';
-  if (leg === 'THUMBNAIL') return 'image';
-  return 'video';
 }
 
 /** A file handed in for review carries `ASSET:<assetId>`; its note leads with
@@ -236,31 +224,23 @@ export function CaptainReviewSurface({
     [assets, leg],
   );
 
-  // ---- The diff map: the submitted item vs a chosen baseline. Version
-  // submissions compare against a timeline version (defaults to the leg's
-  // head — the last approved version); FILE submissions compare the staged
-  // file against a vault file of the leg (defaults to the newest processed
-  // one — the studio's "newest upload vs its older sibling" behaviour). The
-  // strip below the canvas can pick any other version / vault file as the
-  // baseline. ----
+  // ---- The diff map: the submitted item vs its baseline. Version
+  // submissions compare against the leg's head version (the last approved
+  // version); FILE submissions compare the staged file against the newest
+  // processed vault file of the leg — the studio's "newest upload vs its
+  // older sibling" comparison. ----
   const audioLeg = leg === 'SOUND';
   const [view, setView] = useState<PreviewView>('preview');
   const [diffSettings, setDiffSettings] = useState<DiffSettings>(
     audioLeg ? DEFAULT_AUDIO_DIFF_SETTINGS : DEFAULT_DIFF_SETTINGS,
   );
-  const [baselineVersionId, setBaselineVersionId] = useState<string | null>(null);
-  const baselineId = baselineVersionId ?? headVersionId;
 
   const diffVersions = useMemo<PreviewDiffSelection[]>(() => {
     if (isAssetSubmission) {
-      // The staged file vs the picked vault baseline — an explicit pair (the
-      // file selection's parentVersionId names the baseline), so picking any
-      // vault card below the canvas switches exactly what the hand-in is
-      // compared against, just like the version desk switches baselines.
-      const baseline =
-        (baselineVersionId ? processedMediaAssets.find((a) => a.id === baselineVersionId) ?? null : null) ??
-        processedMediaAssets[0] ??
-        null;
+      // The staged file vs the newest processed vault file of the leg — an
+      // explicit pair (the file selection's parentVersionId names the
+      // baseline so the recency rule can't pick a different older file).
+      const baseline = processedMediaAssets[0] ?? null;
       if (!baseline) return [];
       const submissionName = fileParts?.fileName ?? 'Submitted file';
       return [
@@ -285,7 +265,7 @@ export function CaptainReviewSurface({
     }
     const rows = legVersions.data ?? [];
     const submitted = rows.find((v) => v.id === submission.timelineVersionId);
-    const baseline = baselineId ? rows.find((v) => v.id === baselineId) : null;
+    const baseline = headVersionId ? rows.find((v) => v.id === headVersionId) : null;
     // A submission pinned straight onto the (only) baseline has nothing to
     // compare against.
     if (!submitted || !baseline || baseline.id === submitted.id) return [];
@@ -311,7 +291,7 @@ export function CaptainReviewSurface({
         createdAt: submitted.createdAt,
       },
     ];
-  }, [isAssetSubmission, baselineId, baselineVersionId, processedMediaAssets, fileParts, pendingAssetId, legVersions.data, leg, submission.timelineVersionId, submission.createdAt]);
+  }, [isAssetSubmission, headVersionId, processedMediaAssets, fileParts, pendingAssetId, legVersions.data, leg, submission.timelineVersionId, submission.createdAt]);
 
   const activeSelection: PreviewDiffSelection | null = diffVersions[1] ?? null;
   const hasDiff = Boolean(activeSelection && predecessorOf(diffVersions, activeSelection));
@@ -336,71 +316,6 @@ export function CaptainReviewSurface({
 
   const versionNo = version.data?.version ?? null;
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
-
-  // The timeline-versions strip under the canvas — the same row the preview
-  // studios run. The submitted card is the active one; picking any other card
-  // makes the diff map compare the submission against that version / vault
-  // file instead of the default baseline. (A FILE submission has no version
-  // to pin, so the strip leads with the hand-in's own card, then lists the
-  // leg's vault media files as the pickable baselines.)
-  const carouselItems = useMemo<CarouselItem[]>(() => {
-    if (isAssetSubmission) {
-      const media = mediaKindFor(leg);
-      return [
-        {
-          key: `file-${pendingAssetId}`,
-          kind: 'asset',
-          id: pendingAssetId,
-          fileName: fileParts?.fileName ?? 'Submitted file',
-          kindLabel: `${legLabel(leg)} hand-in`,
-          status: 'PENDING_REVIEW',
-          media,
-          statusTag: 'held for review',
-          statusLine: 'awaiting your review',
-        },
-        ...processedMediaAssets.map((a) => ({
-          key: `asset-${a.id}`,
-          kind: 'asset' as const,
-          id: a.id,
-          fileName: a.fileName,
-          kindLabel: VAULT_KIND_LABELS[a.kind] ?? a.kind,
-          status: a.status,
-          media,
-          thumbUrl: proxyUrlFor(projectId, a.id),
-        })),
-      ];
-    }
-    return (legVersions.data ?? [])
-      .map((v) => ({
-        key: `version-${v.id}`,
-        kind: 'version' as const,
-        id: v.id,
-        leg,
-        version: v.version,
-        message: v.message ?? '',
-        createdAt: v.createdAt,
-        isHead: Boolean(headVersionId && v.id === headVersionId),
-      }))
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAssetSubmission, pendingAssetId, fileParts, processedMediaAssets, legVersions.data, leg, headVersionId, projectId]);
-
-  const onVersionStripSelect = (key: string) => {
-    // A FILE hand-in's strip: vault cards pick the compare baseline; the
-    // submitted file's own card returns to the default (newest vault media).
-    if (key.startsWith('asset-')) {
-      setBaselineVersionId(key.slice('asset-'.length));
-      return;
-    }
-    if (key.startsWith('file-')) {
-      setBaselineVersionId(null);
-      return;
-    }
-    if (!key.startsWith('version-')) return;
-    const id = key.slice('version-'.length);
-    // Clicking the submitted card again returns to the leg's head baseline.
-    setBaselineVersionId(id === submission.timelineVersionId ? null : id);
-  };
 
   let canvasBody: ReactNode;
   if (isAssetSubmission) {
@@ -506,18 +421,6 @@ export function CaptainReviewSurface({
         onDecided={onDecided}
       />
 
-      {/* The timeline-versions strip — same spot as the preview studios'
-          carousel row; picking a card switches the diff baseline. */}
-      {carouselItems.length > 0 && (
-        <div className="pv-versions-row">
-          <VersionCarousel
-            items={carouselItems}
-            activeKey={isAssetSubmission ? `file-${pendingAssetId}` : `version-${submission.timelineVersionId}`}
-            onSelect={onVersionStripSelect}
-            emptyText={`No ${legLabel(leg)} versions saved on the timeline yet.`}
-          />
-        </div>
-      )}
     </div>
   );
 }

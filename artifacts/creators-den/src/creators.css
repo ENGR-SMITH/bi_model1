@@ -4396,9 +4396,17 @@ select optgroup {
 
 /* ---- Captain review workbench (preview/video-style template) ---- */
 /* The workbench is the exact preview-page grid — canvas | description+remark
-   rail on top, then the bare Accept / Reject decision under the canvas, then
-   the timeline-versions strip where the preview studios run their carousel. */
-.review-page { padding: 8px clamp(6px, 1vw, 12px) 8px; }
+   rail on top, then the bare Accept / Reject decision under the canvas. The
+   desk spans the shell edge-to-edge with slim padding and tight gaps, so
+   every spare pixel belongs to the canvas and the review rails. */
+.review-page {
+  max-width: none;
+  padding: 2px clamp(4px, .6vw, 8px) 4px;
+  gap: 8px;
+}
+.review-page .pv-top { gap: 8px; }
+.review-page .pv-canvas-col,
+.review-page .pv-notes-col { gap: 8px; }
 
 /* Slim back-to-queue strip above the grid, so the canvas column header stays
    the exact preview/video head (Big canvas eyebrow + annotate + toggle). */

@@ -527,7 +527,11 @@ router.get(
 
     // Proxy lives in R2 → hand the player a short-lived presigned GET. The
     // server only ever generates the URL; the browser streams from the edge.
-    if (proxy.storageProvider === "r2") {
+    // Canvas / Web Audio consumers (the split-screen diff maps) CANNOT read a
+    // cross-origin R2 object back into pixels/samples — it taints the canvas —
+    // so they request `?readable=1` and get the cached local copy streamed
+    // through this same-origin route instead of a redirect.
+    if (proxy.storageProvider === "r2" && req.query.readable !== "1") {
       const url = await getStore().getUrl(asset.projectId, proxy.storageKey);
       if (url) {
         res.redirect(302, url);
