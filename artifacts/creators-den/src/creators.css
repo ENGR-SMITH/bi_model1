@@ -4926,19 +4926,6 @@ select optgroup {
 }
 .stage-submit-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .stage-submit-row .setting-copy { flex: 1 1 220px; margin: 0; }
-.stage-file-chip {
-  display: flex; gap: 10px; align-items: center;
-  padding: 9px 12px; border-radius: 10px;
-  border: 1px solid hsl(var(--accent) / .4);
-  background: hsl(var(--accent) / .08);
-  color: hsl(var(--accent));
-  font-size: 12px;
-  min-width: 0;
-}
-.stage-file-chip svg { flex: 0 0 auto; }
-.stage-file-chip span { min-width: 0; }
-.stage-file-chip b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stage-file-chip small { display: block; color: hsl(var(--muted-foreground)); font-size: 11px; }
 /* Pending review — while a hand-in awaits the Captain, the card collapses to
    the status line alone (the description box / resolved notes / submit row are
    hidden entirely until the review is decided). */

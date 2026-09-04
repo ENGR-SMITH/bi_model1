@@ -638,7 +638,11 @@ export function RoleUploadCard({
         data-testid="role-upload-drop"
       >
         {selected ? (
-          <span><FolderOpen size={14} /> <b>{selected.file.name}</b> — will travel with your submission</span>
+          <span>
+            <FolderOpen size={14} />
+            <b>{selected.file.name}</b>
+            {VAULT_KIND_LABELS[selected.kind] ?? selected.kind} — will travel with your submission
+          </span>
         ) : (
           <span><FolderOpen size={14} /> Drag &amp; drop your {label} here, or click to browse</span>
         )}
