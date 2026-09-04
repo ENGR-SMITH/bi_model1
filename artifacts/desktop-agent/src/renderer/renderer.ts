@@ -95,6 +95,10 @@ async function beginSignIn(): Promise<void> {
 // ---------------------------------------------------------------------------
 // Projects / assets
 // ---------------------------------------------------------------------------
+// Project preselected by a Creator Den hand-off (waits for loadProjects to
+// populate the dropdown, then selects it and loads its assets).
+let pendingLaunchProjectId: string | null = null;
+
 async function loadProjects() {
   const sel = $("project") as HTMLSelectElement;
   const projects = await window.tandemAgent.listProjects();
@@ -104,6 +108,19 @@ async function loadProjects() {
     opt.value = p.id;
     opt.textContent = p.name;
     sel.appendChild(opt);
+  }
+  if (pendingLaunchProjectId) preselectProject(pendingLaunchProjectId);
+}
+
+function preselectProject(projectId: string): void {
+  const sel = $("project") as HTMLSelectElement;
+  if (sel.querySelector(`option[value="${projectId}"]`)) {
+    sel.value = projectId;
+    pendingLaunchProjectId = null;
+    void loadAssets();
+  } else {
+    // The project list may not be loaded yet — apply it once it populates.
+    pendingLaunchProjectId = projectId;
   }
 }
 
@@ -408,6 +425,18 @@ async function main() {
 
   window.tandemAgent.onJobProgress(handleProgress);
   window.tandemAgent.onUpdateEvent(handleUpdate);
+
+  // Creator Den opened the app for an upload — preselect the project and tell
+  // the user the hand-off worked.
+  window.tandemAgent.onLaunchContext((ctx) => {
+    if (ctx.projectId) preselectProject(ctx.projectId);
+    setStatus(
+      ctx.projectId
+        ? "Opened from Creator Den — pick your raw file and upload."
+        : "Opened from Creator Den — pick a project and your raw file, then upload.",
+      "status",
+    );
+  });
 }
 
 void main().catch((err) => {

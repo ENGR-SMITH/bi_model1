@@ -30,6 +30,12 @@
     "files": ["dist/**/*"],
     "compression": "normal",
     "publish": [{ "provider": "generic", "url": "https://{{HOST}}/desktop-agent" }],
+    "protocols": [
+      {
+        "name": "Tandem Desktop Agent",
+        "schemes": ["tandem-agent"]
+      }
+    ],
     "extraResources": [
       {
         "from": "ffmpeg",

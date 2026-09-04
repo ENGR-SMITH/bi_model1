@@ -13,12 +13,27 @@ import { ApiClient } from "./api";
 import { makeProxy, resolveFfmpeg } from "./ffmpeg";
 import { WidgetController } from "./widget";
 import { loadSettings } from "./settings";
-import type { AgentSettings, AppInfo, AuthEvent, JobProgress, UpdateEvent } from "../shared/types";
+import {
+  startControlServer,
+  markJobStart,
+  markJobDone,
+  markLaunchContext,
+  getLaunchContext,
+  isAllowedReturnUrl,
+} from "./control-server";
+import type { AgentSettings, AppInfo, AuthEvent, JobProgress, LaunchContext, UpdateEvent } from "../shared/types";
 
 let mainWindow: BrowserWindow | null = null;
 let sessionCache: AuthSession | null = null;
 let widgetController: WidgetController | null = null;
 let isQuitting = false;
+
+// Custom URL scheme registered at install (and at runtime below) so Creator
+// Den can launch the agent even when it isn't running: `tandem-agent://launch
+// ?projectId=…&returnUrl=…` is handed to the OS, which starts the app and
+// passes the URL back in here.
+const AGENT_PROTOCOL = "tandem-agent";
+let pendingStartupLink: string | null = null;
 
 // Only one agent instance at a time — a second launch (e.g. from a leftover
 // installer or an old copy still running in the tray) just focuses the window
@@ -27,7 +42,31 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
-  app.on("second-instance", () => showMainWindow());
+  // A second launch (installer, deep link, old copy) focuses the running app.
+  // Windows/Linux hand deep links to the first instance as an argv entry.
+  app.on("second-instance", (_event, argv) => {
+    const link = argv.find((arg) => arg.startsWith(AGENT_PROTOCOL + "://"));
+    if (link) handleAgentDeepLink(link);
+    else showMainWindow();
+  });
+  // macOS hands deep links to the running app via open-url instead.
+  app.on("open-url", (event, url) => {
+    event.preventDefault();
+    handleAgentDeepLink(url);
+  });
+}
+
+// Cold start via a deep link (Windows/Linux pass the URL as an argv entry).
+// Processed once the window exists — handled at the top of whenReady().
+pendingStartupLink = process.argv.find((arg) => arg.startsWith(AGENT_PROTOCOL + "://")) ?? null;
+
+// Register the scheme for dev builds; packaged installs register it via the
+// electron-builder `protocols` entry, this just keeps `pnpm dev` working.
+try {
+  app.setAsDefaultProtocolClient(AGENT_PROTOCOL);
+} catch {
+  // non-Windows dev environments can fail silently — the deep link still works
+  // when the installer registered the scheme
 }
 
 function showMainWindow(): void {
@@ -85,6 +124,53 @@ function sendJobProgress(progress: JobProgress): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("agent:job-progress", progress);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Creator Den hand-off (launch + auto-redirect back)
+// ---------------------------------------------------------------------------
+// Creator Den launches the agent for an upload via the control server's
+// POST /launch or the tandem-agent:// deep link. We remember the project to
+// preselect + the page to reopen, focus the app, and tell the renderer. When
+// the upload job succeeds we reopen that page (shell.openExternal) — the
+// user lands back on Creator Den with the file in the vault, automatically.
+
+function parseAgentDeepLink(raw: string): LaunchContext | null {
+  if (!raw || !raw.startsWith(AGENT_PROTOCOL + "://")) return null;
+  try {
+    const url = new URL(raw);
+    if (url.host !== "launch") return null;
+    const projectId = url.searchParams.get("projectId") ?? undefined;
+    const returnUrl = url.searchParams.get("returnUrl") ?? undefined;
+    return {
+      projectId: projectId && projectId.length > 0 ? projectId : undefined,
+      returnUrl: returnUrl && returnUrl.length > 0 ? returnUrl : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function handleLaunchContext(ctx: LaunchContext): void {
+  markLaunchContext(ctx);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("agent:launch-context", ctx);
+  }
+  showMainWindow();
+}
+
+function handleAgentDeepLink(raw: string): void {
+  const ctx = parseAgentDeepLink(raw);
+  if (!ctx) return;
+  const cfg = loadConfig();
+  if (!isAllowedReturnUrl(ctx.returnUrl, cfg.webAppUrl)) ctx.returnUrl = undefined;
+  // macOS can deliver the URL before the window exists (open-url fires ahead
+  // of whenReady) — queue it and let whenReady replay the hand-off.
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    pendingStartupLink = raw;
+    return;
+  }
+  handleLaunchContext(ctx);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,33 +282,52 @@ ipcMain.handle(
     const cfg = loadConfig();
     const api = ensureAuthenticated();
     const ffmpegPath = resolveFfmpeg(cfg.ffmpegPath);
+    const launchCtx = getLaunchContext();
+    // Surface this job to Creator Den's control server so the page that
+    // launched the agent knows when the upload finished.
+    markJobStart({
+      projectId: opts.projectId,
+      fileName: path.basename(opts.localFile),
+      returnUrl: launchCtx.returnUrl,
+    });
 
     const workDir = path.join(cfg.workDir, opts.projectId);
     fs.mkdirSync(workDir, { recursive: true });
     const base = path.basename(opts.localFile).replace(/\.[^.]+$/, "");
     const proxyPath = path.join(workDir, `${base}_720p.mp4`);
 
-    sendJobProgress({ phase: "proxy", percent: -1 });
-    await makeProxy({
-      ffmpegPath,
-      inputPath: opts.localFile,
-      outputPath: proxyPath,
-      onProgress: ({ percent }) => sendJobProgress({ phase: "proxy", percent }),
-    });
+    try {
+      sendJobProgress({ phase: "proxy", percent: -1 });
+      await makeProxy({
+        ffmpegPath,
+        inputPath: opts.localFile,
+        outputPath: proxyPath,
+        onProgress: ({ percent }) => sendJobProgress({ phase: "proxy", percent }),
+      });
 
-    const stat = fs.statSync(proxyPath);
-    const mint = await api.mintProxyUpload(opts.projectId, opts.assetId, base + "_720p.mp4", stat.size, "video/mp4");
-    await api.putToPresigned(mint.uploadUrl, proxyPath, "video/mp4", (sentBytes, totalBytes) =>
-      sendJobProgress({
-        phase: "upload",
-        percent: totalBytes > 0 ? Math.round((sentBytes / totalBytes) * 100) : -1,
-        sentBytes,
-        totalBytes,
-      }),
-    );
-    await api.confirmProxy(opts.projectId, opts.assetId);
+      const stat = fs.statSync(proxyPath);
+      const mint = await api.mintProxyUpload(opts.projectId, opts.assetId, base + "_720p.mp4", stat.size, "video/mp4");
+      await api.putToPresigned(mint.uploadUrl, proxyPath, "video/mp4", (sentBytes, totalBytes) =>
+        sendJobProgress({
+          phase: "upload",
+          percent: totalBytes > 0 ? Math.round((sentBytes / totalBytes) * 100) : -1,
+          sentBytes,
+          totalBytes,
+        }),
+      );
+      await api.confirmProxy(opts.projectId, opts.assetId);
 
-    return { ok: true, storageKey: mint.storageKey, sizeBytes: stat.size };
+      markJobDone();
+      // Auto-redirect the user back to Creator Den: reopen the page they
+      // launched from now that the file is in the vault.
+      if (launchCtx.returnUrl && isAllowedReturnUrl(launchCtx.returnUrl, cfg.webAppUrl)) {
+        void shell.openExternal(launchCtx.returnUrl);
+      }
+      return { ok: true, storageKey: mint.storageKey, sizeBytes: stat.size };
+    } catch (err) {
+      markJobDone((err as Error).message);
+      throw err;
+    }
   },
 );
 
@@ -361,6 +466,20 @@ app.whenReady().then(async () => {
   widgetController.init();
   createWindow();
   const cfg = loadConfig();
+
+  // Creator Den hand-off: the loopback control server lets the web app detect
+  // a running agent, launch it with a project + return URL, and watch the job.
+  startControlServer({
+    webAppUrl: cfg.webAppUrl,
+    port: cfg.controlPort,
+    getVersion: () => app.getVersion(),
+    isSignedIn: () => sessionCache !== null,
+    onLaunch: handleLaunchContext,
+  });
+  if (pendingStartupLink) {
+    handleAgentDeepLink(pendingStartupLink);
+    pendingStartupLink = null;
+  }
   if (!cfg.clerkPublishableKey) {
     mainWindow?.webContents.send("agent:config-error", "Clerk publishable key is not configured.");
   }

@@ -27,6 +27,12 @@ export interface AgentConfig {
    * no trailing slash. Overrides the publish URL baked in at build time.
    */
   updateUrl: string;
+  /**
+   * Loopback port of the control server Creator Den talks to (health check,
+   * launch hand-off, job status polling). Fixed so the web app always knows
+   * where to look; override per-machine with TANDEM_AGENT_CONTROL_PORT.
+   */
+  controlPort: number;
 }
 
 const DEFAULTS: AgentConfig = {
@@ -42,6 +48,7 @@ const DEFAULTS: AgentConfig = {
   ffmpegPath: "",
   workDir: path.join(os.homedir(), ".tandem-agent", "work"),
   updateUrl: "",
+  controlPort: 41737,
 };
 
 function loadFileConfig(): Partial<AgentConfig> {
@@ -69,5 +76,6 @@ export function loadConfig(): AgentConfig {
     ffmpegPath: process.env.TANDEM_FFMPEG_PATH || file.ffmpegPath || DEFAULTS.ffmpegPath,
     workDir: process.env.TANDEM_AGENT_WORK_DIR || file.workDir || DEFAULTS.workDir,
     updateUrl: process.env.TANDEM_UPDATE_URL || file.updateUrl || DEFAULTS.updateUrl,
+    controlPort: Number(process.env.TANDEM_AGENT_CONTROL_PORT || file.controlPort || DEFAULTS.controlPort),
   };
 }

@@ -48,7 +48,7 @@ import type { VideoTranscriptSegment } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
 import { pollWhileProcessing } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
-import { AgentUploadModal, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
+import { AgentLaunchButton, AgentUploadModal, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 import {
   findScriptMark,
   parseScriptRange,
@@ -631,6 +631,21 @@ export default function RoleScriptPage() {
               </div>
             </div>
 
+            {/* The second upload method — hand the file to the desktop agent
+                instead of the browser. The user picks between the two any
+                time; oversized files still land in the modal above. */}
+            <div className="pv-script-agent-row">
+              <AgentLaunchButton
+                projectId={p.id}
+                label="Upload with the desktop agent"
+                context="media file"
+                onDone={() => {
+                  queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(p.id) });
+                  setToast('Uploaded with the desktop agent — the file is in the vault.');
+                }}
+              />
+            </div>
+
             <div className="pv-toolbar" data-testid="script-toolbar">
               <button type="button" onClick={() => command('undo')} aria-label="Undo" title="Undo"><Undo2 size={15} /></button>
               <button type="button" onClick={() => command('redo')} aria-label="Redo" title="Redo"><Redo2 size={15} /></button>
@@ -663,6 +678,11 @@ export default function RoleScriptPage() {
                 fileName={blockedFile.name}
                 fileSizeBytes={blockedFile.size}
                 context="media file"
+                projectId={p.id}
+                onAgentDone={() => {
+                  queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(p.id) });
+                  setToast('Uploaded with the desktop agent — the file is in the vault.');
+                }}
                 onClose={() => setBlockedFile(null)}
               />
             )}
