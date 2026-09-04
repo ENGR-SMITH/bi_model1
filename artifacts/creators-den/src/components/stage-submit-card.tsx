@@ -175,6 +175,11 @@ export function StageSubmitCard({
       formData.append('file', file);
       formData.append('kind', kind);
       formData.append('review', 'true');
+      // The card is "Submit file for review", so it means it even when the
+      // uploader is the project's Captain: forceReview overrides the usual
+      // captain-skip so their hand-in lands on the review desk too (they then
+      // approve it like any other submission). Harmless for crew members.
+      formData.append('forceReview', 'true');
       formData.append('note', note);
       const response = await fetch(getUploadVideoAssetUrl(projectId), {
         method: 'POST',
