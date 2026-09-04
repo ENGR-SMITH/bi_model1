@@ -25,15 +25,10 @@ import {
   Send,
   XCircle,
 } from 'lucide-react';
-import {
-  listVideoSubmissions,
-  listVideoTimelineVersions,
-  useListVideoProjects,
-} from '@workspace/api-client-react';
+import { listVideoSubmissions, useListVideoProjects } from '@workspace/api-client-react';
 import type { VideoSubmission } from '@workspace/api-client-react';
 import { legHint, RELAY_LEGS } from '@/components/shell';
 import { reviewerColor, reviewerLabel } from '@/lib/annotations';
-import type { StudioLeg } from '@/components/role-oracle';
 
 /** A submission enriched with its project's name for the board list. */
 export interface MySubmissionRow extends VideoSubmission {
@@ -96,101 +91,170 @@ function fileSubmissionParts(row: MySubmissionRow): { fileName: string; message:
 }
 
 // ---------------------------------------------------------------------------
-// TimelineTree — a relay-flow chart of the whole timeline: each stage
-// (Selects → Cut → Sound → Finish → Thumbnail) is a branch whose saved
-// versions hang off it, newest on top, with the head marked and the latest
-// submission state shown on the branch.
+// TimelineTree — the project timeline as a VERTICAL branch line that grows
+// from down to up, the way the relay actually progresses (older hand-ins at
+// the bottom, the latest at the top). Every hand-in for review gets its own
+// unique alphabetic tag (A, B, C, … AA, AB…) in the order it was submitted:
+//   · approved hand-ins sit ON the main trunk (they merged into the timeline),
+//   · hand-ins still awaiting the Captain are open dashed branches above them,
+//   · sent-back hand-ins are dead ends that never reached the timeline.
 // ---------------------------------------------------------------------------
+
+/** 0 -> A, 1 -> B, … 25 -> Z, 26 -> AA, 27 -> AB … */
+function alphaTag(index: number): string {
+  let n = index + 1;
+  let tag = '';
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    tag = String.fromCharCode(65 + rem) + tag;
+    n = Math.floor((n - 1) / 26);
+  }
+  return tag;
+}
+
+const TT_ROW_H = 46;
+const TT_TRUNK_X = 8;
+const TT_LANE_SP = 22;
+const TT_DOT = 11;
+
+const TT_STATUS: Record<string, { label: string; cls: string }> = {
+  SUBMITTED: { label: 'awaiting review', cls: 'pending' },
+  APPROVED: { label: 'approved', cls: 'on' },
+  REJECTED: { label: 'sent back', cls: 'rejected' },
+};
 
 export function TimelineTree({
   projectId,
   submissions,
 }: {
   projectId: string;
-  /** The project's submissions (any leg) — used for the per-stage badges. */
+  /** The project's submissions (any leg). */
   submissions: MySubmissionRow[];
 }) {
-  const versionsQuery = useQuery({
-    queryKey: ['relay-tree-versions', projectId],
-    queryFn: async () => {
-      const legs = RELAY_LEGS.map((relay) => relay.leg as StudioLeg);
-      const rows = await Promise.all(
-        legs.map(async (leg) => {
-          const versions = await listVideoTimelineVersions(projectId, leg);
-          return { leg, versions: [...versions].sort((a, b) => a.version - b.version) };
-        }),
-      );
-      return new Map(rows.map((row) => [row.leg, row.versions]));
-    },
-    enabled: Boolean(projectId),
-  });
+  // Oldest hand-in first (the bottom of the trunk) — tags follow that order.
+  const ascending = useMemo(
+    () =>
+      [...submissions].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      ),
+    [submissions],
+  );
+  // Newest first, top-down — the branch reads bottom → up.
+  const rows = useMemo(() => ascending.slice().reverse(), [ascending]);
+  const tagBy = useMemo(
+    () => new Map(ascending.map((row, index) => [row.id, alphaTag(index)])),
+    [ascending],
+  );
 
-  const latestByLeg = useMemo(() => {
-    const map = new Map<string, MySubmissionRow>();
-    for (const submission of submissions) {
-      const current = map.get(submission.leg);
-      if (!current || new Date(submission.createdAt) > new Date(current.createdAt)) {
-        map.set(submission.leg, submission);
-      }
-    }
-    return map;
-  }, [submissions]);
+  const pendingRows = ascending.filter((row) => row.status === 'SUBMITTED');
+  const hasRejected = ascending.some((row) => row.status === 'REJECTED');
+  const laneCount = pendingRows.length;
+  // Each open (awaiting) hand-in owns one dashed lane to the right of the
+  // trunk; sent-back dead ends branch into a stub column past the lanes.
+  const laneBy = new Map(pendingRows.map((row, index) => [row.id, index + 1]));
+  const laneX = (lane: number) => TT_TRUNK_X + lane * TT_LANE_SP;
+  const deadEndX = hasRejected ? TT_TRUNK_X + (laneCount + 1) * TT_LANE_SP + 6 : 0;
+  const graphWidth = Math.max(
+    TT_TRUNK_X * 2 + TT_DOT,
+    deadEndX > 0 ? deadEndX + TT_DOT + 6 : 0,
+    laneCount > 0 ? laneX(laneCount) + TT_DOT + 2 : 0,
+  );
+  const topIndexById = new Map(rows.map((row, index) => [row.id, index]));
+  const centerY = (id: string) => (topIndexById.get(id)! + 0.5) * TT_ROW_H;
 
-  const versionsByLeg = versionsQuery.data;
+  if (rows.length === 0) {
+    return (
+      <div className="paper-card timeline-tree" data-testid="timeline-tree">
+        <div className="inline-heading">
+          <span className="eyebrow"><GitPullRequest size={13} /> Project timeline</span>
+          <span className="mono-label">A → …</span>
+        </div>
+        <p className="setting-copy mt-3">
+          Nothing handed in for review on this project yet — every hand-in gets a letter
+          (A, B, C…) on the branch as the relay grows.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="paper-card timeline-tree" data-testid="timeline-tree">
       <div className="inline-heading">
         <span className="eyebrow"><GitPullRequest size={13} /> Project timeline</span>
-        <span className="mono-label">relay flow</span>
+        <span className="mono-label">{rows.length} hand-in{rows.length === 1 ? '' : 's'}</span>
       </div>
-      <div className="relay-flow">
-        {RELAY_LEGS.map((relay, index) => {
-          const leg = relay.leg as StudioLeg;
-          const versions = versionsByLeg?.get(leg) ?? [];
-          const latest = latestByLeg.get(leg);
-          const badge = latest ? STATUS_META[latest.status] : null;
-          const headVersion = versions.length > 0 ? versions[versions.length - 1] : null;
-          return (
-            <div
-              key={leg}
-              className={`relay-stage ${index < RELAY_LEGS.length - 1 ? 'has-next' : ''}`}
-              data-testid={`relay-stage-${leg.toLowerCase()}`}
-            >
-              <span className={`relay-stage-head den-tag ${LEG_TONES[leg] ?? 'muted'}`} title={relay.hint}>
-                {relay.label}
-              </span>
-              {badge && (
-                <span className={`relay-stage-badge den-tag ${badge.cls}`} title={`Latest submission: ${badge.label}`}>
-                  {latest?.status === 'SUBMITTED' ? <Clock3 size={9} /> : latest?.status === 'APPROVED' ? <CheckCircle2 size={9} /> : <XCircle size={9} />}
-                  {badge.label}
+      <div className="tt-wrap">
+        <div className="tt-labels">
+          {rows.map((row) => {
+            const status = TT_STATUS[row.status];
+            const isFile = isFileSubmission(row);
+            return (
+              <div
+                key={row.id}
+                className={`tt-row ${status?.cls ?? ''}`}
+                title={isFile ? fileSubmissionParts(row).message ?? undefined : row.note || undefined}
+              >
+                <span className={`tt-letter ${status?.cls ?? ''}`} data-testid={`tt-letter-${row.id}`}>
+                  {tagBy.get(row.id)}
                 </span>
-              )}
-              <div className="relay-versions">
-                {versions.length === 0 ? (
-                  <span className="relay-empty">no versions yet</span>
-                ) : (
-                  [...versions]
-                    .reverse()
-                    .map((version) => (
-                      <span
-                        key={version.id}
-                        className={`relay-version ${version.id === headVersion?.id ? 'is-head' : ''}`}
-                        title={`v${version.version}${version.message ? ` — ${version.message}` : ''}`}
-                      >
-                        <b>v{version.version}</b>
-                        {version.id === headVersion?.id && <em>head</em>}
-                      </span>
-                    ))
-                )}
+                <span className="tt-meta">
+                  <b className="truncate">{legLabel(row.leg)}</b>
+                  <small className="truncate">
+                    {isFile ? fileSubmissionParts(row).fileName : status?.label}
+                  </small>
+                </span>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+
+        <div className="tt-graph" style={{ width: graphWidth, height: rows.length * TT_ROW_H }} data-testid="timeline-tree-graph">
+          {/* The main trunk — approved hand-ins merged into the timeline. */}
+          <span className="tt-line tt-trunk" style={{ left: TT_TRUNK_X, top: 0, height: '100%' }} />
+          {/* Open branches: each awaiting hand-in keeps a dashed lane rising
+              from its submission point toward the top (still not merged). */}
+          {pendingRows.map((row) => {
+            const lane = laneBy.get(row.id)!;
+            const branchY = centerY(row.id);
+            const x = laneX(lane);
+            return (
+              <span key={row.id}>
+                <span className="tt-line tt-lane" style={{ left: x, top: 0, height: branchY }} />
+                <span className="tt-elbow tt-elbow-pending" style={{ top: branchY - 1, left: TT_TRUNK_X, width: x - TT_TRUNK_X }} />
+                <span className="tt-dot tt-dot-pending" style={{ top: branchY - TT_DOT / 2, left: x - TT_DOT / 2 }} />
+              </span>
+            );
+          })}
+          {/* Merged / rejected nodes sit at their own row on the trunk. */}
+          {rows.map((row) => {
+            const y = centerY(row.id);
+            if (row.status === 'APPROVED') {
+              return (
+                <span
+                  key={row.id}
+                  className="tt-dot tt-dot-approved"
+                  style={{ top: y - TT_DOT / 2, left: TT_TRUNK_X - TT_DOT / 2 }}
+                  data-testid={`tt-node-${row.id}`}
+                />
+              );
+            }
+            if (row.status === 'REJECTED') {
+              return (
+                <span key={row.id}>
+                  <span className="tt-elbow tt-elbow-rejected" style={{ top: y - 1, left: TT_TRUNK_X, width: deadEndX - TT_TRUNK_X }} />
+                  <span className="tt-dead" style={{ top: y - TT_DOT / 2, left: deadEndX - TT_DOT / 2 }}>
+                    <XCircle size={9} />
+                  </span>
+                </span>
+              );
+            }
+            return null;
+          })}
+        </div>
       </div>
       <p className="den-footnote mt-2">
-        Stages flow Selects → Cut → Sound → Finish → Thumbnail. A stage is added to this timeline
-        only when the Captain approves its submission.
+        The trunk grows upward as approvals merge — open dashed branches are still on the Captain&apos;s
+        desk, dead ends were sent back.
       </p>
     </div>
   );

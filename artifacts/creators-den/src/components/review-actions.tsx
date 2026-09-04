@@ -62,12 +62,7 @@ export function ReviewRemarkCard({
     <div className="paper-card" data-testid="review-oracle-card">
       <div className="inline-heading">
         <span className="eyebrow"><WandSparkles size={13} /> REMARK</span>
-        <span className="den-tag muted">improvement note</span>
       </div>
-      <p className="setting-copy">
-        Note what the submitter should improve — the AI polishes grammar and phrasing only;
-        it never changes what you asked for. Your remark travels with a rejection.
-      </p>
       <textarea
         className="review-oracle-note"
         value={note}
@@ -157,11 +152,7 @@ export function ReviewDecisionCard({
     <div className="paper-card" data-testid="review-decision-card">
       <div className="inline-heading">
         <span className="eyebrow"><CheckCircle2 size={13} /> Decision</span>
-        <span className="den-tag gold">captain only</span>
       </div>
-      <p className="setting-copy">
-        Accept merges this submission to the timeline — Reject sends it back <b>with your REMARK</b>.
-      </p>
       <div className="review-decision-buttons">
         <button
           type="button"
@@ -185,11 +176,6 @@ export function ReviewDecisionCard({
           {reject.isPending ? 'Rejecting…' : 'Reject'}
         </button>
       </div>
-      {!note.trim() && (
-        <p className="setting-copy mt-2" data-testid="review-reject-hint">
-          Write your REMARK above to unlock Reject.
-        </p>
-      )}
       {error && (
         <p className="setting-copy mt-2" role="alert" data-testid="review-decision-error">
           {error.response?.data?.error || 'The decision could not be saved.'}

@@ -3507,7 +3507,6 @@ select optgroup {
 @media (max-width: 1240px) {
   .review-bottom-row { grid-template-columns: 1fr; }
   .review-submission-card { flex: none; max-height: 320px; }
-  .review-rail-notes { flex: none; max-height: 340px; }
 }
 
 /* ---- Preview responsive ---- */
@@ -4436,9 +4435,8 @@ select optgroup {
 
 /* ---- Captain review workbench (preview/video-style template) ---- */
 /* The workbench is a preview-page column: a slim toolbar row, then the
-   60/40-ish canvas|description top row, then the bottom row split into the
-   Decision and REMARK cards (in place of the preview pages' carousel). */
-.review-page { gap: 10px; }
+   canvas | description top row (the exact preview-page grid), then the bottom
+   row split into the Decision and REMARK cards (in place of the carousel). */
 .review-toolbar {
   flex: 0 0 auto;
   display: flex;
@@ -4449,18 +4447,14 @@ select optgroup {
 .review-toolbar .link-btn { white-space: nowrap; }
 .review-toolbar .mono-label { min-width: 0; }
 
-/* The right rail keeps the description front and centre, with the PR review
-   notes below it — both scroll on their own inside the fixed column. */
+/* The right rail holds just the submitter's message, filling the column and
+   scrolling on its own inside the fixed grid — like the notes wall does on
+   the preview pages. */
 .review-submission-card {
   flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-}
-.review-rail-notes {
-  flex: 1 1 0;
-  min-height: 0;
   overflow-y: auto;
 }
 .review-description-file {
@@ -4501,10 +4495,6 @@ select optgroup {
   align-items: stretch;
 }
 .review-bottom-row > .paper-card { min-width: 0; }
-
-/* On shorter canvases the notes wall stays inside its rail; the file-hold and
-   media cards must not fight the fixed page height. */
-.review-page .pv-canvas-col .pv-stage { min-height: 0; }
 
 /* ---- Account panels: workspace storage bar + CV card (profile page) ---- */
 .account-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 26px; }
@@ -5003,4 +4993,103 @@ select optgroup {
 .relay-empty {
   font-size: 10.5px; color: hsl(var(--muted-foreground) / .7);
   padding: 8px 0; text-align: center;
+}
+
+/* ---- Project timeline tree — vertical branch line (down → up, A/B/C tags) ----
+   The timeline is a commit-style graph: the main trunk grows upward as
+   hand-ins are approved, awaiting hand-ins are open dashed branches, and
+   sent-back hand-ins are dead ends. Each hand-in carries a unique letter tag
+   (A, B, C … AA, AB …) in submission order. */
+.tt-wrap {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+  min-width: 0;
+}
+.tt-labels {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tt-row {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.tt-letter {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font: 800 10px var(--app-font-mono);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22);
+}
+.tt-letter.on { background: hsl(155 55% 38%); }
+.tt-letter.pending { background: hsl(var(--sidebar-primary)); }
+.tt-letter.rejected { background: hsl(var(--destructive)); }
+.tt-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.tt-meta b {
+  color: hsl(var(--foreground));
+  font: 600 12px var(--app-font-sans);
+}
+.tt-meta small {
+  color: hsl(var(--muted-foreground));
+  font: 8.5px var(--app-font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.tt-graph {
+  position: relative;
+  flex: 0 0 auto;
+}
+.tt-line { position: absolute; }
+.tt-trunk {
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, hsl(var(--accent) / .9), hsl(155 55% 42%));
+  opacity: .85;
+}
+.tt-lane {
+  width: 0;
+  border-left: 2px dashed hsl(var(--sidebar-primary) / .85);
+}
+.tt-elbow {
+  position: absolute;
+  height: 2px;
+}
+.tt-elbow-pending { background: hsl(var(--sidebar-primary) / .8); }
+.tt-elbow-rejected { background: hsl(var(--destructive) / .8); }
+.tt-dot { position: absolute; border-radius: 999px; }
+.tt-dot-approved {
+  background: hsl(155 55% 38%);
+  box-shadow: 0 0 0 3px hsl(155 55% 38% / .25);
+}
+.tt-dot-pending {
+  width: 9px;
+  height: 9px;
+  background: hsl(var(--sidebar-primary));
+  box-shadow: 0 0 0 2px hsl(var(--sidebar-primary) / .3);
+}
+.tt-dead {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  color: hsl(var(--destructive));
+  border-radius: 999px;
+  background: hsl(var(--destructive) / .14);
 }
