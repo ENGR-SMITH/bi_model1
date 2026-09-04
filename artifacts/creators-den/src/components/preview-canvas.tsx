@@ -25,6 +25,11 @@
 // `submissionId` is the review-desk scope: when set, the timecode markers and
 // AnnotationCanvas pins only show notes that belong to THAT submission (the
 // preview studios leave it unset and show the leg's notes).
+//
+// `directAssetId` is the review desk's file-hand-in mode: a submit-for-review
+// upload is held as PENDING_REVIEW (no proxy row yet), so the canvas streams
+// the staged original straight off the server through the same players and
+// chrome as everything else — no proxy-readiness gate, no fallback juggling.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
@@ -61,6 +66,17 @@ interface StageCanvasBaseProps {
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
   /** Explicit vault asset to preview (picked from the timeline row). */
   vaultAssetId?: string | null;
+  /** A PENDING_REVIEW staged file (a submit-for-review hand-in) to preview
+   * straight off the server — same canvas chrome as a vault preview, but the
+   * staged original streams immediately (a pending file has no proxy to wait
+   * for). Wins over every other resolution. */
+  directAssetId?: string | null;
+  /** timelineVersionId recorded for NEW pins when `directAssetId` is set (the
+   * pending submission id) — the studios leave this unset. */
+  annotationTimelineVersionId?: string | null;
+  /** Leg used to scope annotations when there is no version object (vault /
+   * direct previews); defaults to the canvas's own leg. */
+  defaultLeg?: StudioLeg;
   /** The column-header annotation slot — the annotate pencil portals here. */
   annotationHeaderRef?: RefObject<HTMLDivElement | null>;
   /** Review-desk scope — only THIS submission's notes show as markers/pins. */
@@ -78,6 +94,9 @@ export function VideoStageCanvas({
   version,
   assets,
   vaultAssetId,
+  directAssetId,
+  annotationTimelineVersionId,
+  defaultLeg,
   seekRequest,
   annotationHeaderRef,
   submissionId,
@@ -86,6 +105,9 @@ export function VideoStageCanvas({
   /** A note-click seek from the comments rail — jumps the player to it. */
   seekRequest?: { ms: number; n: number } | null;
 }) {
+  // Direct mode — a staged file held for review streams without the proxy
+  // gate (and never polls: PENDING_REVIEW assets don't transition).
+  const direct = Boolean(directAssetId);
   const [playheadMs, setPlayheadMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -113,17 +135,19 @@ export function VideoStageCanvas({
   // A snapshot clip may reference an asset that is no longer in the vault
   // (or still processing) — validate against the project's assets so the
   // canvas always falls back to real, playable media. An explicitly picked
-  // vault file (from the timeline row) wins over everything.
+  // vault file (from the timeline row) wins over everything, and a staged
+  // file held for review (direct) beats even that.
   const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : '';
   const clipAssetId = activeClip?.assetId && assets.some((a) => a.id === activeClip.assetId) ? activeClip.assetId : '';
-  const assetId = explicitAsset || clipAssetId || fallback?.id || '';
+  const assetId = directAssetId || explicitAsset || clipAssetId || fallback?.id || '';
   const detail = useGetVideoAsset(projectId, assetId, {
     query: {
       queryKey: getGetVideoAssetQueryKey(projectId, assetId),
       enabled: Boolean(assetId),
       // Keep fetching until the proxy finishes, then stop on its own — same
-      // behaviour as the vault player.
-      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+      // behaviour as the vault player. Held-for-review files never process,
+      // so their detail is fetched once and never polled.
+      refetchInterval: direct ? false : (query) => pollWhileProcessing(query.state.data),
     },
   });
   const onSeek = (ms: number) => {
@@ -157,7 +181,7 @@ export function VideoStageCanvas({
       <div className="inline-heading">
         <span className="eyebrow"><Play size={13} /> Big canvas{version ? ` · ${version.leg} v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
-          {!version && <span className="den-tag teal">vault preview</span>}
+          {!version && (direct ? <span className="den-tag gold">held for review</span> : <span className="den-tag teal">vault preview</span>)}
           <span className="mono-label">{formatTimecode(playheadMs)}</span>
         </span>
       </div>
@@ -171,14 +195,15 @@ export function VideoStageCanvas({
             playheadMs={playheadMs}
             onTimeUpdate={setPlayheadMs}
             markers={markers}
+            directStreamUrl={direct ? proxyUrlFor(projectId, assetId) : undefined}
           >
             <AnnotationCanvas
               projectId={projectId}
-              leg={version?.leg ?? 'SELECTS'}
+              leg={version?.leg ?? defaultLeg ?? 'SELECTS'}
               assetId={assetId}
               playheadMs={playheadMs}
               onSeek={onSeek}
-              timelineVersionId={version?.id}
+              timelineVersionId={direct ? annotationTimelineVersionId ?? undefined : version?.id}
               submissionId={submissionId ?? undefined}
               headerRef={annotationHeaderRef}
               surfaceRef={stageRef}
@@ -206,6 +231,9 @@ export function AudioStageCanvas({
   version,
   assets,
   vaultAssetId,
+  directAssetId,
+  annotationTimelineVersionId,
+  defaultLeg,
   seekRequest,
   annotationHeaderRef,
   submissionId,
@@ -214,6 +242,9 @@ export function AudioStageCanvas({
   /** A note-click seek from the comments rail — jumps the player to it. */
   seekRequest?: { ms: number; n: number } | null;
 }) {
+  // Direct mode — a staged file held for review streams without the proxy
+  // gate (and never polls: PENDING_REVIEW assets don't transition).
+  const direct = Boolean(directAssetId);
   const [playheadMs, setPlayheadMs] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
   const comments = useListVideoComments(projectId);
@@ -247,14 +278,15 @@ export function AudioStageCanvas({
   // (from the timeline row) wins over everything.
   const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : undefined;
   const firstValid = (id?: string) => (id && assets.some((a) => a.id === id) ? id : undefined);
-  const assetId = explicitAsset ?? firstValid(clips[0]?.assetId) ?? firstValid(music[0]?.assetId) ?? firstValid(pickups[0]?.assetId) ?? fallback?.id ?? '';
+  const assetId = directAssetId ?? explicitAsset ?? firstValid(clips[0]?.assetId) ?? firstValid(music[0]?.assetId) ?? firstValid(pickups[0]?.assetId) ?? fallback?.id ?? '';
   const detail = useGetVideoAsset(projectId, assetId, {
     query: {
       queryKey: getGetVideoAssetQueryKey(projectId, assetId),
       enabled: Boolean(assetId),
       // Keep fetching until the proxy finishes, then stop on its own — same
-      // behaviour as the vault player.
-      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+      // behaviour as the vault player. Held-for-review files never process,
+      // so their detail is fetched once and never polled.
+      refetchInterval: direct ? false : (query) => pollWhileProcessing(query.state.data),
     },
   });
   const onSeek = (ms: number) => setPlayheadMs(ms);
@@ -288,7 +320,7 @@ export function AudioStageCanvas({
       <div className="inline-heading">
         <span className="eyebrow"><AudioLines size={13} /> Big canvas{version ? ` · SOUND v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
-          {!version && <span className="den-tag teal">vault preview</span>}
+          {!version && (direct ? <span className="den-tag gold">held for review</span> : <span className="den-tag teal">vault preview</span>)}
         </span>
       </div>
       <div className="pv-stage-player mt-2">
@@ -304,11 +336,11 @@ export function AudioStageCanvas({
           >
             <AnnotationCanvas
               projectId={projectId}
-              leg={version?.leg ?? 'SOUND'}
+              leg={version?.leg ?? defaultLeg ?? 'SOUND'}
               assetId={assetId}
               playheadMs={playheadMs}
               onSeek={onSeek}
-              timelineVersionId={version?.id}
+              timelineVersionId={direct ? annotationTimelineVersionId ?? undefined : version?.id}
               submissionId={submissionId ?? undefined}
               headerRef={annotationHeaderRef}
               surfaceRef={stageRef}
@@ -336,10 +368,16 @@ export function ThumbnailStageCanvas({
   version,
   assets,
   vaultAssetId,
+  directAssetId,
+  annotationTimelineVersionId,
+  defaultLeg,
   annotationHeaderRef,
   submissionId,
   emptyTitle = 'No thumbnail design in the vault yet.',
 }: StageCanvasBaseProps) {
+  // Direct mode — a staged design held for review streams without the proxy
+  // gate (and never polls: PENDING_REVIEW assets don't transition).
+  const direct = Boolean(directAssetId);
   const stageRef = useRef<HTMLDivElement>(null);
 
   const snap = version ? ((version.snapshot ?? null) as {
@@ -360,14 +398,14 @@ export function ThumbnailStageCanvas({
   // picked vault file (from the timeline row) wins over everything.
   const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : '';
   const designAssetId = design?.assetId && assets.some((a) => a.id === design.assetId) ? design.assetId : '';
-  const assetId = explicitAsset || designAssetId || fallback?.id || '';
+  const assetId = directAssetId || explicitAsset || designAssetId || fallback?.id || '';
 
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="thumbnail-canvas">
       <div className="inline-heading">
         <span className="eyebrow"><ImageIcon size={13} /> Big canvas{version ? ` · THUMBNAIL v${version.version}` : ''}</span>
         <span className="flex items-center gap-2">
-          {!version && <span className="den-tag teal">vault preview</span>}
+          {!version && (direct ? <span className="den-tag gold">held for review</span> : <span className="den-tag teal">vault preview</span>)}
         </span>
       </div>
       <div className="pv-stage-player mt-2">
@@ -375,10 +413,10 @@ export function ThumbnailStageCanvas({
           <ImageStage src={proxyUrlFor(projectId, assetId)}>
             <AnnotationCanvas
               projectId={projectId}
-              leg="THUMBNAIL"
+              leg={defaultLeg ?? 'THUMBNAIL'}
               assetId={assetId}
               playheadMs={null}
-              timelineVersionId={version?.id}
+              timelineVersionId={direct ? annotationTimelineVersionId ?? undefined : version?.id}
               submissionId={submissionId ?? undefined}
               headerRef={annotationHeaderRef}
               surfaceRef={stageRef}

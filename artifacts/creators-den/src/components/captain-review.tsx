@@ -10,30 +10,30 @@
 //       ThumbnailStageCanvas from preview-canvas), so the desk's media can
 //       never behave differently from the studios; above it sits the same
 //       Preview | Diff map toggle, comparing the submitted version against a
-//       chosen baseline.
+//       chosen baseline. A FILE hand-in (a submit-for-review upload held as
+//       PENDING_REVIEW) runs through the very same shared canvas in its
+//       direct mode and diffs against the leg's vault media — exactly like a
+//       studio previewing its newest upload.
 //     · right column, split 50 : 50 — the submitter's DESCRIPTION (the
 //       message they wrote when handing the stage in) on top, and the
 //       Captain's REMARK note directly below it.
 //   Bottom rows: the big Accept / Reject decision as two bare centered
 //   buttons under the canvas (no card), then the same timeline-versions strip
 //   the preview studios run under their canvas — clicking a version there
-//   switches the diff baseline the submission is compared against.
+//   switches the diff baseline the submission is compared against (for a file
+//   hand-in the strip lists the leg's vault media instead of versions).
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ArrowLeft, AudioLines, Image as ImageIcon, Play, Send } from 'lucide-react';
+import { ArrowLeft, Send } from 'lucide-react';
 import {
-  getGetVideoAssetQueryKey,
   getGetVideoTimelineVersionQueryKey,
-  useGetVideoAsset,
   useGetVideoProject,
   useGetVideoTimelineVersion,
-  useListVideoComments,
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
-import type { VideoAssetDetail, VideoSubmission } from '@workspace/api-client-react';
-import { AssetPlayer, ImageStage, proxyUrlFor } from '@/components/asset-preview';
-import { AnnotationCanvas } from '@/components/annotation-canvas';
+import type { VideoSubmission } from '@workspace/api-client-react';
+import { proxyUrlFor } from '@/components/asset-preview';
 import {
   AudioStageCanvas,
   ThumbnailStageCanvas,
@@ -43,15 +43,13 @@ import {
 import {
   DEFAULT_AUDIO_DIFF_SETTINGS,
   DEFAULT_DIFF_SETTINGS,
-  FullscreenButton,
   PreviewCanvasColumn,
+  VAULT_KIND_LABELS,
   VersionCarousel,
-  WaveformPlayer,
   type CarouselItem,
   type DiffSettings,
   type PreviewView,
 } from '@/components/preview-shared';
-import { formatTimecode } from '@/components/timeline';
 import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
 import { ReviewDecisionBar, ReviewRemarkCard } from '@/components/review-actions';
 import type { StudioLeg } from '@/components/role-oracle';
@@ -73,6 +71,13 @@ function legLabel(leg: string): string {
   return RELAY_LEGS.find((relay) => relay.leg === leg)?.label ?? leg;
 }
 
+/** The media flavour a leg's canvas + vault cards render (drives thumbnails). */
+function mediaKindFor(leg: StudioLeg): 'video' | 'audio' | 'image' {
+  if (leg === 'SOUND') return 'audio';
+  if (leg === 'THUMBNAIL') return 'image';
+  return 'video';
+}
+
 /** A file handed in for review carries `ASSET:<assetId>`; its note leads with
     the file name ("golden-a.mp4 — Best angle of the hero shot."). */
 function fileSubmissionParts(submission: VideoSubmission): { fileName: string; message: string } {
@@ -84,21 +89,23 @@ function fileSubmissionParts(submission: VideoSubmission): { fileName: string; m
   };
 }
 
-type Marker = { id: string; ms: number; tone: 'danger' | 'teal'; label?: string };
-
 // ---------------------------------------------------------------------------
-// ReviewMediaStage — the Big canvas for a VERSION submission. This is a thin
-// wrapper over the SAME shared stage canvases the preview studios run
-// (preview-canvas.tsx), scoped to the review:
-//   · the version object is the submitted version (submission.timelineVersionId),
-//   · `submissionId` makes the shared canvas show only THIS submission's
-//     notes as markers/pins instead of the whole leg's notes,
-//   · the empty-state wording stays review-specific ("…in this hand-in yet.").
-// There is deliberately NO canvas logic here anymore — it lives once, in the
-// shared component the working video/audio/thumbnail studios render.
+// ReviewStage — the Big canvas for a REVIEW submission, rendered from the SAME
+// shared stage canvases the preview studios run (preview-canvas.tsx), scoped
+// to the review:
+//   · a VERSION submission hands the submitted version (its timeline
+//     snapshot) in — the canvas validates the snapshot's clip/design against
+//     the vault exactly like the studios,
+//   · a FILE submission (submit-for-review uploads held as PENDING_REVIEW)
+//     hands the staged asset in via `directAssetId` — there is no snapshot
+//     yet, so the shared canvas streams the staged original straight off the
+//     server in its vault-preview chrome, badge reading "held for review".
+// `submissionId` makes the shared canvas show only THIS submission's notes as
+// markers/pins. There is deliberately NO canvas logic here — it lives once, in
+// the shared component the working video/audio/thumbnail studios render.
 // ---------------------------------------------------------------------------
 
-function ReviewMediaStage({
+function ReviewStage({
   projectId,
   submission,
   leg,
@@ -106,6 +113,8 @@ function ReviewMediaStage({
   snapshot,
   assets,
   annotationHeaderRef,
+  directAssetId = null,
+  directAnnotationVersionId = null,
 }: {
   projectId: string;
   submission: VideoSubmission;
@@ -117,6 +126,11 @@ function ReviewMediaStage({
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
   /** The annotate pencil portals here (shared with the diff map's pencil). */
   annotationHeaderRef: RefObject<HTMLDivElement | null>;
+  /** PENDING_REVIEW staged file to preview directly (file hand-ins). */
+  directAssetId?: string | null;
+  /** timelineVersionId recorded for new pins in direct (file) mode — the
+      pending submission id, exactly like the legacy file canvas wrote. */
+  directAnnotationVersionId?: string | null;
 }) {
   const stageVersion: StageCanvasVersion | null =
     version == null
@@ -133,148 +147,21 @@ function ReviewMediaStage({
       : leg === 'THUMBNAIL'
         ? 'No design in this hand-in yet.'
         : 'No video in this hand-in yet.';
-  const common = {
+  const shared = {
     projectId,
     version: stageVersion,
     assets,
     annotationHeaderRef,
     submissionId: submission.id,
+    directAssetId,
+    annotationTimelineVersionId: directAnnotationVersionId || null,
+    defaultLeg: leg,
     emptyTitle,
   };
 
-  if (leg === 'SOUND') return <AudioStageCanvas {...common} />;
-  if (leg === 'THUMBNAIL') return <ThumbnailStageCanvas {...common} />;
-  return <VideoStageCanvas {...common} />;
-}
-
-// ---------------------------------------------------------------------------
-// ReviewFileStage — the Big canvas for a FILE submission (submit-for-review
-// uploads held as PENDING_REVIEW). The staged original streams straight from
-// the server (the proxy route now serves pending files to members) so the
-// Captain reviews the actual submission in the same canvas as everything else.
-// There is no snapshot to diff yet — the toggle simply stays on Preview, and
-// Accept moves the file into the vault / Reject deletes it.
-// ---------------------------------------------------------------------------
-
-function ReviewFileStage({
-  projectId,
-  submission,
-  leg,
-  assetId,
-  detail,
-  annotationHeaderRef,
-}: {
-  projectId: string;
-  submission: VideoSubmission;
-  leg: StudioLeg;
-  /** The staged pending asset id (from the `ASSET:` sentinel). */
-  assetId: string;
-  detail?: VideoAssetDetail;
-  annotationHeaderRef: RefObject<HTMLDivElement | null>;
-}) {
-  const [playheadMs, setPlayheadMs] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const comments = useListVideoComments(projectId);
-  const fileParts = fileSubmissionParts(submission);
-
-  // Media kind of the staged file drives the player (audio wave / image frame
-  // / video with its own native controls).
-  const kind = detail?.kind ?? '';
-  const mime = detail?.mimeType ?? '';
-  const isAudio = AUDIO_KINDS.has(kind);
-  const isImage = !isAudio && (IMAGE_KINDS.has(kind) || mime.startsWith('image/'));
-
-  const markers = useMemo<Marker[]>(
-    () =>
-      (comments.data ?? [])
-        .filter((c) => c.timecodeMs != null && c.submissionId === submission.id && c.assetId === assetId)
-        .map((c) => ({ id: c.id, ms: c.timecodeMs as number, tone: 'danger' as const, label: c.label ?? undefined })),
-    [comments.data, submission.id, assetId],
-  );
-
-  const directStreamUrl = proxyUrlFor(projectId, assetId);
-
-  return (
-    <div className="paper-card pv-stage" ref={stageRef} data-testid="captain-review-file">
-      <div className="inline-heading">
-        <span className="eyebrow">
-          {isAudio ? <AudioLines size={13} /> : isImage ? <ImageIcon size={13} /> : <Play size={13} />}
-          Big canvas · {fileParts.fileName}
-        </span>
-        {!isAudio && !isImage && (
-          <span className="mono-label">{formatTimecode(playheadMs)}</span>
-        )}
-      </div>
-      <div className="pv-stage-player mt-2">
-        {isImage ? (
-          <ImageStage src={directStreamUrl}>
-            <AnnotationCanvas
-              projectId={projectId}
-              leg={leg}
-              assetId={assetId}
-              playheadMs={null}
-              timelineVersionId={submission.timelineVersionId}
-              submissionId={submission.id}
-              headerRef={annotationHeaderRef}
-              surfaceRef={stageRef}
-              glowPins
-            />
-            <FullscreenButton targetRef={stageRef} />
-          </ImageStage>
-        ) : isAudio ? (
-          <WaveformPlayer
-            projectId={projectId}
-            assetId={assetId}
-            detail={detail}
-            playheadMs={playheadMs}
-            onTimeUpdate={setPlayheadMs}
-            onPlayheadChange={setPlayheadMs}
-            markers={markers}
-          >
-            <AnnotationCanvas
-              projectId={projectId}
-              leg={leg}
-              assetId={assetId}
-              playheadMs={playheadMs}
-              onSeek={setPlayheadMs}
-              timelineVersionId={submission.timelineVersionId}
-              submissionId={submission.id}
-              headerRef={annotationHeaderRef}
-              surfaceRef={stageRef}
-              dropLine
-            />
-            <FullscreenButton targetRef={stageRef} />
-          </WaveformPlayer>
-        ) : (
-          <AssetPlayer
-            projectId={projectId}
-            assetId={assetId}
-            detail={detail}
-            videoRef={videoRef}
-            playheadMs={playheadMs}
-            onTimeUpdate={setPlayheadMs}
-            markers={markers}
-            directStreamUrl={directStreamUrl}
-          >
-            <AnnotationCanvas
-              projectId={projectId}
-              leg={leg}
-              assetId={assetId}
-              playheadMs={playheadMs}
-              onSeek={setPlayheadMs}
-              timelineVersionId={submission.timelineVersionId}
-              submissionId={submission.id}
-              headerRef={annotationHeaderRef}
-              surfaceRef={stageRef}
-              timecodeReveal
-              glowPins
-            />
-          </AssetPlayer>
-        )}
-      </div>
-    </div>
-  );
+  if (leg === 'SOUND') return <AudioStageCanvas {...shared} />;
+  if (leg === 'THUMBNAIL') return <ThumbnailStageCanvas {...shared} />;
+  return <VideoStageCanvas {...shared} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -303,9 +190,9 @@ export function CaptainReviewSurface({
 }) {
   const project = useGetVideoProject(projectId);
   const leg = submission.leg as StudioLeg;
-  // A file handed in for review carries an `ASSET:<assetId>` sentinel — there
-  // is no snapshot to play or diff until the Captain decides (accept moves it
-  // into the vault, reject deletes it and sends it back).
+  // A file handed in for review carries an `ASSET:<assetId>` sentinel — it has
+  // no timeline snapshot; the staged original is what the Captain reviews
+  // until the decision (accept moves it into the vault, reject deletes it).
   const isAssetSubmission = submission.timelineVersionId.startsWith('ASSET:');
   const pendingAssetId = isAssetSubmission ? submission.timelineVersionId.slice('ASSET:'.length) : '';
   const fileParts = isAssetSubmission ? fileSubmissionParts(submission) : null;
@@ -319,18 +206,43 @@ export function CaptainReviewSurface({
   });
   const legVersions = useListVideoTimelineVersions(projectId, leg);
 
-  // The staged pending file's detail — only for file submissions (it has no
-  // proxy row and never transitions to PROCESSED, so no polling loop).
-  const pendingDetail = useGetVideoAsset(projectId, pendingAssetId, {
-    query: {
-      queryKey: getGetVideoAssetQueryKey(projectId, pendingAssetId),
-      enabled: isAssetSubmission && Boolean(pendingAssetId),
-    },
-  });
+  // ---- The media this review is about. The project vault's assets of the
+  // leg's kinds feed the canvases' fallbacks, the diff pool for a FILE
+  // hand-in (only PROCESSED files have a proxy the split-screen map can
+  // stream), and the strip below the canvas. Playable (PROCESSED) files
+  // first, newest first, and no pending-review uploads: nothing may ever try
+  // to stream a proxy that can't exist yet, which is what made the desk's
+  // canvas 404 while the same footage played fine in the vault. ----
+  const assets = project.data?.assets ?? [];
+  const mediaKinds = leg === 'SOUND' ? AUDIO_KINDS : leg === 'THUMBNAIL' ? IMAGE_KINDS : VIDEO_KINDS;
+  const fallbackAssetIds = useMemo(
+    () =>
+      assets
+        .filter((a) => mediaKinds.has(a.kind) && a.status !== 'PENDING_REVIEW')
+        .sort((a, b) => {
+          const playable = (x: { status: string }) => (x.status === 'PROCESSED' ? 0 : 1);
+          return playable(a) - playable(b) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        })
+        .map((a) => a.id),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [assets],
+  );
+  const processedMediaAssets = useMemo(
+    () =>
+      assets
+        .filter((a) => mediaKinds.has(a.kind) && a.status === 'PROCESSED')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [assets, leg],
+  );
 
-  // ---- The diff map: the submitted version vs a chosen baseline (defaults
-  // to the leg's head — the last approved version). The version strip below
-  // the canvas can pick any other version as the baseline. ----
+  // ---- The diff map: the submitted item vs a chosen baseline. Version
+  // submissions compare against a timeline version (defaults to the leg's
+  // head — the last approved version); FILE submissions compare the staged
+  // file against a vault file of the leg (defaults to the newest processed
+  // one — the studio's "newest upload vs its older sibling" behaviour). The
+  // strip below the canvas can pick any other version / vault file as the
+  // baseline. ----
   const audioLeg = leg === 'SOUND';
   const [view, setView] = useState<PreviewView>('preview');
   const [diffSettings, setDiffSettings] = useState<DiffSettings>(
@@ -340,7 +252,37 @@ export function CaptainReviewSurface({
   const baselineId = baselineVersionId ?? headVersionId;
 
   const diffVersions = useMemo<PreviewDiffSelection[]>(() => {
-    if (isAssetSubmission) return [];
+    if (isAssetSubmission) {
+      // The staged file vs the picked vault baseline — an explicit pair (the
+      // file selection's parentVersionId names the baseline), so picking any
+      // vault card below the canvas switches exactly what the hand-in is
+      // compared against, just like the version desk switches baselines.
+      const baseline =
+        (baselineVersionId ? processedMediaAssets.find((a) => a.id === baselineVersionId) ?? null : null) ??
+        processedMediaAssets[0] ??
+        null;
+      if (!baseline) return [];
+      const submissionName = fileParts?.fileName ?? 'Submitted file';
+      return [
+        {
+          key: `asset-${baseline.id}`,
+          id: baseline.id,
+          leg,
+          kind: 'asset',
+          createdAt: baseline.createdAt,
+          label: baseline.fileName,
+        },
+        {
+          key: `file-${pendingAssetId}`,
+          id: pendingAssetId,
+          leg,
+          kind: 'asset',
+          parentVersionId: baseline.id,
+          createdAt: submission.createdAt,
+          label: submissionName,
+        },
+      ];
+    }
     const rows = legVersions.data ?? [];
     const submitted = rows.find((v) => v.id === submission.timelineVersionId);
     const baseline = baselineId ? rows.find((v) => v.id === baselineId) : null;
@@ -369,57 +311,65 @@ export function CaptainReviewSurface({
         createdAt: submitted.createdAt,
       },
     ];
-  }, [isAssetSubmission, baselineId, legVersions.data, leg, submission.timelineVersionId]);
+  }, [isAssetSubmission, baselineId, baselineVersionId, processedMediaAssets, fileParts, pendingAssetId, legVersions.data, leg, submission.timelineVersionId, submission.createdAt]);
 
   const activeSelection: PreviewDiffSelection | null = diffVersions[1] ?? null;
   const hasDiff = Boolean(activeSelection && predecessorOf(diffVersions, activeSelection));
 
   // Open the column on the diff map when a comparison exists (the preview
-  // studios do the same), otherwise keep the plain preview.
+  // studios do the same), otherwise keep the plain preview. Waits until the
+  // compare data has actually resolved: the submitted version list for
+  // version hand-ins, the project vault for file hand-ins.
   const viewInitializedRef = useRef(false);
   useEffect(() => {
     if (viewInitializedRef.current) return;
-    if (isAssetSubmission || (legVersions.data?.length ?? 0) === 0) return;
+    if (isAssetSubmission ? !project.data : (legVersions.data?.length ?? 0) === 0) return;
     viewInitializedRef.current = true;
     setView(hasDiff ? 'diff' : 'preview');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasDiff, isAssetSubmission, legVersions.data?.length]);
+  }, [hasDiff, isAssetSubmission, legVersions.data?.length, project.data]);
   // If the picked baseline suddenly has nothing to compare (e.g. the submitted
   // version itself was picked), fall back to the plain preview.
   useEffect(() => {
     if (!hasDiff) setView('preview');
   }, [hasDiff]);
 
-  // Fallback assets of the right media kind — for the diff map when either
-  // snapshot references no explicit clip/design (or references media that
-  // left the vault). Playable (PROCESSED) files first, newest first, and no
-  // pending-review uploads: the diff must never try to stream a proxy that
-  // can't exist yet, which is what made the desk's canvas 404 while the same
-  // footage played fine in the vault.
-  const assets = project.data?.assets ?? [];
-  const mediaKinds = leg === 'SOUND' ? AUDIO_KINDS : leg === 'THUMBNAIL' ? IMAGE_KINDS : VIDEO_KINDS;
-  const fallbackAssetIds = useMemo(
-    () =>
-      assets
-        .filter((a) => mediaKinds.has(a.kind) && a.status !== 'PENDING_REVIEW')
-        .sort((a, b) => {
-          const playable = (x: { status: string }) => (x.status === 'PROCESSED' ? 0 : 1);
-          return playable(a) - playable(b) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        })
-        .map((a) => a.id),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [assets],
-  );
-
   const versionNo = version.data?.version ?? null;
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
 
   // The timeline-versions strip under the canvas — the same row the preview
   // studios run. The submitted card is the active one; picking any other card
-  // makes the diff map compare the submission against that version instead of
-  // the leg's head. (File submissions have no version to pin, so no strip.)
+  // makes the diff map compare the submission against that version / vault
+  // file instead of the default baseline. (A FILE submission has no version
+  // to pin, so the strip leads with the hand-in's own card, then lists the
+  // leg's vault media files as the pickable baselines.)
   const carouselItems = useMemo<CarouselItem[]>(() => {
-    if (isAssetSubmission) return [];
+    if (isAssetSubmission) {
+      const media = mediaKindFor(leg);
+      return [
+        {
+          key: `file-${pendingAssetId}`,
+          kind: 'asset',
+          id: pendingAssetId,
+          fileName: fileParts?.fileName ?? 'Submitted file',
+          kindLabel: `${legLabel(leg)} hand-in`,
+          status: 'PENDING_REVIEW',
+          media,
+          statusTag: 'held for review',
+          statusLine: 'awaiting your review',
+        },
+        ...processedMediaAssets.map((a) => ({
+          key: `asset-${a.id}`,
+          kind: 'asset' as const,
+          id: a.id,
+          fileName: a.fileName,
+          kindLabel: VAULT_KIND_LABELS[a.kind] ?? a.kind,
+          status: a.status,
+          media,
+          thumbUrl: proxyUrlFor(projectId, a.id),
+        })),
+      ];
+    }
     return (legVersions.data ?? [])
       .map((v) => ({
         key: `version-${v.id}`,
@@ -433,9 +383,19 @@ export function CaptainReviewSurface({
       }))
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAssetSubmission, legVersions.data, leg, headVersionId]);
+  }, [isAssetSubmission, pendingAssetId, fileParts, processedMediaAssets, legVersions.data, leg, headVersionId, projectId]);
 
   const onVersionStripSelect = (key: string) => {
+    // A FILE hand-in's strip: vault cards pick the compare baseline; the
+    // submitted file's own card returns to the default (newest vault media).
+    if (key.startsWith('asset-')) {
+      setBaselineVersionId(key.slice('asset-'.length));
+      return;
+    }
+    if (key.startsWith('file-')) {
+      setBaselineVersionId(null);
+      return;
+    }
     if (!key.startsWith('version-')) return;
     const id = key.slice('version-'.length);
     // Clicking the submitted card again returns to the leg's head baseline.
@@ -444,19 +404,24 @@ export function CaptainReviewSurface({
 
   let canvasBody: ReactNode;
   if (isAssetSubmission) {
+    // A file hand-in has no snapshot — the shared canvas previews the staged
+    // original straight off the server (direct mode, badge "held for review").
     canvasBody = (
-      <ReviewFileStage
+      <ReviewStage
         projectId={projectId}
         submission={submission}
         leg={leg}
-        assetId={pendingAssetId}
-        detail={pendingDetail.data}
+        version={null}
+        snapshot={null}
+        assets={assets}
         annotationHeaderRef={annotationHeaderRef}
+        directAssetId={pendingAssetId}
+        directAnnotationVersionId={submission.timelineVersionId}
       />
     );
   } else {
     canvasBody = (
-      <ReviewMediaStage
+      <ReviewStage
         projectId={projectId}
         submission={submission}
         leg={leg}
@@ -547,7 +512,7 @@ export function CaptainReviewSurface({
         <div className="pv-versions-row">
           <VersionCarousel
             items={carouselItems}
-            activeKey={`version-${submission.timelineVersionId}`}
+            activeKey={isAssetSubmission ? `file-${pendingAssetId}` : `version-${submission.timelineVersionId}`}
             onSelect={onVersionStripSelect}
             emptyText={`No ${legLabel(leg)} versions saved on the timeline yet.`}
           />
