@@ -1,22 +1,21 @@
 // ---------------------------------------------------------------------------
-// CaptainReviewSurface — the Captain's review workbench, restructured on the
-// preview/video template:
+// CaptainReviewSurface — the Captain's review workbench, matching the
+// preview/video template pixel-for-pixel in the top area:
 //
 //   Top row  — the SAME two-column template as the preview pages:
 //     · left column: the Big canvas with the Preview | Diff map toggle (and
-//       diff settings) above it — the submitted version plays with review
-//       pins scoped to this pull request, and the diff map compares it
-//       against the leg's head baseline.
-//     · right column: instead of the pin/comment wall, the DESCRIPTION the
-//       submitter wrote when handing the stage in (plus the PR review notes
-//       dropped on the canvas, so pins stay visible).
+//       diff settings) above it — exactly the preview/video canvas (media +
+//       timecode + markers + pins), comparing the submitted version against
+//       the leg's head baseline.
+//     · right column: the submitter's DESCRIPTION — the message they wrote
+//       when handing the stage in.
 //   Bottom row (where the preview pages run the version carousel) — split
 //     into two cards: the big Accept / Reject decision on the left and the
-//     REMARK (improvement note, AI-polished) on the right.
+//     REMARK note on the right.
 // ---------------------------------------------------------------------------
 
 import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ArrowLeft, AudioLines, Clapperboard, FileUp, GitPullRequest, MessageSquare, Play, Send } from 'lucide-react';
+import { ArrowLeft, AudioLines, Clapperboard, FileUp, GitPullRequest, Play, Send } from 'lucide-react';
 import {
   getGetVideoAssetQueryKey,
   getGetVideoTimelineVersionQueryKey,
@@ -37,11 +36,11 @@ import {
   type DiffSettings,
   type PreviewView,
 } from '@/components/preview-shared';
+import { formatTimecode } from '@/components/timeline';
 import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
 import { ReviewDecisionCard, ReviewRemarkCard } from '@/components/review-actions';
 import type { StudioLeg } from '@/components/role-oracle';
 import { RELAY_LEGS } from '@/components/shell';
-import { reviewerColor, reviewerLabel } from '@/lib/annotations';
 
 const VIDEO_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE']);
 const AUDIO_KINDS = new Set(['RAW_AUDIO', 'VO_PICKUP']);
@@ -59,18 +58,6 @@ function legLabel(leg: string): string {
   return RELAY_LEGS.find((relay) => relay.leg === leg)?.label ?? leg;
 }
 
-function timeAgo(iso: string | Date): string {
-  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
 /** A file handed in for review carries `ASSET:<assetId>`; its note leads with
     the file name ("golden-a.mp4 — Best angle of the hero shot."). */
 function fileSubmissionParts(submission: VideoSubmission): { fileName: string; message: string } {
@@ -83,11 +70,13 @@ function fileSubmissionParts(submission: VideoSubmission): { fileName: string; m
 }
 
 // ---------------------------------------------------------------------------
-// The media stage — one version's clips/designs playing with review pins.
-// Matches the preview pages' canvas: video plays in the frame player (audio
-// legs in the waveform player, THUMBNAIL as a design frame), pins drop
-// scoped to this submission and land on the review-notes rail.
+// The media stage — the same Big canvas as the preview/video page: the
+// version's media plays in the frame player (audio legs in the waveform
+// player, THUMBNAIL as a design frame) with the playhead timecode in the
+// card header, review pins on the frame, and timecode markers under it.
 // ---------------------------------------------------------------------------
+
+type Marker = { id: string; ms: number; tone: 'danger' | 'teal'; label?: string };
 
 function ReviewMediaStage({
   projectId,
@@ -96,6 +85,7 @@ function ReviewMediaStage({
   detail,
   leg,
   isAudio,
+  version,
   playheadMs,
   onSeek,
   annotationHeaderRef,
@@ -108,23 +98,25 @@ function ReviewMediaStage({
   leg: StudioLeg;
   /** Whether the resolved asset is an audio file (waveform view). */
   isAudio: boolean;
+  /** Submitted version number (v2, v3…) for the canvas label. */
+  version: number | null;
   playheadMs: number;
   onSeek: (ms: number) => void;
   /** The annotate pencil portals here (shared with the diff map's pencil). */
   annotationHeaderRef: RefObject<HTMLDivElement | null>;
-  /** Review markers: this PR's timecode comments on the asset. */
-  markers: Array<{ id: string; ms: number; tone: 'accent' | 'gold' | 'danger' | 'teal' | 'muted'; label?: string }>;
+  /** Review markers: this PR's timecode comments + clip boundaries. */
+  markers: Marker[];
 }) {
   return (
     <div className="paper-card pv-stage" data-testid="captain-review-media">
       <div className="inline-heading">
         <span className="eyebrow">
           {isAudio ? <AudioLines size={13} /> : leg === 'THUMBNAIL' ? <Clapperboard size={13} /> : <Play size={13} />}
-          Big canvas · {legLabel(leg)}
+          Big canvas · {legLabel(leg)}{version ? ` v${version}` : ''}
         </span>
-        <span className="flex items-center gap-2">
-          <span className="den-tag gold">submitted for review</span>
-        </span>
+        {leg !== 'THUMBNAIL' && (
+          <span className="mono-label">{formatTimecode(playheadMs)}</span>
+        )}
       </div>
       <div className="pv-stage-player mt-2">
         {leg === 'THUMBNAIL' ? (
@@ -222,7 +214,6 @@ export function CaptainReviewSurface({
   const project = useGetVideoProject(projectId);
   const comments = useListVideoComments(projectId);
   const leg = submission.leg as StudioLeg;
-  const isPending = submission.status === 'SUBMITTED';
   // A file handed in for review carries an `ASSET:<assetId>` sentinel — there
   // is no snapshot to play or diff until the Captain decides (accept moves it
   // into the vault, reject deletes it and sends it back).
@@ -243,8 +234,8 @@ export function CaptainReviewSurface({
   type ReviewSnapshot = {
     clips?: Array<{ id?: string; assetId?: string; inMs: number; outMs: number }>;
     designs?: Array<{ assetId?: string }>;
-    music?: Array<{ id?: string; assetId?: string }>;
-    pickups?: Array<{ id?: string; assetId?: string }>;
+    music?: Array<{ id?: string; assetId?: string; inMs?: number; outMs?: number }>;
+    pickups?: Array<{ id?: string; assetId?: string; timeMs?: number }>;
   };
   const snapshot = (version.data?.snapshot ?? null) as ReviewSnapshot | null;
   const clips = useMemo(() => (Array.isArray(snapshot?.clips) ? snapshot!.clips! : []), [snapshot]);
@@ -286,20 +277,21 @@ export function CaptainReviewSurface({
   const onSeek = (ms: number) => setPlayheadMs(ms);
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
 
-  // Review markers on the media: this PR's timecode comments on the current
-  // asset, drawn as a clickable rail under the frame.
-  const markers = useMemo(
-    () =>
-      (comments.data ?? [])
-        .filter((comment) => comment.timecodeMs !== null && comment.submissionId === submission.id && comment.assetId === assetId)
-        .map((comment) => ({
-          id: comment.id,
-          ms: comment.timecodeMs as number,
-          tone: comment.kind === 'MARK' ? ('gold' as const) : ('accent' as const),
-          label: comment.label ?? undefined,
-        })),
-    [comments.data, submission.id, assetId],
-  );
+  // Timecode markers under the media, exactly like the preview pages: red
+  // ticks for this PR's comments on the asset + teal ticks at clip boundaries.
+  const markers = useMemo<Marker[]>(() => {
+    const list: Marker[] = [];
+    for (const comment of comments.data ?? []) {
+      if (comment.timecodeMs == null || comment.submissionId !== submission.id || comment.assetId !== assetId) continue;
+      list.push({ id: `note-${comment.id}`, ms: comment.timecodeMs, tone: 'danger' });
+    }
+    clips.forEach((clip, index) => list.push({ id: `clip-${index}`, ms: clip.inMs, tone: 'teal' }));
+    if (leg === 'SOUND') {
+      soundMusic.forEach((track, index) => list.push({ id: `music-${index}`, ms: track.inMs ?? 0, tone: 'teal' }));
+      soundPickups.forEach((pickup, index) => list.push({ id: `pickup-${index}`, ms: pickup.timeMs ?? 0, tone: 'danger' }));
+    }
+    return list;
+  }, [comments.data, submission.id, assetId, clips, leg, soundMusic, soundPickups]);
 
   // ---- The diff map: the submitted version vs the leg's head baseline ----
   const audioLeg = leg === 'SOUND';
@@ -350,39 +342,21 @@ export function CaptainReviewSurface({
     [assets],
   );
 
-  // The right rail: who/what was submitted (the DESCRIPTION), then the PR
-  // review notes dropped on the canvas — so pins stay visible while the
-  // description is the focus of the column.
-  const memberNameById = useMemo(
-    () => new Map((project.data?.members ?? []).map((member) => [member.userId, member.name])),
-    [project.data?.members],
-  );
-  const submitterName =
-    memberNameById.get(submission.submittedById) ?? submission.submittedById.slice(0, 8);
-  const railNotes = useMemo(
-    () => (comments.data ?? []).filter((comment) => comment.submissionId === submission.id),
-    [comments.data, submission.id],
-  );
   const versionNo = version.data?.version ?? null;
 
-  // A file held for review can't play or diff until a decision — the canvas
-  // column explains the hold instead.
+  // A file held for review can't play or diff until a decision.
   let canvasBody: ReactNode;
   if (isAssetSubmission) {
     canvasBody = (
       <div className="paper-card pv-stage" data-testid="captain-review-file">
         <div className="inline-heading">
           <span className="eyebrow"><FileUp size={13} /> {fileParts?.fileName}</span>
-          <span className="den-tag gold">awaiting your decision</span>
         </div>
-        <p className="setting-copy mt-3">
-          A file was handed in for review — it is held back from the vault until you decide.
-          <b> Accept</b> moves it into the project vault and starts processing it (proxy,
-          transcription, previews). <b>Reject</b> deletes the file and sends it back with your REMARK.
-        </p>
-        <p className="den-footnote mt-3">
-          There is nothing to preview or diff yet — the file stays private until your decision.
-        </p>
+        <div className="pv-stage-player mt-2">
+          <EmptyPlayer>
+            <p className="text-sm font-semibold">Held for your decision.</p>
+          </EmptyPlayer>
+        </div>
       </div>
     );
   } else if (!assetId) {
@@ -390,8 +364,7 @@ export function CaptainReviewSurface({
       <div className="paper-card pv-stage" data-testid="captain-review-empty">
         <div className="pv-stage-player">
           <EmptyPlayer>
-            <p className="text-sm font-semibold">This submission has no media to preview.</p>
-            <p className="text-xs opacity-70">Open the diff map below to review the pull request itself.</p>
+            <p className="text-sm font-semibold">No media to review in this hand-in.</p>
           </EmptyPlayer>
         </div>
       </div>
@@ -405,6 +378,7 @@ export function CaptainReviewSurface({
         detail={detail.data}
         leg={leg}
         isAudio={isAudio}
+        version={versionNo}
         playheadMs={playheadMs}
         onSeek={onSeek}
         annotationHeaderRef={annotationHeaderRef}
@@ -459,70 +433,22 @@ export function CaptainReviewSurface({
           />
         </div>
 
-        {/* Second column — the submitter's DESCRIPTION (replaces the preview
-            pages' comment wall), with the PR review notes beneath it. */}
+        {/* Second column — the submitter's DESCRIPTION: just the message they
+            wrote when handing the stage in. */}
         <div className="pv-notes-col">
-          <div className="paper-card review-submission-card" data-testid="captain-review-description">
+          <div className="paper-card review-submission-card pv-notes" data-testid="captain-review-description">
             <div className="inline-heading">
               <span className="eyebrow"><Send size={13} /> Submitted for review</span>
               <span className={`den-tag ${LEG_TONES[leg] ?? 'muted'}`}>{legLabel(leg)}</span>
             </div>
-            {isAssetSubmission ? (
+            {isAssetSubmission && (
               <div className="review-description-file">
-                <FileUp size={14} /> <b>{fileParts?.fileName}</b>
+                <FileUp size={13} /> <b>{fileParts?.fileName}</b>
               </div>
-            ) : (
-              <p className="setting-copy mt-1">
-                {legLabel(leg)} <b>v{versionNo ?? '…'}</b> handed in{headVersionId ? ' against the approved baseline' : ''}.
-              </p>
             )}
             <blockquote className="review-description-text">
-              {isAssetSubmission
-                ? fileParts?.message || 'No description was attached — just the file.'
-                : submission.note || 'No description was attached to this submission.'}
+              {isAssetSubmission ? fileParts?.message || '—' : submission.note || '—'}
             </blockquote>
-            <p className="den-footnote mt-2">
-              by <b>{submitterName}</b> · {timeAgo(submission.createdAt)}
-              {isPending ? ' · waiting on your decision' : ''}
-            </p>
-          </div>
-
-          <div className="paper-card pv-notes review-rail-notes" data-testid="captain-review-notes">
-            <div className="inline-heading">
-              <span className="eyebrow"><MessageSquare size={13} /> Review notes</span>
-              <span className="mono-label">{railNotes.length}</span>
-            </div>
-            {railNotes.length === 0 ? (
-              <p className="setting-copy mt-3">
-                No notes on this review yet — pin feedback straight on the media: the annotate
-                pencil sits in the canvas header above.
-              </p>
-            ) : (
-              <div className="den-stack mt-3">
-                {railNotes.map((comment) => {
-                  const color = reviewerColor(comment.authorId);
-                  return (
-                    <div key={comment.id} className={`list-row pv-comment-row ${comment.resolvedAt ? 'is-resolved' : ''}`} data-testid={`captain-review-note-${comment.id}`}>
-                      <span
-                        className="annotation-pin-dot"
-                        style={{ background: comment.resolvedAt ? 'hsl(150 52% 42%)' : color, width: 18, height: 18, fontSize: 9 }}
-                      >
-                        {reviewerLabel(comment.authorId)}
-                      </span>
-                      <span>
-                        <b className="mono-label !text-[9px]">
-                          <span style={{ color: comment.resolvedAt ? 'hsl(150 52% 42%)' : color }}>
-                            {memberNameById.get(comment.authorId) ?? comment.authorId.slice(0, 8)}
-                          </span>
-                          {comment.resolvedAt && <span className="den-tag resolved">resolved</span>}
-                        </b>
-                        <small className="!normal-case">{comment.body}</small>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       </div>
