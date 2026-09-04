@@ -4,9 +4,13 @@
 //
 //   Top row  — the SAME two-column template as the preview pages:
 //     · left column: the Big canvas with the Preview | Diff map toggle (and
-//       diff settings) above it — exactly the preview/video canvas (media +
-//       timecode + markers + pins, clips switching as the playhead moves),
-//       comparing the submitted version against a chosen baseline.
+//       diff settings) above it — the canvas body is the SAME shared
+//       component the preview/video, preview/audio and preview/thumbnail
+//       studios render (VideoStageCanvas / AudioStageCanvas /
+//       ThumbnailStageCanvas from preview-canvas), so the desk's media can
+//       never behave differently from the studios; above it sits the same
+//       Preview | Diff map toggle, comparing the submitted version against a
+//       chosen baseline.
 //     · right column, split 50 : 50 — the submitter's DESCRIPTION (the
 //       message they wrote when handing the stage in) on top, and the
 //       Captain's REMARK note directly below it.
@@ -28,8 +32,14 @@ import {
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import type { VideoAssetDetail, VideoSubmission } from '@workspace/api-client-react';
-import { AssetPlayer, EmptyPlayer, ImageStage, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
+import { AssetPlayer, ImageStage, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
+import {
+  AudioStageCanvas,
+  ThumbnailStageCanvas,
+  VideoStageCanvas,
+  type StageCanvasVersion,
+} from '@/components/preview-canvas';
 import {
   DEFAULT_AUDIO_DIFF_SETTINGS,
   DEFAULT_DIFF_SETTINGS,
@@ -46,7 +56,6 @@ import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/compone
 import { ReviewDecisionBar, ReviewRemarkCard } from '@/components/review-actions';
 import type { StudioLeg } from '@/components/role-oracle';
 import { RELAY_LEGS } from '@/components/shell';
-import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
 
 const VIDEO_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE']);
 const AUDIO_KINDS = new Set(['RAW_AUDIO', 'VO_PICKUP']);
@@ -77,19 +86,16 @@ function fileSubmissionParts(submission: VideoSubmission): { fileName: string; m
 
 type Marker = { id: string; ms: number; tone: 'danger' | 'teal'; label?: string };
 
-type ReviewSnapshot = {
-  clips?: Array<{ id?: string; assetId: string; inMs: number; outMs: number }>;
-  designs?: Array<{ assetId?: string }>;
-  music?: Array<{ id?: string; assetId: string; inMs: number; outMs: number }>;
-  pickups?: Array<{ id?: string; assetId: string; timeMs: number }>;
-};
-
 // ---------------------------------------------------------------------------
-// ReviewMediaStage — the SAME Big canvas as the preview/video page, for a
-// version submission: the snapshot's clip at the playhead streams in the
-// frame player (audio legs in the waveform player, THUMBNAIL as a design
-// frame), switching clips as the playhead moves, with the playhead timecode
-// in the card header, review pins on the frame, and timecode markers under it.
+// ReviewMediaStage — the Big canvas for a VERSION submission. This is a thin
+// wrapper over the SAME shared stage canvases the preview studios run
+// (preview-canvas.tsx), scoped to the review:
+//   · the version object is the submitted version (submission.timelineVersionId),
+//   · `submissionId` makes the shared canvas show only THIS submission's
+//     notes as markers/pins instead of the whole leg's notes,
+//   · the empty-state wording stays review-specific ("…in this hand-in yet.").
+// There is deliberately NO canvas logic here anymore — it lives once, in the
+// shared component the working video/audio/thumbnail studios render.
 // ---------------------------------------------------------------------------
 
 function ReviewMediaStage({
@@ -107,159 +113,38 @@ function ReviewMediaStage({
   /** Submitted version number (v2, v3…) for the canvas label. */
   version: number | null;
   /** The submitted version's snapshot (its timeline document). */
-  snapshot: ReviewSnapshot | null;
+  snapshot: unknown;
   assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
   /** The annotate pencil portals here (shared with the diff map's pencil). */
   annotationHeaderRef: RefObject<HTMLDivElement | null>;
 }) {
-  const [playheadMs, setPlayheadMs] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const comments = useListVideoComments(projectId);
-
-  const clips = useMemo(() => (Array.isArray(snapshot?.clips) ? snapshot!.clips! : []), [snapshot]);
-  const design = Array.isArray(snapshot?.designs) ? snapshot!.designs![0] ?? null : null;
-  const music = Array.isArray(snapshot?.music) ? snapshot!.music! : [];
-  const pickups = Array.isArray(snapshot?.pickups) ? snapshot!.pickups! : [];
-
-  // Follow the playhead into the right clip, exactly like preview/video.
-  const activeClip = activeClipAt({ clips } as TimelineSnapshotLike, playheadMs) ?? clips[0] ?? null;
-
-  const mediaKinds = leg === 'SOUND' ? AUDIO_KINDS : leg === 'THUMBNAIL' ? IMAGE_KINDS : VIDEO_KINDS;
-  const fallbackAsset =
-    assets.find((a) => mediaKinds.has(a.kind) && a.status === 'PROCESSED')?.id ??
-    assets.find((a) => mediaKinds.has(a.kind))?.id ??
-    '';
-  const clipAssetId = activeClip?.assetId && assets.some((a) => a.id === activeClip.assetId) ? activeClip.assetId : '';
-  const assetId =
-    leg === 'THUMBNAIL'
-      ? (design?.assetId && assets.some((a) => a.id === design.assetId) ? design.assetId : '') || fallbackAsset
-      : clipAssetId ||
-        (leg === 'SOUND'
-          ? (music[0]?.assetId && assets.some((a) => a.id === music[0].assetId) ? music[0].assetId : '') ||
-            (pickups[0]?.assetId && assets.some((a) => a.id === pickups[0].assetId) ? pickups[0].assetId : '')
-          : '') ||
-        fallbackAsset;
-
-  const detail = useGetVideoAsset(projectId, assetId, {
-    query: {
-      queryKey: getGetVideoAssetQueryKey(projectId, assetId),
-      enabled: Boolean(assetId),
-      // Keep fetching until the proxy finishes, then stop on its own — same
-      // behaviour as the vault player.
-      refetchInterval: (query) => pollWhileProcessing(query.state.data),
-    },
-  });
-  const onSeek = (ms: number) => {
-    setPlayheadMs(ms);
-    if (videoRef.current) videoRef.current.currentTime = ms / 1000;
+  const stageVersion: StageCanvasVersion | null =
+    version == null
+      ? null
+      : {
+          id: submission.timelineVersionId,
+          leg,
+          version,
+          snapshot: snapshot ?? null,
+        };
+  const emptyTitle =
+    leg === 'SOUND'
+      ? 'No audio in this hand-in yet.'
+      : leg === 'THUMBNAIL'
+        ? 'No design in this hand-in yet.'
+        : 'No video in this hand-in yet.';
+  const common = {
+    projectId,
+    version: stageVersion,
+    assets,
+    annotationHeaderRef,
+    submissionId: submission.id,
+    emptyTitle,
   };
-  const assetKind = assets.find((a) => a.id === assetId)?.kind ?? '';
-  const isAudio = AUDIO_KINDS.has(assetKind);
 
-  // Red ticks = annotation timecodes for this PR on the asset; teal ticks =
-  // clip boundaries — the exact marker set the preview pages draw.
-  const markers = useMemo<Marker[]>(() => {
-    const list: Marker[] = [];
-    for (const comment of comments.data ?? []) {
-      if (comment.timecodeMs == null || comment.submissionId !== submission.id || comment.assetId !== assetId) continue;
-      list.push({ id: `note-${comment.id}`, ms: comment.timecodeMs, tone: 'danger' });
-    }
-    clips.forEach((clip, index) => list.push({ id: `clip-${index}`, ms: clip.inMs, tone: 'teal' }));
-    if (leg === 'SOUND') {
-      music.forEach((track, index) => list.push({ id: `music-${index}`, ms: track.inMs, tone: 'teal' }));
-      pickups.forEach((pickup, index) => list.push({ id: `pickup-${index}`, ms: pickup.timeMs, tone: 'danger' }));
-    }
-    return list;
-  }, [comments.data, submission.id, assetId, clips, leg, music, pickups]);
-
-  return (
-    <div className="paper-card pv-stage" ref={stageRef} data-testid="captain-review-media">
-      <div className="inline-heading">
-        <span className="eyebrow">
-          {leg === 'THUMBNAIL' ? <ImageIcon size={13} /> : isAudio ? <AudioLines size={13} /> : <Play size={13} />}
-          Big canvas{version ? ` · ${leg} v${version}` : ''}
-        </span>
-        {!isAudio && leg !== 'THUMBNAIL' && (
-          <span className="mono-label">{formatTimecode(playheadMs)}</span>
-        )}
-      </div>
-      <div className="pv-stage-player mt-2">
-        {assetId ? (
-          leg === 'THUMBNAIL' ? (
-            <ImageStage src={proxyUrlFor(projectId, assetId)}>
-              <AnnotationCanvas
-                projectId={projectId}
-                leg={leg}
-                assetId={assetId}
-                playheadMs={null}
-                timelineVersionId={submission.timelineVersionId}
-                submissionId={submission.id}
-                headerRef={annotationHeaderRef}
-                surfaceRef={stageRef}
-                glowPins
-              />
-              <FullscreenButton targetRef={stageRef} />
-            </ImageStage>
-          ) : isAudio ? (
-            <WaveformPlayer
-              projectId={projectId}
-              assetId={assetId}
-              detail={detail.data}
-              playheadMs={playheadMs}
-              onTimeUpdate={onSeek}
-              onPlayheadChange={onSeek}
-              markers={markers}
-            >
-              <AnnotationCanvas
-                projectId={projectId}
-                leg={leg}
-                assetId={assetId}
-                playheadMs={playheadMs}
-                onSeek={onSeek}
-                timelineVersionId={submission.timelineVersionId}
-                submissionId={submission.id}
-                headerRef={annotationHeaderRef}
-                surfaceRef={stageRef}
-                dropLine
-              />
-              <FullscreenButton targetRef={stageRef} />
-            </WaveformPlayer>
-          ) : (
-            <AssetPlayer
-              projectId={projectId}
-              assetId={assetId}
-              detail={detail.data}
-              videoRef={videoRef}
-              playheadMs={playheadMs}
-              onTimeUpdate={setPlayheadMs}
-              markers={markers}
-            >
-              <AnnotationCanvas
-                projectId={projectId}
-                leg={leg}
-                assetId={assetId}
-                playheadMs={playheadMs}
-                onSeek={onSeek}
-                timelineVersionId={submission.timelineVersionId}
-                submissionId={submission.id}
-                headerRef={annotationHeaderRef}
-                surfaceRef={stageRef}
-                timecodeReveal
-                glowPins
-              />
-            </AssetPlayer>
-          )
-        ) : (
-          <EmptyPlayer>
-            <p className="text-sm font-semibold">
-              {leg === 'SOUND' ? 'No audio in this hand-in yet.' : leg === 'THUMBNAIL' ? 'No design in this hand-in yet.' : 'No video in this hand-in yet.'}
-            </p>
-          </EmptyPlayer>
-        )}
-      </div>
-    </div>
-  );
+  if (leg === 'SOUND') return <AudioStageCanvas {...common} />;
+  if (leg === 'THUMBNAIL') return <ThumbnailStageCanvas {...common} />;
+  return <VideoStageCanvas {...common} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -443,8 +328,6 @@ export function CaptainReviewSurface({
     },
   });
 
-  const snapshot = (version.data?.snapshot ?? null) as ReviewSnapshot | null;
-
   // ---- The diff map: the submitted version vs a chosen baseline (defaults
   // to the leg's head — the last approved version). The version strip below
   // the canvas can pick any other version as the baseline. ----
@@ -578,7 +461,7 @@ export function CaptainReviewSurface({
         submission={submission}
         leg={leg}
         version={versionNo}
-        snapshot={snapshot}
+        snapshot={version.data?.snapshot ?? null}
         assets={assets}
         annotationHeaderRef={annotationHeaderRef}
       />
