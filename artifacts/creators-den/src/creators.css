@@ -3503,6 +3503,13 @@ select optgroup {
 .pv-script-footer b { color: hsl(var(--foreground)); font-weight: 500; }
 .pv-script-footer .footer-spacer { flex: 1; }
 
+/* ---- Review template responsive ---- */
+@media (max-width: 1240px) {
+  .review-bottom-row { grid-template-columns: 1fr; }
+  .review-submission-card { flex: none; max-height: 320px; }
+  .review-rail-notes { flex: none; max-height: 340px; }
+}
+
 /* ---- Preview responsive ---- */
 @media (max-width: 1240px) {
   .pv-page { height: auto; min-height: 0; overflow: visible; }
@@ -4426,6 +4433,78 @@ select optgroup {
   resize: vertical;
 }
 .review-oracle-note:focus { outline: none; border-color: hsl(var(--accent)); box-shadow: var(--accent-ring); }
+
+/* ---- Captain review workbench (preview/video-style template) ---- */
+/* The workbench is a preview-page column: a slim toolbar row, then the
+   60/40-ish canvas|description top row, then the bottom row split into the
+   Decision and REMARK cards (in place of the preview pages' carousel). */
+.review-page { gap: 10px; }
+.review-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.review-toolbar .link-btn { white-space: nowrap; }
+.review-toolbar .mono-label { min-width: 0; }
+
+/* The right rail keeps the description front and centre, with the PR review
+   notes below it — both scroll on their own inside the fixed column. */
+.review-submission-card {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+.review-rail-notes {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.review-description-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 11px;
+  border-radius: 9px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary) / .4);
+  color: hsl(var(--foreground));
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-description-file svg { color: hsl(var(--accent)); flex-shrink: 0; }
+.review-description-text {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  border-left: 3px solid hsl(var(--accent) / .55);
+  border-radius: 0 10px 10px 0;
+  background: hsl(var(--secondary) / .28);
+  color: hsl(var(--foreground));
+  font: 13.5px/1.6 var(--app-font-sans);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Bottom row — the two review cards replace the version carousel. */
+.review-bottom-row {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-items: stretch;
+}
+.review-bottom-row > .paper-card { min-width: 0; }
+
+/* On shorter canvases the notes wall stays inside its rail; the file-hold and
+   media cards must not fight the fixed page height. */
+.review-page .pv-canvas-col .pv-stage { min-height: 0; }
 
 /* ---- Account panels: workspace storage bar + CV card (profile page) ---- */
 .account-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 26px; }

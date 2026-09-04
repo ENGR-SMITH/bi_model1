@@ -1,9 +1,14 @@
 // ---------------------------------------------------------------------------
-// SubmissionOverview — the crew's side of the /review page (non-Captains).
-// Shows every stage submission the signed-in member has handed in across their
-// projects, with its state (awaiting review / approved / rejected + the
-// Captain's improvement note), and a relay-flow tree of the selected project's
-// whole timeline on the side so the member can see where each stage sits.
+// SubmissionOverview — the crew's side of the /review page (non-Captains),
+// in two scopes:
+//   · project scope (/projects/:projectId/review) — every stage submission
+//     on THAT project, so the crew can watch the relay clear and open the
+//     timeline tree on the side.
+//   · global (/review) — the same board across every project the member is
+//     on.
+// Each row shows the stage, who handed it in, the submitter's description,
+// and its state — awaiting the Captain, approved (merged), or sent back with
+// the improvement note. Rows the signed-in member submitted are tagged "you".
 // ---------------------------------------------------------------------------
 
 import { useMemo, useState } from 'react';
@@ -27,9 +32,10 @@ import {
 } from '@workspace/api-client-react';
 import type { VideoSubmission } from '@workspace/api-client-react';
 import { legHint, RELAY_LEGS } from '@/components/shell';
+import { reviewerColor, reviewerLabel } from '@/lib/annotations';
 import type { StudioLeg } from '@/components/role-oracle';
 
-/** A submission enriched with its project's name for the overview list. */
+/** A submission enriched with its project's name for the board list. */
 export interface MySubmissionRow extends VideoSubmission {
   projectName: string;
 }
@@ -194,38 +200,48 @@ export function TimelineTree({
 // SubmissionOverview
 // ---------------------------------------------------------------------------
 
-export function SubmissionOverview() {
+export function SubmissionOverview({ projectId }: { projectId?: string }) {
   const { user } = useUser();
   const projectsQuery = useListVideoProjects();
   const [filter, setFilter] = useState<StatusFilter>('ALL');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [treeProjectId, setTreeProjectId] = useState<string | null>(null);
 
-  const projects = projectsQuery.data ?? [];
+  const allProjects = projectsQuery.data ?? [];
+  const projects = useMemo(
+    () => (projectId ? allProjects.filter((project) => project.id === projectId) : allProjects),
+    [allProjects, projectId],
+  );
   const userId = user?.id;
   const projectKey = projects.map((project) => project.id).join('|');
+  const scopeProject = projectId ? allProjects.find((project) => project.id === projectId) ?? null : null;
 
-  const mineQuery = useQuery({
+  const boardQuery = useQuery({
     // userId is part of the key so switching accounts can never show another
     // member's cached submissions.
-    queryKey: ['my-video-submissions', userId, projectKey],
-    enabled: projects.length > 0 && Boolean(userId),
+    queryKey: ['review-board', userId, projectId ?? 'all', projectKey],
+    enabled: Boolean(userId) && (projects.length > 0 || Boolean(projectId)),
     queryFn: async (): Promise<{ rows: MySubmissionRow[]; skippedProjects: number }> => {
+      // Project-scoped mode boards exactly one project (by id, even if it has
+      // drifted out of the projects list); global mode boards every project
+      // the member is on. Each is settled on its own: one unreachable project
+      // (a 403/404 drift, a server hiccup) must never blank the whole page
+      // into a fake "Nothing submitted yet." — its rows are skipped and
+      // surfaced instead.
       const nameById = new Map(projects.map((project) => [project.id, project.name]));
-      // Each project is settled on its own: one unreachable project (a 403/404
-      // drift, a server hiccup) must never blank the whole page into a fake
-      // "Nothing submitted yet." — its rows are skipped and surfaced instead.
+      const targets = projectId
+        ? [{ id: projectId, name: nameById.get(projectId) ?? scopeProject?.name ?? 'Untitled project' }]
+        : projects;
       const settled = await Promise.all(
-        projects.map(async (project) => {
+        targets.map(async (project) => {
           try {
             const submissions = await listVideoSubmissions(project.id);
             return {
               ok: true as const,
-              rows: submissions
-                .filter((submission) => submission.submittedById === userId)
-                .map((submission) => ({
-                  ...submission,
-                  projectName: nameById.get(submission.projectId) ?? 'Untitled project',
-                })),
+              rows: submissions.map((submission) => ({
+                ...submission,
+                projectName: nameById.get(submission.projectId) ?? project.name ?? 'Untitled project',
+              })),
             };
           } catch {
             return { ok: false as const, rows: [] as MySubmissionRow[] };
@@ -246,71 +262,59 @@ export function SubmissionOverview() {
     refetchOnWindowFocus: true,
   });
 
-  const queryData = mineQuery.data;
+  const queryData = boardQuery.data;
   const all = queryData?.rows ?? [];
   const skippedProjects = queryData?.skippedProjects ?? 0;
-  const queryFailed = mineQuery.isError && !mineQuery.isFetching;
+  const queryFailed = boardQuery.isError && !boardQuery.isFetching;
   const rows = filter === 'ALL' ? all : all.filter((row) => row.status === filter);
   const open = all.find((row) => row.id === openId) ?? null;
 
-  // The tree shows the project the member last touched (their most recent
-  // submission), switchable when they work across several projects.
+  const mineCount = all.filter((row) => row.submittedById === userId).length;
+
+  // The tree shows the project in scope — or, globally, the project the
+  // member last touched (switchable when they work across several).
   const involvedProjects = useMemo(() => {
     const ids = [...new Set(all.map((row) => row.projectId))];
     return projects.filter((project) => ids.includes(project.id));
   }, [all, projects]);
-  const [treeProjectId, setTreeProjectId] = useState<string | null>(null);
-  const activeProjectId =
-    treeProjectId ?? all[0]?.projectId ?? involvedProjects[0]?.id ?? null;
+  const activeProjectId = projectId ?? treeProjectId ?? involvedProjects[0]?.id ?? null;
   const projectSubmissions = all.filter((row) => row.projectId === activeProjectId);
 
-  const pendingCount = all.filter((row) => row.status === 'SUBMITTED').length;
+  const eyebrow = projectId
+    ? 'Project review board'
+    : 'Your review board';
+  const heading = projectId ? `${scopeProject?.name ?? 'This project'}'s review board` : 'Every stage, everywhere.';
+  const sub = projectId
+    ? 'Everything handed in on this project — awaiting the Captain, approved, or sent back. Your own hand-ins are tagged “you”.'
+    : 'Every stage handed in across your projects — yours and your teammates’ — and where it stands right now.';
 
   return (
     <div className="page" data-testid="submission-overview">
       <div className="page-header">
         <div>
-          <span className="eyebrow"><Send size={13} /> Your submissions</span>
-          <h1>Where your work stands.</h1>
-          <p>
-            Every stage you hand in lands here. {pendingCount > 0
-              ? `${pendingCount} waiting on the Captain${pendingCount === 1 ? '' : 's'} review right now.`
-              : 'When the Captain reviews it, the decision — and their improvement note — shows up here.'}
-          </p>
+          <span className="eyebrow"><Send size={13} /> {eyebrow}</span>
+          <h1>{heading}</h1>
+          <p>{sub}</p>
         </div>
         {all.length > 0 && (
-          <span className="den-tag muted">{all.length} total</span>
+          <span className="den-tag muted">{all.length} submission{all.length === 1 ? '' : 's'} · {mineCount} yours</span>
         )}
       </div>
 
       {queryFailed && all.length === 0 ? (
         <div className="empty-state" data-testid="submission-overview-error" role="alert">
           <AlertTriangle size={22} />
-          <h3>Couldn&apos;t load your submissions.</h3>
+          <h3>Couldn&apos;t load the review board.</h3>
           <p>
             The review server didn&apos;t answer. This is a connection problem, not a review problem —
-            your submitted work is safe on the Captain&apos;s desk.
+            submitted work is safe on the Captain&apos;s desk.
           </p>
-          <button type="button" className="primary-btn" onClick={() => void mineQuery.refetch()} data-testid="submission-overview-retry">
+          <button type="button" className="primary-btn" onClick={() => void boardQuery.refetch()} data-testid="submission-overview-retry">
             <RefreshCw size={13} /> Try again
           </button>
         </div>
-      ) : mineQuery.isLoading && all.length === 0 ? (
-        <div className="panel-empty">Gathering your submissions…</div>
-      ) : all.length === 0 ? (
-        <div className="empty-state" data-testid="submission-overview-empty">
-          <Inbox size={22} />
-          <h3>Nothing submitted yet.</h3>
-          <p>
-            Open a stage you work on — Video, Audio, or Thumbnail — pick your file in the source card
-            and hand it in from the &ldquo;Hand this stage in&rdquo; card, or submit a version from the
-            Desktop agent. The Captain&apos;s decision appears here.
-          </p>
-          <p className="den-footnote">
-            If you uploaded while signed in as this project&apos;s Captain, the file goes straight to the
-            vault instead — Captains don&apos;t review their own uploads, so no submission is created.
-          </p>
-        </div>
+      ) : boardQuery.isLoading && all.length === 0 ? (
+        <div className="panel-empty">Gathering the review board…</div>
       ) : (
         <>
           {skippedProjects > 0 && (
@@ -318,10 +322,24 @@ export function SubmissionOverview() {
               <AlertTriangle size={14} />
               <span>
                 {skippedProjects} project{skippedProjects === 1 ? '' : 's'} couldn&apos;t be reached — their
-                submissions aren&apos;t shown here. <button type="button" className="link-btn" onClick={() => void mineQuery.refetch()}>Try again</button>
+                submissions aren&apos;t shown here. <button type="button" className="link-btn" onClick={() => void boardQuery.refetch()}>Try again</button>
               </span>
             </div>
           )}
+          {all.length === 0 ? (
+            <div className="empty-state" data-testid="submission-overview-empty">
+              <Inbox size={22} />
+              <h3>Nothing submitted yet.</h3>
+              <p>
+                When a stage is handed in for review — Video, Audio, Thumbnail, or Finish — it lands here
+                with its status, and the Captain&apos;s decision (with their REMARK) shows up when it&apos;s made.
+              </p>
+              <p className="den-footnote">
+                If the project&apos;s Captain uploaded while signed in as themselves, their file goes straight
+                to the vault unless they choose to submit it for review — so it never appears here.
+              </p>
+            </div>
+          ) : (
           <div className="submission-overview-grid">
           <div className="submission-list-col">
             <div className="submission-filters" role="tablist" aria-label="Filter submissions">
@@ -349,7 +367,9 @@ export function SubmissionOverview() {
               <div className="den-stack">
                 {rows.map((row) => {
                   const meta = STATUS_META[row.status];
+                  const mine = row.submittedById === userId;
                   const expanded = open?.id === row.id;
+                  const color = reviewerColor(row.submittedById);
                   return (
                     <div key={row.id} className="paper-card submission-row-card">
                       <button
@@ -366,9 +386,17 @@ export function SubmissionOverview() {
                           {legLabel(row.leg)}
                         </span>
                         <span className="min-w-0 flex-1 text-left">
-                          <b className="truncate">{row.projectName}</b>
+                          <b className="truncate">
+                            {row.projectName}
+                            {mine && <span className="den-tag accent ml-2" title="You submitted this">you</span>}
+                          </b>
                           <small>
-                            {row.note ? `“${row.note.slice(0, 110)}”` : 'No note attached'} · {timeAgo(row.createdAt)}
+                            {isFileSubmission(row) ? fileSubmissionParts(row).fileName : row.note ? `“${row.note.slice(0, 110)}”` : 'No note attached'}
+                            {' · '}
+                            <span style={{ color }}>
+                              {reviewerLabel(row.submittedById)} {row.submittedById.slice(0, 8)}
+                            </span>
+                            {' · '}{timeAgo(row.createdAt)}
                           </small>
                         </span>
                         <span className={`den-tag ${meta.cls}`}>{meta.label}</span>
@@ -376,7 +404,7 @@ export function SubmissionOverview() {
                       {expanded && row.id === open?.id && (
                         <div className="submission-detail" data-testid={`submission-detail-${row.id}`}>
                           <div className="submission-detail-note">
-                            <span className="mono-label">What you submitted</span>
+                            <span className="mono-label">What was submitted{!mine ? ` — by ${reviewerLabel(row.submittedById)} ${row.submittedById.slice(0, 8)}` : ''}</span>
                             {isFileSubmission(row) ? (
                               <>
                                 <p className="flex items-center gap-2">
@@ -420,7 +448,7 @@ export function SubmissionOverview() {
                               <Clock3 size={14} />
                               <div>
                                 <b>Awaiting the Captain&apos;s review</b>
-                                <p>Submitted {timeAgo(row.createdAt)}. You&apos;ll see the decision here.</p>
+                                <p>Submitted {timeAgo(row.createdAt)}. The decision shows up here when it&apos;s made.</p>
                               </div>
                             </div>
                           )}
@@ -442,7 +470,7 @@ export function SubmissionOverview() {
           <aside className="submission-tree-col">
             {activeProjectId && (
               <>
-                {involvedProjects.length > 1 && (
+                {!projectId && involvedProjects.length > 1 && (
                   <select
                     value={activeProjectId}
                     onChange={(event) => setTreeProjectId(event.target.value)}
@@ -460,13 +488,14 @@ export function SubmissionOverview() {
             )}
           </aside>
           </div>
+          )}
         </>
       )}
 
       {all.length > 0 && (
         <p className="den-footnote mt-6">
-          Approved stages progress the project timeline — rejected ones are sent back to you with the
-          Captain&apos;s improvement note, and the timeline stays untouched until it passes.
+          Approved stages progress the project timeline — rejected ones are sent back to the submitter with the
+          Captain&apos;s REMARK, and the timeline stays untouched until it passes.
         </p>
       )}
     </div>

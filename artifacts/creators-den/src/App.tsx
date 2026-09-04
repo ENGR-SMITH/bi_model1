@@ -42,6 +42,8 @@ export default function App() {
           <Route path="/explore" component={ExplorePage} />
           <Route path="/notifications" component={NotificationsPage} />
           <Route path="/review" component={ReviewPage} />
+          <Route path="/projects/:projectId/review" component={ReviewPage} />
+          <Route path="/projects/:projectId/notifications" component={NotificationsPage} />
           <Route path="/projects/:projectId" component={VaultPage} />
           <Route path="/projects/:projectId/activity" component={ActivityPage} />
           <Route path="/projects/:projectId/preview" component={PreviewPage} />

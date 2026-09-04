@@ -231,7 +231,11 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
       enabled: isCaptain,
     },
   });
-  const pendingReviews = (reviewQueue.data ?? []).length;
+  // Inside a project the badge counts that project's pending reviews; without
+  // one it counts every owned project's pending reviews.
+  const pendingReviews = projectId
+    ? (reviewQueue.data ?? []).filter((item) => item.projectId === projectId).length
+    : (reviewQueue.data ?? []).length;
 
   // Read-only mode: a PUBLIC project opened by someone who is not a member
   // (e.g. from a search result). The detail query carries the viewer's roles
@@ -280,7 +284,9 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
 
           <div className="cd-topnav-account">
             <span className="cd-topnav-bell-wrap">
-              <Link href="/notifications" className="cd-topnav-bell" aria-label="Notifications" title="Notifications" data-testid="nav-notifications">
+              {/* Inside a project the inbox stays in the project (the rail is
+                  kept); with no project open it is the global inbox. */}
+              <Link href={projectId ? `/projects/${projectId}/notifications` : '/notifications'} className="cd-topnav-bell" aria-label="Notifications" title="Notifications" data-testid="nav-notifications">
                 <Bell size={16} />
                 {unreadCount > 0 && (
                   <span className="cd-topnav-bell-badge" data-testid="nav-notifications-badge">
@@ -345,11 +351,12 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
               <div className="cd-tab-group">
                 {/* A public (non-member) viewer only gets PREVIEW + TIMELINE. */}
                 {!readOnly && tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
-                {/* One Review tab for everyone: Captains land on their review
-                    desk (with the pending-count badge), the crew land on their
-                    own submissions + the timeline tree. */}
+                {/* One Review tab for everyone, project-scoped so the rail
+                    stays: Captains land on this project's review desk (with
+                    the pending-count badge), the crew land on this project's
+                    review board + the timeline tree. */}
                 {!readOnly && (
-                  <Link href="/review" className={`cd-tab ${location === '/review' ? 'active' : ''}`} data-testid="nav-review">
+                  <Link href={`/projects/${projectId}/review`} className={`cd-tab ${location === `/projects/${projectId}/review` || location.startsWith(`/projects/${projectId}/review/`) ? 'active' : ''}`} data-testid="nav-review">
                     <GitPullRequest size={15} />
                     <span>Review</span>
                     {isCaptain && pendingReviews > 0 && (
