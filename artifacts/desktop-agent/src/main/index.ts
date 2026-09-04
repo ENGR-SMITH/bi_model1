@@ -326,6 +326,14 @@ ipcMain.handle(
       return { ok: true, storageKey: mint.storageKey, sizeBytes: stat.size };
     } catch (err) {
       markJobDone((err as Error).message);
+      // The agent reuses the Clerk session token captured at sign-in, and it
+      // is short-lived — when the API answers 401 the token is stale, so drop
+      // the session and ask for a fresh sign-in instead of a cryptic failure.
+      const message = (err as Error).message ?? "";
+      if (/failed \(401\)|Authentication required/i.test(message)) {
+        sessionCache = null;
+        sendAuthEvent({ type: "session-expired", error: "Your sign-in expired. Sign in again to upload." });
+      }
       throw err;
     }
   },

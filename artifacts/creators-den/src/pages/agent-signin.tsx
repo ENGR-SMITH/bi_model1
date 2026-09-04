@@ -24,6 +24,25 @@ interface Attempt {
   loopback: string;
 }
 
+/** Raise the desktop agent app on this machine after sign-in completes.
+ * The agent registers the `tandem-agent://` scheme at install, so opening it
+ * hands control straight back to the app (and focuses its window). A hidden
+ * iframe keeps this sign-in tab in place; on browsers that block iframe
+ * protocol navigation it falls back to a background tab. No-op when the app
+ * isn't installed. */
+function summonDesktopApp(): void {
+  const url = 'tandem-agent://launch';
+  try {
+    const frame = document.createElement('iframe');
+    frame.style.display = 'none';
+    frame.src = url;
+    document.body.appendChild(frame);
+    window.setTimeout(() => frame.remove(), 1500);
+  } catch {
+    window.open(url, '_blank', 'noopener');
+  }
+}
+
 function readAttempt(): Attempt | null {
   const url = new URLSearchParams(window.location.search);
   const state = url.get('state') ?? '';
@@ -97,6 +116,9 @@ export default function AgentSignInPage() {
         if (cancelled) return;
         if (res.ok) {
           setPhase('success');
+          // Sign-in finished — bring the user straight back to the desktop
+          // app instead of leaving them stranded on this tab.
+          summonDesktopApp();
         } else {
           setPhase('error');
           setError(
@@ -151,7 +173,7 @@ export default function AgentSignInPage() {
           <div className="agent-signin-state">
             <div className="agent-signin-check">✓</div>
             <h2>You're signed in</h2>
-            <p>Return to Tandem Desktop Agent — you can close this tab.</p>
+            <p>Opening Tandem Desktop Agent… if it doesn't appear, click its icon (or relaunch it) — you can close this tab.</p>
           </div>
         )}
 

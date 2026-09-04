@@ -43,7 +43,10 @@ export type AuthEvent =
   | { type: "signed-in"; email: string | null }
   | { type: "expired"; error?: string }
   | { type: "cancelled" }
-  | { type: "error"; error: string };
+  | { type: "error"; error: string }
+  /** The API rejected our bearer token (401) — the Clerk session the agent
+   * captured at sign-in is short-lived, so the app must sign in again. */
+  | { type: "session-expired"; error?: string };
 
 export interface AppInfo {
   version: string;

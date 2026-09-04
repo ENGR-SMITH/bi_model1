@@ -210,5 +210,8 @@ GETs.
   small follow-up (same presigned flow, different key prefix).
 - The Clerk session token is handed back to the agent over a loopback
   `127.0.0.1` server the app starts per attempt; the link carries a random
-  per-attempt `state` so only that sign-in can complete. The token is reused
-  as a bearer token and is short-lived; re-request it per sign-in.
+  per-attempt `state` so only that sign-in can complete. Clerk session tokens
+  are intentionally short-lived (~60 seconds), so when the API answers 401 the
+  agent drops the stale session and automatically starts a fresh sign-in — the
+  user's browser still holds the real Clerk session, so the new link completes
+  in one click without re-entering credentials.

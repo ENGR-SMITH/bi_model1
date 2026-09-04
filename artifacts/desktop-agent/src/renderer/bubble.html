@@ -23,61 +23,62 @@
         cursor: default;
       }
 
-      /* The sphere itself. Layered gradients fake a glossy orb: a soft
-         highlight, then the brand red body fading darker toward the rim,
-         finished with a bright rim + outer glow (kept inside the window). */
+      /* The sphere itself. Layered gradients fake a compact glossy orb: a
+         small highlight, the brand red body fading darker toward the rim,
+         and a tight drop shadow — sized for the smaller 56px bubble. */
       .bubble::after {
         content: "";
-        position: absolute; inset: 4px;
+        position: absolute; inset: 2px;
         border-radius: 50%;
         background:
-          radial-gradient(circle at 31% 24%, rgba(255, 255, 255, 0.35), transparent 24%),
-          radial-gradient(circle at 35% 30%, var(--accent-2), var(--accent) 48%, var(--accent-deep) 96%);
+          radial-gradient(circle at 32% 25%, rgba(255, 255, 255, 0.38), transparent 26%),
+          radial-gradient(circle at 35% 30%, var(--accent-2), var(--accent) 52%, var(--accent-deep) 98%);
         box-shadow:
-          0 8px 22px rgba(230, 21, 10, 0.45),
-          0 2px 5px rgba(0, 0, 0, 0.35),
-          inset 0 1px 1px rgba(255, 255, 255, 0.4),
-          inset 0 -2px 5px rgba(0, 0, 0, 0.22);
+          0 4px 12px rgba(230, 21, 10, 0.4),
+          0 1px 3px rgba(0, 0, 0, 0.3),
+          inset 0 1px 1px rgba(255, 255, 255, 0.35),
+          inset 0 -1px 3px rgba(0, 0, 0, 0.18);
         transition: transform 0.14s ease, filter 0.14s ease;
       }
-      .bubble:hover::after { transform: scale(1.05); filter: brightness(1.06); }
-      .bubble:active::after { transform: scale(0.98); }
+      .bubble:hover::after { transform: scale(1.06); filter: brightness(1.07); }
+      .bubble:active::after { transform: scale(0.96); }
 
       /* Clickable core — marked no-drag so clicks reach it. */
       .core {
         -webkit-app-region: no-drag;
         position: relative; z-index: 2;
-        width: 40px; height: 40px; border-radius: 50%;
+        width: 24px; height: 24px; border-radius: 50%;
         display: grid; place-items: center;
         color: #fff; cursor: pointer;
-        font: italic 700 19px/1 "DM Sans", system-ui, -apple-system, sans-serif;
+        font: italic 700 13px/1 "DM Sans", system-ui, -apple-system, sans-serif;
         text-shadow:
-          0 1px 2px rgba(60, 0, 0, 0.65),
-          0 0 12px rgba(255, 255, 255, 0.25);
+          0 1px 1px rgba(60, 0, 0, 0.6),
+          0 0 8px rgba(255, 255, 255, 0.2);
         transition: transform 0.1s ease;
       }
       .core:hover { transform: scale(1.08); }
       .core:active { transform: scale(0.92); }
 
-      /* Close affordance, revealed (and animated in) on hover. */
+      /* Close affordance, revealed (and animated in) on hover. Small enough
+         to sit on the rim of the compact orb without covering it. */
       .close {
         -webkit-app-region: no-drag;
         position: absolute; z-index: 3;
-        top: 3px; right: 3px;
-        width: 20px; height: 20px; border-radius: 50%;
-        background: rgba(12, 12, 14, 0.82);
+        top: 0; right: 0;
+        width: 15px; height: 15px; border-radius: 50%;
+        background: rgba(12, 12, 14, 0.85);
         color: #fff; cursor: pointer;
         display: grid; place-items: center;
-        font: 600 11px/1 system-ui, sans-serif;
-        border: 1px solid rgba(255, 255, 255, 0.4);
+        font: 600 8px/1 system-ui, sans-serif;
+        border: 1px solid rgba(255, 255, 255, 0.5);
         opacity: 0; visibility: hidden; transform: scale(0.5);
         transition: opacity 0.16s ease, transform 0.16s ease, background 0.15s ease, visibility 0.16s;
       }
       .bubble:hover .close { opacity: 1; visibility: visible; transform: scale(1); }
       .close:hover {
         background: var(--accent);
-        border-color: rgba(255, 255, 255, 0.65);
-        box-shadow: 0 0 10px rgba(230, 21, 10, 0.6);
+        border-color: rgba(255, 255, 255, 0.7);
+        box-shadow: 0 0 8px rgba(230, 21, 10, 0.6);
       }
     </style>
   </head>

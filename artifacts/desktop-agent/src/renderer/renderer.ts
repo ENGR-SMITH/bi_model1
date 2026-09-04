@@ -313,7 +313,7 @@ function initListeners() {
   });
 
   // Main process reports when the browser page finished (or the link expired).
-  window.tandemAgent.onAuthEvent((evt) => {
+  window.tandemAgent.onAuthEvent(async (evt) => {
     if (evt.type === "signed-in") {
       closeSigninPanel();
       setAuthNote("Signed in.", "ok");
@@ -321,6 +321,20 @@ function initListeners() {
     } else if (evt.type === "expired") {
       closeSigninPanel();
       setAuthNote("The sign-in link expired. Click Sign up for a fresh one.", "err");
+    } else if (evt.type === "session-expired") {
+      // The API rejected our token (401) — the Clerk session token the agent
+      // captures at sign-in is short-lived (~1 minute by design), so drop the
+      // stale session and start a fresh sign-in automatically. The user's
+      // browser still holds the real Clerk session, so the new link completes
+      // in one click without re-entering credentials.
+      chosenFile = null;
+      $("file").textContent = "";
+      const projSel = $("project") as HTMLSelectElement;
+      projSel.length = 1;
+      ($("asset") as HTMLSelectElement).length = 0;
+      setAuthNote("Your sign-in expired — getting you a fresh one…", "err");
+      await refreshWho();
+      if (!signedIn) await beginSignIn();
     } else if (evt.type === "error") {
       closeSigninPanel();
       setAuthNote(evt.error, "err");
