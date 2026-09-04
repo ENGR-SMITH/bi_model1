@@ -10,6 +10,11 @@
 //     submission, so the Captain sees what was addressed.
 //   - Submit — pins the stage's current head snapshot for review (approve
 //     merges it to the timeline; reject sends it back with the Captain's note).
+//
+// Multi-leg stages (Video owns SELECTS + CUT) no longer ask which leg is
+// being handed in — the card targets the leg that is actually being worked
+// on (one awaiting the Captain's review first, otherwise the one with the
+// newest saved snapshot).
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useState } from 'react';
@@ -34,7 +39,7 @@ import {
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import type { StudioLeg } from '@/components/role-oracle';
-import { legHint, RELAY_LEGS } from '@/components/shell';
+import { RELAY_LEGS } from '@/components/shell';
 import { VAULT_KIND_LABELS } from '@/components/preview-shared';
 import { BROWSER_UPLOAD_MAX_LABEL, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 
@@ -86,9 +91,13 @@ export function StageSubmitCard({
   const comments = useListVideoComments(projectId);
   const submissions = useListVideoSubmissions(projectId);
 
-  // A role that owns two legs (Video → SELECTS + CUT) picks which stage head
-  // they are handing over; single-leg stages have no picker.
-  const [leg, setLeg] = useState<StudioLeg>(legs[0]);
+  // The card does not ask which stage to hand in (the Selects/Cut tabs are
+  // gone) — the leg is auto-targeted: one already awaiting the Captain's
+  // review first, otherwise the leg with the newest saved snapshot.
+  const legVersionQueries = legs.map((option) => ({
+    leg: option,
+    query: useListVideoTimelineVersions(projectId, option),
+  }));
   const [description, setDescription] = useState('');
   const [includeResolved, setIncludeResolved] = useState(true);
   // What the server actually answered on the last file hand-in — the card must
@@ -96,8 +105,29 @@ export function StageSubmitCard({
   const [fileResult, setFileResult] = useState<{ fileName: string; review: boolean } | null>(null);
   // The server pins the stage's current head snapshot — with none saved there
   // is nothing to hand in yet.
-  const versions = useListVideoTimelineVersions(projectId, leg);
-  const hasSnapshot = (versions.data?.length ?? 0) > 0;
+  const hasSnapshot = (legVersionQueries.find((entry) => entry.leg === leg)?.query.data?.length ?? 0) > 0;
+
+  // The leg the card hands in, resolved from the data: a pending review keeps
+  // its status banner visible; otherwise the leg whose snapshot was most
+  // recently saved is the one being worked on. Single-leg stages never switch.
+  const leg = useMemo<StudioLeg>(() => {
+    if (legs.length < 2) return legs[0];
+    const pendingLeg = legs.find((option) =>
+      (submissions.data ?? []).some((s) => s.leg === option && s.status === 'SUBMITTED'),
+    );
+    if (pendingLeg) return pendingLeg;
+    const newest = legVersionQueries
+      .map(({ leg: option, query }) => ({
+        leg: option,
+        latest: query.data
+          ? [...query.data].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+          : null,
+      }))
+      .filter((entry) => entry.latest != null)
+      .sort((a, b) => new Date(b.latest!.createdAt).getTime() - new Date(a.latest!.createdAt).getTime())[0];
+    return newest?.leg ?? legs[0];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [legs, legVersionQueries, submissions.data]);
 
   const canSubmit =
     project.data?.myRoles?.includes('CAPTAIN') ||
@@ -240,29 +270,10 @@ export function StageSubmitCard({
         <span className="den-tag gold">submit for review</span>
       </div>
 
-      {legs.length > 1 && (
-        <div className="stage-leg-picker" role="tablist" aria-label="Stage to submit">
-          {legs.map((option) => (
-            <button
-              key={option}
-              type="button"
-              role="tab"
-              aria-selected={leg === option}
-              className={`stage-leg-btn ${leg === option ? 'active' : ''}`}
-              onClick={() => setLeg(option)}
-              title={legHint(option)}
-              data-testid={`stage-leg-${option.toLowerCase()}`}
-            >
-              {legLabel(option)}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* While the hand-in awaits the Captain, the status line is the ONLY
           content of the card — no description box, no resolved-notes list, no
-          submit row. Picking another leg tab (Video owns SELECTS + CUT) still
-          shows that leg's own form when it has no review pending. */}
+          submit row. The card targets the leg that is actually being worked
+          on, so the pending stage's status stays in view. */}
       {pending && (
         <div
           className="stage-submit-banner is-pending stage-submit-banner-standalone"
@@ -287,16 +298,6 @@ export function StageSubmitCard({
               </span>
             </div>
           )}
-          {latestDecided?.status === 'APPROVED' && (
-            <div className="stage-submit-banner is-approved" data-testid="stage-submit-approved">
-              <CheckCircle2 size={14} />
-              <span>
-                <b>{legLabel(leg)} was approved</b> — the last submission merged into the timeline.
-                Hand in another pass anytime.
-              </span>
-            </div>
-          )}
-
           <div className="stage-desc-wrap">
             <textarea
               className="stage-desc-input"

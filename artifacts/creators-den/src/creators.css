@@ -3505,7 +3505,7 @@ select optgroup {
 
 /* ---- Review template responsive ---- */
 @media (max-width: 1240px) {
-  .review-decision-bar { padding: 4px 0 10px; }
+  .review-decision-bar { padding: 10px 12px; }
   .review-decision-buttons { flex-wrap: wrap; justify-content: center; }
   .review-rail { gap: 10px; }
   .review-rail > .paper-card { flex: none; max-height: 300px; }
@@ -4396,34 +4396,36 @@ select optgroup {
 
 /* ---- Captain review workbench (preview/video-style template) ---- */
 /* The workbench is the exact preview-page grid — canvas | description+remark
-   rail on top, then the bare Accept / Reject decision under the canvas. The
-   desk spans the shell edge-to-edge with slim padding and tight gaps, so
-   every spare pixel belongs to the canvas and the review rails. */
+   rail on top, with the back-to-queue control at the head of the canvas
+   column and the Accept / Reject decision bar under the canvas, inside the
+   canvas column. The desk spans the shell edge-to-edge with slim padding and
+   tight gaps, so every spare pixel belongs to the canvas and the review
+   rails. */
 .review-page {
   max-width: none;
-  padding: 2px clamp(4px, .6vw, 8px) 4px;
+  padding: 2px clamp(2px, .3vw, 4px) 4px;
   gap: 8px;
 }
 .review-page .pv-top { gap: 8px; }
 .review-page .pv-canvas-col,
 .review-page .pv-notes-col { gap: 8px; }
 
-/* Slim back-to-queue strip above the grid, so the canvas column header stays
-   the exact preview/video head (Big canvas eyebrow + annotate + toggle). */
-.review-topbar {
-  flex: 0 0 auto;
-  min-height: 0;
-  display: flex;
+/* The back-to-queue control sits at the head of the canvas column, top-left,
+   beside the "Big canvas" eyebrow. */
+.review-canvas-eyebrow {
+  display: inline-flex;
   align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
-/* The compact back-to-queue control in the column header (icon only). */
+/* The compact back-to-queue control (icon only). */
 .pv-review-back {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 999px;
   border: 1px solid hsl(var(--border));
   background: hsl(var(--card));
@@ -4456,29 +4458,46 @@ select optgroup {
   word-break: break-word;
 }
 
-/* The REMARK card — a heading + the note field filling the rest of the card. */
-.review-remark-card { overflow: hidden; }
+/* The REMARK card — a heading + the note field filling the rest of the card.
+   Tight internal padding so the field itself gets the room. */
+.review-remark-card { overflow: hidden; padding: 14px 16px; }
 .review-remark-card .review-oracle-note {
   flex: 1;
   min-height: 0;
-  margin-top: 10px;
+  margin-top: 8px;
+  padding: 9px 11px;
 }
 
-/* Decision — the big Accept / Reject pair as bare, centered buttons below
-   the canvas. No card around them. */
+/* Decision — the Accept / Reject pair sits below the canvas (inside the
+   canvas column) as a quiet panel: the two buttons centered, with a hint
+   line that says why Reject stays locked until a Remark is written. */
 .review-decision-bar {
   flex: 0 0 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 2px 0;
+  gap: 8px;
+  padding: 12px 16px 14px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card));
+  box-shadow: var(--shadow-sm);
 }
 .review-decision-buttons {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+/* The "write a Remark to reject" hint under the buttons. */
+.review-decision-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font: 11px/1.5 var(--app-font-sans);
 }
 .review-decision-approve,
 .review-decision-reject {
