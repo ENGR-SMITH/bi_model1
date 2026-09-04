@@ -22,9 +22,9 @@ import { SubmissionOverview } from '@/components/submission-overview';
 //     every pending submission across their owned projects; the crew see the
 //     board across their projects.
 // The Captain's workbench is the preview/video template: Big canvas with the
-// Preview | Diff map toggle, the submitter's description in the rail, and a
-// bottom row split into the big Accept / Reject decision and the REMARK
-// improvement note.
+// Preview | Diff map toggle, a right rail split 50/50 into the submitter's
+// description and the REMARK improvement note, then the bare Accept / Reject
+// decision under the canvas and the timeline-versions strip.
 // ---------------------------------------------------------------------------
 
 const LEG_TONES: Record<string, string> = {

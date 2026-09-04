@@ -3505,8 +3505,11 @@ select optgroup {
 
 /* ---- Review template responsive ---- */
 @media (max-width: 1240px) {
-  .review-bottom-row { grid-template-columns: 1fr; }
-  .review-submission-card { flex: none; max-height: 320px; }
+  .review-decision-bar { padding: 4px 0 10px; }
+  .review-decision-buttons { flex-wrap: wrap; justify-content: center; }
+  .review-rail { gap: 10px; }
+  .review-rail > .paper-card { flex: none; max-height: 300px; }
+  .review-remark-card .review-oracle-note { min-height: 120px; }
 }
 
 /* ---- Preview responsive ---- */
@@ -4391,52 +4394,10 @@ select optgroup {
   box-shadow: 0 0 0 3px hsl(var(--card));
 }
 
-/* ---- Review desk ---------------------------------------------------------- */
-.review-decision-buttons {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-  margin-top: 10px;
-}
-.review-decision-approve,
-.review-decision-reject {
-  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 11px 12px;
-  border-radius: 12px;
-  font: 800 15px var(--app-font-sans);
-  color: #fff;
-  border: 2px solid transparent;
-  transition: transform .12s ease, filter .12s ease, opacity .12s ease;
-}
-.review-decision-approve {
-  background: hsl(155 55% 38%);
-  box-shadow: 0 8px 0 hsl(155 55% 26%);
-}
-.review-decision-approve:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
-.review-decision-reject {
-  background: hsl(var(--destructive));
-  box-shadow: 0 8px 0 hsl(var(--destructive) / .55);
-}
-.review-decision-reject:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
-.review-decision-approve:active:not(:disabled),
-.review-decision-reject:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
-.review-decision-approve:disabled,
-.review-decision-reject:disabled { opacity: .45; cursor: not-allowed; }
-.review-oracle-note {
-  width: 100%;
-  min-height: 78px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
-  color: hsl(var(--foreground));
-  font: 13px/1.55 var(--app-font-sans);
-  resize: none;
-}
-.review-oracle-note:focus { outline: none; border-color: hsl(var(--accent)); box-shadow: var(--accent-ring); }
-
 /* ---- Captain review workbench (preview/video-style template) ---- */
-/* The workbench is the exact preview-page grid — canvas | description top
-   row, then the bottom row split into the Decision and REMARK cards (in place
-   of the carousel) — with a tighter frame than the standard preview pages. */
+/* The workbench is the exact preview-page grid — canvas | description+remark
+   rail on top, then the bare Accept / Reject decision under the canvas, then
+   the timeline-versions strip where the preview studios run their carousel. */
 .review-page { padding: 8px clamp(6px, 1vw, 12px) 8px; }
 
 /* Slim back-to-queue strip above the grid, so the canvas column header stays
@@ -4464,16 +4425,17 @@ select optgroup {
 }
 .pv-review-back:hover { color: hsl(var(--foreground)); border-color: hsl(var(--accent) / .5); }
 
-/* The right rail holds just the submitter's message, filling the column and
-   scrolling on its own inside the fixed grid — like the notes wall does on
-   the preview pages. */
-.review-submission-card {
+/* The right rail splits 50 : 50 of its height — the submitter's DESCRIPTION
+   on top and the Captain's REMARK below it, each card exactly one half of the
+   rail. */
+.review-rail { gap: 12px; }
+.review-rail > .paper-card {
   flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
 }
+.review-rail > .review-submission-card { overflow-y: auto; }
 .review-description-text {
   margin: 10px 0 0;
   padding: 12px 14px;
@@ -4486,21 +4448,76 @@ select optgroup {
   word-break: break-word;
 }
 
-/* Bottom row — the two review cards replace the version carousel. */
-.review-bottom-row {
-  flex: 0 0 auto;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  align-items: stretch;
+/* The REMARK card — a heading + the note field filling the rest of the card. */
+.review-remark-card { overflow: hidden; }
+.review-remark-card .review-oracle-note {
+  flex: 1;
+  min-height: 0;
+  margin-top: 10px;
 }
-.review-bottom-row > .paper-card { min-width: 0; }
-.review-remark-card {
+
+/* Decision — the big Accept / Reject pair as bare, centered buttons below
+   the canvas. No card around them. */
+.review-decision-bar {
+  flex: 0 0 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
 }
-.review-remark-card .review-oracle-note { flex: 1; }
+.review-decision-buttons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.review-decision-approve,
+.review-decision-reject {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 12px 30px;
+  border-radius: 999px;
+  font: 700 15px var(--app-font-sans);
+  letter-spacing: .01em;
+  color: #fff;
+  border: 0;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease, opacity .15s ease;
+}
+.review-decision-approve {
+  background: linear-gradient(135deg, hsl(155 58% 43%), hsl(155 60% 32%));
+  box-shadow: 0 8px 20px hsl(155 58% 32% / .35), inset 0 1px 0 hsl(155 58% 75% / .4);
+}
+.review-decision-approve:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-2px); box-shadow: 0 12px 24px hsl(155 58% 32% / .42), inset 0 1px 0 hsl(155 58% 75% / .4); }
+.review-decision-reject {
+  background: linear-gradient(135deg, hsl(var(--destructive)), hsl(var(--destructive) / .82));
+  box-shadow: 0 8px 20px hsl(var(--destructive) / .3), inset 0 1px 0 hsl(0 0% 100% / .2);
+}
+.review-decision-reject:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 12px 24px hsl(var(--destructive) / .36), inset 0 1px 0 hsl(0 0% 100% / .2); }
+.review-decision-approve:active:not(:disabled),
+.review-decision-reject:active:not(:disabled) { transform: translateY(1px) scale(.99); box-shadow: none; }
+.review-decision-approve:focus-visible,
+.review-decision-reject:focus-visible { outline: 2px solid hsl(var(--accent)); outline-offset: 2px; }
+.review-decision-approve:disabled,
+.review-decision-reject:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+.review-decision-error { margin: 0; color: hsl(var(--destructive)); }
+
+/* The REMARK note field. */
+.review-oracle-note {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font: 13px/1.55 var(--app-font-sans);
+  resize: none;
+}
+.review-oracle-note:focus { outline: none; border-color: hsl(var(--accent)); box-shadow: var(--accent-ring); }
+
 
 /* ---- Account panels: workspace storage bar + CV card (profile page) ---- */
 .account-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 26px; }
@@ -4895,6 +4912,12 @@ select optgroup {
 .stage-file-chip span { min-width: 0; }
 .stage-file-chip b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stage-file-chip small { display: block; color: hsl(var(--muted-foreground)); font-size: 11px; }
+/* Pending review — the whole hand-in form stays visible but disabled until the
+   Captain accepts or rejects it. */
+.stage-submit-card.is-locked .stage-desc-wrap { opacity: .55; }
+.stage-submit-card.is-locked .stage-desc-input,
+.stage-submit-card.is-locked .stage-resolved-head input { cursor: not-allowed; }
+.stage-resolved-head input:disabled { opacity: .45; }
 
 /* ---- Submission overview (crew side of /review) --------------------------- */
 .submission-overview-grid {

@@ -6,15 +6,17 @@
 //     · left column: the Big canvas with the Preview | Diff map toggle (and
 //       diff settings) above it — exactly the preview/video canvas (media +
 //       timecode + markers + pins, clips switching as the playhead moves),
-//       comparing the submitted version against the leg's head baseline.
-//     · right column: the submitter's DESCRIPTION — the message they wrote
-//       when handing the stage in.
-//   Bottom row (where the preview pages run the version carousel) — split
-//     into two cards: the big Accept / Reject decision on the left and the
-//     REMARK note on the right.
+//       comparing the submitted version against a chosen baseline.
+//     · right column, split 50 : 50 — the submitter's DESCRIPTION (the
+//       message they wrote when handing the stage in) on top, and the
+//       Captain's REMARK note directly below it.
+//   Bottom rows: the big Accept / Reject decision as two bare centered
+//   buttons under the canvas (no card), then the same timeline-versions strip
+//   the preview studios run under their canvas — clicking a version there
+//   switches the diff baseline the submission is compared against.
 // ---------------------------------------------------------------------------
 
-import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { ArrowLeft, AudioLines, Image as ImageIcon, Play, Send } from 'lucide-react';
 import {
   getGetVideoAssetQueryKey,
@@ -33,13 +35,15 @@ import {
   DEFAULT_DIFF_SETTINGS,
   FullscreenButton,
   PreviewCanvasColumn,
+  VersionCarousel,
   WaveformPlayer,
+  type CarouselItem,
   type DiffSettings,
   type PreviewView,
 } from '@/components/preview-shared';
 import { formatTimecode } from '@/components/timeline';
 import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
-import { ReviewDecisionCard, ReviewRemarkCard } from '@/components/review-actions';
+import { ReviewDecisionBar, ReviewRemarkCard } from '@/components/review-actions';
 import type { StudioLeg } from '@/components/role-oracle';
 import { RELAY_LEGS } from '@/components/shell';
 import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
@@ -441,29 +445,34 @@ export function CaptainReviewSurface({
 
   const snapshot = (version.data?.snapshot ?? null) as ReviewSnapshot | null;
 
-  // ---- The diff map: the submitted version vs the leg's head baseline ----
+  // ---- The diff map: the submitted version vs a chosen baseline (defaults
+  // to the leg's head — the last approved version). The version strip below
+  // the canvas can pick any other version as the baseline. ----
   const audioLeg = leg === 'SOUND';
   const [view, setView] = useState<PreviewView>('preview');
   const [diffSettings, setDiffSettings] = useState<DiffSettings>(
     audioLeg ? DEFAULT_AUDIO_DIFF_SETTINGS : DEFAULT_DIFF_SETTINGS,
   );
+  const [baselineVersionId, setBaselineVersionId] = useState<string | null>(null);
+  const baselineId = baselineVersionId ?? headVersionId;
 
   const diffVersions = useMemo<PreviewDiffSelection[]>(() => {
-    // A submission pinned straight onto the head has nothing older to compare.
-    if (isAssetSubmission || !headVersionId || headVersionId === submission.timelineVersionId) return [];
+    if (isAssetSubmission) return [];
     const rows = legVersions.data ?? [];
-    const head = rows.find((v) => v.id === headVersionId);
     const submitted = rows.find((v) => v.id === submission.timelineVersionId);
-    if (!head || !submitted) return [];
+    const baseline = baselineId ? rows.find((v) => v.id === baselineId) : null;
+    // A submission pinned straight onto the (only) baseline has nothing to
+    // compare against.
+    if (!submitted || !baseline || baseline.id === submitted.id) return [];
     return [
       {
-        key: `version-${head.id}`,
-        id: head.id,
+        key: `version-${baseline.id}`,
+        id: baseline.id,
         leg,
         kind: 'version',
-        version: head.version,
-        parentVersionId: head.parentVersionId ?? null,
-        createdAt: head.createdAt,
+        version: baseline.version,
+        parentVersionId: baseline.parentVersionId ?? null,
+        createdAt: baseline.createdAt,
       },
       {
         key: `version-${submitted.id}`,
@@ -471,16 +480,32 @@ export function CaptainReviewSurface({
         leg,
         kind: 'version',
         version: submitted.version,
-        // Point at the head so the pair diffs submission vs baseline even when
+        // Point at the baseline so the pair diffs submission vs it even when
         // the submission was saved on top of an older snapshot.
-        parentVersionId: head.id,
+        parentVersionId: baseline.id,
         createdAt: submitted.createdAt,
       },
     ];
-  }, [isAssetSubmission, headVersionId, legVersions.data, leg, submission.timelineVersionId]);
+  }, [isAssetSubmission, baselineId, legVersions.data, leg, submission.timelineVersionId]);
 
   const activeSelection: PreviewDiffSelection | null = diffVersions[1] ?? null;
   const hasDiff = Boolean(activeSelection && predecessorOf(diffVersions, activeSelection));
+
+  // Open the column on the diff map when a comparison exists (the preview
+  // studios do the same), otherwise keep the plain preview.
+  const viewInitializedRef = useRef(false);
+  useEffect(() => {
+    if (viewInitializedRef.current) return;
+    if (isAssetSubmission || (legVersions.data?.length ?? 0) === 0) return;
+    viewInitializedRef.current = true;
+    setView(hasDiff ? 'diff' : 'preview');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasDiff, isAssetSubmission, legVersions.data?.length]);
+  // If the picked baseline suddenly has nothing to compare (e.g. the submitted
+  // version itself was picked), fall back to the plain preview.
+  useEffect(() => {
+    if (!hasDiff) setView('preview');
+  }, [hasDiff]);
 
   // Fallback assets of the right media kind — for the diff map when either
   // snapshot references no explicit clip/design.
@@ -494,6 +519,34 @@ export function CaptainReviewSurface({
 
   const versionNo = version.data?.version ?? null;
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
+
+  // The timeline-versions strip under the canvas — the same row the preview
+  // studios run. The submitted card is the active one; picking any other card
+  // makes the diff map compare the submission against that version instead of
+  // the leg's head. (File submissions have no version to pin, so no strip.)
+  const carouselItems = useMemo<CarouselItem[]>(() => {
+    if (isAssetSubmission) return [];
+    return (legVersions.data ?? [])
+      .map((v) => ({
+        key: `version-${v.id}`,
+        kind: 'version' as const,
+        id: v.id,
+        leg,
+        version: v.version,
+        message: v.message ?? '',
+        createdAt: v.createdAt,
+        isHead: Boolean(headVersionId && v.id === headVersionId),
+      }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAssetSubmission, legVersions.data, leg, headVersionId]);
+
+  const onVersionStripSelect = (key: string) => {
+    if (!key.startsWith('version-')) return;
+    const id = key.slice('version-'.length);
+    // Clicking the submitted card again returns to the leg's head baseline.
+    setBaselineVersionId(id === submission.timelineVersionId ? null : id);
+  };
 
   let canvasBody: ReactNode;
   if (isAssetSubmission) {
@@ -569,9 +622,9 @@ export function CaptainReviewSurface({
           />
         </div>
 
-        {/* Second column — the submitter's DESCRIPTION: just the message they
-            wrote when handing the stage in. */}
-        <div className="pv-notes-col">
+        {/* Second column — the submitter's DESCRIPTION on top and the
+            Captain's REMARK below it, each card taking half of the rail. */}
+        <div className="pv-notes-col review-rail">
           <div className="paper-card review-submission-card pv-notes" data-testid="captain-review-description">
             <div className="inline-heading">
               <span className="eyebrow"><Send size={13} /> Submitted for review</span>
@@ -581,20 +634,31 @@ export function CaptainReviewSurface({
               {isAssetSubmission ? fileParts?.message || '—' : submission.note || '—'}
             </blockquote>
           </div>
+          <ReviewRemarkCard note={note} onChange={onNoteChange} />
         </div>
       </div>
 
-      {/* Bottom row — where the preview pages run the version carousel: the
-          big Accept / Reject decision and the REMARK improvement note. */}
-      <div className="review-bottom-row">
-        <ReviewDecisionCard
-          projectId={projectId}
-          submissionId={submission.id}
-          note={note}
-          onDecided={onDecided}
-        />
-        <ReviewRemarkCard note={note} onChange={onNoteChange} />
-      </div>
+      {/* Decision — the big Accept / Reject pair, floating centered under the
+          canvas (no card around them). */}
+      <ReviewDecisionBar
+        projectId={projectId}
+        submissionId={submission.id}
+        note={note}
+        onDecided={onDecided}
+      />
+
+      {/* The timeline-versions strip — same spot as the preview studios'
+          carousel row; picking a card switches the diff baseline. */}
+      {carouselItems.length > 0 && (
+        <div className="pv-versions-row">
+          <VersionCarousel
+            items={carouselItems}
+            activeKey={`version-${submission.timelineVersionId}`}
+            onSelect={onVersionStripSelect}
+            emptyText={`No ${legLabel(leg)} versions saved on the timeline yet.`}
+          />
+        </div>
+      )}
     </div>
   );
 }
