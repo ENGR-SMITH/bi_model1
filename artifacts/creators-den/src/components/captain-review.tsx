@@ -15,7 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ArrowLeft, AudioLines, Clapperboard, FileUp, Play, Send } from 'lucide-react';
+import { ArrowLeft, AudioLines, FileUp, Image as ImageIcon, Play, Send } from 'lucide-react';
 import {
   getGetVideoAssetQueryKey,
   getGetVideoTimelineVersionQueryKey,
@@ -31,6 +31,7 @@ import { AnnotationCanvas } from '@/components/annotation-canvas';
 import {
   DEFAULT_AUDIO_DIFF_SETTINGS,
   DEFAULT_DIFF_SETTINGS,
+  FullscreenButton,
   PreviewCanvasColumn,
   WaveformPlayer,
   type DiffSettings,
@@ -107,23 +108,21 @@ function ReviewMediaStage({
   /** Review markers: this PR's timecode comments + clip boundaries. */
   markers: Marker[];
 }) {
+  const stageRef = useRef<HTMLDivElement>(null);
   return (
-    <div className="paper-card pv-stage" data-testid="captain-review-media">
+    <div className="paper-card pv-stage" ref={stageRef} data-testid="captain-review-media">
       <div className="inline-heading">
         <span className="eyebrow">
-          {isAudio ? <AudioLines size={13} /> : leg === 'THUMBNAIL' ? <Clapperboard size={13} /> : <Play size={13} />}
-          Big canvas · {legLabel(leg)}{version ? ` v${version}` : ''}
+          {isAudio ? <AudioLines size={13} /> : leg === 'THUMBNAIL' ? <ImageIcon size={13} /> : <Play size={13} />}
+          Big canvas{version ? ` · ${leg} v${version}` : ''}
         </span>
-        {leg !== 'THUMBNAIL' && (
+        {!isAudio && leg !== 'THUMBNAIL' && (
           <span className="mono-label">{formatTimecode(playheadMs)}</span>
         )}
       </div>
       <div className="pv-stage-player mt-2">
         {leg === 'THUMBNAIL' ? (
-          <ImageStage
-            src={proxyUrlFor(projectId, assetId)}
-            title={`${legLabel(leg)} design — submitted for review`}
-          >
+          <ImageStage src={proxyUrlFor(projectId, assetId)}>
             <AnnotationCanvas
               projectId={projectId}
               leg={leg}
@@ -132,8 +131,10 @@ function ReviewMediaStage({
               timelineVersionId={submission.timelineVersionId}
               submissionId={submission.id}
               headerRef={annotationHeaderRef}
+              surfaceRef={stageRef}
               glowPins
             />
+            <FullscreenButton targetRef={stageRef} />
           </ImageStage>
         ) : isAudio ? (
           <WaveformPlayer
@@ -144,7 +145,6 @@ function ReviewMediaStage({
             onTimeUpdate={onSeek}
             onPlayheadChange={onSeek}
             markers={markers}
-            title={`${legLabel(leg)} — submitted for review`}
           >
             <AnnotationCanvas
               projectId={projectId}
@@ -155,8 +155,10 @@ function ReviewMediaStage({
               timelineVersionId={submission.timelineVersionId}
               submissionId={submission.id}
               headerRef={annotationHeaderRef}
+              surfaceRef={stageRef}
               dropLine
             />
+            <FullscreenButton targetRef={stageRef} />
           </WaveformPlayer>
         ) : (
           <AssetPlayer
@@ -166,7 +168,6 @@ function ReviewMediaStage({
             playheadMs={playheadMs}
             onTimeUpdate={onSeek}
             markers={markers}
-            title={`${legLabel(leg)} — submitted for review`}
           >
             <AnnotationCanvas
               projectId={projectId}
@@ -177,6 +178,7 @@ function ReviewMediaStage({
               timelineVersionId={submission.timelineVersionId}
               submissionId={submission.id}
               headerRef={annotationHeaderRef}
+              surfaceRef={stageRef}
               timecodeReveal
               glowPins
             />
