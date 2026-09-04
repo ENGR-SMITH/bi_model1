@@ -14,6 +14,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
+import { Link } from 'wouter';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -169,10 +170,7 @@ export function TimelineTree({
           <span className="eyebrow"><GitPullRequest size={13} /> Project timeline</span>
           <span className="mono-label">A → …</span>
         </div>
-        <p className="setting-copy mt-3">
-          Nothing handed in for review on this project yet — every hand-in gets a letter
-          (A, B, C…) on the branch as the relay grows.
-        </p>
+        <p className="setting-copy mt-3">Nothing handed in for review yet.</p>
       </div>
     );
   }
@@ -252,10 +250,6 @@ export function TimelineTree({
           })}
         </div>
       </div>
-      <p className="den-footnote mt-2">
-        The trunk grows upward as approvals merge — open dashed branches are still on the Captain&apos;s
-        desk, dead ends were sent back.
-      </p>
     </div>
   );
 }
@@ -347,10 +341,7 @@ export function SubmissionOverview({ projectId }: { projectId?: string }) {
   const eyebrow = projectId
     ? 'Project review board'
     : 'Your review board';
-  const heading = projectId ? `${scopeProject?.name ?? 'This project'}'s review board` : 'Every stage, everywhere.';
-  const sub = projectId
-    ? 'Everything handed in on this project — awaiting the Captain, approved, or sent back. Your own hand-ins are tagged “you”.'
-    : 'Every stage handed in across your projects — yours and your teammates’ — and where it stands right now.';
+  const heading = projectId ? `${scopeProject?.name ?? 'This project'}'s review board` : 'Your review board';
 
   return (
     <div className="page" data-testid="submission-overview">
@@ -358,7 +349,6 @@ export function SubmissionOverview({ projectId }: { projectId?: string }) {
         <div>
           <span className="eyebrow"><Send size={13} /> {eyebrow}</span>
           <h1>{heading}</h1>
-          <p>{sub}</p>
         </div>
         {all.length > 0 && (
           <span className="den-tag muted">{all.length} submission{all.length === 1 ? '' : 's'} · {mineCount} yours</span>
@@ -394,14 +384,7 @@ export function SubmissionOverview({ projectId }: { projectId?: string }) {
             <div className="empty-state" data-testid="submission-overview-empty">
               <Inbox size={22} />
               <h3>Nothing submitted yet.</h3>
-              <p>
-                When a stage is handed in for review — Video, Audio, Thumbnail, or Finish — it lands here
-                with its status, and the Captain&apos;s decision (with their REMARK) shows up when it&apos;s made.
-              </p>
-              <p className="den-footnote">
-                If the project&apos;s Captain uploaded while signed in as themselves, their file goes straight
-                to the vault unless they choose to submit it for review — so it never appears here.
-              </p>
+              <p>When a stage is handed in for review, it lands here with its status and decision.</p>
             </div>
           ) : (
           <div className="submission-overview-grid">
@@ -434,8 +417,9 @@ export function SubmissionOverview({ projectId }: { projectId?: string }) {
                   const mine = row.submittedById === userId;
                   const expanded = open?.id === row.id;
                   const color = reviewerColor(row.submittedById);
+                  const statusCls = row.status === 'APPROVED' ? 'status-approved' : row.status === 'REJECTED' ? 'status-rejected' : 'status-submitted';
                   return (
-                    <div key={row.id} className="paper-card submission-row-card">
+                    <div key={row.id} className={`paper-card submission-row-card ${statusCls}`}>
                       <button
                         type="button"
                         className="list-row submission-row"
@@ -486,12 +470,8 @@ export function SubmissionOverview({ projectId }: { projectId?: string }) {
                             <div className="submission-decision is-rejected">
                               <XCircle size={14} />
                               <div>
-                                <b>{isFileSubmission(row) ? 'Sent back — file deleted' : 'Sent back by the Captain'}</b>
-                                <p>
-                                  {row.decisionNote || (isFileSubmission(row)
-                                    ? 'The Captain sent the file back — it was removed and the vault was not changed.'
-                                    : 'No note was attached — open the stage and check the review comments.')}
-                                </p>
+                                <b>{isFileSubmission(row) ? 'Sent back — file removed' : 'Sent back by the Captain'}</b>
+                                {row.decisionNote && <p>{row.decisionNote}</p>}
                                 {row.decidedAt && <small>{timeAgo(row.decidedAt)}</small>}
                               </div>
                             </div>
@@ -512,16 +492,17 @@ export function SubmissionOverview({ projectId }: { projectId?: string }) {
                               <Clock3 size={14} />
                               <div>
                                 <b>Awaiting the Captain&apos;s review</b>
-                                <p>Submitted {timeAgo(row.createdAt)}. The decision shows up here when it&apos;s made.</p>
+                                <p>Submitted {timeAgo(row.createdAt)}</p>
                               </div>
                             </div>
                           )}
-                          <a
-                            className="link-btn"
+                          <Link
+                            className="submission-open-preview"
                             href={`/projects/${row.projectId}/preview`}
+                            data-testid={`submission-open-preview-${row.id}`}
                           >
                             Open the project preview →
-                          </a>
+                          </Link>
                         </div>
                       )}
                     </div>
@@ -556,12 +537,6 @@ export function SubmissionOverview({ projectId }: { projectId?: string }) {
         </>
       )}
 
-      {all.length > 0 && (
-        <p className="den-footnote mt-6">
-          Approved stages progress the project timeline — rejected ones are sent back to the submitter with the
-          Captain&apos;s REMARK, and the timeline stays untouched until it passes.
-        </p>
-      )}
     </div>
   );
 }

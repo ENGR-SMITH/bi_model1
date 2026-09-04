@@ -4393,15 +4393,15 @@ select optgroup {
 
 /* ---- Review desk ---------------------------------------------------------- */
 .review-decision-buttons {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-  margin-top: 14px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  margin-top: 10px;
 }
 .review-decision-approve,
 .review-decision-reject {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 16px 12px;
+  padding: 11px 12px;
   border-radius: 12px;
-  font: 800 16px var(--app-font-sans);
+  font: 800 15px var(--app-font-sans);
   color: #fff;
   border: 2px solid transparent;
   transition: transform .12s ease, filter .12s ease, opacity .12s ease;
@@ -4422,30 +4422,40 @@ select optgroup {
 .review-decision-reject:disabled { opacity: .45; cursor: not-allowed; }
 .review-oracle-note {
   width: 100%;
-  margin-top: 10px;
+  min-height: 78px;
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid hsl(var(--border));
   background: hsl(var(--card));
   color: hsl(var(--foreground));
   font: 13px/1.55 var(--app-font-sans);
-  resize: vertical;
+  resize: none;
 }
 .review-oracle-note:focus { outline: none; border-color: hsl(var(--accent)); box-shadow: var(--accent-ring); }
 
 /* ---- Captain review workbench (preview/video-style template) ---- */
-/* The workbench is a preview-page column: a slim toolbar row, then the
-   canvas | description top row (the exact preview-page grid), then the bottom
-   row split into the Decision and REMARK cards (in place of the carousel). */
-.review-toolbar {
-  flex: 0 0 auto;
-  display: flex;
+/* The workbench is the exact preview-page grid — canvas | description top
+   row, then the bottom row split into the Decision and REMARK cards (in place
+   of the carousel) — with a tighter frame than the standard preview pages. */
+.review-page { padding: 8px clamp(6px, 1vw, 12px) 8px; }
+.review-page .pv-top { gap: 8px; }
+.review-page .pv-canvas-col { gap: 10px; }
+
+/* The compact back-to-queue control in the column header (icon only). */
+.pv-review-back {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease;
 }
-.review-toolbar .link-btn { white-space: nowrap; }
-.review-toolbar .mono-label { min-width: 0; }
+.pv-review-back:hover { color: hsl(var(--foreground)); border-color: hsl(var(--accent) / .5); }
 
 /* The right rail holds just the submitter's message, filling the column and
    scrolling on its own inside the fixed grid — like the notes wall does on
@@ -4457,22 +4467,6 @@ select optgroup {
   flex-direction: column;
   overflow-y: auto;
 }
-.review-description-file {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  padding: 8px 11px;
-  border-radius: 9px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--secondary) / .4);
-  color: hsl(var(--foreground));
-  font-size: 12.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.review-description-file svg { color: hsl(var(--accent)); flex-shrink: 0; }
 .review-description-text {
   margin: 10px 0 0;
   padding: 12px 14px;
@@ -4491,10 +4485,15 @@ select optgroup {
   min-width: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
   align-items: stretch;
 }
 .review-bottom-row > .paper-card { min-width: 0; }
+.review-remark-card {
+  display: flex;
+  flex-direction: column;
+}
+.review-remark-card .review-oracle-note { flex: 1; }
 
 /* ---- Account panels: workspace storage bar + CV card (profile page) ---- */
 .account-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 26px; }
@@ -4917,7 +4916,15 @@ select optgroup {
   border-color: hsl(var(--accent) / .5);
   background: hsl(var(--accent) / .1);
 }
-.submission-row-card { padding: 0; overflow: hidden; }
+.submission-row-card {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  border-left-width: 3px;
+}
+.submission-row-card.status-submitted { border-left-color: hsl(var(--sidebar-primary) / .55); }
+.submission-row-card.status-approved { border-left-color: hsl(155 55% 38%); }
+.submission-row-card.status-rejected { border-left-color: hsl(var(--destructive) / .8); }
 .submission-row { padding: 12px 14px; }
 .submission-row small { display: block; max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .submission-detail { padding: 0 14px 14px; border-top: 1px dashed hsl(var(--border)); }
@@ -4942,6 +4949,21 @@ select optgroup {
 .submission-decision.is-pending { background: hsl(var(--sidebar-primary) / .07); border-color: hsl(var(--sidebar-primary) / .25); }
 .submission-decision.is-pending b { color: hsl(var(--sidebar-primary)); }
 .submission-detail > .link-btn { margin-top: 12px; }
+.submission-open-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 8px 13px;
+  border-radius: 9px;
+  border: 1px solid hsl(var(--accent) / .45);
+  background: hsl(var(--accent) / .1);
+  color: hsl(var(--accent));
+  font: 600 12px var(--app-font-sans);
+  text-decoration: none;
+  transition: background .15s ease, border-color .15s ease;
+}
+.submission-open-preview:hover { background: hsl(var(--accent) / .18); border-color: hsl(var(--accent) / .7); }
 .submission-tree-col { position: sticky; top: 18px; }
 
 /* ---- Relay-flow timeline tree --------------------------------------------- */

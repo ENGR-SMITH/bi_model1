@@ -15,7 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ArrowLeft, AudioLines, Clapperboard, FileUp, GitPullRequest, Play, Send } from 'lucide-react';
+import { ArrowLeft, AudioLines, Clapperboard, FileUp, Play, Send } from 'lucide-react';
 import {
   getGetVideoAssetQueryKey,
   getGetVideoTimelineVersionQueryKey,
@@ -389,19 +389,6 @@ export function CaptainReviewSurface({
 
   return (
     <div className="page pv-page review-page" data-testid="review-workbench">
-      <div className="review-toolbar">
-        <button type="button" className="link-btn" onClick={onBack} data-testid="review-back">
-          <ArrowLeft size={13} /> Back to the queue
-        </button>
-        <span className={`den-tag ${LEG_TONES[leg] ?? 'muted'}`}>{legLabel(leg)}</span>
-        <span className="mono-label truncate">
-          {isAssetSubmission ? fileParts?.fileName : `${legLabel(leg)} v${versionNo ?? '…'} submitted`}
-        </span>
-        <span className="den-tag gold ml-auto">
-          <GitPullRequest size={11} /> {submission.status}
-        </span>
-      </div>
-
       <div className="pv-top">
         {/* First column — the Big canvas with Preview | Diff map, exactly like
             the preview pages. */}
@@ -410,7 +397,18 @@ export function CaptainReviewSurface({
             view={view}
             onViewChange={setView}
             hasDiff={hasDiff}
-            eyebrow={<span className="eyebrow"><Clapperboard size={13} /> Big canvas</span>}
+            eyebrow={
+              <button
+                type="button"
+                className="pv-review-back"
+                onClick={onBack}
+                title="Back to the queue"
+                aria-label="Back to the queue"
+                data-testid="review-back"
+              >
+                <ArrowLeft size={14} />
+              </button>
+            }
             annotationHeaderRef={annotationHeaderRef}
             settings={hasDiff ? diffSettings : undefined}
             onSettingsChange={hasDiff ? setDiffSettings : undefined}
@@ -441,11 +439,6 @@ export function CaptainReviewSurface({
               <span className="eyebrow"><Send size={13} /> Submitted for review</span>
               <span className={`den-tag ${LEG_TONES[leg] ?? 'muted'}`}>{legLabel(leg)}</span>
             </div>
-            {isAssetSubmission && (
-              <div className="review-description-file">
-                <FileUp size={13} /> <b>{fileParts?.fileName}</b>
-              </div>
-            )}
             <blockquote className="review-description-text">
               {isAssetSubmission ? fileParts?.message || '—' : submission.note || '—'}
             </blockquote>
