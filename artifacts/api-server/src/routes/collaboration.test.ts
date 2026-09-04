@@ -5,7 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { eq } from "drizzle-orm";
-import { encryptSecret } from "../lib/oracle";
+import { encryptSecret } from "../lib/secrets";
 
 // Voice-note uploads land on disk; point multer at a throwaway temp dir.
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "collaboration-test-"));

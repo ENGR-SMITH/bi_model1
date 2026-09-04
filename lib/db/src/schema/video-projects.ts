@@ -18,6 +18,10 @@ import { z } from "zod/v4";
 
 export const tandemVideoProjectsTable = pgTable("tandem_video_projects", {
   id: text("id").primaryKey(),
+  // The workspace channel this project lives in (multi-channel restructure).
+  // Legacy pre-channel projects keep this null until their owner attaches
+  // them to a channel; null-channel projects stay off the CMS/channel homes.
+  channelId: text("channel_id"),
   ownerId: text("owner_id").notNull(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),

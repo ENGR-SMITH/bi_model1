@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { eq, asc } from "drizzle-orm";
 import { db, oracleHealthEventsTable, oracleProvidersTable, type OracleProvider } from "@workspace/db";
+import { decryptSecret, encryptSecret, keyHint } from "./secrets";
 
 export type ProviderId = "groq" | "openrouter" | "ollama" | "lmstudio" | "freebuff";
 export type ProviderHealth = "connected" | "not_configured" | "checking" | "rate_limited" | "unavailable" | "error" | "disabled";
@@ -61,31 +62,6 @@ export const providerDefinitions: ProviderDefinition[] = [
 ];
 
 const definitionFor = (id: string) => providerDefinitions.find((item) => item.id === id);
-const encryptionKey = () => crypto.createHash("sha256").update(process.env.SESSION_SECRET ?? "manuskript-development-key").digest();
-
-export function encryptSecret(value: string): string {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", encryptionKey(), iv);
-  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
-  return [iv.toString("base64url"), cipher.getAuthTag().toString("base64url"), encrypted.toString("base64url")].join(".");
-}
-
-function decryptSecret(value: string): string {
-  const [ivText, tagText, encryptedText] = value.split(".");
-  const decipher = crypto.createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(ivText, "base64url"));
-  decipher.setAuthTag(Buffer.from(tagText, "base64url"));
-  return Buffer.concat([decipher.update(Buffer.from(encryptedText, "base64url")), decipher.final()]).toString("utf8");
-}
-
-export function keyHint(ciphertext: string | null): string | null {
-  if (!ciphertext) return null;
-  try {
-    const value = decryptSecret(ciphertext);
-    return value.length > 4 ? `${"•".repeat(Math.min(8, value.length - 4))}${value.slice(-4)}` : "••••";
-  } catch {
-    return "configured";
-  }
-}
 
 // Environment-variable mapping so model credentials can be set once in .env
 // (or the deployment environment) and the admin page reflects them. API keys

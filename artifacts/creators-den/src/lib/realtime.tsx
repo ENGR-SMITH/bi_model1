@@ -23,6 +23,8 @@ import {
 import { io, type Socket } from 'socket.io-client';
 import { useAuth, useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
+import { denRouteInfo } from '@/lib/den-urls';
 import {
   getGetVideoAssetQueryKey,
   getGetVideoProjectQueryKey,
@@ -43,6 +45,15 @@ import {
 export interface PresenceEntry {
   userId: string;
   name: string;
+  leg: string | null;
+  joinedAt: number;
+}
+
+/** A member visible on a channel — through a project or on the home itself. */
+export interface ChannelPresenceEntry {
+  userId: string;
+  name: string;
+  projectId: string | null;
   leg: string | null;
   joinedAt: number;
 }
@@ -105,17 +116,24 @@ export function useRealtimeSocket(): Socket | null {
 /**
  * Joins a project room with presence and keeps that project's caches live.
  * Call once per project page; `leg` announces which studio the user is in.
+ * Channel-scoped pages also announce the channel, so the channel home can
+ * show who is active on any project in the channel.
  */
 export function useProjectRealtime(projectId?: string, leg?: string | null) {
   const socket = useRealtimeSocket();
   const queryClient = useQueryClient();
   const { user } = useUser();
+  const [location] = useLocation();
+  const info = denRouteInfo(location);
+  // Only announce a channel when the page actually runs inside one — legacy
+  // flat / read-only public pages stay project-only.
+  const channelId = info.mode === 'channel-project' ? info.channelId : null;
 
   useEffect(() => {
     if (!socket || !projectId) return;
 
     const name = user?.firstName || user?.username || undefined;
-    socket.emit('presence:join', { projectId, leg: leg ?? null, name });
+    socket.emit('presence:join', { projectId, channelId, leg: leg ?? null, name });
 
     const invalidate = (keys: Array<readonly unknown[]>) => {
       for (const key of keys) {
@@ -194,7 +212,37 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
       socket.off('grant.revoked', onGrant);
       socket.emit('presence:leave', { projectId });
     };
-  }, [socket, projectId, leg, queryClient, user?.firstName, user?.username]);
+  }, [socket, projectId, channelId, leg, queryClient, user?.firstName, user?.username]);
+}
+
+/**
+ * Live roster of everyone currently visible on a channel (on any project or
+ * on the channel home). Subscribes the caller's socket to the channel room so
+ * the channel home can show contributor dots and per-project avatar stacks.
+ */
+export function useChannelPresence(channelId?: string): ChannelPresenceEntry[] {
+  const socket = useRealtimeSocket();
+  const { user } = useUser();
+  const [roster, setRoster] = useState<ChannelPresenceEntry[]>([]);
+
+  useEffect(() => {
+    if (!socket || !channelId) {
+      setRoster([]);
+      return;
+    }
+    const apply = (payload: { channelId: string; roster: ChannelPresenceEntry[] }) => {
+      if (payload.channelId !== channelId) return;
+      setRoster(payload.roster);
+    };
+    socket.emit('presence:channelJoin', { channelId });
+    socket.on('channel.presence', apply);
+    return () => {
+      socket.off('channel.presence', apply);
+      socket.emit('presence:channelLeave', { channelId });
+    };
+  }, [socket, channelId, user?.id]);
+
+  return roster;
 }
 
 /** Live roster of members currently in a project room (for presence UI). */

@@ -27,3 +27,4 @@ export * from "./video-production";
 export * from "./account";
 export * from "./tickets";
 export * from "./subscriptions";
+export * from "./channels";

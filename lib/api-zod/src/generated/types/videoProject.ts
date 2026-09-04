@@ -9,6 +9,11 @@ import type { VideoProjectVisibility } from './videoProjectVisibility';
 
 export interface VideoProject {
   id: string;
+  /**
+     * The workspace channel this project lives in (null for legacy unlinked projects)
+     * @nullable
+     */
+  channelId: string | null;
   ownerId: string;
   name: string;
   description: string;

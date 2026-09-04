@@ -2030,10 +2030,17 @@ export const PurchaseTicketResponse = zod.object({
 
 
 /**
+ * Returns the projects the user owns or is a member of. When a channelId is given, the list is scoped to that channel (editors only see the projects they are members of there). Set unlinked=1 to list only the caller's channel-less legacy projects.
  * @summary List the authenticated user's content-creation projects
  */
+export const ListVideoProjectsQueryParams = zod.object({
+  "channelId": zod.coerce.string().optional().describe('When set, only return projects inside this channel (caller must be a channel member)'),
+  "unlinked": zod.coerce.string().optional().describe('When 1, return only the caller\'s projects that are not attached to any channel yet')
+})
+
 export const ListVideoProjectsResponseItem = zod.object({
   "id": zod.string(),
+  "channelId": zod.string().nullable().describe('The workspace channel this project lives in (null for legacy unlinked projects)'),
   "ownerId": zod.string(),
   "name": zod.string(),
   "description": zod.string(),
@@ -2046,7 +2053,7 @@ export const ListVideoProjectsResponse = zod.array(ListVideoProjectsResponseItem
 
 
 /**
- * @summary Create a locked video project (Captain)
+ * @summary Create a locked video project in a channel (Captain)
  */
 export const createVideoProjectBodyNameMax = 120;
 
@@ -2054,13 +2061,16 @@ export const createVideoProjectBodyDescriptionMax = 2000;
 
 
 
+
 export const CreateVideoProjectBody = zod.object({
   "name": zod.string().min(1).max(createVideoProjectBodyNameMax),
-  "description": zod.string().max(createVideoProjectBodyDescriptionMax).optional()
-})
+  "description": zod.string().max(createVideoProjectBodyDescriptionMax).optional(),
+  "channelId": zod.string().min(1).optional().describe('The workspace channel this project belongs to; the creator must own it (omit only for legacy\/unlinked projects)')
+}).describe('Projects are created inside a workspace channel when channelId is given (the creator must own that channel); omitting it creates a legacy unlinked project for pre-channel tooling\/tests')
 
 export const CreateVideoProjectResponse = zod.object({
   "id": zod.string(),
+  "channelId": zod.string().nullable().describe('The workspace channel this project lives in (null for legacy unlinked projects)'),
   "ownerId": zod.string(),
   "name": zod.string(),
   "description": zod.string(),
@@ -2097,6 +2107,306 @@ export const CreateVideoProjectResponse = zod.object({
 
 
 /**
+ * Channels the caller owns (OWNER) or is an editor on (EDITOR), each with their role, YouTube link state, and project/editor counts. Used by the CMS landing page.
+ * @summary List the channels on the caller's CMS grid
+ */
+export const ListChannelsResponseItem = zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string(),
+  "status": zod.enum(['CREATED', 'CONNECTED']),
+  "name": zod.string(),
+  "youtubeChannelId": zod.string().nullable(),
+  "youtubeTitle": zod.string().nullable(),
+  "youtubeDescription": zod.string().nullable(),
+  "youtubeAvatarUrl": zod.string().nullable(),
+  "youtubeBannerUrl": zod.string().nullable(),
+  "youtubeCountry": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "myRole": zod.enum(['OWNER', 'EDITOR']),
+  "youtubeConnected": zod.boolean(),
+  "projectCount": zod.number().int(),
+  "editorCount": zod.number().int()
+}).describe('A channel as shown on the CMS grid \/ den chrome, with the viewer\'s role and counts')
+export const ListChannelsResponse = zod.array(ListChannelsResponseItem)
+
+
+/**
+ * Creates the channel and its OWNER membership row. YouTube OAuth linking (Phase 2 connect flow) later upgrades it to CONNECTED with real branding.
+ * @summary Create a new Creator Den channel (CREATED, unlinked)
+ */
+export const createChannelBodyNameMax = 80;
+
+
+
+export const CreateChannelBody = zod.object({
+  "name": zod.string().min(1).max(createChannelBodyNameMax)
+})
+
+export const CreateChannelResponse = zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string(),
+  "status": zod.enum(['CREATED', 'CONNECTED']),
+  "name": zod.string(),
+  "youtubeChannelId": zod.string().nullable(),
+  "youtubeTitle": zod.string().nullable(),
+  "youtubeDescription": zod.string().nullable(),
+  "youtubeAvatarUrl": zod.string().nullable(),
+  "youtubeBannerUrl": zod.string().nullable(),
+  "youtubeCountry": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "myRole": zod.enum(['OWNER', 'EDITOR']),
+  "youtubeConnected": zod.boolean(),
+  "projectCount": zod.number().int(),
+  "editorCount": zod.number().int()
+}).describe('A channel as shown on the CMS grid \/ den chrome, with the viewer\'s role and counts')
+
+
+/**
+ * @summary Read a channel the caller is on (owner or editor)
+ */
+
+
+
+export const GetChannelParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const GetChannelResponse = zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string(),
+  "status": zod.enum(['CREATED', 'CONNECTED']),
+  "name": zod.string(),
+  "youtubeChannelId": zod.string().nullable(),
+  "youtubeTitle": zod.string().nullable(),
+  "youtubeDescription": zod.string().nullable(),
+  "youtubeAvatarUrl": zod.string().nullable(),
+  "youtubeBannerUrl": zod.string().nullable(),
+  "youtubeCountry": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "myRole": zod.enum(['OWNER', 'EDITOR']),
+  "youtubeConnected": zod.boolean(),
+  "projectCount": zod.number().int(),
+  "editorCount": zod.number().int()
+}).describe('A channel as shown on the CMS grid \/ den chrome, with the viewer\'s role and counts')
+
+
+/**
+ * @summary Rename a channel (owner only)
+ */
+
+
+
+export const UpdateChannelParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const updateChannelBodyNameMax = 80;
+
+
+
+export const UpdateChannelBody = zod.object({
+  "name": zod.string().min(1).max(updateChannelBodyNameMax)
+})
+
+export const UpdateChannelResponse = zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string(),
+  "status": zod.enum(['CREATED', 'CONNECTED']),
+  "name": zod.string(),
+  "youtubeChannelId": zod.string().nullable(),
+  "youtubeTitle": zod.string().nullable(),
+  "youtubeDescription": zod.string().nullable(),
+  "youtubeAvatarUrl": zod.string().nullable(),
+  "youtubeBannerUrl": zod.string().nullable(),
+  "youtubeCountry": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "myRole": zod.enum(['OWNER', 'EDITOR']),
+  "youtubeConnected": zod.boolean(),
+  "projectCount": zod.number().int(),
+  "editorCount": zod.number().int()
+}).describe('A channel as shown on the CMS grid \/ den chrome, with the viewer\'s role and counts')
+
+
+/**
+ * Fails with 409 while the channel still has projects; the channel must be emptied first. Deleting also removes channel membership rows.
+ * @summary Delete an empty channel (owner only)
+ */
+
+
+
+export const DeleteChannelParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const DeleteChannelResponse = zod.void()
+
+
+/**
+ * Validates the caller owns the channel, generates a PKCE consent URL with a signed state token, and returns the Google authorization URL to open in a new tab. Fails when YouTube OAuth credentials are not configured on the server.
+ * @summary Start linking a channel to its YouTube channel via Google OAuth (owner only)
+ */
+
+
+
+export const StartChannelOauthParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const StartChannelOauthResponse = zod.object({
+  "url": zod.string().describe('Full Google OAuth authorization URL (PKCE) to open in a new tab')
+}).describe('The Google consent URL to open for the channel owner\'s YouTube link')
+
+
+/**
+ * Verifies the signed state, swaps the code for tokens at Google, fetches the connected YouTube channel (mine=true), refuses a YouTube channel already bound elsewhere, stores the tokens encrypted, and upgrades the channel to CONNECTED with real branding.
+ * @summary Exchange the Google consent code and bind the YouTube channel
+ */
+
+
+
+export const ExchangeChannelOauthParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const ExchangeChannelOauthBody = zod.object({
+  "state": zod.string().describe('The signed state token from the consent URL'),
+  "code": zod.string().describe('The one-time authorization code from Google\'s redirect')
+}).describe('The Google callback parameters, exchanged server-side for tokens')
+
+export const ExchangeChannelOauthResponse = zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string(),
+  "status": zod.enum(['CREATED', 'CONNECTED']),
+  "name": zod.string(),
+  "youtubeChannelId": zod.string().nullable(),
+  "youtubeTitle": zod.string().nullable(),
+  "youtubeDescription": zod.string().nullable(),
+  "youtubeAvatarUrl": zod.string().nullable(),
+  "youtubeBannerUrl": zod.string().nullable(),
+  "youtubeCountry": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "myRole": zod.enum(['OWNER', 'EDITOR']),
+  "youtubeConnected": zod.boolean(),
+  "projectCount": zod.number().int(),
+  "editorCount": zod.number().int()
+}).describe('A channel as shown on the CMS grid \/ den chrome, with the viewer\'s role and counts')
+
+
+/**
+ * Revokes the Google token (best-effort), clears the encrypted token vault, and returns the channel to CREATED. Projects, roster, and editors stay; the card shows the connect action again.
+ * @summary Disconnect the YouTube link (owner only)
+ */
+
+
+
+export const DisconnectChannelOauthParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const DisconnectChannelOauthResponse = zod.object({
+  "id": zod.string(),
+  "ownerId": zod.string(),
+  "status": zod.enum(['CREATED', 'CONNECTED']),
+  "name": zod.string(),
+  "youtubeChannelId": zod.string().nullable(),
+  "youtubeTitle": zod.string().nullable(),
+  "youtubeDescription": zod.string().nullable(),
+  "youtubeAvatarUrl": zod.string().nullable(),
+  "youtubeBannerUrl": zod.string().nullable(),
+  "youtubeCountry": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "myRole": zod.enum(['OWNER', 'EDITOR']),
+  "youtubeConnected": zod.boolean(),
+  "projectCount": zod.number().int(),
+  "editorCount": zod.number().int()
+}).describe('A channel as shown on the CMS grid \/ den chrome, with the viewer\'s role and counts')
+
+
+/**
+ * GitHub-contributors-style roster for the channel home: every user on the channel plus the project roles they hold across the channel's projects.
+ * @summary List the channel roster (owner + editors) with resolved identities
+ */
+
+
+
+export const ListChannelPeopleParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const ListChannelPeopleResponseItem = zod.object({
+  "userId": zod.string(),
+  "name": zod.string().nullable(),
+  "imageUrl": zod.string().nullable(),
+  "role": zod.enum(['OWNER', 'EDITOR']),
+  "projectRoles": zod.array(zod.string()).describe('Roles the person holds across the channel\'s projects (CAPTAIN for the owner on their projects)'),
+  "projectCount": zod.number().int().describe('Number of the channel\'s projects this person is on')
+}).describe('One roster entry on a channel home — a GitHub-contributors-style avatar with the roles they hold on the channel\'s projects')
+export const ListChannelPeopleResponse = zod.array(ListChannelPeopleResponseItem)
+
+
+/**
+ * The owner sees every project in the channel; an editor sees only the projects they are an ACTIVE member of. Same project-row shape as the global project list.
+ * @summary List the projects shown on a channel home
+ */
+
+
+
+export const ListChannelProjectsParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const ListChannelProjectsResponseItem = zod.object({
+  "id": zod.string(),
+  "channelId": zod.string().nullable().describe('The workspace channel this project lives in (null for legacy unlinked projects)'),
+  "ownerId": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.string(),
+  "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListChannelProjectsResponse = zod.array(ListChannelProjectsResponseItem)
+
+
+/**
+ * Legacy projects created before the multi-channel restructure have no channel. The Captain attaches them to a channel they own so the project appears on that channel home (and the CMS grid) again.
+ * @summary Attach a legacy unlinked project to one of the Captain's channels
+ */
+
+
+
+export const AttachVideoProjectChannelParams = zod.object({
+  "projectId": zod.coerce.string().min(1)
+})
+
+
+
+
+export const AttachVideoProjectChannelBody = zod.object({
+  "channelId": zod.string().min(1)
+}).describe('The channel to attach a legacy unlinked project to')
+
+export const AttachVideoProjectChannelResponse = zod.object({
+  "id": zod.string(),
+  "channelId": zod.string().nullable().describe('The workspace channel this project lives in (null for legacy unlinked projects)'),
+  "ownerId": zod.string(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "status": zod.string(),
+  "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
  * Public profile track history — only projects the user owns or participates in that are marked PUBLIC. Private projects never appear.
  * @summary List a user's public content-creation projects
  */
@@ -2109,6 +2419,7 @@ export const ListPublicVideoProjectsParams = zod.object({
 
 export const ListPublicVideoProjectsResponseItem = zod.object({
   "id": zod.string(),
+  "channelId": zod.string().nullable().describe('The workspace channel this project lives in (null for legacy unlinked projects)'),
   "ownerId": zod.string(),
   "name": zod.string(),
   "description": zod.string(),
@@ -2281,6 +2592,7 @@ export const GetVideoProjectParams = zod.object({
 
 export const GetVideoProjectResponse = zod.object({
   "id": zod.string(),
+  "channelId": zod.string().nullable().describe('The workspace channel this project lives in (null for legacy unlinked projects)'),
   "ownerId": zod.string(),
   "name": zod.string(),
   "description": zod.string(),
@@ -2347,6 +2659,7 @@ export const UpdateVideoProjectVisibilityBody = zod.object({
 
 export const UpdateVideoProjectVisibilityResponse = zod.object({
   "id": zod.string(),
+  "channelId": zod.string().nullable().describe('The workspace channel this project lives in (null for legacy unlinked projects)'),
   "ownerId": zod.string(),
   "name": zod.string(),
   "description": zod.string(),

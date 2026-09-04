@@ -36,10 +36,24 @@ export type PresenceEntry = {
   joinedAt: number;
 };
 
+// Channel-level presence: who is active on ANY project in a channel (or on
+// the channel home itself). Entries carry the projectId so the channel home
+// can light up per-project avatar stacks on its project carousel.
+export type ChannelPresenceEntry = {
+  userId: string;
+  name: string;
+  projectId: string | null;
+  leg: string | null;
+  joinedAt: number;
+};
+
 // projectId -> userId -> presence entry
 const presenceByProject = new Map<string, Map<string, PresenceEntry>>();
+// channelId -> userId -> presence entry
+const presenceByChannel = new Map<string, Map<string, ChannelPresenceEntry>>();
 
 const PROJECT_ROOM = (projectId: string) => `project:${projectId}`;
+const CHANNEL_ROOM = (channelId: string) => `channel:${channelId}`;
 const USER_ROOM = (userId: string) => `user:${userId}`;
 
 function displayNameFor(socket: Socket): string {
@@ -53,6 +67,27 @@ function broadcastRoster(projectId: string): void {
   io?.to(room).emit("presence.updated", { projectId, roster });
 }
 
+function broadcastChannelRoster(channelId: string): void {
+  const room = CHANNEL_ROOM(channelId);
+  const roster = [...(presenceByChannel.get(channelId)?.values() ?? [])];
+  io?.to(room).emit("channel.presence", { channelId, roster });
+}
+
+/** Drops the user's presence entry for a specific project on a channel. */
+function removeChannelProjectEntry(
+  socket: Socket,
+  channelId: string,
+  projectId: string,
+): void {
+  const entries = presenceByChannel.get(channelId);
+  const userId = socket.data.userId as string | undefined;
+  if (!entries || !userId) return;
+  const entry = entries.get(userId);
+  if (entry && entry.projectId === projectId) entries.delete(userId);
+  if (entries.size === 0) presenceByChannel.delete(channelId);
+  broadcastChannelRoster(channelId);
+}
+
 function leaveProject(socket: Socket, projectId: string): void {
   const entries = presenceByProject.get(projectId);
   const userId = socket.data.userId as string | undefined;
@@ -60,6 +95,14 @@ function leaveProject(socket: Socket, projectId: string): void {
   if (entries && entries.size === 0) presenceByProject.delete(projectId);
   socket.leave(PROJECT_ROOM(projectId));
   broadcastRoster(projectId);
+
+  // The user may also be visible on a channel through this project (presence
+  // joins carry the channel id when the caller is inside a channel-scoped
+  // page). Drop that contribution to the channel roster.
+  const channelId = socket.data.projectChannel as Record<string, string> | undefined;
+  if (channelId && channelId[projectId]) {
+    removeChannelProjectEntry(socket, channelId[projectId], projectId);
+  }
 }
 
 /**
@@ -100,10 +143,14 @@ export function initRealtime(server: HttpServer): Server {
   io.on("connection", (socket) => {
     const userId = socket.data.userId as string;
     socket.join(USER_ROOM(userId));
-    // Track the projects this socket is present in so disconnect can clean up.
+    // Track the projects + channels this socket is present in so disconnect
+    // can clean up both presence maps.
     socket.data.projects = new Set<string>();
+    socket.data.channels = new Set<string>();
+    // projectId -> channelId for the projects joined with channel context.
+    socket.data.projectChannel = {} as Record<string, string>;
 
-    socket.on("presence:join", (payload: { projectId?: string; leg?: string | null; name?: string } | null) => {
+    socket.on("presence:join", (payload: { projectId?: string; channelId?: string | null; leg?: string | null; name?: string } | null) => {
       const projectId = payload?.projectId;
       if (!projectId) return;
       if (payload?.name) socket.data.name = String(payload.name);
@@ -125,6 +172,67 @@ export function initRealtime(server: HttpServer): Server {
       socket.emit("presence.roster", { projectId, roster });
       broadcastRoster(projectId);
       logger.info({ userId, projectId }, "Presence joined");
+
+      // Channel-scoped pages also feed the channel roster (channel home shows
+      // who is active on any project in the channel + per-project dots).
+      const channelId = payload?.channelId || null;
+      if (channelId) {
+        const channelEntries =
+          presenceByChannel.get(channelId) ?? new Map<string, ChannelPresenceEntry>();
+        channelEntries.set(userId, {
+          userId,
+          name: displayNameFor(socket),
+          projectId,
+          leg: payload?.leg ?? null,
+          joinedAt: Date.now(),
+        });
+        presenceByChannel.set(channelId, channelEntries);
+        socket.join(CHANNEL_ROOM(channelId));
+        (socket.data.channels as Set<string>).add(channelId);
+        (socket.data.projectChannel as Record<string, string>)[projectId] = channelId;
+        broadcastChannelRoster(channelId);
+      }
+    });
+
+    // The channel home (no project open) subscribes to the channel roster and
+    // is itself visible on the channel (projectId: null) so teammates see the
+    // home is occupied.
+    socket.on("presence:channelJoin", (payload: { channelId?: string } | null) => {
+      const channelId = payload?.channelId;
+      if (!channelId) return;
+      socket.join(CHANNEL_ROOM(channelId));
+      (socket.data.channels as Set<string>).add(channelId);
+      const channelEntries =
+        presenceByChannel.get(channelId) ?? new Map<string, ChannelPresenceEntry>();
+      channelEntries.set(userId, {
+        userId,
+        name: displayNameFor(socket),
+        projectId: null,
+        leg: null,
+        joinedAt: Date.now(),
+      });
+      presenceByChannel.set(channelId, channelEntries);
+      const roster = [...channelEntries.values()];
+      socket.emit("channel.presence", { channelId, roster });
+      broadcastChannelRoster(channelId);
+    });
+
+    socket.on("presence:channelLeave", (payload: { channelId?: string } | null) => {
+      const channelId = payload?.channelId;
+      if (!channelId) return;
+      socket.leave(CHANNEL_ROOM(channelId));
+      (socket.data.channels as Set<string>).delete(channelId);
+      const channelEntries = presenceByChannel.get(channelId);
+      if (channelEntries) {
+        // Only drop the home presence (projectId null); project-scoped entries
+        // are removed when their project presence leaves.
+        const entry = channelEntries.get(userId);
+        if (entry && entry.projectId === null) {
+          channelEntries.delete(userId);
+          if (channelEntries.size === 0) presenceByChannel.delete(channelId);
+        }
+      }
+      broadcastChannelRoster(channelId);
     });
 
     socket.on("presence:update", (payload: { projectId?: string; leg?: string | null } | null) => {
@@ -149,6 +257,15 @@ export function initRealtime(server: HttpServer): Server {
       for (const projectId of socket.data.projects as Set<string>) {
         leaveProject(socket, projectId);
       }
+      // Channel-home presences (projectId null) belong to this socket only.
+      for (const channelId of socket.data.channels as Set<string>) {
+        const channelEntries = presenceByChannel.get(channelId);
+        if (channelEntries && channelEntries.get(userId)?.projectId === null) {
+          channelEntries.delete(userId);
+          if (channelEntries.size === 0) presenceByChannel.delete(channelId);
+          broadcastChannelRoster(channelId);
+        }
+      }
       logger.info({ userId }, "Socket disconnected");
     });
   });
@@ -168,6 +285,10 @@ export function emitToProject(projectId: string, event: string, payload: unknown
 
 export function emitToUser(userId: string, event: string, payload: unknown): void {
   io?.to(USER_ROOM(userId)).emit(event, payload);
+}
+
+export function emitToChannel(channelId: string, event: string, payload: unknown): void {
+  io?.to(CHANNEL_ROOM(channelId)).emit(event, payload);
 }
 
 /** Worker convenience: streams job state changes into the project room. */
