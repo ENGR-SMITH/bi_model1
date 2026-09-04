@@ -58,6 +58,7 @@ export function AssetPlayer({
   audio = false,
   controls = true,
   markers,
+  directStreamUrl,
 }: {
   projectId: string;
   assetId: string;
@@ -83,6 +84,9 @@ export function AssetPlayer({
   controls?: boolean;
   /** Review markers (design §10): comments pinned at a timecode, drawn as a clickable rail under the frame. */
   markers?: Array<{ id: string; ms: number; tone?: 'accent' | 'gold' | 'danger' | 'teal' | 'muted'; label?: string }>;
+  /** Stream a URL directly, bypassing the proxy-ready gate — used to preview
+   * a PENDING_REVIEW staged file (the Captain reviews the raw submission). */
+  directStreamUrl?: string;
 }) {
   const internalVideoRef = useRef<HTMLVideoElement>(null);
   const internalAudioRef = useRef<HTMLAudioElement>(null);
@@ -95,9 +99,10 @@ export function AssetPlayer({
     ? internalAudioRef
     : videoRef;
   const proxyUrl = proxyUrlFor(projectId, assetId);
-  const ready = hasProxyFile(detail);
-  const processing = Boolean(detail) && detail!.status !== 'PROCESSED';
-  const loading = detail === undefined;
+  const streamUrl = directStreamUrl ?? proxyUrl;
+  const ready = Boolean(directStreamUrl) || hasProxyFile(detail);
+  const processing = !directStreamUrl && Boolean(detail) && detail!.status !== 'PROCESSED';
+  const loading = detail === undefined && !directStreamUrl;
   const proxyFile = detail?.files?.find((file) => file.kind === 'PROXY');
   const demoProxy = proxyFile?.metadata?.demo === true;
   // Static images (designed thumbnails) are their own proxy — render an <img>.
@@ -222,7 +227,7 @@ export function AssetPlayer({
             <audio
               ref={internalAudioRef}
               key={`${assetId}-${retryKey}`}
-              src={proxyUrl}
+              src={streamUrl}
               controls={controls}
               preload="metadata"
               onTimeUpdate={(event) => emitTime(event.currentTarget)}
@@ -235,7 +240,7 @@ export function AssetPlayer({
         ) : isImage ? (
           <img
             key={`${assetId}-${retryKey}`}
-            src={proxyUrl}
+            src={streamUrl}
             alt="Preview"
             style={filter ? { filter } : undefined}
             onError={() => setMediaError(true)}
@@ -246,7 +251,7 @@ export function AssetPlayer({
           <video
             ref={videoRef}
             key={`${assetId}-${retryKey}`}
-            src={proxyUrl}
+            src={streamUrl}
             controls={controls}
             preload="metadata"
             style={filter ? { filter } : undefined}

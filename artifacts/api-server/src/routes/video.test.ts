@@ -980,6 +980,53 @@ describe("submit-for-review uploads (review = true)", () => {
     expect(row.submittedById).toBe("user-2");
   });
 
+  it("lets the Captain preview a held file in the review canvas before deciding", async () => {
+    const project = await createProject();
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+
+    const upload = await uploadForReview({
+      projectId: project.id,
+      kind: "RAW_VIDEO",
+      fileName: "held-preview.mp4",
+      note: "Check this one.",
+      asUser: "user-2",
+    });
+    expect(upload.status).toBe(201);
+    const [pendingRow] = await state.db
+      .select()
+      .from(state.tables.tandemVideoAssetsTable)
+      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+    expect(pendingRow.status).toBe("PENDING_REVIEW");
+    const stagedPath = path.join(process.env.VIDEO_UPLOAD_DIR!, pendingRow.storageKey);
+    expect(fs.existsSync(stagedPath)).toBe(true);
+
+    // The staged file's detail is readable by project members — the review
+    // canvas needs kind/mime to pick the right player for the held file.
+    state.userId = "captain-1";
+    const detail = await request(API).get(`/api/video/projects/${project.id}/assets/${pendingRow.id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.status).toBe("PENDING_REVIEW");
+    expect(detail.body.kind).toBe("RAW_VIDEO");
+    expect(detail.body.fileName).toBe("held-preview.mp4");
+
+    // And the staged original streams to the Captain so the Big canvas plays
+    // the actual submission before the decision.
+    const proxy = await request(API).get(`/api/video/projects/${project.id}/assets/${pendingRow.id}/proxy`);
+    expect(proxy.status).toBe(200);
+    expect(Number(proxy.headers["content-length"])).toBeGreaterThan(0);
+    expect(proxy.headers["accept-ranges"]).toBe("bytes");
+    expect(proxy.headers["content-type"]).toContain("mp4");
+
+    // A non-member must never see a pending submission's bytes — PUBLIC
+    // read-only preview only covers approved vault files.
+    await request(API).patch(`/api/video/projects/${project.id}/visibility`).send({ visibility: "PUBLIC" });
+    state.userId = "stranger-1";
+    const blocked = await request(API).get(`/api/video/projects/${project.id}/assets/${pendingRow.id}/proxy`);
+    expect(blocked.status).toBe(403);
+  });
+
   it("approving the submission lands the file in the vault and starts processing", async () => {
     const project = await createProject();
     await request(API)
