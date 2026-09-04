@@ -43,6 +43,10 @@ export interface AuthSession {
   token: string;
   userId: string;
   email: string | null;
+  /** Display name (e.g. "Ada Lovelace"), handed over by the sign-in page. */
+  name: string | null;
+  /** Avatar image URL (Clerk-hosted), handed over by the sign-in page. */
+  imageUrl: string | null;
 }
 
 const SIGN_IN_TTL_MS = 10 * 60 * 1000; // how long a sign-in link stays valid
@@ -138,9 +142,9 @@ export async function beginBrowserSignIn(
         if (body.length > MAX_BODY_BYTES) req.destroy();
       });
       req.on("end", () => {
-        let parsed: { state?: unknown; token?: unknown };
+        let parsed: { state?: unknown; token?: unknown; name?: unknown; imageUrl?: unknown };
         try {
-          parsed = JSON.parse(body) as { state?: unknown; token?: unknown };
+          parsed = JSON.parse(body) as { state?: unknown; token?: unknown; name?: unknown; imageUrl?: unknown };
         } catch {
           res.writeHead(400, { ...corsHeaders, "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: false, error: "Invalid request body." }));
@@ -180,7 +184,7 @@ export async function beginBrowserSignIn(
  * tokens.
  */
 function completeFromPost(
-  body: { state?: unknown; token?: unknown },
+  body: { state?: unknown; token?: unknown; name?: unknown; imageUrl?: unknown },
   expectedState: string,
   expectedIss: string,
   webOrigin: string,
@@ -188,6 +192,12 @@ function completeFromPost(
   if (body.state !== expectedState || typeof body.token !== "string") return null;
   const claims = decodeSessionJwt(body.token, expectedIss, webOrigin);
   if (!claims) return null;
+  const name =
+    typeof body.name === "string" && body.name.trim().length > 0 ? body.name.trim().slice(0, 120) : null;
+  const imageUrl =
+    typeof body.imageUrl === "string" && /^https?:\/\//.test(body.imageUrl)
+      ? body.imageUrl.slice(0, 500)
+      : null;
   return {
     token: body.token,
     userId: typeof claims.sub === "string" ? claims.sub : "unknown",
@@ -197,6 +207,8 @@ function completeFromPost(
         : typeof claims.email_address === "string"
           ? claims.email_address
           : null,
+    name,
+    imageUrl,
   };
 }
 

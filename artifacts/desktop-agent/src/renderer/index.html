@@ -97,17 +97,6 @@
 
       .stack { display: grid; gap: 14px; align-content: start; }
 
-      /* Signed-in feature area: two columns once auth is done */
-      .feature-grid {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 330px;
-        gap: 14px;
-        align-items: start;
-      }
-      @media (max-width: 800px) {
-        .feature-grid { grid-template-columns: minmax(0, 1fr); }
-      }
-
       /* --- Form rows --- */
       .field { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; align-items: center; }
       .field + .field { margin-top: 12px; }
@@ -141,6 +130,45 @@
         box-shadow: 0 0 0 3px rgba(230, 21, 10, 0.14);
       }
       select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      /* --- Roles on the selected project --- */
+      .roles-row {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+        margin-top: 12px; padding-top: 12px;
+        border-top: 1px dashed var(--border);
+      }
+      .role-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+      .role-chip {
+        font: 600 10px var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em;
+        padding: 4px 9px; border-radius: 999px;
+        border: 1px solid var(--border-strong);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--fg);
+      }
+      .role-chip-role-captain, .role-chip-role-uploader {
+        border-color: rgba(255, 95, 77, 0.5);
+        background: var(--accent-soft);
+        color: #ffd9d4;
+      }
+      .role-chip-role-video { border-color: rgba(255, 95, 77, 0.35); color: #ffc4bd; }
+      .role-chip-role-audio { border-color: rgba(47, 191, 143, 0.35); color: #a9ecda; }
+      .role-chip-role-thumbnail { border-color: rgba(255, 196, 87, 0.4); color: #ffe3ad; }
+      .role-chip-role-script, .role-chip-role-viewer { opacity: 0.75; }
+      .roles-note {
+        font-size: 11.5px; color: var(--muted-fg); line-height: 1.55;
+        flex: 1 1 100%;
+      }
+      .roles-note.is-blocked { color: #ffb4ab; }
+      .roles-note:not(.is-blocked)::before { content: ""; }
+      .roles-note:not(.is-blocked) { font-family: var(--font-mono); font-size: 10.5px; }
+
+      .dropzone.is-disabled { cursor: not-allowed; opacity: 0.6; }
+      .dropzone.is-disabled:hover, .dropzone.is-disabled.drag {
+        border-color: var(--border-strong);
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .dropzone.is-disabled .dz-title { color: var(--muted-fg); }
+      .dropzone.is-disabled .dz-sub b { color: var(--muted-fg); }
 
       /* --- Buttons --- */
       button {
@@ -195,13 +223,18 @@
       .auth-card { padding: 16px 20px; }
       .auth-main { display: flex; align-items: center; gap: 14px; }
       .auth-avatar {
-        width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+        position: relative;
+        width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
         display: grid; place-items: center;
-        font: 700 14px var(--font-sans); text-transform: uppercase;
+        font: 700 15px var(--font-sans); text-transform: uppercase;
         color: var(--faint-fg);
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid var(--border-strong);
         transition: all 0.25s;
+      }
+      .auth-avatar-img {
+        position: absolute; inset: 0;
+        width: 100%; height: 100%; object-fit: cover;
       }
       .auth-card.signed-in .auth-avatar {
         color: #fff;
@@ -210,8 +243,8 @@
         box-shadow: 0 0 0 3px var(--accent-soft);
       }
       .auth-id { min-width: 0; flex: 1; }
-      .auth-id #who { font: 600 14px var(--font-sans); color: var(--fg); display: block; }
-      .auth-id #who .auth-email { font: 500 13.5px var(--font-mono); color: var(--accent-2); }
+      .auth-id #who { font: 600 14px var(--font-sans); color: var(--fg); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .auth-id #who .auth-email { font: 500 13px var(--font-mono); color: var(--muted-fg); }
       .auth-sub { font-size: 11.5px; color: var(--muted-fg); margin-top: 2px; display: block; }
       .auth-actions { display: flex; gap: 8px; flex-shrink: 0; }
       #sign-in.btn-primary { min-width: 118px; }
@@ -249,9 +282,44 @@
       }
       @keyframes spinDot { to { transform: rotate(360deg); } }
 
-      /* --- Workspace / upload --- */
-      .source-row { display: flex; gap: 8px; align-items: center; }
-      .source-row .status { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* --- Workspace + drop zone --- */
+      .project-row { display: flex; gap: 8px; align-items: center; }
+      .dropzone {
+        display: grid; place-items: center; text-align: center;
+        gap: 6px;
+        padding: 26px 18px;
+        border: 1.5px dashed var(--border-strong);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.02);
+        cursor: pointer;
+        transition: border-color 0.16s ease, background 0.16s ease;
+      }
+      .dropzone:hover, .dropzone.drag {
+        border-color: rgba(255, 95, 77, 0.65);
+        background: var(--accent-soft);
+      }
+      .dropzone .dz-icon {
+        width: 42px; height: 42px; border-radius: 12px;
+        display: grid; place-items: center;
+        color: var(--accent-2);
+        background: var(--accent-soft);
+        font-size: 18px;
+      }
+      .dropzone .dz-title { font: 600 14px var(--font-sans); color: var(--fg); }
+      .dropzone .dz-sub { font-size: 11.5px; color: var(--muted-fg); }
+      .dropzone .dz-sub b { color: var(--accent-2); font-weight: 600; }
+      .dropzone.has-file {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        text-align: left;
+        border-style: solid;
+        border-color: rgba(255, 95, 77, 0.4);
+      }
+      .dropzone.has-file .dz-icon { grid-row: span 2; }
+      .dropzone.has-file .dz-title { font-size: 13px; }
+      .dropzone.has-file .dz-sub { color: var(--muted-fg); }
+      .dz-change { font: 600 11px var(--font-mono); color: var(--accent-2); text-transform: uppercase; letter-spacing: 0.08em; }
+
+      /* --- Upload --- */
       #upload { width: 100%; margin-top: 4px; }
       .bar {
         height: 7px; border-radius: 999px;
@@ -348,7 +416,7 @@
         <span class="brand-mark">T</span>
         <div>
           <h1>Tandem Desktop Agent</h1>
-          <p class="sub">Make a 720p proxy with local FFmpeg and upload it straight to Cloudflare R2.</p>
+          <p class="sub">Drop footage from your PC into a project's vault — any size.</p>
         </div>
         <span class="header-chip"><span class="dot"></span>Desktop agent</span>
       </header>
@@ -390,42 +458,49 @@
 
       <!-- Signed-in feature area (hidden until auth completes) -->
       <div id="feature-cards" class="hidden" style="margin-top: 14px;">
-        <div class="feature-grid">
-          <!-- Left column: workspace + upload -->
-          <div class="stack">
-            <div class="card">
-              <p class="card-title">Workspace</p>
-              <div class="field">
-                <label for="project">Project</label>
+        <div class="stack">
+          <!-- Workspace: pick the project -->
+          <div class="card">
+            <p class="card-title">Workspace</p>
+            <div class="field">
+              <label for="project">Project</label>
+              <div class="project-row">
                 <select id="project"><option>— load a project —</option></select>
               </div>
-              <div class="field">
-                <label for="asset">Asset</label>
-                <select id="asset"></select>
-              </div>
-              <div class="field">
-                <label for="pick">Source</label>
-                <div class="source-row">
-                  <button id="pick" class="btn-secondary">Choose raw file…</button>
-                  <span id="file" class="status"></span>
-                </div>
-              </div>
             </div>
-
-            <div class="card">
-              <p class="card-title">Generate &amp; upload</p>
-              <button id="upload" class="btn-primary" disabled>Generate proxy &amp; upload to R2</button>
-              <div class="bar"><div id="barfill"></div></div>
-              <div id="progress-label" class="progress-label hidden"></div>
-              <div id="status" class="status"></div>
+            <div class="roles-row hidden" id="roles-row">
+              <span id="role-chips" class="role-chips"></span>
+              <span id="roles-note" class="roles-note"></span>
             </div>
           </div>
 
-          <!-- Right column: floating widget -->
+          <!-- Drop your file card -->
+          <div class="card">
+            <p class="card-title">Source file</p>
+            <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Choose or drop a file to upload">
+              <span class="dz-icon">▣</span>
+              <div>
+                <span class="dz-title" id="dz-title">Drag &amp; drop your file here</span>
+                <span class="dz-sub" id="dz-sub">or <b>click to choose</b> — footage, audio, or media from your PC</span>
+              </div>
+              <span class="dz-change" id="dz-change" style="display:none;">Change</span>
+            </div>
+          </div>
+
+          <!-- Upload card -->
+          <div class="card">
+            <p class="card-title">Upload to the vault</p>
+            <button id="upload" class="btn-primary" disabled>Upload to project vault</button>
+            <div class="bar"><div id="barfill"></div></div>
+            <div id="progress-label" class="progress-label hidden"></div>
+            <div id="status" class="status"></div>
+          </div>
+
+          <!-- Floating widget — bottom row -->
           <div class="card">
             <p class="card-title">Floating widget</p>
-            <p class="widget-desc" style="font-size:12px;color:var(--muted-fg);line-height:1.6;margin-bottom:2px;">
-              A Grammarly-style bubble that appears while a video plays on your PC.
+            <p style="font-size:12px;color:var(--muted-fg);line-height:1.6;margin-bottom:2px;">
+              A compact bubble that pops up over other apps so Tandem is one click away.
               <span id="platform-note" style="color:var(--faint-fg);"></span>
             </p>
             <div class="setting-row">

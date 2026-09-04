@@ -22,8 +22,8 @@ import { isVideoPlaying, listMediaSessions } from "./media-session";
 import { loadSettings, saveSettings } from "./settings";
 import type { AgentSettings } from "../shared/types";
 
-const BUBBLE_WIDTH = 88;
-const BUBBLE_HEIGHT = 88;
+const BUBBLE_WIDTH = 56;
+const BUBBLE_HEIGHT = 56;
 const POLL_INTERVAL_MS = 3000;
 const HOTKEY = "CommandOrControl+Alt+T";
 
@@ -118,6 +118,11 @@ export class WidgetController {
     } catch {
       // hotkey already taken — tray remains as the fallback
     }
+    // Enabling the widget engages it immediately: the bubble shows right away
+    // (and stays pinned until dismissed), instead of waiting for a video to
+    // start playing somewhere. Auto-show then re-summons it after a manual ✕.
+    this.pinned = true;
+    this.showBubble();
     if (this.settings.widgetAutoShow) {
       this.pollTimer = setInterval(() => void this.poll(), POLL_INTERVAL_MS);
     }

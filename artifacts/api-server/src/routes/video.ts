@@ -52,6 +52,7 @@ import { notify } from "./video-platform";
 import { upload } from "../video/upload";
 import { createAssetFromUpload } from "../video/content-address";
 import { ensureUploadFits } from "../video/quota";
+import { uploadBlockReason } from "../video/roles";
 import { captureVaultStorage, reclaimDeletedVaultFiles } from "../video/storage-cleanup";
 import { recordVideoActivity } from "../video/activity";
 import { resolveProjectAccess } from "../video/access";
@@ -860,6 +861,23 @@ router.post(
     const rawKind = String(req.body?.kind ?? "RAW_VIDEO");
     if (!ALLOWED_ASSET_KINDS.includes(rawKind as (typeof ALLOWED_ASSET_KINDS)[number])) {
       res.status(400).json({ error: `Unknown asset kind: ${rawKind}` });
+      return;
+    }
+
+    // Role gate: a member may only add the vault kinds their project roles own
+    // (THUMBNAIL_DESIGN/GRAPHIC images need the THUMBNAIL role, footage the
+    // VIDEO role, sound the AUDIO role), so a Video member can't drop images
+    // into the vault through any client — web or desktop. The Captain/Uploader
+    // may add anything; a SCRIPT member may add raw audio/video because the
+    // Script desk uploads media to transcribe from (see src/video/roles.ts).
+    const blockReason = uploadBlockReason(member.roles, rawKind);
+    if (blockReason) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch {
+        // Multer file already cleaned up — nothing to do.
+      }
+      res.status(403).json({ error: blockReason });
       return;
     }
 

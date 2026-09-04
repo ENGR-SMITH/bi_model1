@@ -13,7 +13,7 @@
 // stashed in sessionStorage as well as read from the URL — that way they
 // survive Clerk's own query-param juggling during the flow.
 import { useEffect, useMemo, useState } from 'react';
-import { SignIn, useAuth } from '@clerk/react';
+import { SignIn, useAuth, useUser } from '@clerk/react';
 
 const ATTEMPT_KEY = 'tandem-agent-signin-attempt';
 
@@ -22,6 +22,25 @@ type Phase = 'loading' | 'signin' | 'posting' | 'success' | 'error';
 interface Attempt {
   state: string;
   loopback: string;
+}
+
+/** Raise the desktop agent app on this machine after sign-in completes.
+ * The agent registers the `tandem-agent://` scheme at install, so opening it
+ * hands control straight back to the app (and focuses its window). A hidden
+ * iframe keeps this sign-in tab in place; on browsers that block iframe
+ * protocol navigation it falls back to a background tab. No-op when the app
+ * isn't installed. */
+function summonDesktopApp(): void {
+  const url = 'tandem-agent://launch';
+  try {
+    const frame = document.createElement('iframe');
+    frame.style.display = 'none';
+    frame.src = url;
+    document.body.appendChild(frame);
+    window.setTimeout(() => frame.remove(), 1500);
+  } catch {
+    window.open(url, '_blank', 'noopener');
+  }
 }
 
 function readAttempt(): Attempt | null {
@@ -52,6 +71,7 @@ function readAttempt(): Attempt | null {
 export default function AgentSignInPage() {
   const attempt = useMemo(readAttempt, []);
   const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { user } = useUser();
   const [phase, setPhase] = useState<Phase>('loading');
   const [error, setError] = useState('');
 
@@ -89,14 +109,26 @@ export default function AgentSignInPage() {
         return;
       }
       try {
+        // The desktop agent has no access to Clerk's user API, so it takes the
+        // display profile (name + avatar) from here — the page that owns the
+        // session — and shows it in the app's account card.
+        const fullName = [user?.firstName ?? '', user?.lastName ?? ''].filter(Boolean).join(' ').trim();
         const res = await fetch(`${attempt.loopback}/complete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state: attempt.state, token }),
+          body: JSON.stringify({
+            state: attempt.state,
+            token,
+            name: fullName || null,
+            imageUrl: user?.imageUrl || null,
+          }),
         });
         if (cancelled) return;
         if (res.ok) {
           setPhase('success');
+          // Sign-in finished — bring the user straight back to the desktop
+          // app instead of leaving them stranded on this tab.
+          summonDesktopApp();
         } else {
           setPhase('error');
           setError(
@@ -116,7 +148,7 @@ export default function AgentSignInPage() {
     return () => {
       cancelled = true;
     };
-  }, [phase, attempt, getToken]);
+  }, [phase, attempt, getToken, user?.firstName, user?.lastName, user?.imageUrl]);
 
   return (
     <div className="agent-signin-page">
@@ -151,7 +183,7 @@ export default function AgentSignInPage() {
           <div className="agent-signin-state">
             <div className="agent-signin-check">✓</div>
             <h2>You're signed in</h2>
-            <p>Return to Tandem Desktop Agent — you can close this tab.</p>
+            <p>Opening Tandem Desktop Agent… if it doesn't appear, click its icon (or relaunch it) — you can close this tab.</p>
           </div>
         )}
 

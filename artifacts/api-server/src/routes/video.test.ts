@@ -614,6 +614,123 @@ describe("vault assets", () => {
     expect(proxy.status).toBe(200);
     expect(proxy.headers["content-type"]).toContain("image/png");
   });
+
+  it("blocks uploads whose vault kind the member's roles don't own", async () => {
+    const project = await createProject();
+    // user-2 holds AUDIO only — footage and images are owned by other roles.
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "AUDIO" });
+    state.userId = "user-2";
+
+    const image = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "THUMBNAIL_DESIGN")
+      .attach("file", Buffer.from("png bytes"), "cover.png");
+    expect(image.status).toBe(403);
+    expect(image.body.error).toMatch(/Thumbnail members/i);
+
+    const video = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", Buffer.from("video bytes"), "cam.mp4");
+    expect(video.status).toBe(403);
+    expect(video.body.error).toMatch(/Video members/i);
+
+    // The kind their role owns is fine.
+    const audio = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_AUDIO")
+      .attach("file", Buffer.from("audio bytes"), "mix.wav");
+    expect(audio.status).toBe(201);
+    expect(audio.body.kind).toBe("RAW_AUDIO");
+  });
+
+  it("lets a member with several roles upload each owned kind", async () => {
+    const project = await createProject();
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+    // The Captain grants a second role (VIDEO + THUMBNAIL) on the member row.
+    state.userId = "captain-1";
+    const detail = (await request(API).get(`/api/video/projects/${project.id}`)).body;
+    const member = detail.members.find((m: any) => m.userId === "user-2");
+    const updated = await request(API)
+      .patch(`/api/video/projects/${project.id}/members/${member.id}`)
+      .send({ roles: ["VIDEO", "THUMBNAIL"] });
+    expect(updated.status).toBe(200);
+
+    state.userId = "user-2";
+    const footage = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", Buffer.from("footage"), "cam.mp4");
+    expect(footage.status).toBe(201);
+    const design = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "THUMBNAIL_DESIGN")
+      .attach("file", Buffer.from("png"), "cover.png");
+    expect(design.status).toBe(201);
+    // Still blocked for a role they don't hold.
+    const sound = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "VO_PICKUP")
+      .attach("file", Buffer.from("voice"), "pickup.wav");
+    expect(sound.status).toBe(403);
+  });
+
+  it("allows SCRIPT members to add raw audio/video for transcription only", async () => {
+    const project = await createProject();
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "SCRIPT" });
+    state.userId = "user-2";
+
+    const media = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_AUDIO")
+      .attach("file", Buffer.from("interview audio"), "interview.wav");
+    expect(media.status).toBe(201);
+
+    const design = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "THUMBNAIL_DESIGN")
+      .attach("file", Buffer.from("png"), "cover.png");
+    expect(design.status).toBe(403);
+  });
+
+  it("blocks Viewers and lets the Captain/Uploader add any kind", async () => {
+    const project = await createProject();
+    // A member added without a content role is a Viewer.
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-2"), role: "VIEWER" });
+    state.userId = "user-2";
+    const viewer = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "RAW_VIDEO")
+      .attach("file", Buffer.from("x"), "cam.mp4");
+    expect(viewer.status).toBe(403);
+    expect(viewer.body.error).toMatch(/your roles here are Viewer/i);
+
+    // The Captain and an Uploader can add any vault kind.
+    state.userId = "captain-1";
+    const capImage = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "THUMBNAIL_DESIGN")
+      .attach("file", Buffer.from("png"), "cover.png");
+    expect(capImage.status).toBe(201);
+
+    await request(API)
+      .post(`/api/video/projects/${project.id}/members`)
+      .send({ uid: tandemUid("user-3"), role: "UPLOADER" });
+    state.userId = "user-3";
+    const upImage = await request(API)
+      .post(`/api/video/projects/${project.id}/assets`)
+      .field("kind", "GRAPHIC")
+      .attach("file", Buffer.from("png"), "graphic.png");
+    expect(upImage.status).toBe(201);
+  });
 });
 
 describe("content-addressed media (Git LFS)", () => {

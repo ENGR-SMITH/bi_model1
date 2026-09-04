@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { AgentSettings, AppInfo, AuthEvent, JobProgress, LaunchContext, UpdateEvent } from "../shared/types";
 
 /** Subscribe helper: returns an unsubscribe function. */
@@ -21,7 +21,22 @@ const api = {
   whoami: () => ipcRenderer.invoke("agent:whoami"),
   listProjects: () => ipcRenderer.invoke("agent:list-projects"),
   listAssets: (projectId: string) => ipcRenderer.invoke("agent:list-assets", projectId),
-  pickFile: () => ipcRenderer.invoke("agent:pick-file"),
+  /** Roles the signed-in viewer holds on a project (drives the upload gate). */
+  projectRoles: (projectId: string) =>
+    ipcRenderer.invoke("agent:project-roles", projectId) as Promise<{ myRoles: string[] }>,
+  pickFile: (extensions?: string[]) => ipcRenderer.invoke("agent:pick-file", extensions),
+  /** Metadata (path/name/size) for a picked or dropped file — stat happens in main. */
+  fileInfo: (filePath: string) =>
+    ipcRenderer.invoke("agent:file-info", filePath) as Promise<{
+      path: string;
+      name: string;
+      sizeBytes: number;
+    } | null>,
+  /** Resolve the absolute path of a file dropped onto the window (webUtils). */
+  droppedFilePath: (file: File) => webUtils.getPathForFile(file),
+  /** Upload a local raw file into the vault as a NEW asset (no asset needed). */
+  uploadRaw: (opts: { projectId: string; localFile: string }) =>
+    ipcRenderer.invoke("agent:upload-raw", opts),
   uploadProxy: (opts: { projectId: string; assetId: string; localFile: string }) =>
     ipcRenderer.invoke("agent:upload-proxy", opts),
 
