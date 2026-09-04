@@ -287,19 +287,53 @@ export function PreviewDiff({
     );
   }
 
-  const newerAssetId = mediaAssetId(leg, own.data.snapshot, fallbackAssetIds);
-  const olderAssetId = mediaAssetId(leg, prev.data.snapshot, fallbackAssetIds);
+  // A saved snapshot can reference a vault file that has since left the
+  // project (deleted by its uploader / the Captain, or still held back as a
+  // pending submission) — streaming that proxy 404s, which is exactly what
+  // made the review desk's diff map die while the same footage played fine in
+  // the vault. Resolve each side only to media that is actually in the vault:
+  // a vanished reference stops the diff (with a clear notice below) instead
+  // of hitting a dead stream, while a snapshot with NO media at all still
+  // falls back to the newest vault file of the right kind, like the canvases.
+  const vaultIds = new Set(fallbackAssetIds);
+  const vaultFallback = fallbackAssetIds[0] ?? '';
+  const ownCandidate = mediaAssetId(leg, own.data.snapshot);
+  const prevCandidate = mediaAssetId(leg, prev.data.snapshot);
+  const ownGone = Boolean(ownCandidate) && !vaultIds.has(ownCandidate);
+  const prevGone = Boolean(prevCandidate) && !vaultIds.has(prevCandidate);
+  const newerAssetId = ownGone ? '' : ownCandidate || vaultFallback;
+  const olderAssetId = prevGone ? '' : prevCandidate || vaultFallback;
 
-  // One/both snapshots reference no comparable media — surface a clear notice
-  // instead of silently rendering nothing, so the missing-diff isn't a mystery.
+  // One/both snapshots have no comparable media in the vault — surface a
+  // clear notice (naming a missing/deleted file when that's the cause)
+  // instead of silently rendering nothing, so the missing diff isn't a
+  // mystery and no dead proxy is ever streamed.
   if (!newerAssetId || !olderAssetId) {
-    const missing = !newerAssetId ? `v${own.data.version}` : `v${prev.data.version}`;
+    const ownBad = !newerAssetId;
+    const prevBad = !olderAssetId;
+    const bad = ownBad && prevBad
+      ? `v${own.data.version} and v${prev.data.version}`
+      : ownBad
+        ? `v${own.data.version}`
+        : `v${prev.data.version}`;
+    const gone = ownGone || prevGone;
+    // A noun that reads right for the media kind being diffed.
+    const mediaNoun = leg === 'SOUND' ? 'audio' : leg === 'THUMBNAIL' ? 'design image' : 'footage';
     return (
       <div className="preview-diff-panel preview-diff-note" data-testid="preview-diff">
         <p>
-          No comparable {leg === 'THUMBNAIL' ? 'design image' : 'clip'} on{' '}
-          <b>{missing}</b> to diff against the other version — add media to that
-          version's timeline first.
+          {gone ? (
+            <>
+              The {mediaNoun} behind <b>{bad}</b> is no longer in the project vault,
+              so the split-screen diff can't play it — compare a version whose
+              media is still in the vault, or review it in <b>Preview</b>.
+            </>
+          ) : (
+            <>
+              No comparable {mediaNoun} on <b>{bad}</b> to diff against the other
+              version — add media to that version's timeline first.
+            </>
+          )}
         </p>
       </div>
     );

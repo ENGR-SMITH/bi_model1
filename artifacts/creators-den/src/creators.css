@@ -4912,12 +4912,13 @@ select optgroup {
 .stage-file-chip span { min-width: 0; }
 .stage-file-chip b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stage-file-chip small { display: block; color: hsl(var(--muted-foreground)); font-size: 11px; }
-/* Pending review — the whole hand-in form stays visible but disabled until the
-   Captain accepts or rejects it. */
-.stage-submit-card.is-locked .stage-desc-wrap { opacity: .55; }
-.stage-submit-card.is-locked .stage-desc-input,
-.stage-submit-card.is-locked .stage-resolved-head input { cursor: not-allowed; }
-.stage-resolved-head input:disabled { opacity: .45; }
+/* Pending review — while a hand-in awaits the Captain, the card collapses to
+   the status line alone (the description box / resolved notes / submit row are
+   hidden entirely until the review is decided). */
+.stage-submit-card.is-locked .stage-submit-banner-standalone {
+  padding: 15px 16px;
+  font-size: 13px;
+}
 
 /* ---- Submission overview (crew side of /review) --------------------------- */
 .submission-overview-grid {
@@ -5057,16 +5058,24 @@ select optgroup {
   gap: 6px;
   margin-top: 14px;
   min-width: 0;
+  /* Many pending hand-ins each open a dashed lane to the right of the trunk
+     (plus a dead-end stub column for sent-back ones) — the tree can outgrow
+     its 300px column. Scroll it horizontally instead of silently clipping
+     part of the branch off, so the whole tree is always reachable. */
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 .tt-labels {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 .tt-row {
-  flex: 1 1 0;
+  /* One row per hand-in, each exactly TT_ROW_H tall and gap-less, so the
+     label rows line up 1:1 with the graph's dots/lines below every count. */
+  flex: 0 0 auto;
+  height: 46px;
   min-width: 0;
   display: flex;
   align-items: center;

@@ -136,8 +136,9 @@ export function StageSubmitCard({
     (submission) => submission.status === 'APPROVED' || submission.status === 'REJECTED',
   );
 
-  // While a hand-in is awaiting the Captain's review the whole card is locked:
-  // every control stays visible but disabled until the review is decided.
+  // While a hand-in is awaiting the Captain's review the whole card collapses
+  // to just the pending status line: there is no editable draft or submit
+  // control to mistake for a live form until the review is decided.
   const locked = Boolean(pending);
 
   const submit = useCreateVideoSubmission();
@@ -258,158 +259,166 @@ export function StageSubmitCard({
         </div>
       )}
 
+      {/* While the hand-in awaits the Captain, the status line is the ONLY
+          content of the card — no description box, no resolved-notes list, no
+          submit row. Picking another leg tab (Video owns SELECTS + CUT) still
+          shows that leg's own form when it has no review pending. */}
       {pending && (
-        <div className="stage-submit-banner is-pending" data-testid="stage-submit-pending">
+        <div
+          className="stage-submit-banner is-pending stage-submit-banner-standalone"
+          data-testid="stage-submit-pending"
+        >
           <Clock3 size={14} />
           <span>
             <b>{legLabel(leg)} is awaiting the Captain&apos;s review</b> — submitted {timeAgo(pending.createdAt)}.
-            Handing this stage in again is disabled until the Captain accepts or rejects it.
-          </span>
-        </div>
-      )}
-      {!pending && latestDecided?.status === 'REJECTED' && (
-        <div className="stage-submit-banner is-rejected" data-testid="stage-submit-rejected">
-          <XCircle size={14} />
-          <span>
-            <b>{legLabel(leg)} was sent back</b>
-            {latestDecided.decisionNote ? ` — ${latestDecided.decisionNote}` : ''}
-          </span>
-        </div>
-      )}
-      {!pending && latestDecided?.status === 'APPROVED' && (
-        <div className="stage-submit-banner is-approved" data-testid="stage-submit-approved">
-          <CheckCircle2 size={14} />
-          <span>
-            <b>{legLabel(leg)} was approved</b> — the last submission merged into the timeline.
-            Hand in another pass anytime.
+            You&apos;ll be able to hand in another pass once it&apos;s decided.
           </span>
         </div>
       )}
 
-      <div className="stage-desc-wrap">
-        <textarea
-          className="stage-desc-input"
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder={`Describe what you did in this ${roleName.toLowerCase()} pass before handing it to the Captain — the cut, the mix, the design, and what you changed since the last review.`}
-          rows={4}
-          maxLength={2000}
-          disabled={locked || !canSubmit}
-          data-testid="stage-submit-description"
-        />
-        <div className="stage-desc-tools">
-          {!canSubmit && <span className="setting-copy">Only the {legLabel(leg)} role (or the Captain) can hand this stage in.</span>}
-        </div>
-      </div>
+      {!pending && (
+        <>
+          {latestDecided?.status === 'REJECTED' && (
+            <div className="stage-submit-banner is-rejected" data-testid="stage-submit-rejected">
+              <XCircle size={14} />
+              <span>
+                <b>{legLabel(leg)} was sent back</b>
+                {latestDecided.decisionNote ? ` — ${latestDecided.decisionNote}` : ''}
+              </span>
+            </div>
+          )}
+          {latestDecided?.status === 'APPROVED' && (
+            <div className="stage-submit-banner is-approved" data-testid="stage-submit-approved">
+              <CheckCircle2 size={14} />
+              <span>
+                <b>{legLabel(leg)} was approved</b> — the last submission merged into the timeline.
+                Hand in another pass anytime.
+              </span>
+            </div>
+          )}
 
-      {resolvedNotes.length > 0 && (
-        <div className="stage-resolved" data-testid="stage-resolved-notes">
-          <label className="stage-resolved-head">
-            <input
-              type="checkbox"
-              checked={includeResolved}
-              onChange={(event) => setIncludeResolved(event.target.checked)}
-              disabled={locked}
-              data-testid="stage-resolved-toggle"
+          <div className="stage-desc-wrap">
+            <textarea
+              className="stage-desc-input"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={`Describe what you did in this ${roleName.toLowerCase()} pass before handing it to the Captain — the cut, the mix, the design, and what you changed since the last review.`}
+              rows={4}
+              maxLength={2000}
+              disabled={!canSubmit}
+              data-testid="stage-submit-description"
             />
-            <span>
-              <b>Include {resolvedNotes.length} resolved note{resolvedNotes.length === 1 ? '' : 's'}</b>
-              <small>Notes you marked done from the review comments — sent with your submission.</small>
-            </span>
-          </label>
-          <ul>
-            {resolvedNotes.map((note, index) => (
-              <li key={index}>“{note}”</li>
-            ))}
-          </ul>
-        </div>
-      )}
+            <div className="stage-desc-tools">
+              {!canSubmit && <span className="setting-copy">Only the {legLabel(leg)} role (or the Captain) can hand this stage in.</span>}
+            </div>
+          </div>
 
-      {pendingFile && (
-        <div className="stage-file-chip" data-testid="stage-file-chip">
-          <FileUp size={13} />
-          <span>
-            <b>{pendingFile.file.name}</b>
-            <small>
-              {VAULT_KIND_LABELS[pendingFile.kind] ?? pendingFile.kind} — travels with your description
-              {pendingFileOverCap ? ` · over the ${BROWSER_UPLOAD_MAX_LABEL} browser limit, use the Desktop agent button` : ''}
-            </small>
-          </span>
-        </div>
-      )}
+          {resolvedNotes.length > 0 && (
+            <div className="stage-resolved" data-testid="stage-resolved-notes">
+              <label className="stage-resolved-head">
+                <input
+                  type="checkbox"
+                  checked={includeResolved}
+                  onChange={(event) => setIncludeResolved(event.target.checked)}
+                  data-testid="stage-resolved-toggle"
+                />
+                <span>
+                  <b>Include {resolvedNotes.length} resolved note{resolvedNotes.length === 1 ? '' : 's'}</b>
+                  <small>Notes you marked done from the review comments — sent with your submission.</small>
+                </span>
+              </label>
+              <ul>
+                {resolvedNotes.map((note, index) => (
+                  <li key={index}>“{note}”</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-      <div className="stage-submit-row">
-        <button
-          type="button"
-          className="primary-btn"
-          onClick={onSubmit}
-          disabled={
-            submitting ||
-            locked ||
-            !canSubmit ||
-            pendingFileOverCap ||
-            (!hasSnapshot && !pendingFile) ||
-            (!description.trim() && resolvedNotes.length === 0)
-          }
-          data-testid="stage-submit-button"
-        >
-          {submitting ? <Clock3 size={13} className="spin" /> : <Send size={13} />}
-          {submitting
-            ? pendingFile
-              ? 'Submitting file…'
-              : 'Submitting…'
-            : pending
-              ? 'In review'
-              : pendingFile
-                ? 'Submit file for review'
-                : 'Submit for review'}
-        </button>
-        {pendingFile && (
-          <span className="setting-copy">
-            Sends the file and your description to the Captain — Accept adds it to the vault, Reject deletes it and sends it back with their note.
-          </span>
-        )}
-      </div>
-      {fileResult && !pending && (
-        <div
-          className={`stage-submit-banner ${fileResult.review ? 'is-pending' : 'is-approved'}`}
-          role="status"
-          data-testid={fileResult.review ? 'stage-submit-file-in-review' : 'stage-submit-file-direct'}
-        >
-          {fileResult.review ? <Clock3 size={14} /> : <CheckCircle2 size={14} />}
-          <span>
-            {fileResult.review ? (
-              <>
-                <b>{fileResult.fileName} was submitted for review</b>
-                It&apos;s on the Captain&apos;s desk now — the decision and any improvement note will
-                appear on your /review page.
-              </>
-            ) : (
-              <>
-                <b>{fileResult.fileName} went straight into the project vault</b>
-                No review submission was created — this happens when the upload is made by the
-                project&apos;s Captain (their files skip review), or when the app/server build you&apos;re
-                using predates the review flow. Ask your Captain to update if you expected a review.
-              </>
+          {pendingFile && (
+            <div className="stage-file-chip" data-testid="stage-file-chip">
+              <FileUp size={13} />
+              <span>
+                <b>{pendingFile.file.name}</b>
+                <small>
+                  {VAULT_KIND_LABELS[pendingFile.kind] ?? pendingFile.kind} — travels with your description
+                  {pendingFileOverCap ? ` · over the ${BROWSER_UPLOAD_MAX_LABEL} browser limit, use the Desktop agent button` : ''}
+                </small>
+              </span>
+            </div>
+          )}
+
+          <div className="stage-submit-row">
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={onSubmit}
+              disabled={
+                submitting ||
+                !canSubmit ||
+                pendingFileOverCap ||
+                (!hasSnapshot && !pendingFile) ||
+                (!description.trim() && resolvedNotes.length === 0)
+              }
+              data-testid="stage-submit-button"
+            >
+              {submitting ? <Clock3 size={13} className="spin" /> : <Send size={13} />}
+              {submitting
+                ? pendingFile
+                  ? 'Submitting file…'
+                  : 'Submitting…'
+                : pendingFile
+                  ? 'Submit file for review'
+                  : 'Submit for review'}
+            </button>
+            {pendingFile && (
+              <span className="setting-copy">
+                Sends the file and your description to the Captain — Accept adds it to the vault, Reject deletes it and sends it back with their note.
+              </span>
             )}
-          </span>
-        </div>
-      )}
-      {!hasSnapshot && !pendingFile && !pending && (
-        <p className="setting-copy" role="status" data-testid="stage-submit-no-snapshot">
-          This stage has no saved snapshot yet — save a version of the {legLabel(leg)} in the preview
-          studio first, then hand it in here.
-        </p>
-      )}
-      {submit.isError && (
-        <p className="setting-copy mt-2" role="alert">
-          {submitError?.response?.data?.error || 'The submission could not be created.'}
-        </p>
-      )}
-      {submitFile.isError && (
-        <p className="setting-copy mt-2" role="alert">
-          {fileError?.message || 'The file could not be submitted for review.'}
-        </p>
+          </div>
+          {fileResult && (
+            <div
+              className={`stage-submit-banner ${fileResult.review ? 'is-pending' : 'is-approved'}`}
+              role="status"
+              data-testid={fileResult.review ? 'stage-submit-file-in-review' : 'stage-submit-file-direct'}
+            >
+              {fileResult.review ? <Clock3 size={14} /> : <CheckCircle2 size={14} />}
+              <span>
+                {fileResult.review ? (
+                  <>
+                    <b>{fileResult.fileName} was submitted for review</b>
+                    It&apos;s on the Captain&apos;s desk now — the decision and any improvement note will
+                    appear on your /review page.
+                  </>
+                ) : (
+                  <>
+                    <b>{fileResult.fileName} went straight into the project vault</b>
+                    No review submission was created — this happens when the upload is made by the
+                    project&apos;s Captain (their files skip review), or when the app/server build you&apos;re
+                    using predates the review flow. Ask your Captain to update if you expected a review.
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+          {!hasSnapshot && !pendingFile && (
+            <p className="setting-copy" role="status" data-testid="stage-submit-no-snapshot">
+              This stage has no saved snapshot yet — save a version of the {legLabel(leg)} in the preview
+              studio first, then hand it in here.
+            </p>
+          )}
+          {submit.isError && (
+            <p className="setting-copy mt-2" role="alert">
+              {submitError?.response?.data?.error || 'The submission could not be created.'}
+            </p>
+          )}
+          {submitFile.isError && (
+            <p className="setting-copy mt-2" role="alert">
+              {fileError?.message || 'The file could not be submitted for review.'}
+            </p>
+          )}
+        </>
       )}
     </div>
   );
