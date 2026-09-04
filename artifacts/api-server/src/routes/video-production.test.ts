@@ -240,17 +240,20 @@ describe("timelines (Git-style versions)", () => {
       .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
       .send({ snapshot: { clips: [{ id: "c1", assetId: "a1", inMs: 0, outMs: 5000 }] }, message: "Hook and setup" });
     expect(first.status).toBe(200);
-    expect(first.body.version).toBe(1);
+    expect(first.body.versions[0].version).toBe(1);
     expect(first.body.versions).toHaveLength(1);
 
     const second = await request(API)
       .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
       .send({ snapshot: { clips: [{ id: "c1", assetId: "a1", inMs: 0, outMs: 5000 }, { id: "c2", assetId: "a1", inMs: 5000, outMs: 9000 }] }, message: "Add the payoff" });
     expect(second.status).toBe(200);
-    expect(second.body.version).toBe(2);
     expect(second.body.versions).toHaveLength(2);
     expect(second.body.versions[0].version).toBe(2);
     expect(second.body.versions[0].message).toBe("Add the payoff");
+    // Review gate: a crew member's saves are CANDIDATES — the leg's head
+    // (what other studios/preview/diff see) does not move until the Captain
+    // approves a submission.
+    expect(second.body.version).toBeNull();
   });
 
   it("reads one version's full snapshot for diffing", async () => {
@@ -324,15 +327,21 @@ describe("thumbnail leg (5th leg)", () => {
       .send({ snapshot: { designs: [{ id: "d1", assetId: "design-a", title: "I Tested the $10k Camera", style: "TEXT_OVERLAY" }] }, message: "First cover" });
     expect(first.status).toBe(200);
     expect(first.body.leg).toBe("THUMBNAIL");
-    expect(first.body.version).toBe(1);
-    expect(first.body.snapshot.designs[0].style).toBe("TEXT_OVERLAY");
+    expect(first.body.versions[0].version).toBe(1);
+    const firstId = first.body.versions[0].id;
+    const firstDetail = await request(API).get(
+      `/api/video/projects/${project.id}/timelines/THUMBNAIL/versions/${firstId}`,
+    );
+    expect(firstDetail.body.snapshot.designs[0].style).toBe("TEXT_OVERLAY");
 
     const second = await request(API)
       .put(`/api/video/projects/${project.id}/timelines/THUMBNAIL`)
       .send({ snapshot: { designs: [{ id: "d1", assetId: "design-b", title: "I Tested the $10k Camera", style: "FACE_CLOSEUP" }] }, message: "Swap the image" });
     expect(second.status).toBe(200);
-    expect(second.body.version).toBe(2);
     expect(second.body.versions).toHaveLength(2);
+    expect(second.body.versions[0].version).toBe(2);
+    // Crew saves are candidates — no head movement until the Captain approves.
+    expect(second.body.version).toBeNull();
   });
 
   it("only the Thumbnail Designer (or Captain) can edit the THUMBNAIL leg", async () => {
@@ -1154,6 +1163,56 @@ describe("submissions (Captain review)", () => {
     expect(approved.body.decidedAt).not.toBeNull();
   });
 
+  it("keeps crew saves off the leg head until approval — reject leaves it, approve merges it", async () => {
+    const project = await createProject();
+    await addMember(project.id, "architect@example.com", "VIDEO");
+    state.userId = "architect-1";
+
+    // Save a candidate (v1): the head stays empty — a crew save is NOT a
+    // timeline update on its own.
+    const v1 = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+      .send({ snapshot: { clips: [{ id: "c1", assetId: "a1", inMs: 0, outMs: 5000 }] }, message: "First selects" });
+    expect(v1.status).toBe(200);
+    let timeline = await request(API).get(`/api/video/projects/${project.id}/timelines/SELECTS`);
+    expect(timeline.body.version).toBeNull();
+
+    // Submit → the Captain REJECTS: the head still never moves.
+    const rejected = await request(API)
+      .post(`/api/video/projects/${project.id}/submissions`)
+      .send({ leg: "SELECTS", note: "First pass" });
+    expect(rejected.status).toBe(201);
+    state.userId = "captain-1";
+    await request(API)
+      .post(`/api/video/projects/${project.id}/submissions/${rejected.body.id}/reject`)
+      .send({ note: "Tighten the pacing" });
+    timeline = await request(API).get(`/api/video/projects/${project.id}/timelines/SELECTS`);
+    expect(timeline.body.version).toBeNull();
+    expect(timeline.body.status).toBe("REJECTED");
+
+    // Fix + save v2, submit, and this time the Captain APPROVES — the merge:
+    // only now does the leg head move to the submitted version.
+    state.userId = "architect-1";
+    const v2 = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+      .send({ snapshot: { clips: [{ id: "c1", assetId: "a1", inMs: 0, outMs: 4000 }] }, message: "Tighter pass" });
+    expect(v2.body.versions).toHaveLength(2);
+    const approved = await request(API)
+      .post(`/api/video/projects/${project.id}/submissions`)
+      .send({ leg: "SELECTS", note: "Tighter pass" });
+    expect(approved.status).toBe(201);
+    state.userId = "captain-1";
+    const decided = await request(API).post(
+      `/api/video/projects/${project.id}/submissions/${approved.body.id}/approve`,
+    );
+    expect(decided.status).toBe(200);
+
+    timeline = await request(API).get(`/api/video/projects/${project.id}/timelines/SELECTS`);
+    expect(timeline.body.version).toBe(2);
+    expect(timeline.body.status).toBe("APPROVED");
+    expect(timeline.body.versions[0].version).toBe(2);
+  });
+
   it("only the Captain can approve or reject", async () => {
     const project = await createProject();
     await addMember(project.id, "architect@example.com", "VIDEO");
@@ -1622,29 +1681,45 @@ describe("captain's review queue + decision notes (M4)", () => {
     expect(invite.deepLink).toContain(`/creators-den/projects/${project.id}`);
   });
 
-  it("notifies the rest of the crew on timeline saves and pinned notes", async () => {
+  it("keeps crew saves quiet until review, notifies on pinned notes and the Captain's own saves", async () => {
     const project = await createProject();
     await addMember(project.id, "editor@example.com", "VIDEO");
 
-    // The editor (not the Captain) saves a SELECTS pass — the Captain is
-    // notified the timeline moved.
+    // A crew member's save is a review CANDIDATE — it must NOT fan out to the
+    // crew/activity (that only happens when the Captain approves it).
     state.userId = "editor-1";
     const saved = await request(API)
       .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
       .send({ snapshot: { clips: [] } });
     expect(saved.status).toBe(200);
 
-    // Then the editor pins a note — the Captain is notified about it too.
+    // The editor pins a note — the Captain is notified about that.
     const comment = await request(API)
       .post(`/api/video/projects/${project.id}/comments`)
       .send({ leg: "SELECTS", body: "Check this beat", timecodeMs: 1200 });
     expect(comment.status).toBe(201);
 
+    // The Captain's OWN save is authoritative — the crew IS notified then.
+    state.userId = "captain-1";
+    const ownerSave = await request(API)
+      .put(`/api/video/projects/${project.id}/timelines/SELECTS`)
+      .send({ snapshot: { clips: [{ id: "c1" }] }, message: "Captain pass" });
+    expect(ownerSave.status).toBe(200);
+    expect(ownerSave.body.version).toBe(2);
+
     const captainNotes = await state.db
       .select()
       .from(state.tables.tandemVideoNotificationsTable)
       .where(eq(state.tables.tandemVideoNotificationsTable.recipientId, "captain-1"));
-    expect(captainNotes.some((n: any) => n.category === "video_timeline_updated")).toBe(true);
+    // The crew save stayed quiet; only the pinned note + the editor's own
+    // timeline notification (editor-1 is notified of the Captain's save) exist.
     expect(captainNotes.some((n: any) => n.category === "video_comment")).toBe(true);
+    expect(captainNotes.some((n: any) => n.category === "video_timeline_updated")).toBe(false);
+
+    const editorNotes = await state.db
+      .select()
+      .from(state.tables.tandemVideoNotificationsTable)
+      .where(eq(state.tables.tandemVideoNotificationsTable.recipientId, "editor-1"));
+    expect(editorNotes.some((n: any) => n.category === "video_timeline_updated")).toBe(true);
   });
 });

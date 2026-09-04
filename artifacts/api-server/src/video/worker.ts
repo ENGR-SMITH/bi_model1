@@ -725,28 +725,35 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
   demo: boolean;
   storageKey: string | null;
 }> {
-  const params = (job.params ?? {}) as { leg?: string; format?: string };
+  const params = (job.params ?? {}) as { leg?: string; format?: string; timelineVersionId?: string };
   const leg = params.leg ?? "CUT";
   const format = params.format === "PICTURE_LOCK" ? "PICTURE_LOCK" : "PREVIEW";
 
-  const [timeline] = await db
-    .select()
-    .from(tandemVideoTimelinesTable)
-    .where(
-      and(
-        eq(tandemVideoTimelinesTable.projectId, asset.projectId),
-        eq(tandemVideoTimelinesTable.leg, leg),
-      ),
-    )
-    .limit(1);
-  if (!timeline || !timeline.currentVersionId) {
+  // A render job may target an explicit version (the picture-lock of the
+  // SUBMITTED candidate, queued at submit time) or fall back to the leg's
+  // current head (the last APPROVED baseline) for plain previews.
+  let versionId = params.timelineVersionId ?? null;
+  if (!versionId) {
+    const [timeline] = await db
+      .select()
+      .from(tandemVideoTimelinesTable)
+      .where(
+        and(
+          eq(tandemVideoTimelinesTable.projectId, asset.projectId),
+          eq(tandemVideoTimelinesTable.leg, leg),
+        ),
+      )
+      .limit(1);
+    versionId = timeline?.currentVersionId ?? null;
+  }
+  if (!versionId) {
     throw new Error("No saved timeline snapshot to render");
   }
 
   const [version] = await db
     .select()
     .from(tandemVideoTimelineVersionsTable)
-    .where(eq(tandemVideoTimelineVersionsTable.id, timeline.currentVersionId))
+    .where(eq(tandemVideoTimelineVersionsTable.id, versionId))
     .limit(1);
   if (!version) {
     throw new Error("Timeline head version is missing");
