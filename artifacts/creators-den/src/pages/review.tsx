@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
-import { ArrowLeft, GitPullRequest, Inbox, ShieldCheck, Sparkles } from 'lucide-react';
+import { GitPullRequest, Inbox, ShieldCheck, Sparkles } from 'lucide-react';
+import { useParams } from 'wouter';
 import {
   getListVideoReviewQueueQueryKey,
   useListVideoProjects,
@@ -9,17 +10,21 @@ import {
 } from '@workspace/api-client-react';
 import type { VideoReviewQueueItem, VideoSubmission } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
-import { ReviewPanel } from '@/components/review-panel';
-import { ReviewDecisionCard, ReviewOracleCard } from '@/components/review-actions';
+import { CaptainReviewSurface } from '@/components/captain-review';
 import { SubmissionOverview } from '@/components/submission-overview';
-import { useRealtimeNotifications } from '@/lib/realtime';
 
 // ---------------------------------------------------------------------------
-// Review — the Captain's review desk (captains only). A notification-style
-// queue of every pending (SUBMITTED) leg submission across the Captain's
-// projects; clicking one opens the full review surface — the media, pins,
-// comments, and diff — with two cards under it: big Accept / Reject and the
-// Editor's oracle improvement note (AI polishes grammar + phrasing only).
+// Review — the review page, reachable two ways:
+//   · inside a project  (/projects/:projectId/review) — keeps the whole
+//     project rail visible. The Captain sees THIS project's queue, the crew
+//     see this project's review board + timeline tree.
+//   · global            (/review) — used when no project is open. Captains see
+//     every pending submission across their owned projects; the crew see the
+//     board across their projects.
+// The Captain's workbench is the preview/video template: Big canvas with the
+// Preview | Diff map toggle, the submitter's description in the rail, and a
+// bottom row split into the big Accept / Reject decision and the REMARK
+// improvement note.
 // ---------------------------------------------------------------------------
 
 const LEG_TONES: Record<string, string> = {
@@ -43,39 +48,73 @@ function timeAgo(iso: string): string {
 }
 
 export default function ReviewPage() {
+  const { projectId } = useParams<{ projectId?: string }>();
   const { user } = useUser();
   const queryClient = useQueryClient();
   const projects = useListVideoProjects();
   const queue = useListVideoReviewQueue({
     query: {
       queryKey: getListVideoReviewQueueQueryKey(),
-      // The queue spans every owned project and the socket is project-scoped,
-      // so while the desk is open it polls to pick up new submissions and
-      // to drop the ones the Captain just decided.
+      // The queue spans owned projects and the socket is project-scoped, so
+      // while the desk is open it polls to pick up new submissions and to
+      // drop the ones the Captain just decided.
       refetchInterval: 8_000,
       refetchOnWindowFocus: true,
     },
   });
-  useRealtimeNotifications();
-
   const [selected, setSelected] = useState<VideoReviewQueueItem | null>(null);
   const [note, setNote] = useState('');
 
-  // Only Captains get the desk: the queue is built from the viewer's OWNED
-  // projects (server-side), and the UI gates on owning at least one.
-  const isCaptain = (projects.data ?? []).some((project) => project.ownerId === user?.id);
-  const items = (queue.data ?? []) as VideoReviewQueueItem[];
+  const allItems = (queue.data ?? []) as VideoReviewQueueItem[];
+  // Inside a project the desk only shows that project's reviews.
+  const items = projectId ? allItems.filter((item) => item.projectId === projectId) : allItems;
+
+  // The Captain is the owner of the review surface: globally, someone who
+  // owns at least one project; inside a project, that project's owner.
+  const currentProject = projectId ? (projects.data ?? []).find((p) => p.id === projectId) : null;
+  const isCaptain = projectId
+    ? Boolean(currentProject && currentProject.ownerId === user?.id)
+    : (projects.data ?? []).some((project) => project.ownerId === user?.id);
+
   const current = selected ? (items.find((item) => item.id === selected.id) ?? selected) : null;
-  // The queue row carries every field ReviewPanel reads from a submission
-  // (leg/status/timelineVersionId/note/id/submittedById) — the extra decision
-  // fields are absent from the summary, so narrow the type for the panel.
+  // The queue row carries every field the review surface reads from a
+  // submission (leg/status/timelineVersionId/note/id/submittedById) — the
+  // extra decision fields are absent from the summary, so narrow the type.
   const reviewSubmission = current as unknown as VideoSubmission;
 
-  // Everyone else sees their own submissions: what they handed in, whether it
-  // is awaiting the Captain, approved, or sent back with the improvement note —
-  // plus the relay-flow tree of the project timeline on the side.
+  const clearSelection = () => {
+    setSelected(null);
+    setNote('');
+    void queryClient.invalidateQueries({ queryKey: getListVideoReviewQueueQueryKey() });
+  };
+
+  // Everyone else sees the project's review board: every stage that has been
+  // handed in (awaiting the Captain, approved, or sent back with the
+  // improvement note) plus the relay-flow tree of the timeline on the side.
   if (!isCaptain) {
-    return <SubmissionOverview />;
+    return <SubmissionOverview projectId={projectId} />;
+  }
+
+  const projectName = projectId
+    ? currentProject?.name ?? items[0]?.projectName ?? 'this project'
+    : null;
+
+  // ---- The Captain's desk ----------------------------------------------
+  if (current) {
+    return (
+      <CaptainReviewSurface
+        projectId={current.projectId}
+        submission={reviewSubmission}
+        headVersionId={current.headVersionId}
+        note={note}
+        onNoteChange={setNote}
+        onDecided={() => clearSelection()}
+        onBack={() => {
+          setSelected(null);
+          setNote('');
+        }}
+      />
+    );
   }
 
   return (
@@ -83,52 +122,18 @@ export default function ReviewPage() {
       <div className="page-header">
         <div>
           <SectionEyebrow><ShieldCheck size={13} /> Review desk · captains only</SectionEyebrow>
-          <h1>Every hand-off, one desk.</h1>
+          <h1>{projectName ? `Reviews for ${projectName}.` : 'Every hand-off, one desk.'}</h1>
           <p>
-            When a leg is submitted for review it lands here. Open it, mark what to fix with the
-            Editor&apos;s oracle, then Accept (merges to the timeline) or Reject (sent back with your note).
+            When a leg is submitted for review it lands here. Open it, mark what to fix in the
+            REMARK, then Accept (merges to the timeline) or Reject (sent back with your note).
           </p>
         </div>
-        {!current && (
-          <span className="den-tag muted" data-testid="review-queue-count">
-            {items.length} pending
-          </span>
-        )}
+        <span className="den-tag muted" data-testid="review-queue-count">
+          {items.length} pending
+        </span>
       </div>
 
-      {current ? (
-        <div className="review-workbench" data-testid="review-workbench">
-          <button type="button" className="link-btn mb-3" onClick={() => setSelected(null)} data-testid="review-back">
-            <ArrowLeft size={13} /> Back to the queue
-          </button>
-
-          <ReviewPanel
-            projectId={current.projectId}
-            submission={reviewSubmission}
-            headVersionId={current.headVersionId}
-            onClose={() => setSelected(null)}
-            hideDecision
-          />
-
-          {/* Instead of the version carousel: two cards — the Editor's oracle
-              improvement note and the big green Accept / red Reject. */}
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <ReviewOracleCard note={note} onChange={setNote} />
-            <ReviewDecisionCard
-              projectId={current.projectId}
-              submissionId={current.id}
-              note={note}
-              onDecided={() => {
-                setSelected(null);
-                setNote('');
-                // Pull the decided item off the queue right away instead of
-                // waiting for the next poll tick.
-                void queryClient.invalidateQueries({ queryKey: getListVideoReviewQueueQueryKey() });
-              }}
-            />
-          </div>
-        </div>
-      ) : queue.isLoading ? (
+      {queue.isLoading ? (
         <div className="panel-empty">Opening the review desk…</div>
       ) : items.length === 0 ? (
         <div className="empty-state" data-testid="review-queue-empty">
@@ -173,12 +178,10 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {!current && (
-        <p className="den-footnote mt-6">
-          <Sparkles size={13} />
-          The oracle only improves grammar and phrasing — the improvement note stays yours.
-        </p>
-      )}
+      <p className="den-footnote mt-6">
+        <Sparkles size={13} />
+        The oracle only improves grammar and phrasing — the improvement note stays yours.
+      </p>
     </div>
   );
 }

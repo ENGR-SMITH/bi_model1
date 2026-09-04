@@ -13,13 +13,13 @@ import {
 } from '@workspace/api-client-react';
 
 // ---------------------------------------------------------------------------
-// Captain review actions — the two cards under the media surface on the
-// REVIEW page:
+// Captain review actions — the two cards in the bottom row of the captain's
+// REVIEW workbench (the preview/video-style template):
 //   1. ReviewDecisionCard — BIG green Accept / red Reject. Rejecting requires
 //      an improvement note, which travels back to the submitter.
-//   2. ReviewOracleCard — the Editor's oracle: a note field for what to fix,
-//      with an AI button that improves grammar / phrasing ONLY (never adds or
-//      changes the substance of the note).
+//   2. ReviewRemarkCard — REMARK: a note field for what to fix, with an AI
+//      button that improves grammar / phrasing ONLY (never adds or changes
+//      the substance of the note).
 // ---------------------------------------------------------------------------
 
 // The oracle's rephrase-only system prompt: grammar + clarity + phrasing.
@@ -33,7 +33,7 @@ const IMPROVE_PROMPT = [
   'Return ONLY the improved note text, with no preamble, quotes, or commentary.',
 ].join(' ');
 
-export function ReviewOracleCard({
+export function ReviewRemarkCard({
   note,
   onChange,
 }: {
@@ -61,12 +61,12 @@ export function ReviewOracleCard({
   return (
     <div className="paper-card" data-testid="review-oracle-card">
       <div className="inline-heading">
-        <span className="eyebrow"><WandSparkles size={13} /> The Editor&apos;s oracle</span>
+        <span className="eyebrow"><WandSparkles size={13} /> REMARK</span>
         <span className="den-tag muted">improvement note</span>
       </div>
       <p className="setting-copy">
-        Write what the submitter should improve — then let the oracle polish the wording.
-        The AI only improves grammar and phrasing; it never changes what you asked for.
+        Note what the submitter should improve — the AI polishes grammar and phrasing only;
+        it never changes what you asked for. Your remark travels with a rejection.
       </p>
       <textarea
         className="review-oracle-note"
@@ -160,8 +160,7 @@ export function ReviewDecisionCard({
         <span className="den-tag gold">captain only</span>
       </div>
       <p className="setting-copy">
-        Approving merges this version as the new baseline. Rejecting sends it back to the
-        submitter <b>with your improvement note</b> — the note is required so they know what to fix.
+        Accept merges this submission to the timeline — Reject sends it back <b>with your REMARK</b>.
       </p>
       <div className="review-decision-buttons">
         <button
@@ -188,7 +187,7 @@ export function ReviewDecisionCard({
       </div>
       {!note.trim() && (
         <p className="setting-copy mt-2" data-testid="review-reject-hint">
-          Add an improvement note in the oracle card to unlock Reject.
+          Write your REMARK above to unlock Reject.
         </p>
       )}
       {error && (
