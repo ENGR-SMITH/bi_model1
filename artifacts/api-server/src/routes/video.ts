@@ -925,6 +925,27 @@ router.post(
       .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     const isProjectOwner = uploadOwner?.ownerId === userId;
+    // Audit the upload's path so a review bypass is visible in the logs: a
+    // crew submit-for-review upload must land here as a pending submission;
+    // anything else (no review flag, or the project owner uploading) goes
+    // straight into the vault.
+    req.log.info(
+      {
+        projectId: params.data.projectId,
+        uploaderId: userId,
+        fileName: req.file.originalname,
+        kind: rawKind,
+        reviewFlag: submitForReview,
+        projectOwnerId: uploadOwner?.ownerId ?? null,
+        path: submitForReview && !isProjectOwner ? "review" : "direct",
+        reason: !submitForReview
+          ? "no review flag"
+          : isProjectOwner
+            ? "uploader is the project owner (captain-skip)"
+            : "submit for review",
+      },
+      "video asset upload",
+    );
     if (submitForReview && !isProjectOwner) {
       const fileName = req.file.originalname;
       const note = String(req.body?.note ?? "").slice(0, 2000);
@@ -961,6 +982,17 @@ router.post(
           submittedById: userId,
         })
         .returning();
+
+      req.log.info(
+        {
+          projectId: params.data.projectId,
+          submissionId: submission.id,
+          assetId: pendingAsset.id,
+          fileName,
+          submittedById: userId,
+        },
+        "video asset held for review — submission created",
+      );
 
       // Realtime + activity + Captain notification — same hand-off as a stage
       // submission, so the review desk learns about it instantly.

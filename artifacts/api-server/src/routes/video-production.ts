@@ -1907,7 +1907,6 @@ router.post(
       body.data.format,
       headAssetId,
       renderVersionId,
-      timeline.currentVersionId,
     );
     const [job] = await db
       .select()
