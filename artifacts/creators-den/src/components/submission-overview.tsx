@@ -12,6 +12,7 @@ import { useUser } from '@clerk/react';
 import {
   CheckCircle2,
   Clock3,
+  FileUp,
   GitPullRequest,
   Inbox,
   Send,
@@ -68,6 +69,22 @@ function timeAgo(iso: string): string {
 
 function legLabel(leg: string): string {
   return RELAY_LEGS.find((relay) => relay.leg === leg)?.label ?? leg;
+}
+
+// A file handed in for review (desktop-agent / submit-for-review upload)
+// carries an `ASSET:<assetId>` sentinel — its note leads with the file name
+// ("golden-take-a.mp4 — Best angle of the hero shot.").
+function isFileSubmission(row: MySubmissionRow): boolean {
+  return row.timelineVersionId.startsWith('ASSET:');
+}
+
+function fileSubmissionParts(row: MySubmissionRow): { fileName: string; message: string | null } {
+  const note = row.note ?? '';
+  const fileName = note.split(' — ')[0] || 'File submission';
+  return {
+    fileName,
+    message: note.includes(' — ') ? note.slice(note.indexOf(' — ') + 3).trim() : null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -312,15 +329,28 @@ export function SubmissionOverview() {
                         <div className="submission-detail" data-testid={`submission-detail-${row.id}`}>
                           <div className="submission-detail-note">
                             <span className="mono-label">What you submitted</span>
-                            <p>{row.note || 'No note was attached to this submission.'}</p>
+                            {isFileSubmission(row) ? (
+                              <>
+                                <p className="flex items-center gap-2">
+                                  <FileUp size={13} /> <b>{fileSubmissionParts(row).fileName}</b>
+                                </p>
+                                {fileSubmissionParts(row).message && (
+                                  <p>“{fileSubmissionParts(row).message}”</p>
+                                )}
+                              </>
+                            ) : (
+                              <p>{row.note || 'No note was attached to this submission.'}</p>
+                            )}
                           </div>
                           {row.status === 'REJECTED' ? (
                             <div className="submission-decision is-rejected">
                               <XCircle size={14} />
                               <div>
-                                <b>Sent back by the Captain</b>
+                                <b>{isFileSubmission(row) ? 'Sent back — file deleted' : 'Sent back by the Captain'}</b>
                                 <p>
-                                  {row.decisionNote || 'No note was attached — open the stage and check the review comments.'}
+                                  {row.decisionNote || (isFileSubmission(row)
+                                    ? 'The Captain sent the file back — it was removed and the vault was not changed.'
+                                    : 'No note was attached — open the stage and check the review comments.')}
                                 </p>
                                 {row.decidedAt && <small>{timeAgo(row.decidedAt)}</small>}
                               </div>
@@ -329,7 +359,11 @@ export function SubmissionOverview() {
                             <div className="submission-decision is-approved">
                               <CheckCircle2 size={14} />
                               <div>
-                                <b>Approved — merged into the project timeline</b>
+                                <b>
+                                  {isFileSubmission(row)
+                                    ? 'Approved — added to the project vault'
+                                    : 'Approved — merged into the project timeline'}
+                                </b>
                                 {row.decisionNote && <p>{row.decisionNote}</p>}
                               </div>
                             </div>

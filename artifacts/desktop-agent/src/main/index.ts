@@ -381,16 +381,17 @@ ipcMain.handle(
 );
 
 // ---------------------------------------------------------------------------
-// Raw vault upload (drag & drop / choose from the PC)
+// Raw upload — submit for review (drag & drop / choose from the PC)
 // ---------------------------------------------------------------------------
-// The agent streams the picked raw file into the vault as a NEW asset — no
-// asset dropdown: the file itself is the upload. Progress streams back as
-// agent:job-progress (phase "upload"), and the job record (control server)
-// is marked so a Creator Den page that launched the agent can refresh + the
-// agent reopens its return URL when the file lands.
+// The agent streams the picked raw file with the Captain-note as a review
+// submission (review=true): the file is held back from the vault as a pending
+// review entry until the Captain approves it on Creator Den. Progress streams
+// back as agent:job-progress (phase "upload"), and the job record (control
+// server) is marked so a Creator Den page that launched the agent can refresh
+// + the agent reopens its return URL once the submission lands.
 ipcMain.handle(
   "agent:upload-raw",
-  async (_e, opts: { projectId: string; localFile: string }) => {
+  async (_e, opts: { projectId: string; localFile: string; note?: string }) => {
     const cfg = loadConfig();
     ensureAuthenticated(); // fail fast when not signed in
     const launchCtx = getLaunchContext();
@@ -410,6 +411,7 @@ ipcMain.handle(
         token: sessionCache!.token,
         projectId: opts.projectId,
         filePath: opts.localFile,
+        note: opts.note,
         onProgress: (sentBytes, totalBytes) =>
           sendJobProgress({
             phase: "upload",
@@ -422,7 +424,13 @@ ipcMain.handle(
       if (launchCtx.returnUrl && isAllowedReturnUrl(launchCtx.returnUrl, cfg.webAppUrl)) {
         void shell.openExternal(launchCtx.returnUrl);
       }
-      return { ok: true, assetId: result.assetId, fileName: result.fileName } as const;
+      return {
+        ok: true,
+        assetId: result.assetId,
+        fileName: result.fileName,
+        submissionId: result.submissionId,
+        review: result.review,
+      } as const;
     } catch (err) {
       const message = (err as Error).message ?? "";
       markJobDone(message);

@@ -2394,6 +2394,10 @@ select optgroup {
   grid-row: 1;
   grid-template-rows: minmax(0, 68fr) minmax(0, 32fr);
 }
+.role-col-2--solo {
+  /* No direct-upload bar on role pages anymore — the canvas fills the column. */
+  grid-template-rows: minmax(0, 1fr);
+}
 .role-col-3 {
   grid-column: 3;
   grid-row: 1;

@@ -105,6 +105,30 @@
         text-transform: uppercase; letter-spacing: 0.12em;
         color: var(--muted-fg);
       }
+      .field > label .opt {
+        font: 400 10px var(--font-sans); text-transform: none; letter-spacing: 0;
+        color: var(--faint-fg);
+      }
+      .field textarea {
+        font: 500 13px var(--font-sans);
+        color: var(--fg);
+        background: var(--input);
+        border: 1px solid var(--border-strong);
+        border-radius: 9px;
+        padding: 10px 12px;
+        outline: none;
+        width: 100%;
+        min-height: 66px;
+        line-height: 1.5;
+        resize: vertical;
+        transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+      }
+      .field textarea:focus {
+        border-color: rgba(230, 21, 10, 0.65);
+        box-shadow: 0 0 0 3px rgba(230, 21, 10, 0.14);
+      }
+      .field textarea::placeholder { color: var(--faint-fg); }
+      .field textarea:disabled { opacity: 0.55; cursor: not-allowed; }
 
       select, input[type="text"], input[type="url"] {
         font: 500 13px var(--font-sans);
@@ -481,16 +505,23 @@
               <span class="dz-icon">▣</span>
               <div>
                 <span class="dz-title" id="dz-title">Drag &amp; drop your file here</span>
-                <span class="dz-sub" id="dz-sub">or <b>click to choose</b> — footage, audio, or media from your PC</span>
+                <span class="dz-sub" id="dz-sub">or <b>click to choose</b> — a file from your PC to hand in for review</span>
               </div>
               <span class="dz-change" id="dz-change" style="display:none;">Change</span>
             </div>
           </div>
 
-          <!-- Upload card -->
+          <!-- Submit for review card -->
           <div class="card">
-            <p class="card-title">Upload to the vault</p>
-            <button id="upload" class="btn-primary" disabled>Upload to project vault</button>
+            <p class="card-title">Submit for review</p>
+            <p style="font-size:11.5px;color:var(--muted-fg);line-height:1.55;margin-bottom:12px;">
+              The file and your note go to the Captain&apos;s review desk — the vault only changes once it is approved.
+            </p>
+            <div class="field" style="align-items:flex-start;">
+              <label for="upload-note">Note to the Captain <span class="opt">optional</span></label>
+              <textarea id="upload-note" rows="3" placeholder="Describe this file — what it is, what it is for, and anything the Captain should look at…"></textarea>
+            </div>
+            <button id="upload" class="btn-primary" disabled>Submit for review</button>
             <div class="bar"><div id="barfill"></div></div>
             <div id="progress-label" class="progress-label hidden"></div>
             <div id="status" class="status"></div>

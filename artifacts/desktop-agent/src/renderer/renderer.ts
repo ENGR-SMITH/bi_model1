@@ -509,7 +509,7 @@ function handleProgress(p: JobProgress) {
   } else {
     const mb = (n?: number) => (n === undefined ? "—" : (n / 1048576).toFixed(1));
     const pct = p.percent >= 0 ? ` (${p.percent}%)` : "";
-    label.textContent = `Uploading to the vault… ${mb(p.sentBytes)} / ${mb(p.totalBytes)} MB${pct}`;
+    label.textContent = `Sending for review… ${mb(p.sentBytes)} / ${mb(p.totalBytes)} MB${pct}`;
   }
 
   if (p.percent < 0) {
@@ -543,16 +543,20 @@ async function runUpload() {
   uploading = true;
   updateUploadEnabled();
   resetProgress();
-  setStatus(`Uploading “${chosenFile.name}” to the vault…`);
+  setStatus(`Sending “${chosenFile.name}” to the Captain for review…`);
   const btn = $("upload") as HTMLButtonElement;
-  btn.textContent = "Uploading…";
+  btn.textContent = "Submitting…";
+  const note = ($("upload-note") as HTMLTextAreaElement).value.trim();
   try {
-    const result = await window.tandemAgent.uploadRaw({ projectId, localFile: chosenFile.path });
+    const result = await window.tandemAgent.uploadRaw({ projectId, localFile: chosenFile.path, note });
     const fill = $("barfill");
     fill.classList.remove("indeterminate");
     fill.style.width = "100%";
+    ($("upload-note") as HTMLTextAreaElement).value = "";
     setStatus(
-      `“${result.fileName}” is in the vault — its proxy and preview are being prepared in the background.`,
+      result.review
+        ? `“${result.fileName}” was submitted for review — the Captain approves it on Creator Den before it reaches the project vault.`
+        : `“${result.fileName}” is in the vault — its proxy and preview are being prepared in the background.`,
       "ok",
     );
   } catch (err) {
@@ -560,7 +564,7 @@ async function runUpload() {
     resetProgress();
   } finally {
     uploading = false;
-    btn.textContent = "Upload to project vault";
+    btn.textContent = "Submit for review";
     updateUploadEnabled();
   }
 }

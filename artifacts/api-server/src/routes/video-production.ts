@@ -1174,42 +1174,119 @@ async function decideSubmission(
     .where(eq(tandemVideoSubmissionsTable.id, submission.id))
     .returning();
 
-  await db
-    .update(tandemVideoTimelinesTable)
-    .set({ status: decision, updatedAt: new Date() })
-    .where(
-      and(
-        eq(tandemVideoTimelinesTable.projectId, submission.projectId),
-        eq(tandemVideoTimelinesTable.leg, submission.leg),
-      ),
-    );
+  // A file handed in for review (desktop agent / role-page upload) carries an
+  // `ASSET:<assetId>` sentinel instead of a timeline-version id: there is no
+  // snapshot to merge, so the decision never touches the leg timeline or the
+  // Lock. Approval runs the staged file through the normal upload pipeline so
+  // it lands in the vault; rejection deletes the staged file and its row.
+  const assetRef = submission.timelineVersionId?.startsWith("ASSET:")
+    ? submission.timelineVersionId.slice("ASSET:".length)
+    : null;
+
+  if (assetRef) {
+    const [pending] = await db
+      .select()
+      .from(tandemVideoAssetsTable)
+      .where(eq(tandemVideoAssetsTable.id, assetRef))
+      .limit(1);
+    if (pending && pending.status === "PENDING_REVIEW") {
+      if (decision === "APPROVED") {
+        const stagedPath = path.join(uploadDir(), pending.storageKey);
+        if (!fs.existsSync(stagedPath)) {
+          res.status(400).json({ error: "The uploaded file is no longer available on the server" });
+          return;
+        }
+        try {
+          const { asset, status } = await createAssetFromUpload({
+            projectId: pending.projectId,
+            uploaderId: pending.uploaderId,
+            kind: pending.kind,
+            fileName: pending.fileName,
+            mimeType: pending.mimeType || "application/octet-stream",
+            sizeBytes: Number(pending.sizeBytes),
+            filePath: stagedPath,
+            storageKey: pending.storageKey,
+          });
+          // The staged placeholder becomes the real vault row — repoint the
+          // submission at it so decided history links to the live file.
+          await db
+            .delete(tandemVideoAssetsTable)
+            .where(eq(tandemVideoAssetsTable.id, pending.id));
+          await db
+            .update(tandemVideoSubmissionsTable)
+            .set({ timelineVersionId: `ASSET:${asset.id}` })
+            .where(eq(tandemVideoSubmissionsTable.id, submission.id));
+          emitToProject(submission.projectId, "asset.uploaded", { ...asset, status });
+          if (status === "PROCESSED") {
+            emitToProject(submission.projectId, "asset.processed", {
+              projectId: submission.projectId,
+              assetId: asset.id,
+            });
+          }
+        } catch (error) {
+          logger.error({ submissionId: submission.id, err: error }, "Approved upload could not be finalized");
+          res.status(500).json({ error: "The upload could not be finalized — try rejecting and re-uploading" });
+          return;
+        }
+      } else {
+        // REJECTED — remove the staged bytes so the pending upload doesn't
+        // linger on disk or count against the project's storage.
+        try {
+          const stagedPath = path.join(uploadDir(), pending.storageKey);
+          if (fs.existsSync(stagedPath)) fs.unlinkSync(stagedPath);
+        } catch {
+          // Best-effort — the row deletion below is the source of truth.
+        }
+        await db
+          .delete(tandemVideoAssetsTable)
+          .where(eq(tandemVideoAssetsTable.id, pending.id));
+      }
+    }
+  } else {
+    await db
+      .update(tandemVideoTimelinesTable)
+      .set({ status: decision, updatedAt: new Date() })
+      .where(
+        and(
+          eq(tandemVideoTimelinesTable.projectId, submission.projectId),
+          eq(tandemVideoTimelinesTable.leg, submission.leg),
+        ),
+      );
+  }
 
   // Realtime: the submitter's studio learns the decision instantly.
   emitToProject(submission.projectId, "submission.decided", updated);
 
   // Activity feed: the Captain's decision lands on the project timeline.
-  const [decidedVersion] = await db
-    .select({ version: tandemVideoTimelineVersionsTable.version })
-    .from(tandemVideoTimelineVersionsTable)
-    .where(eq(tandemVideoTimelineVersionsTable.id, submission.timelineVersionId))
-    .limit(1);
+  const [decidedVersion] = assetRef
+    ? []
+    : await db
+        .select({ version: tandemVideoTimelineVersionsTable.version })
+        .from(tandemVideoTimelineVersionsTable)
+        .where(eq(tandemVideoTimelineVersionsTable.id, submission.timelineVersionId))
+        .limit(1);
+  const assetFileName = assetRef ? submission.note.split(" — ")[0] : null;
   await recordVideoActivity({
     projectId: submission.projectId,
     eventType: decision === "APPROVED" ? "submission_approved" : "submission_rejected",
     leg: submission.leg,
     summary:
       decision === "APPROVED"
-        ? `Approved ${submission.leg}${decidedVersion ? ` v${decidedVersion.version}` : ""} — merged as the new baseline`
-        : `Rejected ${submission.leg}${decidedVersion ? ` v${decidedVersion.version}` : ""} — sent back for another pass${
-            decisionNote ? ` (${decisionNote.slice(0, 120)})` : ""
-          }`,
+        ? assetRef
+          ? `Approved upload “${assetFileName}” — added to the vault`
+          : `Approved ${submission.leg}${decidedVersion ? ` v${decidedVersion.version}` : ""} — merged as the new baseline`
+        : assetRef
+          ? `Rejected upload “${assetFileName}” — sent back${decisionNote ? ` (${decisionNote.slice(0, 120)})` : ""}`
+          : `Rejected ${submission.leg}${decidedVersion ? ` v${decidedVersion.version}` : ""} — sent back for another pass${
+              decisionNote ? ` (${decisionNote.slice(0, 120)})` : ""
+            }`,
     actorId: userId,
     resourceId: submission.id,
   });
 
   // Lock release (M3): approving the FINISH leg flips the project to RELEASED,
   // enabling downloads for the whole team.
-  if (submission.leg === "FINISH" && decision === "APPROVED") {
+  if (!assetRef && submission.leg === "FINISH" && decision === "APPROVED") {
     await db
       .update(tandemVideoProjectsTable)
       .set({ status: "RELEASED", updatedAt: new Date() })

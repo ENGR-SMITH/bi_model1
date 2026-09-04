@@ -44,7 +44,7 @@ import {
   UploadVideoAssetParams,
   UploadVideoAssetResponse,
 } from "@workspace/api-zod";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
 import { randomUUID } from "node:crypto";
 import type { TandemVideoMember } from "@workspace/db";
@@ -256,10 +256,18 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
       ),
     );
 
+  // Files awaiting Captain review (submit-for-review uploads) are held back
+  // from the vault until approved — they surface through the review queue and
+  // the submitter's own submissions instead.
   const assets = await db
     .select()
     .from(tandemVideoAssetsTable)
-    .where(eq(tandemVideoAssetsTable.projectId, project.id))
+    .where(
+      and(
+        eq(tandemVideoAssetsTable.projectId, project.id),
+        ne(tandemVideoAssetsTable.status, "PENDING_REVIEW"),
+      ),
+    )
     .orderBy(desc(tandemVideoAssetsTable.createdAt));
 
   // Resolve member ids to Clerk display names + avatar urls (cached,
@@ -891,6 +899,92 @@ router.post(
         // Multer file already cleaned up — nothing to do.
       }
       res.status(413).json({ error: fit.error });
+      return;
+    }
+
+    // Submit-for-review uploads (desktop agent): the file is held back from
+    // the vault as a PENDING_REVIEW asset and handed to the Captain as a
+    // review submission. Only an approval moves it into the vault and starts
+    // processing; a rejection deletes it (timeline_version_id carries the
+    // sentinel `ASSET:<assetId>` so review surfaces can tell the two apart
+    // without a schema change).
+    const submitForReview = String(req.body?.review ?? "") === "true";
+    if (submitForReview) {
+      const fileName = req.file.originalname;
+      const note = String(req.body?.note ?? "").slice(0, 2000);
+      const assetId = randomUUID();
+      const [pendingAsset] = await db
+        .insert(tandemVideoAssetsTable)
+        .values({
+          id: assetId,
+          projectId: params.data.projectId,
+          uploaderId: userId,
+          kind: rawKind,
+          fileName,
+          mimeType: req.file.mimetype || "application/octet-stream",
+          sizeBytes: req.file.size,
+          durationMs: null,
+          storageKey: req.file.filename,
+          storageProvider: "local",
+          contentHash: null,
+          status: "PENDING_REVIEW",
+          version: 0,
+        })
+        .returning();
+      const [submission] = await db
+        .insert(tandemVideoSubmissionsTable)
+        .values({
+          id: randomUUID(),
+          projectId: params.data.projectId,
+          leg: ASSET_LEG[rawKind] ?? "SELECTS",
+          timelineVersionId: `ASSET:${assetId}`,
+          status: "SUBMITTED",
+          // The note carries the file name first so the review queue and the
+          // submitter's dashboard read naturally without extra fields.
+          note: note ? `${fileName} — ${note}` : fileName,
+          submittedById: userId,
+        })
+        .returning();
+
+      // Realtime + activity + Captain notification — same hand-off as a stage
+      // submission, so the review desk learns about it instantly.
+      emitToProject(params.data.projectId, "submission.new", submission);
+      await recordVideoActivity({
+        projectId: params.data.projectId,
+        eventType: "submission_created",
+        leg: ASSET_LEG[rawKind] ?? null,
+        summary: `${fileName} submitted for review — waiting on the Captain`,
+        actorId: userId,
+        resourceId: submission.id,
+      });
+      const [owner] = await db
+        .select()
+        .from(tandemVideoProjectsTable)
+        .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+        .limit(1);
+      if (owner && owner.ownerId !== userId) {
+        await notify(
+          owner.ownerId,
+          "video_submission",
+          "New upload for review",
+          `${fileName} was uploaded for your review.`,
+          `/creators-den/projects/${params.data.projectId}`,
+          submission.id,
+        ).catch(() => {});
+      }
+
+      res.status(201).json({
+        id: pendingAsset.id,
+        projectId: pendingAsset.projectId,
+        kind: pendingAsset.kind,
+        fileName: pendingAsset.fileName,
+        mimeType: pendingAsset.mimeType,
+        sizeBytes: pendingAsset.sizeBytes,
+        status: pendingAsset.status,
+        version: pendingAsset.version,
+        submissionId: submission.id,
+        review: true,
+      });
       return;
     }
 
