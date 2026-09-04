@@ -204,6 +204,11 @@ file, upload, and widget cards stay hidden. Once signed in:
    built in the background); a **Reject** deletes the file and sends it back
    with the Captain's improvement note.
 
+**The Captain adds directly.** When the signed-in viewer *is* the Captain of
+the selected project, the note field and review hand-off disappear and the
+button becomes **Upload to vault**: the file goes straight in with no
+self-approval (the server applies the same rule to every client).
+
 **Uploads are role-gated.** The file types you can submit follow the roles you
 were assigned on the selected project (the same rule the Creator Den role
 pages use): VIDEO members can add footage, AUDIO members sound, THUMBNAIL

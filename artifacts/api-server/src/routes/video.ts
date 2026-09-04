@@ -828,10 +828,18 @@ router.get(
       return;
     }
 
+    // Files awaiting Captain review (submit-for-review uploads) stay out of
+    // the vault until approved — they surface through the review queue and the
+    // submitter's own submissions instead.
     const assets = await db
       .select()
       .from(tandemVideoAssetsTable)
-      .where(eq(tandemVideoAssetsTable.projectId, params.data.projectId))
+      .where(
+        and(
+          eq(tandemVideoAssetsTable.projectId, params.data.projectId),
+          ne(tandemVideoAssetsTable.status, "PENDING_REVIEW"),
+        ),
+      )
       .orderBy(desc(tandemVideoAssetsTable.createdAt));
 
     res.json(ListVideoAssetsResponse.parse(assets));
@@ -902,14 +910,22 @@ router.post(
       return;
     }
 
-    // Submit-for-review uploads (desktop agent): the file is held back from
-    // the vault as a PENDING_REVIEW asset and handed to the Captain as a
-    // review submission. Only an approval moves it into the vault and starts
-    // processing; a rejection deletes it (timeline_version_id carries the
-    // sentinel `ASSET:<assetId>` so review surfaces can tell the two apart
-    // without a schema change).
+    // Submit-for-review uploads: the file is held back from the vault as a
+    // PENDING_REVIEW asset and handed to the Captain as a review submission.
+    // Only an approval moves it into the vault and starts processing; a
+    // rejection deletes it (timeline_version_id carries the sentinel
+    // `ASSET:<assetId>` so review surfaces can tell the two apart without a
+    // schema change). The Captain's own uploads skip the queue — they'd
+    // otherwise have to approve their own files — and land straight in the
+    // vault through the normal pipeline below.
     const submitForReview = String(req.body?.review ?? "") === "true";
-    if (submitForReview) {
+    const [uploadOwner] = await db
+      .select({ ownerId: tandemVideoProjectsTable.ownerId })
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
+    const isProjectOwner = uploadOwner?.ownerId === userId;
+    if (submitForReview && !isProjectOwner) {
       const fileName = req.file.originalname;
       const note = String(req.body?.note ?? "").slice(0, 2000);
       const assetId = randomUUID();

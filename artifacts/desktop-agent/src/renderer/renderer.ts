@@ -53,6 +53,32 @@ function rolesHeld(): string[] {
   return projectRoles.status === "ready" ? projectRoles.roles : [];
 }
 
+/** The signed-in viewer is the Captain of the selected project — their own
+ * uploads skip the review queue and land straight in the vault (the server
+ * makes the same decision), so the app drops the "note to the Captain" step. */
+function isCaptain(): boolean {
+  return rolesHeld().includes("CAPTAIN");
+}
+
+/** Resting label of the primary action: direct upload for the Captain,
+ * submit-for-review for everyone else. */
+function uploadButtonLabel(): string {
+  return isCaptain() ? "Upload to vault" : "Submit for review";
+}
+
+/** Toggle the captain-facing copy: no note field, no review hand-off. */
+function renderUploadMode(): void {
+  const captain = isCaptain();
+  ($("note-field") as HTMLElement).style.display = captain ? "none" : "";
+  $("review-card-title").textContent = captain ? "Upload to the vault" : "Submit for review";
+  $("review-copy").textContent = captain
+    ? "You're the Captain — files you add go straight into the vault, no review needed."
+    : "The file and your note go to the Captain's review desk — the vault only changes once it is approved.";
+  const btn = $("upload") as HTMLButtonElement;
+  btn.textContent = uploadButtonLabel();
+  updateUploadEnabled();
+}
+
 /** The uploadable file families the held roles own (empty = nothing). */
 function fileFamiliesForRoles(roles: string[]): FileFamily[] {
   if (roles.some((role) => role === "CAPTAIN" || role === "UPLOADER")) {
@@ -379,6 +405,7 @@ async function loadRolesFor(projectId: string): Promise<void> {
   }
   renderRoles();
   setFileChip();
+  renderUploadMode();
 }
 
 // ---------------------------------------------------------------------------
@@ -564,7 +591,7 @@ async function runUpload() {
     resetProgress();
   } finally {
     uploading = false;
-    btn.textContent = "Submit for review";
+    btn.textContent = uploadButtonLabel();
     updateUploadEnabled();
   }
 }

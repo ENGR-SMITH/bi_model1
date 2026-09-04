@@ -1052,6 +1052,38 @@ describe("submit-for-review uploads (review = true)", () => {
     expect(timelines).toHaveLength(0);
   });
 
+  it("lets the Captain's own uploads skip the queue and land straight in the vault", async () => {
+    const project = await createProject(); // captain-1 owns it
+
+    const res = await uploadForReview({
+      projectId: project.id,
+      kind: "RAW_VIDEO",
+      fileName: "captain-footage.mp4",
+      note: "A couple of hero shots.",
+      asUser: "captain-1",
+    });
+    expect(res.status).toBe(201);
+    // No review hand-off: the file went through the normal upload pipeline.
+    expect(res.body.review).toBeFalsy();
+    expect(res.body.submissionId).toBeUndefined();
+    expect(res.body.status).not.toBe("PENDING_REVIEW");
+    expect(res.body.contentHash).toBeTruthy();
+
+    // No submission was created, and the vault shows the file immediately.
+    const subs = await state.db
+      .select()
+      .from(state.tables.tandemVideoSubmissionsTable)
+      .where(eq(state.tables.tandemVideoSubmissionsTable.projectId, project.id));
+    expect(subs).toHaveLength(0);
+    const queue = await request(API).get("/api/video/review/queue");
+    expect(queue.body).toHaveLength(0);
+
+    state.userId = "captain-1";
+    const detail = await request(API).get(`/api/video/projects/${project.id}`);
+    expect(detail.body.assets).toHaveLength(1);
+    expect(detail.body.assets[0].fileName).toBe("captain-footage.mp4");
+  });
+
   it("rejecting the submission deletes the staged file and frees the vault", async () => {
     const project = await createProject();
     await request(API)
