@@ -19,6 +19,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
   Clock3,
+  FileUp,
   Send,
   Sparkles,
   XCircle,
@@ -28,6 +29,7 @@ import {
   getGetVideoTimelineQueryKey,
   getListVideoCommentsQueryKey,
   getListVideoSubmissionsQueryKey,
+  getUploadVideoAssetUrl,
   oracleChat,
   useCreateVideoSubmission,
   useGetVideoProject,
@@ -37,6 +39,8 @@ import {
 } from '@workspace/api-client-react';
 import type { StudioLeg } from '@/components/role-oracle';
 import { legHint, RELAY_LEGS } from '@/components/shell';
+import { VAULT_KIND_LABELS } from '@/components/preview-shared';
+import { BROWSER_UPLOAD_MAX_LABEL, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 
 /** The role that owns each relay leg (mirrors the server's LEG_ROLES). */
 const LEG_ROLE: Record<StudioLeg, string> = {
@@ -78,12 +82,19 @@ export function StageSubmitCard({
   projectId,
   legs,
   roleName,
+  pendingFile,
+  onFileSubmitted,
 }: {
   projectId: string;
   /** The relay legs this stage owns (Video owns SELECTS + CUT, Audio SOUND…). */
   legs: StudioLeg[];
   /** e.g. "Visual Editor" / "Sound Designer" — used in the card copy. */
   roleName: string;
+  /** A file picked in the upload card — it travels with the description as a
+      submit-for-review upload (approve moves it into the vault). */
+  pendingFile?: { file: File; kind: string } | null;
+  /** Called once a pending file has been handed in (page clears the pick). */
+  onFileSubmitted?: () => void;
 }) {
   const queryClient = useQueryClient();
   const project = useGetVideoProject(projectId);
@@ -147,12 +158,55 @@ export function StageSubmitCard({
 
   const submit = useCreateVideoSubmission();
 
+  // A picked file is handed in as a submit-for-review upload: the file + the
+  // description below go to the Captain's review desk together, and only an
+  // approval moves the file into the vault.
+  const submitFile = useMutation({
+    mutationFn: async ({ file, kind, note }: { file: File; kind: string; note: string }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('kind', kind);
+      formData.append('review', 'true');
+      formData.append('note', note);
+      const response = await fetch(getUploadVideoAssetUrl(projectId), {
+        method: 'POST',
+        body: formData,
+      });
+      let data: { error?: string } = {};
+      try {
+        data = (await response.json()) as { error?: string };
+      } catch {
+        // Non-JSON body — keep the generic message.
+      }
+      if (!response.ok) {
+        throw new Error(data.error || `The submission failed (${response.status}).`);
+      }
+      return data;
+    },
+    onSuccess: () => {
+      setDescription('');
+      queryClient.invalidateQueries({ queryKey: getListVideoSubmissionsQueryKey(projectId) });
+      queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+      onFileSubmitted?.();
+    },
+  });
+
+  const pendingFileOverCap = pendingFile ? exceedsBrowserUploadCap(pendingFile.file) : false;
+
   const resolvedBlock = includeResolved && resolvedNotes.length > 0
     ? `\n\nResolved notes from review:\n${resolvedNotes.map((note) => `- ${note}`).join('\n')}`
     : '';
   const finalNote = (description.trim() + resolvedBlock).trim();
 
   const onSubmit = () => {
+    if (pendingFile) {
+      submitFile.mutate({
+        file: pendingFile.file,
+        kind: pendingFile.kind,
+        note: finalNote,
+      });
+      return;
+    }
     submit.mutate(
       { projectId, data: { leg, note: finalNote || undefined } },
       {
@@ -168,6 +222,8 @@ export function StageSubmitCard({
   };
 
   const submitError = submit.error as { response?: { data?: { error?: string } } } | null;
+  const fileError = submitFile.error as Error | null;
+  const submitting = submit.isPending || submitFile.isPending;
 
   return (
     <div className="paper-card stage-submit-card" data-testid="stage-submit-card">
@@ -275,29 +331,52 @@ export function StageSubmitCard({
         </div>
       )}
 
+      {pendingFile && (
+        <div className="stage-file-chip" data-testid="stage-file-chip">
+          <FileUp size={13} />
+          <span>
+            <b>{pendingFile.file.name}</b>
+            <small>
+              {VAULT_KIND_LABELS[pendingFile.kind] ?? pendingFile.kind} — travels with your description
+              {pendingFileOverCap ? ` · over the ${BROWSER_UPLOAD_MAX_LABEL} browser limit, use the Desktop agent button` : ''}
+            </small>
+          </span>
+        </div>
+      )}
+
       <div className="stage-submit-row">
         <button
           type="button"
           className="primary-btn"
           onClick={onSubmit}
           disabled={
-            submit.isPending ||
+            submitting ||
             Boolean(pending) ||
             !canSubmit ||
-            !hasSnapshot ||
+            pendingFileOverCap ||
+            (!hasSnapshot && !pendingFile) ||
             (!description.trim() && resolvedNotes.length === 0)
           }
           data-testid="stage-submit-button"
         >
-          {submit.isPending ? <Clock3 size={13} className="spin" /> : <Send size={13} />}
-          {submit.isPending ? 'Submitting…' : pending ? 'In review' : 'Submit for review'}
+          {submitting ? <Clock3 size={13} className="spin" /> : <Send size={13} />}
+          {submitting
+            ? pendingFile
+              ? 'Submitting file…'
+              : 'Submitting…'
+            : pending
+              ? 'In review'
+              : pendingFile
+                ? 'Submit file for review'
+                : 'Submit for review'}
         </button>
         <span className="setting-copy">
-          Pins the current {legLabel(leg)} snapshot — the Captain reviews it, then Accept merges it to the
-          timeline or Reject sends it back with their note.
+          {pendingFile
+            ? 'Sends the file and your description to the Captain — Accept adds it to the vault, Reject deletes it and sends it back with their note.'
+            : `Pins the current ${legLabel(leg)} snapshot — the Captain reviews it, then Accept merges it to the timeline or Reject sends it back with their note.`}
         </span>
       </div>
-      {!hasSnapshot && !pending && (
+      {!hasSnapshot && !pendingFile && !pending && (
         <p className="setting-copy" role="status" data-testid="stage-submit-no-snapshot">
           This stage has no saved snapshot yet — save a version of the {legLabel(leg)} in the preview
           studio first, then hand it in here.
@@ -306,6 +385,11 @@ export function StageSubmitCard({
       {submit.isError && (
         <p className="setting-copy mt-2" role="alert">
           {submitError?.response?.data?.error || 'The submission could not be created.'}
+        </p>
+      )}
+      {submitFile.isError && (
+        <p className="setting-copy mt-2" role="alert">
+          {fileError?.message || 'The file could not be submitted for review.'}
         </p>
       )}
     </div>

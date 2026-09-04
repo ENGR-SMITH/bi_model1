@@ -2,12 +2,14 @@
 // Video role page — the picture studio.
 //
 // Column one: a vertical scrolling shelf mixing the project's SELECTS + CUT
-// versions with the vault's video files. Column two: the big canvas — the
-// selected version's clip (or the picked vault file) streams as a proxy, with
-// the spatial AnnotationCanvas on top and a full-screen expand button.
-// Column three, row 1: the pin / comment wall; row 2: the Visual Editor's
-// "Hand this stage in" card. Vault files only arrive here via submit-for-
-// review (approved by the Captain) — there is no direct upload on this page.
+// versions with the vault's video files. Column two, row 1: the big canvas —
+// the selected version's clip (or the picked vault file) streams as a proxy,
+// with the spatial AnnotationCanvas on top and a full-screen expand button;
+// row 2: the source-file picker (format + drop zone, no direct upload — the
+// "Hand this stage in" card submits the file with the description). Column
+// three, row 1: the pin / comment wall; row 2: the Visual Editor's submit
+// card. Vault files only arrive via submit-for-review (approved by the
+// Captain) or the desktop agent.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -30,6 +32,7 @@ import { VersionShelf, type ShelfItem } from '@/components/version-shelf';
 import {
   PreviewNotesPanel,
   RoleLayout,
+  RoleUploadCard,
   VAULT_KIND_LABELS,
   type PreviewVersion,
 } from '@/components/preview-shared';
@@ -41,6 +44,16 @@ import type { StudioLeg } from '@/components/role-oracle';
 
 const VIDEO_LEGS: StudioLeg[] = ['SELECTS', 'CUT'];
 const VIDEO_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE']);
+const VIDEO_UPLOAD_KINDS = ['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE'].map((value) => ({ value, label: VAULT_KIND_LABELS[value] }));
+
+// This page accepts video files only — the accept list and the client check
+// below reject anything else (no audio / image / script files here).
+const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.m4v,.mkv,.webm,.avi,.mpg,.mpeg';
+const VIDEO_FILE_RE = /\.(mp4|mov|m4v|mkv|webm|avi|mpg|mpeg)$/i;
+const checkVideoFile = (file: File): string | null =>
+  file.type.startsWith('video/') || VIDEO_FILE_RE.test(file.name)
+    ? null
+    : 'Only video files can be picked here (.mp4, .mov, .webm, .mkv, .avi).';
 
 // ---------------------------------------------------------------------------
 // VideoCanvas — the big canvas for one selected version. When the version has
@@ -203,6 +216,9 @@ export default function RoleVideoPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
+  // A file picked in the upload card — handed in together with the description
+  // by the "Hand this stage in" card (submit-for-review, no direct upload).
+  const [pendingUpload, setPendingUpload] = useState<{ file: File; kind: string } | null>(null);
 
   // Default to the newest version once the list arrives (unless a vault file
   // has been picked from the version shelf).
@@ -320,6 +336,21 @@ export default function RoleVideoPage() {
           projectId={p.id}
           legs={VIDEO_LEGS}
           roleName="Video Editor"
+          pendingFile={pendingUpload}
+          onFileSubmitted={() => setPendingUpload(null)}
+        />
+      }
+      upload={
+        <RoleUploadCard
+          projectId={p.id}
+          label="video file"
+          kinds={VIDEO_UPLOAD_KINDS}
+          defaultKind="RAW_VIDEO"
+          accept={VIDEO_ACCEPT}
+          checkFormat={checkVideoFile}
+          onPick={(file, kind) => setPendingUpload({ file, kind })}
+          onClear={() => setPendingUpload(null)}
+          selected={pendingUpload}
         />
       }
     />

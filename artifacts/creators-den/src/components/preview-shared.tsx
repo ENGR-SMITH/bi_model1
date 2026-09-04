@@ -30,13 +30,11 @@ import {
   Mic2,
   Minimize,
   Settings2,
-  Upload,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetVideoProjectQueryKey,
   getListVideoCommentsQueryKey,
-  getUploadVideoAssetUrl,
   useGetVideoProject,
   useListVideoComments,
   useResolveVideoComment,
@@ -46,7 +44,7 @@ import type { StudioLeg } from '@/components/role-oracle';
 import { formatClock, proxyUrlFor } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
 import { geometryKey, parseGeometry, reviewerColor, reviewerLabel } from '@/lib/annotations';
-import { AgentLaunchButton, AgentUploadModal, BROWSER_UPLOAD_MAX_LABEL, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
+import { AgentLaunchButton, BROWSER_UPLOAD_MAX_LABEL, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 
 /** Green used to mark a resolved comment / annotation as solved. */
 export const RESOLVED_GREEN = 'hsl(150 52% 42%)';
@@ -508,11 +506,14 @@ export const VAULT_KIND_LABELS: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// RoleUploadCard — the bottom row of the canvas column. A compact upload
-// section: a format dropdown (the page's own vault kinds), a clickable /
-// draggable drop zone, an upload button, and a progress row. The file joins
-// the vault under the chosen kind, guarded by the page's accept list + format
-// check, so a video can never be dropped on the thumbnail page and vice versa.
+// RoleUploadCard — the bottom row of the canvas column: a file PICKER only.
+// The format dropdown + drop zone choose the file and the vault kind; there is
+// deliberately NO upload button — the "Hand this stage in" card submits the
+// chosen file together with the member's description for the Captain's review
+// (the desktop-agent button is the alternative path for oversized files). The
+// card reports the picked file upward through onPick so the page can hand it
+// to the submit card, and the page passes the pick back down via `selected`
+// so the chip reflects the file that will travel with the submission.
 // ---------------------------------------------------------------------------
 
 export function RoleUploadCard({
@@ -522,6 +523,9 @@ export function RoleUploadCard({
   defaultKind,
   accept,
   checkFormat,
+  onPick,
+  onClear,
+  selected,
 }: {
   projectId: string;
   /** e.g. "video file" / "audio file" / "thumbnail design". */
@@ -534,89 +538,18 @@ export function RoleUploadCard({
   accept: string;
   /** Client-side format guard — returns an error message for a disallowed file. */
   checkFormat: (file: File) => string | null;
+  /** Reports a newly picked file (and kind) so the submit card can send it. */
+  onPick: (file: File, kind: string) => void;
+  /** Clears the picked file (page resets its controlled state). */
+  onClear: () => void;
+  /** The currently picked file (controlled by the page). */
+  selected: { file: File; kind: string } | null;
 }) {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
-  const xhrRef = useRef<XMLHttpRequest | null>(null);
-  const [kind, setKind] = useState(defaultKind);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [kind, setKind] = useState(selected?.kind ?? defaultKind);
   const [drag, setDrag] = useState(false);
-  const [phase, setPhase] = useState<'idle' | 'uploading' | 'done'>('idle');
-  const [progress, setProgress] = useState(0);
-  const [name, setName] = useState('');
   const [error, setError] = useState('');
-  // A picked file that is too big for the browser path — the agent modal.
-  const [blockedFile, setBlockedFile] = useState<File | null>(null);
-
-  useEffect(
-    () => () => {
-      xhrRef.current?.abort();
-    },
-    [],
-  );
-
-  const startUpload = (file: File) => {
-    const invalid = checkFormat(file);
-    if (invalid) {
-      setError(invalid);
-      return;
-    }
-    // Files at/over the cap go through the desktop agent, never the browser.
-    if (exceedsBrowserUploadCap(file)) {
-      setError('');
-      setBlockedFile(file);
-      return;
-    }
-    setError('');
-    setPendingFile(null);
-    setName(file.name);
-    setProgress(0);
-    setPhase('uploading');
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('kind', kind);
-
-    const xhr = new XMLHttpRequest();
-    xhrRef.current = xhr;
-    xhr.open('POST', getUploadVideoAssetUrl(projectId));
-    xhr.upload.onprogress = (progressEvent) => {
-      if (progressEvent.lengthComputable && progressEvent.total > 0) {
-        setProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
-      }
-    };
-    xhr.onload = () => {
-      xhrRef.current = null;
-      if (xhr.status >= 200 && xhr.status < 300) {
-        setPhase('done');
-        queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
-        if (fileRef.current) fileRef.current.value = '';
-      } else {
-        let message = 'The upload failed. Try once more.';
-        try {
-          const data = JSON.parse(xhr.responseText) as { error?: string };
-          if (typeof data?.error === 'string') message = data.error;
-        } catch {
-          // Non-JSON body — keep the generic message.
-        }
-        setPhase('idle');
-        setError(message);
-      }
-    };
-    xhr.onerror = () => {
-      xhrRef.current = null;
-      setPhase('idle');
-      setError('The upload was interrupted — your connection dropped.');
-    };
-    xhr.send(formData);
-  };
-
-  const cancel = () => {
-    xhrRef.current?.abort();
-    xhrRef.current = null;
-    setPhase('idle');
-    setProgress(0);
-  };
 
   const pickFile = (file: File | undefined | null) => {
     if (!file) return;
@@ -626,8 +559,14 @@ export function RoleUploadCard({
       return;
     }
     setError('');
-    setPendingFile(file);
+    onPick(file, kind);
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const changeKind = (value: string) => {
+    setKind(value);
+    // Re-label the pending pick so the submitted kind stays in sync.
+    if (selected?.file) onPick(selected.file, value);
   };
 
   const onDropZoneClick = () => fileRef.current?.click();
@@ -638,13 +577,14 @@ export function RoleUploadCard({
     pickFile(event.dataTransfer.files?.[0]);
   };
 
+  const overCap = selected ? exceedsBrowserUploadCap(selected.file) : false;
+
   return (
     <div className="paper-card role-upload-card" data-testid="role-upload">
       <div className="role-upload-row">
         <select
           value={kind}
-          onChange={(event) => setKind(event.target.value)}
-          disabled={phase === 'uploading'}
+          onChange={(event) => changeKind(event.target.value)}
           aria-label="File format"
           data-testid="role-upload-kind"
         >
@@ -652,19 +592,9 @@ export function RoleUploadCard({
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
-        <button
-          type="button"
-          className="primary-btn"
-          onClick={() => pendingFile && startUpload(pendingFile)}
-          disabled={phase === 'uploading' || !pendingFile}
-          data-testid="role-upload-button"
-        >
-          <Upload size={13} />
-          {phase === 'uploading' ? `${progress}%` : 'Upload'}
-        </button>
-        {/* The second method — upload through the desktop agent instead. The
-            user picks between the two any time; oversized files still land
-            here via the modal below. */}
+        {/* The second method — hand the file in through the desktop agent
+            instead (no browser cap; it submits for review with its own
+            description field). */}
         <AgentLaunchButton
           projectId={projectId}
           label="Desktop agent"
@@ -672,19 +602,8 @@ export function RoleUploadCard({
           onDone={() => queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) })}
         />
       </div>
-      {/* Too big for the browser path — download + use the desktop agent. */}
-      {blockedFile && (
-        <AgentUploadModal
-          fileName={blockedFile.name}
-          fileSizeBytes={blockedFile.size}
-          context={label}
-          projectId={projectId}
-          onAgentDone={() => queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) })}
-          onClose={() => setBlockedFile(null)}
-        />
-      )}
       <div
-        className={`role-upload-drop ${drag ? 'drag' : ''}`}
+        className={`role-upload-drop ${drag ? 'drag' : ''} ${selected ? 'has-file' : ''}`}
         role="button"
         tabIndex={0}
         onClick={onDropZoneClick}
@@ -703,8 +622,8 @@ export function RoleUploadCard({
         title="Click to browse, or drop a file here"
         data-testid="role-upload-drop"
       >
-        {pendingFile ? (
-          <span><FolderOpen size={14} /> <b>{pendingFile.name}</b> — ready to upload</span>
+        {selected ? (
+          <span><FolderOpen size={14} /> <b>{selected.file.name}</b> — will travel with your submission</span>
         ) : (
           <span><FolderOpen size={14} /> Drag &amp; drop your {label} here, or click to browse</span>
         )}
@@ -714,30 +633,24 @@ export function RoleUploadCard({
         type="file"
         accept={accept}
         onChange={(event) => pickFile(event.target.files?.[0])}
-        disabled={phase === 'uploading'}
         className="hidden"
         data-testid="role-upload-input"
       />
-      {phase === 'uploading' && (
-        <span className="role-upload-status" data-testid="role-upload-progress">
-          <span className="den-upload-progress-bar"><span style={{ width: `${progress}%` }} /></span>
-          <b className="mono-label">{progress}%</b>
-          <button type="button" onClick={cancel} className="den-upload-cancel">Cancel</button>
-        </span>
-      )}
-      {phase === 'done' && (
-        <span className="role-upload-status" data-testid="role-upload-done">
-          <Check size={12} /> <b className="truncate">{name}</b> is in the vault
-        </span>
-      )}
-      {phase === 'idle' && error && (
-        <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-error">{error}</span>
-      )}
-      {phase === 'idle' && blockedFile && (
-        <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-too-big">
-          {blockedFile.name} is over the {BROWSER_UPLOAD_MAX_LABEL} browser limit — use the desktop agent to upload it.
-        </span>
-      )}
+      <div className="role-upload-actions">
+        {selected ? (
+          <button type="button" className="link-btn" onClick={onClear} data-testid="role-upload-clear">
+            Remove this file
+          </button>
+        ) : null}
+        {error && (
+          <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-error">{error}</span>
+        )}
+        {overCap && (
+          <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-too-big">
+            {selected!.file.name} is over the {BROWSER_UPLOAD_MAX_LABEL} browser limit — use the desktop agent for this one.
+          </span>
+        )}
+      </div>
     </div>
   );
 }
