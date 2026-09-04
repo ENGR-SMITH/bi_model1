@@ -2395,13 +2395,15 @@ select optgroup {
   grid-template-rows: minmax(0, 68fr) minmax(0, 32fr);
 }
 .role-col-2--solo {
-  /* No direct-upload bar on role pages anymore — the canvas fills the column. */
+  /* Fallback when a role page has no picker card — the canvas fills the column. */
   grid-template-rows: minmax(0, 1fr);
 }
 .role-col-3 {
   grid-column: 3;
   grid-row: 1;
-  grid-template-rows: minmax(0, 32fr) minmax(0, 68fr);
+  /* 40 : 60 — the "Hand this stage in" card (bottom row) is the shorter one;
+     the comment wall above it gets the taller share. */
+  grid-template-rows: minmax(0, 60fr) minmax(0, 40fr);
 }
 .role-canvas-main {
   grid-row: 1;
@@ -2535,8 +2537,10 @@ select optgroup {
 }
 
 /* ---- Role upload card (second column, second row) ----
-   A compact upload section: a format dropdown (the page's own kinds), a
-   clickable / draggable drop zone, an upload button, and a progress row. */
+   A compact file PICKER: a format dropdown (the page's own kinds) + a
+   clickable / draggable drop zone. No direct upload — the "Hand this stage
+   in" card submits the picked file together with the description for the
+   Captain's review; the Desktop agent button is the oversized-file path. */
 .role-upload-card {
   height: 100%;
   min-height: 0;
@@ -2584,6 +2588,19 @@ select optgroup {
   white-space: nowrap;
 }
 .role-upload-drop b { font-weight: 600; }
+.role-upload-drop.has-file {
+  border-color: hsl(var(--accent) / .5);
+  color: hsl(var(--foreground));
+}
+.role-upload-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-height: 20px;
+}
+.role-upload-actions .setting-copy { margin: 0; font-size: 11px; }
 .role-upload-status {
   flex: 0 0 auto;
   display: flex;
@@ -4781,6 +4798,19 @@ select optgroup {
 }
 .stage-submit-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .stage-submit-row .setting-copy { flex: 1 1 220px; margin: 0; }
+.stage-file-chip {
+  display: flex; gap: 10px; align-items: center;
+  padding: 9px 12px; border-radius: 10px;
+  border: 1px solid hsl(var(--accent) / .4);
+  background: hsl(var(--accent) / .08);
+  color: hsl(var(--accent));
+  font-size: 12px;
+  min-width: 0;
+}
+.stage-file-chip svg { flex: 0 0 auto; }
+.stage-file-chip span { min-width: 0; }
+.stage-file-chip b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stage-file-chip small { display: block; color: hsl(var(--muted-foreground)); font-size: 11px; }
 
 /* ---- Submission overview (crew side of /review) --------------------------- */
 .submission-overview-grid {

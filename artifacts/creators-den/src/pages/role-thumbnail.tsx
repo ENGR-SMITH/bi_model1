@@ -2,12 +2,14 @@
 // Thumbnail role page — the cover studio.
 //
 // Column one: a vertical scrolling shelf mixing the project's THUMBNAIL
-// versions with the vault's design images. Column two: the big canvas — the
-// selected version's chosen design (or the picked vault file) rendered at its
-// natural aspect, with spatial pins and a full-screen expand button. Column
-// three, row 1: the pin / comment wall; row 2: the Thumbnail Designer's
-// "Hand this stage in" card. Design files only arrive here via submit-for-
-// review (approved by the Captain) — no direct upload on this page.
+// versions with the vault's design images. Column two, row 1: the big canvas
+// — the selected version's chosen design (or the picked vault file) rendered
+// at its natural aspect, with spatial pins and a full-screen expand button;
+// row 2: the source-file picker (no direct upload — the "Hand this stage in"
+// card submits the file with the description). Column three, row 1: the pin /
+// comment wall; row 2: the Thumbnail Designer's submit card. Design files
+// only arrive via submit-for-review (approved by the Captain) or the desktop
+// agent.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -28,6 +30,7 @@ import {
   FullscreenButton,
   PreviewNotesPanel,
   RoleLayout,
+  RoleUploadCard,
   VAULT_KIND_LABELS,
   type PreviewVersion,
 } from '@/components/preview-shared';
@@ -36,6 +39,16 @@ import { RoleAccessDenied } from '@/components/role-access-denied';
 import { hasRole } from '@/lib/roles';
 
 const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
+const IMAGE_UPLOAD_KINDS = ['THUMBNAIL_DESIGN', 'GRAPHIC'].map((value) => ({ value, label: VAULT_KIND_LABELS[value] }));
+
+// This page accepts image files only — the accept list and the client check
+// below reject anything else (no video / audio / script files here).
+const IMAGE_ACCEPT = 'image/*,.png,.jpg,.jpeg,.webp,.gif,.avif';
+const IMAGE_FILE_RE = /\.(png|jpe?g|webp|gif|avif)$/i;
+const checkImageFile = (file: File): string | null =>
+  file.type.startsWith('image/') || IMAGE_FILE_RE.test(file.name)
+    ? null
+    : 'Only image files can be picked here (.png, .jpg, .webp).';
 
 // ---------------------------------------------------------------------------
 // ThumbnailCanvas — the design canvas for one selected THUMBNAIL version.
@@ -134,6 +147,9 @@ export default function RoleThumbnailPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
+  // A file picked in the upload card — handed in together with the description
+  // by the "Hand this stage in" card (submit-for-review, no direct upload).
+  const [pendingUpload, setPendingUpload] = useState<{ file: File; kind: string } | null>(null);
 
   // Default to the newest version once the list arrives (unless a vault file
   // has been picked from the version shelf).
@@ -256,6 +272,21 @@ export default function RoleThumbnailPage() {
           projectId={p.id}
           legs={['THUMBNAIL']}
           roleName="Thumbnail Designer"
+          pendingFile={pendingUpload}
+          onFileSubmitted={() => setPendingUpload(null)}
+        />
+      }
+      upload={
+        <RoleUploadCard
+          projectId={p.id}
+          label="thumbnail design"
+          kinds={IMAGE_UPLOAD_KINDS}
+          defaultKind="THUMBNAIL_DESIGN"
+          accept={IMAGE_ACCEPT}
+          checkFormat={checkImageFile}
+          onPick={(file, kind) => setPendingUpload({ file, kind })}
+          onClear={() => setPendingUpload(null)}
+          selected={pendingUpload}
         />
       }
     />

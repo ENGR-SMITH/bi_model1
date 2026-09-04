@@ -2,12 +2,13 @@
 // Audio role page — the sound studio.
 //
 // Column one: a vertical scrolling shelf mixing the project's SOUND versions
-// with the vault's audio files. Column two: the big canvas — the selected
-// version's audio (or the picked vault file) plays as a wavelength bar view
-// with a red tick at the playhead; pins drop straight on the wave. Column
-// three, row 1: the pin / comment wall; row 2: the Sound Designer's "Hand
-// this stage in" card. Vault files only arrive here via submit-for-review
-// (approved by the Captain) — there is no direct upload on this page.
+// with the vault's audio files. Column two, row 1: the big canvas — the
+// selected version's audio (or the picked vault file) plays as a wavelength
+// bar view with a red tick at the playhead; pins drop straight on the wave;
+// row 2: the source-file picker (no direct upload — the "Hand this stage in"
+// card submits the file with the description). Column three, row 1: the pin /
+// comment wall; row 2: the Sound Designer's submit card. Vault files only
+// arrive via submit-for-review (approved by the Captain) or the desktop agent.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -31,6 +32,7 @@ import {
   FullscreenButton,
   PreviewNotesPanel,
   RoleLayout,
+  RoleUploadCard,
   VAULT_KIND_LABELS,
   WaveformPlayer,
   type PreviewVersion,
@@ -41,6 +43,16 @@ import { hasRole } from '@/lib/roles';
 import type { StudioLeg } from '@/components/role-oracle';
 
 const AUDIO_KINDS = new Set(['RAW_AUDIO', 'VO_PICKUP']);
+const AUDIO_UPLOAD_KINDS = ['RAW_AUDIO', 'VO_PICKUP'].map((value) => ({ value, label: VAULT_KIND_LABELS[value] }));
+
+// This page accepts audio files only — the accept list and the client check
+// below reject anything else (no video / image / script files here).
+const AUDIO_ACCEPT = 'audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.aif,.aiff,.opus';
+const AUDIO_FILE_RE = /\.(wav|mp3|m4a|aac|flac|ogg|aif|aiff|opus)$/i;
+const checkAudioFile = (file: File): string | null =>
+  file.type.startsWith('audio/') || AUDIO_FILE_RE.test(file.name)
+    ? null
+    : 'Only audio files can be picked here (.wav, .mp3, .m4a, .flac, .ogg).';
 
 // ---------------------------------------------------------------------------
 // AudioCanvas — the wave canvas for one selected SOUND version. Falls back to
@@ -191,6 +203,9 @@ export default function RoleAudioPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
+  // A file picked in the upload card — handed in together with the description
+  // by the "Hand this stage in" card (submit-for-review, no direct upload).
+  const [pendingUpload, setPendingUpload] = useState<{ file: File; kind: string } | null>(null);
 
   // Default to the newest version once the list arrives (unless a vault file
   // has been picked from the version shelf).
@@ -307,6 +322,21 @@ export default function RoleAudioPage() {
           projectId={p.id}
           legs={['SOUND']}
           roleName="Audio Editor"
+          pendingFile={pendingUpload}
+          onFileSubmitted={() => setPendingUpload(null)}
+        />
+      }
+      upload={
+        <RoleUploadCard
+          projectId={p.id}
+          label="audio file"
+          kinds={AUDIO_UPLOAD_KINDS}
+          defaultKind="RAW_AUDIO"
+          accept={AUDIO_ACCEPT}
+          checkFormat={checkAudioFile}
+          onPick={(file, kind) => setPendingUpload({ file, kind })}
+          onClear={() => setPendingUpload(null)}
+          selected={pendingUpload}
         />
       }
     />
