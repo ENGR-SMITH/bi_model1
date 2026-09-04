@@ -23,6 +23,22 @@ export const tandemTicketsTable = pgTable("tandem_tickets", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 });
 
+// ---------------------------------------------------------------------------
+// TANDEM category tours — the one-time 10-minute preview a new visitor gets
+// in a den before buying that category's pass. One row per (user, category)
+// ever: granting the tour twice is impossible, so once the 10 minutes are up
+// the only way back in is an active pass.
+// ---------------------------------------------------------------------------
+
+export const tandemToursTable = pgTable("tandem_tours", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  // authors | content-creators (each den has its own independent tour)
+  category: text("category").notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+});
+
 export const tandemPromoCodesTable = pgTable("tandem_promo_codes", {
   code: text("code").primaryKey(),
   // FREE (waive the fee) | PERCENT (percent off) | FLAT (cents off)
@@ -38,6 +54,8 @@ export const tandemPromoCodesTable = pgTable("tandem_promo_codes", {
 
 export const insertTandemTicketSchema = createInsertSchema(tandemTicketsTable);
 export const insertTandemPromoCodeSchema = createInsertSchema(tandemPromoCodesTable);
+export const insertTandemTourSchema = createInsertSchema(tandemToursTable);
 
 export type TandemTicket = typeof tandemTicketsTable.$inferSelect;
 export type TandemPromoCode = typeof tandemPromoCodesTable.$inferSelect;
+export type TandemTour = typeof tandemToursTable.$inferSelect;

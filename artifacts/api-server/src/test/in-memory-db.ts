@@ -466,6 +466,14 @@ export const tandemTicketsTable = sqliteTable("tandem_tickets", {
   expiresAt: integer("expires_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
+export const tandemToursTable = sqliteTable("tandem_tours", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  category: text("category").notNull(),
+  startedAt: integer("started_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  endsAt: integer("ends_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const tandemPromoCodesTable = sqliteTable("tandem_promo_codes", {
   code: text("code").primaryKey(),
   kind: text("kind").notNull(),
@@ -813,6 +821,11 @@ export async function buildInMemoryDb() {
       promo_code TEXT, card_last_4 TEXT NOT NULL,
       purchased_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
     );
+    CREATE TABLE tandem_tours (
+      id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
+      category TEXT NOT NULL,
+      started_at INTEGER NOT NULL, ends_at INTEGER NOT NULL
+    );
     CREATE TABLE tandem_promo_codes (
       code TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL,
       value INTEGER NOT NULL DEFAULT 0, max_uses INTEGER NOT NULL DEFAULT 0,
@@ -917,6 +930,7 @@ export async function buildInMemoryDb() {
     tandemAccountQuotasTable,
     tandemUserCvsTable,
     tandemTicketsTable,
+    tandemToursTable,
     tandemPromoCodesTable,
     tandemSubscriptionsTable,
     tandemVideoStorageSnapshotsTable,

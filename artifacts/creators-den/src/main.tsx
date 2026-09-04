@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import App from './App';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { DenTourGate } from '@/components/den-tour-gate';
 import { RealtimeProvider } from '@/lib/realtime';
 import AgentSignInPage from '@/pages/agent-signin';
 
@@ -117,7 +118,11 @@ createRoot(document.getElementById('root')!, {
           <AgentSignInPage />
         ) : (
           <ClerkGate>
-            <App />
+            {/* The one-time 10-minute preview tour / pass gate for this den —
+                the desktop-agent sign-in page above intentionally bypasses it. */}
+            <DenTourGate category="content-creators">
+              <App />
+            </DenTourGate>
           </ClerkGate>
         )}
       </ErrorBoundary>

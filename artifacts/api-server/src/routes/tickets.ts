@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { and, eq, gt, sql } from "drizzle-orm";
-import { db, tandemPromoCodesTable, tandemSubscriptionsTable, tandemTicketsTable } from "@workspace/db";
+import { db, tandemPromoCodesTable, tandemSubscriptionsTable, tandemTicketsTable, tandemToursTable } from "@workspace/db";
 import {
   GetTicketStatusResponse,
   PurchaseTicketBody,
@@ -17,6 +17,10 @@ const router: IRouter = Router();
 // the whole category (Author-Writer room / Content-Creators room).
 export const PASS_PRICE_USD = 188; // $1.88 in cents
 export const PASS_WEEKS = 3;
+// A visitor without a pass gets ONE 10-minute preview tour per den (a row in
+// tandem_tours). Each den tours independently, matching its own pass.
+export const TOUR_MINUTES = 10;
+export const TOUR_MS = TOUR_MINUTES * 60 * 1000;
 export const TICKET_CATEGORIES = ["authors", "content-creators"] as const;
 export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
 
@@ -78,6 +82,133 @@ export async function resolvePromo(raw: string | undefined, priceUsd: number): P
   const discount = Math.min(priceUsd, Math.max(0, promo.value));
   return { code, kind: "FLAT", value: promo.value, discount, label: `$${(promo.value / 100).toFixed(2)} off` };
 }
+
+// GET /tickets/access/:category — the den entry state for one category:
+// whether the viewer holds an active pass, whether their one-time tour is
+// live (and when it ends), whether it has already been used, and whether a
+// fresh tour may be started. The den apps consult this on every load, so a
+// lapsed tour can never be re-granted client-side.
+router.get("/tickets/access/:category", async (req: Request, res: Response): Promise<void> => {
+  const userId = getAuth(req).userId;
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const category = String(req.params.category ?? "");
+  if (!TICKET_CATEGORIES.includes(category as TicketCategory)) {
+    res.status(400).json({ error: `Unknown category: ${category}` });
+    return;
+  }
+
+  const [pass] = await db
+    .select()
+    .from(tandemTicketsTable)
+    .where(
+      and(
+        eq(tandemTicketsTable.userId, userId),
+        eq(tandemTicketsTable.category, category),
+        gt(tandemTicketsTable.expiresAt, new Date()),
+      ),
+    )
+    .orderBy(tandemTicketsTable.expiresAt)
+    .limit(1);
+  // At most one tour row per (user, category) is ever granted.
+  const [tour] = await db
+    .select()
+    .from(tandemToursTable)
+    .where(and(eq(tandemToursTable.userId, userId), eq(tandemToursTable.category, category)))
+    .orderBy(tandemToursTable.startedAt)
+    .limit(1);
+
+  const passActive = Boolean(pass);
+  const tourActive = Boolean(tour && tour.endsAt.getTime() > Date.now());
+  const tourUsed = Boolean(tour && tour.endsAt.getTime() <= Date.now());
+
+  res.json({
+    category,
+    tourMinutes: TOUR_MINUTES,
+    passActive,
+    tourActive,
+    tourEndsAt: tourActive && tour ? tour.endsAt.toISOString() : null,
+    tourUsed,
+    canStartTour: !passActive && !tour,
+  });
+});
+
+// POST /tickets/tour/start — grant the viewer's one-time 10-minute preview
+// tour of a den. Refuses when they already hold an active pass (none needed)
+// or when the tour has already been granted (it is one per user per den —
+// after it ends, an active pass is the only way back in).
+router.post("/tickets/tour/start", async (req: Request, res: Response): Promise<void> => {
+  const userId = getAuth(req).userId;
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const { category } = (req.body ?? {}) as { category?: string };
+  if (!TICKET_CATEGORIES.includes(category as TicketCategory)) {
+    res.status(400).json({ error: "A category is required" });
+    return;
+  }
+
+  const [pass] = await db
+    .select()
+    .from(tandemTicketsTable)
+    .where(
+      and(
+        eq(tandemTicketsTable.userId, userId),
+        eq(tandemTicketsTable.category, category as string),
+        gt(tandemTicketsTable.expiresAt, new Date()),
+      ),
+    )
+    .orderBy(tandemTicketsTable.expiresAt)
+    .limit(1);
+  if (pass) {
+    res.status(400).json({ error: "You already have an active pass — no tour needed." });
+    return;
+  }
+
+  const [existing] = await db
+    .select()
+    .from(tandemToursTable)
+    .where(
+      and(eq(tandemToursTable.userId, userId), eq(tandemToursTable.category, category as string)),
+    )
+    .limit(1);
+  if (existing) {
+    res.status(409).json({
+      error:
+        existing.endsAt.getTime() > Date.now()
+          ? "Your preview tour is already running."
+          : "Your 10-minute tour has already been used — buy a pass to come back.",
+    });
+    return;
+  }
+
+  const startedAt = new Date();
+  const endsAt = new Date(startedAt.getTime() + TOUR_MS);
+  const [tour] = await db
+    .insert(tandemToursTable)
+    .values({
+      id: randomUUID(),
+      userId,
+      category: category as string,
+      startedAt,
+      endsAt,
+    })
+    .returning();
+
+  res.status(201).json({
+    tour: {
+      category: tour.category,
+      tourMinutes: TOUR_MINUTES,
+      startedAt: tour.startedAt.toISOString(),
+      endsAt: tour.endsAt.toISOString(),
+    },
+  });
+});
 
 // GET /tickets/status — the pass price/duration and the viewer's active
 // passes, so the category pages can show the ticket gate (or unlock).
