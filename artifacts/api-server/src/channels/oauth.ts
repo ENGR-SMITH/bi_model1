@@ -84,7 +84,10 @@ function verifyState(state: string): { channelId: string } | null {
   if (!payload || !digest) return null;
   const secret = process.env.SESSION_SECRET ?? "manuskript-development-key";
   const expected = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
-  if (!crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(expected))) return null;
+  // timingSafeEqual throws on length mismatch — a forged state fails the
+  // length check just as hard as a bad digest.
+  if (Buffer.from(digest).length !== expected.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(digest), expected)) return null;
   try {
     const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { channelId?: string; exp?: number };
     if (typeof parsed.channelId !== "string" || typeof parsed.exp !== "number") return null;
