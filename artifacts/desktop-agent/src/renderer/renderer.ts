@@ -92,6 +92,27 @@ async function beginSignIn(): Promise<void> {
   }
 }
 
+// Same as beginSignIn but opens the link in the browser automatically — used
+// when the session token went stale mid-use. The browser already holds the
+// real Clerk session, so the page completes on its own and the app gets a
+// fresh token without the user doing anything beyond letting the tab open.
+async function beginAutoReSignIn(): Promise<void> {
+  try {
+    const res = await window.tandemAgent.signInBegin();
+    if (!res.ok) {
+      setAuthNote(res.error ?? "Could not start sign-in.", "err");
+      return;
+    }
+    openSigninPanel(res.url);
+    const opened = await window.tandemAgent.openExternal(res.url);
+    if (!opened.ok) {
+      setAuthNote("Your fresh sign-in link is ready — click Open in browser.", "err");
+    }
+  } catch (err) {
+    setAuthNote(`Sign-in failed: ${(err as Error).message}`, "err");
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Projects / assets
 // ---------------------------------------------------------------------------
@@ -334,7 +355,7 @@ function initListeners() {
       ($("asset") as HTMLSelectElement).length = 0;
       setAuthNote("Your sign-in expired — getting you a fresh one…", "err");
       await refreshWho();
-      if (!signedIn) await beginSignIn();
+      if (!signedIn) await beginAutoReSignIn();
     } else if (evt.type === "error") {
       closeSigninPanel();
       setAuthNote(evt.error, "err");
