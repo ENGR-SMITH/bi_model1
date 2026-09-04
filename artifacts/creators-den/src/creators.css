@@ -4438,8 +4438,6 @@ select optgroup {
    row, then the bottom row split into the Decision and REMARK cards (in place
    of the carousel) — with a tighter frame than the standard preview pages. */
 .review-page { padding: 8px clamp(6px, 1vw, 12px) 8px; }
-.review-page .pv-top { gap: 8px; }
-.review-page .pv-canvas-col { gap: 10px; }
 
 /* The compact back-to-queue control in the column header (icon only). */
 .pv-review-back {
