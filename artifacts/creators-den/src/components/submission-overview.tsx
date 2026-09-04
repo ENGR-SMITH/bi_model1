@@ -10,11 +10,13 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import {
+  AlertTriangle,
   CheckCircle2,
   Clock3,
   FileUp,
   GitPullRequest,
   Inbox,
+  RefreshCw,
   Send,
   XCircle,
 } from 'lucide-react';
@@ -203,24 +205,40 @@ export function SubmissionOverview() {
   const projectKey = projects.map((project) => project.id).join('|');
 
   const mineQuery = useQuery({
-    queryKey: ['my-video-submissions', projectKey],
+    // userId is part of the key so switching accounts can never show another
+    // member's cached submissions.
+    queryKey: ['my-video-submissions', userId, projectKey],
     enabled: projects.length > 0 && Boolean(userId),
-    queryFn: async (): Promise<MySubmissionRow[]> => {
+    queryFn: async (): Promise<{ rows: MySubmissionRow[]; skippedProjects: number }> => {
       const nameById = new Map(projects.map((project) => [project.id, project.name]));
-      const rows = await Promise.all(
+      // Each project is settled on its own: one unreachable project (a 403/404
+      // drift, a server hiccup) must never blank the whole page into a fake
+      // "Nothing submitted yet." — its rows are skipped and surfaced instead.
+      const settled = await Promise.all(
         projects.map(async (project) => {
-          const submissions = await listVideoSubmissions(project.id);
-          return submissions
-            .filter((submission) => submission.submittedById === userId)
-            .map((submission) => ({
-              ...submission,
-              projectName: nameById.get(submission.projectId) ?? 'Untitled project',
-            }));
+          try {
+            const submissions = await listVideoSubmissions(project.id);
+            return {
+              ok: true as const,
+              rows: submissions
+                .filter((submission) => submission.submittedById === userId)
+                .map((submission) => ({
+                  ...submission,
+                  projectName: nameById.get(submission.projectId) ?? 'Untitled project',
+                })),
+            };
+          } catch {
+            return { ok: false as const, rows: [] as MySubmissionRow[] };
+          }
         }),
       );
-      return rows
-        .flat()
+      const rows = settled
+        .flatMap((result) => result.rows)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return {
+        rows,
+        skippedProjects: settled.filter((result) => !result.ok).length,
+      };
     },
     // Keep states live while the page is open: approvals/rejections arrive
     // from the Captain without a manual refresh.
@@ -228,7 +246,10 @@ export function SubmissionOverview() {
     refetchOnWindowFocus: true,
   });
 
-  const all = mineQuery.data ?? [];
+  const queryData = mineQuery.data;
+  const all = queryData?.rows ?? [];
+  const skippedProjects = queryData?.skippedProjects ?? 0;
+  const queryFailed = mineQuery.isError && !mineQuery.isFetching;
   const rows = filter === 'ALL' ? all : all.filter((row) => row.status === filter);
   const open = all.find((row) => row.id === openId) ?? null;
 
@@ -262,19 +283,46 @@ export function SubmissionOverview() {
         )}
       </div>
 
-      {mineQuery.isLoading && all.length === 0 ? (
+      {queryFailed && all.length === 0 ? (
+        <div className="empty-state" data-testid="submission-overview-error" role="alert">
+          <AlertTriangle size={22} />
+          <h3>Couldn&apos;t load your submissions.</h3>
+          <p>
+            The review server didn&apos;t answer. This is a connection problem, not a review problem —
+            your submitted work is safe on the Captain&apos;s desk.
+          </p>
+          <button type="button" className="primary-btn" onClick={() => void mineQuery.refetch()} data-testid="submission-overview-retry">
+            <RefreshCw size={13} /> Try again
+          </button>
+        </div>
+      ) : mineQuery.isLoading && all.length === 0 ? (
         <div className="panel-empty">Gathering your submissions…</div>
       ) : all.length === 0 ? (
         <div className="empty-state" data-testid="submission-overview-empty">
           <Inbox size={22} />
           <h3>Nothing submitted yet.</h3>
           <p>
-            Open a stage you work on — Video, Audio, or Thumbnail — describe what you did in the
-            &ldquo;Hand this stage in&rdquo; card and submit it. The Captain&apos;s decision appears here.
+            Open a stage you work on — Video, Audio, or Thumbnail — pick your file in the source card
+            and hand it in from the &ldquo;Hand this stage in&rdquo; card, or submit a version from the
+            Desktop agent. The Captain&apos;s decision appears here.
+          </p>
+          <p className="den-footnote">
+            If you uploaded while signed in as this project&apos;s Captain, the file goes straight to the
+            vault instead — Captains don&apos;t review their own uploads, so no submission is created.
           </p>
         </div>
       ) : (
-        <div className="submission-overview-grid">
+        <>
+          {skippedProjects > 0 && (
+            <div className="panel-warning mb-4" role="status" data-testid="submission-overview-partial">
+              <AlertTriangle size={14} />
+              <span>
+                {skippedProjects} project{skippedProjects === 1 ? '' : 's'} couldn&apos;t be reached — their
+                submissions aren&apos;t shown here. <button type="button" className="link-btn" onClick={() => void mineQuery.refetch()}>Try again</button>
+              </span>
+            </div>
+          )}
+          <div className="submission-overview-grid">
           <div className="submission-list-col">
             <div className="submission-filters" role="tablist" aria-label="Filter submissions">
               {FILTERS.map((option) => (
@@ -411,7 +459,8 @@ export function SubmissionOverview() {
               </>
             )}
           </aside>
-        </div>
+          </div>
+        </>
       )}
 
       {all.length > 0 && (
