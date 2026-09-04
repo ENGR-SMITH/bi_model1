@@ -17,21 +17,25 @@
 //     · right column, split 50 : 50 — the submitter's DESCRIPTION (the
 //       message they wrote when handing the stage in) on top, and the
 //       Captain's REMARK note directly below it.
-//   Bottom: the big Accept / Reject decision as two bare centered buttons
-//   under the canvas (no card). Version submissions diff against the leg's
-//   head version; a FILE hand-in diffs against the newest processed vault
-//   file of the leg.
+//   Bottom of the canvas column: the big Accept / Reject decision bar sits
+//   directly under the canvas, and the back-to-queue control lives at the
+//   head of the canvas column (top-left, beside the "Big canvas" eyebrow).
+//   Version submissions diff against the leg's head version; a FILE hand-in
+//   diffs against the newest processed vault file of the leg.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useUser } from '@clerk/react';
 import { ArrowLeft, Send } from 'lucide-react';
 import {
   getGetVideoTimelineVersionQueryKey,
   useGetVideoProject,
   useGetVideoTimelineVersion,
+  useListVideoComments,
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import type { VideoSubmission } from '@workspace/api-client-react';
+import { formatTimecode } from '@/components/timeline';
 import {
   AudioStageCanvas,
   ThumbnailStageCanvas,
@@ -177,6 +181,8 @@ export function CaptainReviewSurface({
   onBack: () => void;
 }) {
   const project = useGetVideoProject(projectId);
+  const { user } = useUser();
+  const comments = useListVideoComments(projectId);
   const leg = submission.leg as StudioLeg;
   // A file handed in for review carries an `ASSET:<assetId>` sentinel — it has
   // no timeline snapshot; the staged original is what the Captain reviews
@@ -317,6 +323,32 @@ export function CaptainReviewSurface({
   const versionNo = version.data?.version ?? null;
   const annotationHeaderRef = useRef<HTMLDivElement>(null);
 
+  // ---- Annotations → REMARK ----
+  // Every pin note the Captain drops on this review's canvas lands in the
+  // REMARK field automatically, so the improvement note travels back with a
+  // rejection without retyping anything. Only the pins scoped to THIS
+  // submission (the workbench canvas scopes them) by the signed-in Captain
+  // sync; the seen-set keeps re-renders from appending a pin twice.
+  const syncedCommentIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    syncedCommentIds.current = new Set();
+  }, [submission.id]);
+  useEffect(() => {
+    if (!user?.id) return;
+    let extra = '';
+    for (const comment of comments.data ?? []) {
+      if (comment.submissionId !== submission.id) continue;
+      if (comment.authorId !== user.id) continue;
+      if (!comment.body.trim()) continue;
+      if (syncedCommentIds.current.has(comment.id)) continue;
+      syncedCommentIds.current.add(comment.id);
+      const stamp = comment.timecodeMs != null ? `@${formatTimecode(comment.timecodeMs)} — ` : '';
+      extra += `\n• ${stamp}${comment.body.trim()}`;
+    }
+    if (extra) onNoteChange(`${note}${extra}`.trim());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comments.data, submission.id, user?.id]);
+
   let canvasBody: ReactNode;
   if (isAssetSubmission) {
     // A file hand-in has no snapshot — the shared canvas previews the staged
@@ -350,30 +382,31 @@ export function CaptainReviewSurface({
 
   return (
     <div className="page pv-page review-page" data-testid="review-workbench">
-      {/* Slim back control above the grid — the column header itself is the
-          exact preview/video head (Big canvas eyebrow + annotate + toggle). */}
-      <div className="review-topbar">
-        <button
-          type="button"
-          className="pv-review-back"
-          onClick={onBack}
-          title="Back to the queue"
-          aria-label="Back to the queue"
-          data-testid="review-back"
-        >
-          <ArrowLeft size={14} />
-        </button>
-      </div>
-
       <div className="pv-top">
         {/* First column — the Big canvas with Preview | Diff map, exactly like
-            the preview pages. */}
+            the preview pages. The back-to-queue control sits at the head of
+            the canvas column, top-left, beside the "Big canvas" eyebrow. The
+            Accept / Reject decision bar sits directly under the canvas. */}
         <div className="pv-canvas-col">
           <PreviewCanvasColumn
             view={view}
             onViewChange={setView}
             hasDiff={hasDiff}
-            eyebrow={<span className="eyebrow">Big canvas</span>}
+            eyebrow={
+              <span className="review-canvas-eyebrow">
+                <button
+                  type="button"
+                  className="pv-review-back"
+                  onClick={onBack}
+                  title="Back to the queue"
+                  aria-label="Back to the queue"
+                  data-testid="review-back"
+                >
+                  <ArrowLeft size={14} />
+                </button>
+                <span className="eyebrow">Big canvas</span>
+              </span>
+            }
             annotationHeaderRef={annotationHeaderRef}
             settings={hasDiff ? diffSettings : undefined}
             onSettingsChange={hasDiff ? setDiffSettings : undefined}
@@ -394,6 +427,14 @@ export function CaptainReviewSurface({
               ) : null
             }
           />
+          {/* Decision — the big Accept / Reject pair, directly below the
+              canvas, aligned with it. */}
+          <ReviewDecisionBar
+            projectId={projectId}
+            submissionId={submission.id}
+            note={note}
+            onDecided={onDecided}
+          />
         </div>
 
         {/* Second column — the submitter's DESCRIPTION on top and the
@@ -411,16 +452,6 @@ export function CaptainReviewSurface({
           <ReviewRemarkCard note={note} onChange={onNoteChange} />
         </div>
       </div>
-
-      {/* Decision — the big Accept / Reject pair, floating centered under the
-          canvas (no card around them). */}
-      <ReviewDecisionBar
-        projectId={projectId}
-        submissionId={submission.id}
-        note={note}
-        onDecided={onDecided}
-      />
-
     </div>
   );
 }

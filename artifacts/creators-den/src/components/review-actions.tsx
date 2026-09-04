@@ -91,6 +91,7 @@ export function ReviewDecisionBar({
   };
 
   const canReject = note.trim().length > 0 && !pending;
+  const hasNote = note.trim().length > 0;
 
   return (
     <div className="review-decision-bar" data-testid="review-decision-bar">
@@ -111,13 +112,21 @@ export function ReviewDecisionBar({
           className="review-decision-reject"
           onClick={() => decide('REJECTED')}
           disabled={!canReject}
-          title={note.trim() ? 'Reject — sends it back with your Remark' : 'Write a Remark to reject'}
+          title={hasNote ? 'Reject — sends it back with your Remark' : 'Write a Remark to reject'}
           data-testid="review-decision-reject"
         >
           <XCircle size={18} />
           {reject.isPending ? 'Rejecting…' : 'Reject'}
         </button>
       </div>
+      {/* A rejection must travel back with a reason — the Reject button stays
+          locked until the REMARK field holds one, and this says why. */}
+      {!hasNote && !pending && (
+        <p className="review-decision-hint" role="status" data-testid="review-reject-hint">
+          <MessageSquare size={11} />
+          Write a Remark above — you must leave a note before you can Reject this hand-in.
+        </p>
+      )}
       {error && (
         <p className="setting-copy review-decision-error" role="alert" data-testid="review-decision-error">
           {error.response?.data?.error || 'The decision could not be saved.'}

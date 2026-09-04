@@ -25,15 +25,11 @@ import {
   getGetVideoProjectQueryKey,
   getListVideoDownloadsQueryKey,
   getListVideoGrantsQueryKey,
-  getListVideoSubmissionsQueryKey,
   useAddVideoProjectMember,
-  useApproveVideoSubmission,
   useCreateVideoGrant,
   useGetVideoProject,
   useListVideoDownloads,
   useListVideoGrants,
-  useListVideoSubmissions,
-  useRejectVideoSubmission,
   useRemoveVideoProjectMember,
   useRevokeVideoGrant,
   useUpdateVideoProjectMemberRoles,
@@ -559,76 +555,6 @@ function DownloadAuditPanel({ projectId, myRoles }: { projectId: string; myRoles
   );
 }
 
-function SubmissionsPanel({ projectId, myRoles }: { projectId: string; myRoles: string[] }) {
-  const queryClient = useQueryClient();
-  const submissions = useListVideoSubmissions(projectId);
-  const approve = useApproveVideoSubmission();
-  const reject = useRejectVideoSubmission();
-
-  const decide = (submissionId: string, decision: 'approve' | 'reject') => {
-    const mutation = decision === 'approve' ? approve : reject;
-    mutation.mutate(
-      { projectId, submissionId },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: getListVideoSubmissionsQueryKey(projectId) });
-        },
-      },
-    );
-  };
-
-  const rows = submissions.data ?? [];
-  const pending = rows.filter((s) => s.status === 'SUBMITTED');
-  const isCaptain = myRoles.includes('CAPTAIN');
-
-  if (rows.length === 0) return null;
-
-  return (
-    <div className="paper-card" data-testid="panel-submissions">
-      <div className="inline-heading">
-        <span className="eyebrow"><Film size={13} /> Pull requests</span>
-        {pending.length > 0 && <span className="den-tag gold">{pending.length} open</span>}
-      </div>
-      <div className="den-stack">
-        {rows.map((submission) => {
-          const meta = LEG_META[submission.leg as keyof typeof LEG_META] ?? { label: submission.leg, role: '', icon: Film };
-          const Icon = meta.icon;
-          const isPending = submission.status === 'SUBMITTED';
-          return (
-            <div key={submission.id} className="list-row" data-testid={`submission-${submission.id}`}>
-              <span className="world-symbol"><Icon size={13} /></span>
-              <span>
-                <b>{meta.label} — {meta.role}</b>
-                <small>
-                  {submission.status.replaceAll('_', ' ')} · v{submission.timelineVersionId.slice(0, 8)}
-                  {submission.note && ` · “${submission.note.slice(0, 60)}”`}
-                </small>
-              </span>
-              {isPending && isCaptain ? (
-                <span className="flex gap-2">
-                  <button type="button" onClick={() => decide(submission.id, 'approve')} disabled={approve.isPending || reject.isPending} className="secondary-btn" data-testid={`button-approve-${submission.id}`}>
-                    <Check size={13} /> Approve
-                  </button>
-                  <button type="button" onClick={() => decide(submission.id, 'reject')} disabled={approve.isPending || reject.isPending} className="secondary-btn" data-testid={`button-reject-${submission.id}`}>
-                    <X size={13} /> Reject
-                  </button>
-                </span>
-              ) : (
-                <span className={`den-tag ${submission.status === 'APPROVED' ? 'teal' : submission.status === 'REJECTED' ? 'danger' : 'gold'}`}>
-                  {submission.status}
-                </span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      {pending.length > 0 && !isCaptain && (
-        <p className="setting-copy mt-3">Waiting on the Captain to approve or reject the pending stage.</p>
-      )}
-    </div>
-  );
-}
-
 export default function ContentCreatorsProjectPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const queryClient = useQueryClient();
@@ -835,7 +761,6 @@ export default function ContentCreatorsProjectPage() {
         </div>
 
         <div className="cd-watch-rail">
-          <SubmissionsPanel projectId={p.id} myRoles={myRoles} />
           <DownloadAuditPanel projectId={p.id} myRoles={myRoles} />
         </div>
       </div>
