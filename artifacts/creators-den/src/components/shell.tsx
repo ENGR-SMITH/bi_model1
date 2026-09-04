@@ -299,6 +299,26 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
               </div>
             </div>
+            {/* The Review desk — an always-visible Captain-only chip beside the
+                workspace. The queue scans every project the viewer owns, so it
+                can't live on the project rail (that rail disappears off-project,
+                and /review is a top-level route). */}
+            {isCaptain && (
+              <div className="cd-topnav-chip">
+                <Link
+                  href="/review"
+                  className={`cd-topnav-review${location === '/review' ? ' cd-topnav-review-active' : ''}`}
+                  title="Review desk — accept or reject crew submissions"
+                  data-testid="nav-review"
+                >
+                  <GitPullRequest size={14} />
+                  <span>Review</span>
+                  {pendingReviews > 0 && (
+                    <b className="cd-topnav-review-badge" data-testid="nav-review-badge">{pendingReviews}</b>
+                  )}
+                </Link>
+              </div>
+            )}
           </div>
 
           {projectId && (
@@ -306,17 +326,6 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
               <div className="cd-tab-group">
                 {/* A public (non-member) viewer only gets PREVIEW + TIMELINE. */}
                 {!readOnly && tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
-                {/* The Review desk moved onto the nav as a Captain-only tab,
-                    sitting right beside the Vault. */}
-                {!readOnly && isCaptain && (
-                  <Link href="/review" className={`cd-tab ${location === '/review' ? 'active' : ''}`} data-testid="nav-review">
-                    <GitPullRequest size={15} />
-                    <span>Review</span>
-                    {pendingReviews > 0 && (
-                      <b className="cd-topnav-review-badge cd-nav-badge" data-testid="nav-review-badge">{pendingReviews}</b>
-                    )}
-                  </Link>
-                )}
                 {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
                 {tab(`/projects/${projectId}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview', true)}
               </div>

@@ -10,14 +10,18 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Save } from 'lucide-react';
 import { Link, useParams } from 'wouter';
+import { useQueryClient } from '@tanstack/react-query';
 import {
+  getGetVideoTimelineQueryKey,
   getGetVideoTimelineVersionQueryKey,
+  getListVideoTimelineVersionsQueryKey,
   useGetVideoProject,
   useGetVideoTimeline,
   useGetVideoTimelineVersion,
   useListVideoTimelineVersions,
+  useSaveVideoTimeline,
 } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
 import { EmptyPlayer, ImageStage, proxyUrlFor } from '@/components/asset-preview';
@@ -33,6 +37,7 @@ import {
 } from '@/components/preview-shared';
 import { RoleOracle } from '@/components/role-oracle';
 import { RoleAccessDenied } from '@/components/role-access-denied';
+import { StageHandoff } from '@/components/stage-handoff';
 import { hasRole } from '@/lib/roles';
 
 const IMAGE_KINDS = new Set(['THUMBNAIL_DESIGN', 'GRAPHIC']);
@@ -65,6 +70,8 @@ function ThumbnailCanvas({
   vaultAssetId?: string;
 }) {
   const stageRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+  const save = useSaveVideoTimeline();
 
   const snap = version ? ((version.snapshot ?? null) as {
     designs?: Array<{ id?: string; assetId: string; title?: string; style?: string }>;
@@ -86,8 +93,66 @@ function ThumbnailCanvas({
   const designAssetId = design?.assetId && assets.some((a) => a.id === design.assetId) ? design.assetId : '';
   const assetId = explicitAsset || designAssetId || fallback?.id || '';
 
+  // Choosing a design IS the thumbnail stage's work: a vault file picked from
+  // the shelf is not a version until it is saved, so the canvas offers the
+  // save right where the design is being judged.
+  const picked = vaultAssetId && explicitAsset ? (assets.find((a) => a.id === vaultAssetId) ?? null) : null;
+  const saving = save.isPending;
+  const saveError = save.error as { response?: { data?: { error?: string } } } | null;
+
+  const onSave = () => {
+    if (!picked) return;
+    save.mutate(
+      {
+        projectId,
+        leg: 'THUMBNAIL',
+        data: {
+          snapshot: { designs: [{ assetId: picked.id, title: picked.fileName }] },
+          message: `Chose ${picked.fileName} as the thumbnail`,
+        },
+      },
+      {
+        onSuccess: () => {
+          // Refresh the shelf, head version, and hand-off status below.
+          queryClient.invalidateQueries({ queryKey: getGetVideoTimelineQueryKey(projectId, 'THUMBNAIL') });
+          queryClient.invalidateQueries({ queryKey: getListVideoTimelineVersionsQueryKey(projectId, 'THUMBNAIL') });
+        },
+      },
+    );
+  };
+
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="thumbnail-canvas">
+      {picked && (
+        <div
+          className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2"
+          style={{ borderColor: 'hsl(var(--border))' }}
+          data-testid="thumbnail-save-bar"
+        >
+          <span className="setting-copy">
+            Previewing “{picked.fileName}” — not saved as a version yet.
+          </span>
+          {picked.status !== 'PROCESSED' ? (
+            <span className="den-tag gold">processing…</span>
+          ) : (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="secondary-btn"
+              data-testid="thumbnail-save-version"
+            >
+              <Save size={13} />
+              {saving ? 'Saving…' : 'Save as new version'}
+            </button>
+          )}
+          {saveError && (
+            <span className="setting-copy w-full" role="alert">
+              {saveError.response?.data?.error || 'The design could not be saved.'}
+            </span>
+          )}
+        </div>
+      )}
       <div className="pv-stage-player">
         {assetId ? (
           <ImageStage src={proxyUrlFor(projectId, assetId)}>
@@ -255,7 +320,7 @@ export default function RoleThumbnailPage() {
           items={shelfItems}
           activeKey={activeKey}
           onSelect={onShelfSelect}
-          emptyText="No versions or vault files yet — save a snapshot in the Thumbnail studio, or upload a design above."
+          emptyText="No versions or vault files yet — upload a design above and save it as v1 from the canvas."
         />
       }
       canvas={
@@ -290,6 +355,14 @@ export default function RoleThumbnailPage() {
           defaultKind="THUMBNAIL_DESIGN"
           accept={IMAGE_ACCEPT}
           checkFormat={checkImageFile}
+        />
+      }
+      handoff={
+        <StageHandoff
+          projectId={p.id}
+          leg="THUMBNAIL"
+          label="Thumbnail"
+          emptyHint="Upload a design above, pick it from the shelf, then click “Save as new version” on the canvas — that creates this stage's first version to hand off."
         />
       }
     />

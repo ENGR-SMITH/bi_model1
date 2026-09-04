@@ -457,6 +457,7 @@ export function RoleLayout({
   notes,
   oracle,
   upload,
+  handoff,
 }: {
   /** Column one — the vertical shelf of timeline versions + vault uploads. */
   versions: ReactNode;
@@ -468,6 +469,8 @@ export function RoleLayout({
   oracle: ReactNode;
   /** Column two, row two — the upload card. */
   upload: ReactNode;
+  /** Full-width bottom row — the stage hand-off (submit for review). */
+  handoff?: ReactNode;
 }) {
   return (
     <div className="page pv-page role-page" data-testid="role-page">
@@ -481,6 +484,7 @@ export function RoleLayout({
           <div className="role-notes-main">{oracle}</div>
           <div className="role-notes-bar">{notes}</div>
         </div>
+        {handoff && <div className="role-handoff">{handoff}</div>}
       </div>
     </div>
   );

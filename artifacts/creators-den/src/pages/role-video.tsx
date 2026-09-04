@@ -36,6 +36,7 @@ import {
 } from '@/components/preview-shared';
 import { RoleOracle } from '@/components/role-oracle';
 import { RoleAccessDenied } from '@/components/role-access-denied';
+import { StageHandoff } from '@/components/stage-handoff';
 import { hasRole } from '@/lib/roles';
 import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
 import type { StudioLeg } from '@/components/role-oracle';
@@ -343,7 +344,7 @@ export default function RoleVideoPage() {
           items={shelfItems}
           activeKey={activeKey}
           onSelect={onShelfSelect}
-          emptyText="No versions or vault files yet — save a snapshot in the Selects or Cut studio, or upload footage above."
+          emptyText="No versions yet — upload footage above, edit in an external NLE, then bring the Selects / Cut back through the round-trip on the hand-off cards below."
         />
       }
       canvas={
@@ -380,6 +381,12 @@ export default function RoleVideoPage() {
           accept={VIDEO_ACCEPT}
           checkFormat={checkVideoFile}
         />
+      }
+      handoff={
+        <div className="grid gap-4 lg:grid-cols-2" data-testid="video-handoff">
+          <StageHandoff projectId={p.id} leg="SELECTS" label="Selects" projectName={p.name} />
+          <StageHandoff projectId={p.id} leg="CUT" label="Cut" projectName={p.name} />
+        </div>
       }
     />
   );

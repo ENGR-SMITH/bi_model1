@@ -2367,14 +2367,31 @@ select optgroup {
   max-width: none;
   padding: 20px clamp(18px, 2.5vw, 34px);
   height: calc(100dvh - 107px - 30px);
+  /* The stage hand-off row (and an expanded external-editor round-trip) can
+     outgrow the viewport — let the page scroll instead of clipping. */
+  overflow-y: auto;
 }
 .role-grid {
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns: 10fr 50fr 40fr;
-  grid-template-rows: minmax(0, 1fr);
+  /* Row two (auto) hosts the full-width stage hand-off row. Row one keeps a
+     usable floor so expanding the hand-off scrolls the page rather than
+     crushing the studio to nothing. */
+  grid-template-rows: minmax(340px, 1fr) auto;
   gap: 16px;
+}
+/* The stage hand-off (submit for review) — a full-width bottom row that the
+   role pages slot into RoleLayout. Its children (one or two hand-off cards)
+   keep a comfortable max width instead of stretching across the whole page. */
+.role-handoff {
+  grid-column: 1 / -1;
+  min-height: 0;
+  align-content: start;
+}
+.role-handoff > * {
+  max-width: 1160px;
 }
 .role-versions-col {
   grid-column: 1;
@@ -4207,19 +4224,14 @@ select optgroup {
   background: hsl(var(--card) / .35);
   clip-path: polygon(0 0, calc(100% - var(--sp-3)) 0, 100% 100%, 0 100%);
 }
-.cd-topnav-chip .cd-topnav-review:hover { color: hsl(var(--accent)); }
+.cd-topnav-chip .cd-topnav-review:hover,
+.cd-topnav-chip .cd-topnav-review-active { color: hsl(var(--accent)); }
 .cd-topnav-review-badge {
   min-width: 17px; height: 17px; padding: 0 4px;
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 999px;
   background: hsl(var(--sidebar-primary));
   color: #fff; font: 700 10px var(--app-font-sans);
-}
-/* The Review tab's pending badge, when Review lives on the project nav rail. */
-.cd-nav-badge {
-  position: static;
-  margin-left: 5px;
-  background: hsl(var(--destructive));
 }
 
 /* ---- Notifications page -------------------------------------------------- */

@@ -135,13 +135,16 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
       if (payload.projectId !== projectId) return;
       invalidate([getListVideoChatMessagesQueryKey(projectId)]);
     };
-    const onSubmission = (payload: { projectId: string }) => {
+    const onSubmission = (payload: { projectId: string; leg?: string }) => {
       if (payload.projectId !== projectId) return;
       invalidate([
         getListVideoSubmissionsQueryKey(projectId),
         getGetVideoProjectQueryKey(projectId),
         // The vault's activity feed follows submissions + decisions live.
         getListVideoActivityQueryKey(projectId),
+        // The stage hand-off status (DRAFT/SUBMITTED/APPROVED/REJECTED) lives
+        // on the leg timeline — flip it the moment a submission is decided.
+        ...(payload.leg ? [getGetVideoTimelineQueryKey(projectId, payload.leg as 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL')] : []),
       ]);
     };
     const onAsset = (payload: { projectId: string; assetId?: string }) => {
@@ -154,7 +157,7 @@ export function useProjectRealtime(projectId?: string, leg?: string | null) {
     };
     const onTimeline = (payload: { projectId: string; leg?: string }) => {
       if (payload.projectId !== projectId) return;
-      const leg = (payload.leg ?? '') as 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH';
+      const leg = (payload.leg ?? '') as 'SELECTS' | 'CUT' | 'SOUND' | 'FINISH' | 'THUMBNAIL';
       invalidate([
         getGetVideoTimelineQueryKey(projectId, leg),
         // The project-level CommitLog in the vault follows saves live too.

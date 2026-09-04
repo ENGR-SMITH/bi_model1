@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { Check, Download, Film, Package, Upload, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Download, Film, Package, Repeat2, Upload, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getCheckoutVideoTimelineAafUrl,
@@ -25,9 +25,11 @@ import {
   getGetVideoTimelineCheckoutManifestQueryKey,
   getGetVideoTimelineQueryKey,
   getListVideoJobsQueryKey,
+  getListVideoReviewQueueQueryKey,
   getListVideoSubmissionsQueryKey,
   getGetVideoTimelineCheckoutBundleDownloadUrl,
   useExportVideoTimelineCheckout,
+  useGetVideoTimeline,
   useGetVideoTimelineCheckoutManifest,
   useImportVideoTimeline,
   useListVideoJobs,
@@ -349,6 +351,8 @@ export function ImportFlow({
           queryClient.invalidateQueries({ queryKey: getGetVideoTimelineQueryKey(projectId, leg) });
           queryClient.invalidateQueries({ queryKey: getListVideoSubmissionsQueryKey(projectId) });
           queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+          // The import auto-submits — keep the Captain's review queue + badge fresh.
+          queryClient.invalidateQueries({ queryKey: getListVideoReviewQueueQueryKey() });
         },
         onError: (err) => {
           const data = (err as { response?: { data?: { error?: string; unresolved?: string[] } } }).response?.data;
@@ -440,6 +444,56 @@ export function ImportFlow({
         <p className="setting-copy mt-2" role="alert">
           {error}
         </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * InterchangeSection — the collapsible "edit this stage in an external NLE"
+ * round-trip (checkout → edit → import) that the role studios slot into each
+ * stage's hand-off card. Collapsed by default so the studio grid stays roomy;
+ * expand it when you actually want to take the stage into Premiere/Resolve.
+ */
+export function InterchangeSection({
+  projectId,
+  projectName,
+  leg,
+}: {
+  projectId: string;
+  projectName: string;
+  leg: StudioLeg;
+}) {
+  const [open, setOpen] = useState(false);
+  // The checkout exports the saved head, so the panels know the version count.
+  const timeline = useGetVideoTimeline(projectId, leg);
+  const savedVersion = timeline.data?.version ?? null;
+
+  return (
+    <div data-testid={`interchange-${leg.toLowerCase()}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-2 text-left"
+        aria-expanded={open}
+        data-testid={`interchange-toggle-${leg.toLowerCase()}`}
+      >
+        <span className="eyebrow">
+          <Repeat2 size={13} /> External editor round-trip
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="den-tag muted">checkout → edit → import</span>
+          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </span>
+      </button>
+      {open && (
+        // Stacked (not side-by-side): the accordion can sit inside a half-width
+        // hand-off card on the Video studio, where two columns would cramp the
+        // format chips and file lists.
+        <div className="mt-3 grid gap-4" data-testid={`interchange-body-${leg.toLowerCase()}`}>
+          <CheckoutPanel projectId={projectId} projectName={projectName} leg={leg} savedVersion={savedVersion} />
+          <ImportFlow projectId={projectId} leg={leg} canEdit />
+        </div>
       )}
     </div>
   );

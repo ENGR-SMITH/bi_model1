@@ -38,6 +38,7 @@ import {
 } from '@/components/preview-shared';
 import { RoleOracle } from '@/components/role-oracle';
 import { RoleAccessDenied } from '@/components/role-access-denied';
+import { StageHandoff } from '@/components/stage-handoff';
 import { hasRole } from '@/lib/roles';
 import type { StudioLeg } from '@/components/role-oracle';
 
@@ -336,7 +337,7 @@ export default function RoleAudioPage() {
           items={shelfItems}
           activeKey={activeKey}
           onSelect={onShelfSelect}
-          emptyText="No versions or vault files yet — save a snapshot in the Sound studio, or upload audio above."
+          emptyText="No versions yet — upload audio above, edit in an external NLE, then bring the Sound pass back through the round-trip on the hand-off card below."
         />
       }
       canvas={
@@ -374,6 +375,7 @@ export default function RoleAudioPage() {
           checkFormat={checkAudioFile}
         />
       }
+      handoff={<StageHandoff projectId={p.id} leg="SOUND" label="Sound" projectName={p.name} />}
     />
   );
 }
