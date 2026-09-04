@@ -26,7 +26,6 @@ import { useProjectRealtime } from '@/lib/realtime';
 import { AssetPlayer, EmptyPlayer, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { VersionShelf, type ShelfItem } from '@/components/version-shelf';
-import { formatTimecode } from '@/components/timeline';
 import {
   PreviewNotesPanel,
   RoleLayout,
@@ -34,7 +33,7 @@ import {
   VAULT_KIND_LABELS,
   type PreviewVersion,
 } from '@/components/preview-shared';
-import { RoleOracle } from '@/components/role-oracle';
+import { StageSubmitCard } from '@/components/stage-submit-card';
 import { RoleAccessDenied } from '@/components/role-access-denied';
 import { hasRole } from '@/lib/roles';
 import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
@@ -273,43 +272,6 @@ export default function RoleVideoPage() {
     }
   };
 
-  // The asset actually shown in the player — feeds the oracle's context
-  // (transcript + vault). Same query key the canvas uses, so no duplicate fetch.
-  const canvasAssetId = useMemo(() => {
-    const proj = project.data;
-    if (!proj) return '';
-    const snap = (selectedDetail.data?.snapshot ?? null) as TimelineSnapshotLike | null;
-    const clips = Array.isArray(snap?.clips) ? snap!.clips! : [];
-    const firstClipAsset = clips[0]?.assetId;
-    const vaultVideo = proj.assets.find((a) => VIDEO_KINDS.has(a.kind) && a.status === 'PROCESSED') ?? proj.assets.find((a) => VIDEO_KINDS.has(a.kind)) ?? null;
-    return (vaultAssetId && proj.assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : '') ||
-      (firstClipAsset && proj.assets.some((a) => a.id === firstClipAsset) ? firstClipAsset : '') ||
-      vaultVideo?.id || '';
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.data, vaultAssetId, selectedDetail.data?.snapshot]);
-
-  const oracleAsset = useGetVideoAsset(projectId, canvasAssetId, {
-    query: {
-      queryKey: getGetVideoAssetQueryKey(projectId, canvasAssetId),
-      enabled: Boolean(canvasAssetId),
-    },
-  });
-
-  const oracleContext = useMemo(() => {
-    const proj = project.data;
-    if (!proj) return '';
-    const lines = (oracleAsset.data?.transcript?.segments ?? [])
-      .map((s) => `${formatTimecode(s.startMs)}–${formatTimecode(s.endMs)}: ${s.text}`)
-      .join('\n');
-    return [
-      `Project: ${proj.name}`,
-      `Active: ${activeVersion ? `${activeVersion.leg} v${activeVersion.version}${activeVersion.message ? ` — ${activeVersion.message}` : ''}` : vaultAssetId ? 'a vault file' : 'nothing yet'}`,
-      `Vault (${proj.assets.length} file${proj.assets.length === 1 ? '' : 's'}): ${proj.assets.map((a) => `${a.fileName} [${a.kind}]`).join(', ') || 'empty'}`,
-      `Transcript:\n${lines.slice(0, 6000) || '(no transcript yet)'}`,
-    ].join('\n\n').slice(0, 12000);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.data, activeVersion, vaultAssetId, oracleAsset.data]);
-
   if (project.isLoading) {
     return (
       <div className="page">
@@ -364,11 +326,10 @@ export default function RoleVideoPage() {
         />
       }
       oracle={
-        <RoleOracle
-          leg="CUT"
+        <StageSubmitCard
+          projectId={p.id}
+          legs={VIDEO_LEGS}
           roleName="Video Editor"
-          context={oracleContext}
-          placeholder="e.g. Where should the next cut land, and which take is strongest?"
         />
       }
       upload={

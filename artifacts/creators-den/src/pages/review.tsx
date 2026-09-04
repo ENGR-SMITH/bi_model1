@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'wouter';
 import { useUser } from '@clerk/react';
 import { ArrowLeft, GitPullRequest, Inbox, ShieldCheck, Sparkles } from 'lucide-react';
 import {
@@ -11,6 +10,7 @@ import type { VideoReviewQueueItem, VideoSubmission } from '@workspace/api-clien
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { ReviewPanel } from '@/components/review-panel';
 import { ReviewDecisionCard, ReviewOracleCard } from '@/components/review-actions';
+import { SubmissionOverview } from '@/components/submission-overview';
 import { useRealtimeNotifications } from '@/lib/realtime';
 
 // ---------------------------------------------------------------------------
@@ -62,20 +62,11 @@ export default function ReviewPage() {
   // fields are absent from the summary, so narrow the type for the panel.
   const reviewSubmission = current as unknown as VideoSubmission;
 
+  // Everyone else sees their own submissions: what they handed in, whether it
+  // is awaiting the Captain, approved, or sent back with the improvement note —
+  // plus the relay-flow tree of the project timeline on the side.
   if (!isCaptain) {
-    return (
-      <div className="page">
-        <div className="page-guide"><span className="guide-pin" /><div><b>CAPTAINS ONLY</b><span>The review desk is for the people who own projects.</span></div></div>
-        <h1 style={{ font: '700 clamp(30px, 4vw, 43px) var(--app-font-serif)', letterSpacing: '-.045em', margin: '9px 0 20px' }}>
-          The review desk is for Captains.
-        </h1>
-        <p className="setting-copy" style={{ maxWidth: 520 }}>
-          Every submission made by your crew lands here for you to accept or reject. If you own a
-          project, this page opens your queue automatically.
-        </p>
-        <Link href="/" className="primary-btn mt-4"><ArrowLeft size={14} /> Back to the room</Link>
-      </div>
-    );
+    return <SubmissionOverview />;
   }
 
   return (

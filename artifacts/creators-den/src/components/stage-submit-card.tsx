@@ -1,0 +1,295 @@
+// ---------------------------------------------------------------------------
+// StageSubmitCard — the description + submit card on the role pages (Video /
+// Audio / Thumbnail). Replaces the old oracle chat: instead of asking an AI,
+// the member writes a short description of the work done on this stage and
+// submits the current snapshot for the Captain's review.
+//
+//   - Description field — what was done in this pass.
+//   - "Improve writing" — the AI polishes grammar + phrasing ONLY (never
+//     changes the substance, timecodes, or instructions).
+//   - Resolved review notes — comments other people left on previous versions
+//     that the member marked done are listed here and auto-included with the
+//     submission, so the Captain sees what was addressed.
+//   - Submit — pins the stage's current head snapshot for review (approve
+//     merges it to the timeline; reject sends it back with the Captain's note).
+// ---------------------------------------------------------------------------
+
+import { useMemo, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  CheckCircle2,
+  Clock3,
+  Send,
+  Sparkles,
+  XCircle,
+} from 'lucide-react';
+import {
+  getGetVideoProjectQueryKey,
+  getGetVideoTimelineQueryKey,
+  getListVideoCommentsQueryKey,
+  getListVideoSubmissionsQueryKey,
+  oracleChat,
+  useCreateVideoSubmission,
+  useGetVideoProject,
+  useListVideoComments,
+  useListVideoSubmissions,
+} from '@workspace/api-client-react';
+import type { StudioLeg } from '@/components/role-oracle';
+import { RELAY_LEGS } from '@/components/shell';
+
+/** The role that owns each relay leg (mirrors the server's LEG_ROLES). */
+const LEG_ROLE: Record<StudioLeg, string> = {
+  SELECTS: 'VIDEO',
+  CUT: 'VIDEO',
+  SOUND: 'AUDIO',
+  FINISH: 'CAPTAIN',
+  THUMBNAIL: 'THUMBNAIL',
+};
+
+// The oracle's rephrase-only system prompt: grammar + clarity + phrasing.
+// Every specific point, timecode, and instruction must survive verbatim; the
+// AI is explicitly forbidden from adding suggestions or changing meaning.
+const IMPROVE_PROMPT = [
+  "You are the Editor's oracle in a video relay (Creators Den).",
+  'A crew member has described the work they did on their stage before submitting it for review.',
+  'Improve the description\'s grammar, spelling, clarity, and phrasing ONLY.',
+  'Keep every specific point, timecode, file reference, and instruction exactly as written — do not add new details, invent work, or change the meaning.',
+  'Return ONLY the improved description text, with no preamble, quotes, or commentary.',
+].join(' ');
+
+function timeAgo(iso: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function legLabel(leg: string): string {
+  return RELAY_LEGS.find((relay) => relay.leg === leg)?.label ?? leg;
+}
+
+export function StageSubmitCard({
+  projectId,
+  legs,
+  roleName,
+}: {
+  projectId: string;
+  /** The relay legs this stage owns (Video owns SELECTS + CUT, Audio SOUND…). */
+  legs: StudioLeg[];
+  /** e.g. "Visual Editor" / "Sound Designer" — used in the card copy. */
+  roleName: string;
+}) {
+  const queryClient = useQueryClient();
+  const project = useGetVideoProject(projectId);
+  const comments = useListVideoComments(projectId);
+  const submissions = useListVideoSubmissions(projectId);
+
+  // A role that owns two legs (Video → SELECTS + CUT) picks which stage head
+  // they are handing over; single-leg stages have no picker.
+  const [leg, setLeg] = useState<StudioLeg>(legs[0]);
+  const [description, setDescription] = useState('');
+  const [includeResolved, setIncludeResolved] = useState(true);
+
+  const canSubmit =
+    project.data?.myRoles?.includes('CAPTAIN') ||
+    project.data?.myRoles?.includes(LEG_ROLE[leg]);
+
+  // Review notes from earlier passes that the member marked as done — these
+  // are listed and auto-included so the Captain sees what was addressed.
+  const resolvedNotes = useMemo(
+    () =>
+      (comments.data ?? [])
+        .filter(
+          (comment) =>
+            comment.leg === leg &&
+            comment.resolvedAt != null &&
+            !comment.submissionId &&
+            Boolean(comment.body),
+        )
+        .map((comment) => comment.body.trim())
+        .filter(Boolean),
+    [comments.data, leg],
+  );
+
+  // The submission state for this leg drives the card: pending review (locked),
+  // rejected (show the Captain's note + allow a fresh submit), approved.
+  const legSubmissions = useMemo(
+    () => (submissions.data ?? []).filter((submission) => submission.leg === leg),
+    [submissions.data, leg],
+  );
+  const pending = legSubmissions.find((submission) => submission.status === 'SUBMITTED') ?? null;
+  const latestDecided = legSubmissions.find(
+    (submission) => submission.status === 'APPROVED' || submission.status === 'REJECTED',
+  );
+
+  const enhance = useMutation({
+    mutationFn: () =>
+      oracleChat({
+        messages: [
+          { role: 'system', content: IMPROVE_PROMPT },
+          { role: 'user', content: (description.trim() || 'The description is empty.').slice(0, 4000) },
+        ],
+        context: null,
+        temperature: 0.2,
+      }),
+    onSuccess: (result) => setDescription(result.content.trim()),
+  });
+
+  const submit = useCreateVideoSubmission();
+
+  const resolvedBlock = includeResolved && resolvedNotes.length > 0
+    ? `\n\nResolved notes from review:\n${resolvedNotes.map((note) => `- ${note}`).join('\n')}`
+    : '';
+  const finalNote = (description.trim() + resolvedBlock).trim();
+
+  const onSubmit = () => {
+    submit.mutate(
+      { projectId, data: { leg, note: finalNote || undefined } },
+      {
+        onSuccess: () => {
+          setDescription('');
+          queryClient.invalidateQueries({ queryKey: getListVideoSubmissionsQueryKey(projectId) });
+          queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+          queryClient.invalidateQueries({ queryKey: getGetVideoTimelineQueryKey(projectId, leg) });
+          queryClient.invalidateQueries({ queryKey: getListVideoCommentsQueryKey(projectId) });
+        },
+      },
+    );
+  };
+
+  const submitError = submit.error as { response?: { data?: { error?: string } } } | null;
+
+  return (
+    <div className="paper-card stage-submit-card" data-testid="stage-submit-card">
+      <div className="inline-heading">
+        <span className="eyebrow"><Send size={13} /> Hand this stage in</span>
+        <span className="den-tag gold">submit for review</span>
+      </div>
+
+      {legs.length > 1 && (
+        <div className="stage-leg-picker" role="tablist" aria-label="Stage to submit">
+          {legs.map((option) => (
+            <button
+              key={option}
+              type="button"
+              role="tab"
+              aria-selected={leg === option}
+              className={`stage-leg-btn ${leg === option ? 'active' : ''}`}
+              onClick={() => setLeg(option)}
+              data-testid={`stage-leg-${option.toLowerCase()}`}
+            >
+              {legLabel(option)}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pending && (
+        <div className="stage-submit-banner is-pending" data-testid="stage-submit-pending">
+          <Clock3 size={14} />
+          <span>
+            <b>{legLabel(leg)} is awaiting the Captain&apos;s review</b> — submitted {timeAgo(pending.createdAt)}.
+            You&apos;ll be able to hand in another pass once it&apos;s decided.
+          </span>
+        </div>
+      )}
+      {!pending && latestDecided?.status === 'REJECTED' && (
+        <div className="stage-submit-banner is-rejected" data-testid="stage-submit-rejected">
+          <XCircle size={14} />
+          <span>
+            <b>{legLabel(leg)} was sent back</b>
+            {latestDecided.decisionNote ? ` — ${latestDecided.decisionNote}` : ''}
+          </span>
+        </div>
+      )}
+      {!pending && latestDecided?.status === 'APPROVED' && (
+        <div className="stage-submit-banner is-approved" data-testid="stage-submit-approved">
+          <CheckCircle2 size={14} />
+          <span>
+            <b>{legLabel(leg)} was approved</b> — the last submission merged into the timeline.
+            Hand in another pass anytime.
+          </span>
+        </div>
+      )}
+
+      <div className="stage-desc-wrap">
+        <textarea
+          className="stage-desc-input"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          placeholder={`Describe what you did in this ${roleName.toLowerCase()} pass before handing it to the Captain — the cut, the mix, the design, and what you changed since the last review.`}
+          rows={4}
+          maxLength={2000}
+          disabled={Boolean(pending) || !canSubmit}
+          data-testid="stage-submit-description"
+        />
+        <div className="stage-desc-tools">
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => enhance.mutate()}
+            disabled={enhance.isPending || !description.trim() || Boolean(pending) || !canSubmit}
+            title="Polish grammar and phrasing only — the substance stays yours"
+            data-testid="stage-submit-enhance"
+          >
+            {enhance.isPending ? <Sparkles size={12} className="spin" /> : <Sparkles size={12} />}
+            {enhance.isPending ? 'Polishing…' : 'Improve writing'}
+          </button>
+          {enhance.isError && (
+            <span className="setting-copy" role="alert">The oracle could not polish it right now — your draft is unchanged.</span>
+          )}
+          {!canSubmit && <span className="setting-copy">Only the {legLabel(leg)} role (or the Captain) can hand this stage in.</span>}
+        </div>
+      </div>
+
+      {resolvedNotes.length > 0 && (
+        <div className="stage-resolved" data-testid="stage-resolved-notes">
+          <label className="stage-resolved-head">
+            <input
+              type="checkbox"
+              checked={includeResolved}
+              onChange={(event) => setIncludeResolved(event.target.checked)}
+              data-testid="stage-resolved-toggle"
+            />
+            <span>
+              <b>Include {resolvedNotes.length} resolved note{resolvedNotes.length === 1 ? '' : 's'}</b>
+              <small>Notes you marked done from the review comments — sent with your submission.</small>
+            </span>
+          </label>
+          <ul>
+            {resolvedNotes.map((note, index) => (
+              <li key={index}>“{note}”</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="stage-submit-row">
+        <button
+          type="button"
+          className="primary-btn"
+          onClick={onSubmit}
+          disabled={submit.isPending || Boolean(pending) || !canSubmit || (!description.trim() && resolvedNotes.length === 0)}
+          data-testid="stage-submit-button"
+        >
+          {submit.isPending ? <Clock3 size={13} className="spin" /> : <Send size={13} />}
+          {submit.isPending ? 'Submitting…' : pending ? 'In review' : 'Submit for review'}
+        </button>
+        <span className="setting-copy">
+          Pins the current {legLabel(leg)} snapshot — the Captain reviews it, then Accept merges it to the
+          timeline or Reject sends it back with their note.
+        </span>
+      </div>
+      {submit.isError && (
+        <p className="setting-copy mt-2" role="alert">
+          {submitError?.response?.data?.error || 'The submission could not be created.'}
+        </p>
+      )}
+    </div>
+  );
+}

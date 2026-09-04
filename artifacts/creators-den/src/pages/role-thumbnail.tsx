@@ -31,7 +31,7 @@ import {
   VAULT_KIND_LABELS,
   type PreviewVersion,
 } from '@/components/preview-shared';
-import { RoleOracle } from '@/components/role-oracle';
+import { StageSubmitCard } from '@/components/stage-submit-card';
 import { RoleAccessDenied } from '@/components/role-access-denied';
 import { hasRole } from '@/lib/roles';
 
@@ -202,19 +202,6 @@ export default function RoleThumbnailPage() {
     }
   };
 
-  const oracleContext = useMemo(() => {
-    const proj = project.data;
-    if (!proj) return '';
-    const snap = (selectedDetail.data?.snapshot ?? null) as { designs?: Array<{ assetId: string; title?: string; style?: string }> } | null;
-    const design = Array.isArray(snap?.designs) ? snap!.designs![0] : null;
-    return [
-      `Project: ${proj.name}`,
-      `Active: ${design ? `THUMBNAIL v${activeVersion?.version ?? '?'}${design.title ? ` — ${design.title}` : ''}${design.style ? ` (${design.style})` : ''}` : vaultAssetId ? 'a vault file' : 'nothing yet'}`,
-      `Vault (${proj.assets.length} file${proj.assets.length === 1 ? '' : 's'}): ${proj.assets.map((a) => `${a.fileName} [${a.kind}]`).join(', ') || 'empty'}`,
-    ].join('\n\n').slice(0, 12000);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.data, selectedDetail.data?.snapshot, activeVersion?.version, vaultAssetId]);
-
   if (project.isLoading) {
     return (
       <div className="page">
@@ -275,11 +262,10 @@ export default function RoleThumbnailPage() {
         />
       }
       oracle={
-        <RoleOracle
-          leg="THUMBNAIL"
+        <StageSubmitCard
+          projectId={p.id}
+          legs={['THUMBNAIL']}
           roleName="Thumbnail Designer"
-          context={oracleContext}
-          placeholder="e.g. Which frame and headline would pop at a small size?"
         />
       }
       upload={
