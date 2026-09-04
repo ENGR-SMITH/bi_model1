@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
 import { ArrowLeft, GitPullRequest, Inbox, ShieldCheck, Sparkles } from 'lucide-react';
 import {
@@ -43,9 +44,17 @@ function timeAgo(iso: string): string {
 
 export default function ReviewPage() {
   const { user } = useUser();
+  const queryClient = useQueryClient();
   const projects = useListVideoProjects();
   const queue = useListVideoReviewQueue({
-    query: { queryKey: getListVideoReviewQueueQueryKey() },
+    query: {
+      queryKey: getListVideoReviewQueueQueryKey(),
+      // The queue spans every owned project and the socket is project-scoped,
+      // so while the desk is open it polls to pick up new submissions and
+      // to drop the ones the Captain just decided.
+      refetchInterval: 8_000,
+      refetchOnWindowFocus: true,
+    },
   });
   useRealtimeNotifications();
 
@@ -112,6 +121,9 @@ export default function ReviewPage() {
               onDecided={() => {
                 setSelected(null);
                 setNote('');
+                // Pull the decided item off the queue right away instead of
+                // waiting for the next poll tick.
+                void queryClient.invalidateQueries({ queryKey: getListVideoReviewQueueQueryKey() });
               }}
             />
           </div>

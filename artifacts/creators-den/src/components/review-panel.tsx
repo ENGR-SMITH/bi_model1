@@ -18,6 +18,7 @@ import {
   getGetVideoAssetQueryKey,
   getGetVideoProjectQueryKey,
   getGetVideoTimelineVersionQueryKey,
+  getListVideoReviewQueueQueryKey,
   getListVideoSubmissionsQueryKey,
   useApproveVideoSubmission,
   useGetVideoAsset,
@@ -123,6 +124,9 @@ export function ReviewPanel({
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListVideoSubmissionsQueryKey(projectId) });
           queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
+          // The Captain's desk reads this queue — keep it in sync when a
+          // decision happens from a project page.
+          queryClient.invalidateQueries({ queryKey: getListVideoReviewQueueQueryKey() });
           onClose();
         },
       },

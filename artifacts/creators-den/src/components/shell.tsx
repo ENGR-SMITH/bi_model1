@@ -321,6 +321,25 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             </div>
           </div>
 
+          {/* The Review desk is a GLOBAL surface (it spans every project the
+              signed-in member belongs to), so it stays reachable even before a
+              project is opened — Captains see their queue, the crew their own
+              submissions. Inside a project the same tab lives in the rail
+              below. */}
+          {!projectId && (
+            <nav className="cd-topnav-tabs" aria-label="Global sections">
+              <div className="cd-tab-group">
+                <Link href="/review" className={`cd-tab ${location === '/review' ? 'active' : ''}`} data-testid="nav-review">
+                  <GitPullRequest size={15} />
+                  <span>Review</span>
+                  {isCaptain && pendingReviews > 0 && (
+                    <b className="cd-topnav-review-badge cd-nav-badge" data-testid="nav-review-badge">{pendingReviews}</b>
+                  )}
+                </Link>
+              </div>
+            </nav>
+          )}
+
           {projectId && (
             <nav className="cd-topnav-tabs" aria-label="Project sections">
               <div className="cd-tab-group">

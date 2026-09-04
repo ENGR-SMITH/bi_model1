@@ -142,6 +142,26 @@ const LEG_ROLES: Record<string, string> = {
   THUMBNAIL: "THUMBNAIL",
 } as const;
 
+async function isProjectOwner(projectId: string, userId: string): Promise<boolean> {
+  const [project] = await db
+    .select({ ownerId: tandemVideoProjectsTable.ownerId })
+    .from(tandemVideoProjectsTable)
+    .where(eq(tandemVideoProjectsTable.id, projectId))
+    .limit(1);
+  return project?.ownerId === userId;
+}
+
+/** The newest saved version id of a leg timeline (the review candidate). */
+async function latestVersionId(timelineId: string): Promise<string | null> {
+  const [latest] = await db
+    .select({ id: tandemVideoTimelineVersionsTable.id })
+    .from(tandemVideoTimelineVersionsTable)
+    .where(eq(tandemVideoTimelineVersionsTable.timelineId, timelineId))
+    .orderBy(desc(tandemVideoTimelineVersionsTable.version))
+    .limit(1);
+  return latest?.id ?? null;
+}
+
 async function requireMember(
   projectId: string,
   userId: string,
@@ -608,50 +628,61 @@ router.put(
       })
       .returning();
 
-    await db
-      .update(tandemVideoTimelinesTable)
-      .set({ currentVersionId: version.id, updatedAt: new Date() })
-      .where(eq(tandemVideoTimelinesTable.id, timelineId));
+    // Review gate on the public head: the OWNER's saves are authoritative and
+    // advance the leg immediately (they edit on behalf of the whole relay, and
+    // approving their own work would be a pointless loop). A crew member's
+    // save is a CANDIDATE: the version is kept for their studio and for
+    // submission, but the leg's head — what every other studio, the preview,
+    // and the Captain's diff baseline see — only moves when the Captain
+    // APPROVES the submission (see decideSubmission). Until then nothing about
+    // a draft save is broadcast to the crew or lands on the activity feed.
+    const ownerSave = await isProjectOwner(params.data.projectId, userId);
+    if (ownerSave) {
+      await db
+        .update(tandemVideoTimelinesTable)
+        .set({ currentVersionId: version.id, status: "DRAFT", updatedAt: new Date() })
+        .where(eq(tandemVideoTimelinesTable.id, timelineId));
 
-    // Realtime: teammates in the studio see the new snapshot appear live.
-    emitToProject(params.data.projectId, "timeline.saved", {
-      projectId: params.data.projectId,
-      leg: params.data.leg,
-      version: version.version,
-      versionId: version.id,
-      message: version.message,
-      createdById: userId,
-    });
+      // Realtime: teammates in the studio see the new snapshot appear live.
+      emitToProject(params.data.projectId, "timeline.saved", {
+        projectId: params.data.projectId,
+        leg: params.data.leg,
+        version: version.version,
+        versionId: version.id,
+        message: version.message,
+        createdById: userId,
+      });
 
-    // Activity feed: the save shows up on the vault's project timeline.
-    await recordVideoActivity({
-      projectId: params.data.projectId,
-      eventType: "version_saved",
-      leg: params.data.leg,
-      summary: `Saved ${params.data.leg} v${versionNumber}${
-        version.message ? ` — “${version.message.slice(0, 120)}”` : ""
-      }`,
-      actorId: userId,
-      resourceId: version.id,
-    });
-
-    // Notify the rest of the crew that the stage moved (M4).
-    const crew = await db
-      .select()
-      .from(tandemVideoMembersTable)
-      .where(eq(tandemVideoMembersTable.projectId, params.data.projectId));
-    for (const member of crew) {
-      if (member.userId === userId) continue;
-      await notify(
-        member.userId,
-        "video_timeline_updated",
-        `${params.data.leg} updated`,
-        `${params.data.leg} v${versionNumber} was saved${
+      // Activity feed: the save shows up on the vault's project timeline.
+      await recordVideoActivity({
+        projectId: params.data.projectId,
+        eventType: "version_saved",
+        leg: params.data.leg,
+        summary: `Saved ${params.data.leg} v${versionNumber}${
           version.message ? ` — “${version.message.slice(0, 120)}”` : ""
-        }.`,
-        `/creators-den/projects/${params.data.projectId}`,
-        version.id,
-      ).catch(() => {});
+        }`,
+        actorId: userId,
+        resourceId: version.id,
+      });
+
+      // Notify the rest of the crew that the stage moved (M4).
+      const crew = await db
+        .select()
+        .from(tandemVideoMembersTable)
+        .where(eq(tandemVideoMembersTable.projectId, params.data.projectId));
+      for (const member of crew) {
+        if (member.userId === userId) continue;
+        await notify(
+          member.userId,
+          "video_timeline_updated",
+          `${params.data.leg} updated`,
+          `${params.data.leg} v${versionNumber} was saved${
+            version.message ? ` — “${version.message.slice(0, 120)}”` : ""
+          }.`,
+          `/creators-den/projects/${params.data.projectId}`,
+          version.id,
+        ).catch(() => {});
+      }
     }
 
     const state = await buildTimelineResponse(params.data.projectId, params.data.leg);
@@ -850,28 +881,35 @@ router.post(
       })
       .returning();
 
-    await db
-      .update(tandemVideoTimelinesTable)
-      .set({ currentVersionId: restored.id, updatedAt: new Date() })
-      .where(eq(tandemVideoTimelinesTable.id, timeline.id));
+    // Same review gate as a save: an owner's rollback is authoritative and
+    // re-points the head; a crew member's rollback creates a candidate that
+    // only lands on the leg once the Captain approves it (and is quiet until
+    // then — no broadcast, no activity entry).
+    const ownerRollback = await isProjectOwner(params.data.projectId, userId);
+    if (ownerRollback) {
+      await db
+        .update(tandemVideoTimelinesTable)
+        .set({ currentVersionId: restored.id, status: "DRAFT", updatedAt: new Date() })
+        .where(eq(tandemVideoTimelinesTable.id, timeline.id));
 
-    emitToProject(params.data.projectId, "timeline.saved", {
-      projectId: params.data.projectId,
-      leg: params.data.leg,
-      version: restored.version,
-      versionId: restored.id,
-      message: restored.message,
-      createdById: userId,
-    });
+      emitToProject(params.data.projectId, "timeline.saved", {
+        projectId: params.data.projectId,
+        leg: params.data.leg,
+        version: restored.version,
+        versionId: restored.id,
+        message: restored.message,
+        createdById: userId,
+      });
 
-    await recordVideoActivity({
-      projectId: params.data.projectId,
-      eventType: "version_rolled_back",
-      leg: params.data.leg,
-      summary: `Rolled ${params.data.leg} back to v${target.version} (now v${restored.version})`,
-      actorId: userId,
-      resourceId: restored.id,
-    });
+      await recordVideoActivity({
+        projectId: params.data.projectId,
+        eventType: "version_rolled_back",
+        leg: params.data.leg,
+        summary: `Rolled ${params.data.leg} back to v${target.version} (now v${restored.version})`,
+        actorId: userId,
+        resourceId: restored.id,
+      });
+    }
 
     const state = await buildTimelineResponse(params.data.projectId, params.data.leg);
     res.json(RollbackVideoTimelineResponse.parse(state));
@@ -1007,7 +1045,11 @@ router.post(
         ),
       )
       .limit(1);
-    if (!timeline || !timeline.currentVersionId) {
+    // The submission pins the member's NEWEST SAVED VERSION — their candidate
+    // — not the leg's head (the head is the last APPROVED baseline and only
+    // moves when the Captain approves, see decideSubmission).
+    const pinnedVersionId = timeline ? await latestVersionId(timeline.id) : null;
+    if (!timeline || !pinnedVersionId) {
       res.status(400).json({ error: "This stage has no saved snapshot to submit" });
       return;
     }
@@ -1034,7 +1076,7 @@ router.post(
         id: randomUUID(),
         projectId: params.data.projectId,
         leg: body.data.leg,
-        timelineVersionId: timeline.currentVersionId,
+        timelineVersionId: pinnedVersionId,
         status: "SUBMITTED",
         note: body.data.note ?? "",
         submittedById: userId,
@@ -1054,7 +1096,7 @@ router.post(
     const [pinnedVersion] = await db
       .select({ version: tandemVideoTimelineVersionsTable.version })
       .from(tandemVideoTimelineVersionsTable)
-      .where(eq(tandemVideoTimelineVersionsTable.id, timeline.currentVersionId!))
+      .where(eq(tandemVideoTimelineVersionsTable.id, pinnedVersionId))
       .limit(1);
     await recordVideoActivity({
       projectId: params.data.projectId,
@@ -1083,23 +1125,24 @@ router.post(
     }
 
     // Picture-lock render on submit (M2): the Visual Editor's submission kicks
-    // off a render of the head snapshot so the Captain reviews the cut, not
-    // just the JSON.
+    // off a render of the PINNED candidate snapshot (not the leg head — which
+    // is still the last approved baseline) so the Captain reviews the cut,
+    // not just the JSON.
     if (body.data.leg === "CUT") {
-      const [head] = await db
+      const [pinned] = await db
         .select()
         .from(tandemVideoTimelineVersionsTable)
-        .where(eq(tandemVideoTimelineVersionsTable.id, timeline.currentVersionId))
+        .where(eq(tandemVideoTimelineVersionsTable.id, pinnedVersionId))
         .limit(1);
-      const headSnapshot = (head?.snapshot ?? {}) as { clips?: Array<{ assetId?: string }> };
-      const headAssetId = headSnapshot.clips?.[0]?.assetId;
-      if (headAssetId) {
+      const pinnedSnapshot = (pinned?.snapshot ?? {}) as { clips?: Array<{ assetId?: string }> };
+      const pinnedAssetId = pinnedSnapshot.clips?.[0]?.assetId;
+      if (pinnedAssetId) {
         await enqueueRenderJob(
           params.data.projectId,
           body.data.leg,
           "PICTURE_LOCK",
-          headAssetId,
-          timeline.currentVersionId,
+          pinnedAssetId,
+          pinnedVersionId,
         ).catch(() => {});
       }
     }
@@ -1243,9 +1286,18 @@ async function decideSubmission(
       }
     }
   } else {
+    // The real merge: APPROVAL re-points the leg's head at the submitted
+    // version — this is the only moment a crew member's work becomes the
+    // baseline every studio sees. A REJECTION leaves the head untouched (the
+    // last approved baseline stays), so rejected work never sits on the
+    // project timeline.
     await db
       .update(tandemVideoTimelinesTable)
-      .set({ status: decision, updatedAt: new Date() })
+      .set({
+        status: decision,
+        ...(decision === "APPROVED" ? { currentVersionId: submission.timelineVersionId } : {}),
+        updatedAt: new Date(),
+      })
       .where(
         and(
           eq(tandemVideoTimelinesTable.projectId, submission.projectId),
@@ -1828,7 +1880,10 @@ router.post(
         ),
       )
       .limit(1);
-    if (!timeline || !timeline.currentVersionId) {
+    // A studio renders its own newest saved snapshot (a crew member's latest
+    // candidate, or the Captain's head) — not the approved baseline.
+    const renderVersionId = timeline ? (await latestVersionId(timeline.id)) ?? timeline.currentVersionId : null;
+    if (!timeline || !renderVersionId) {
       res.status(400).json({ error: "Save a snapshot before rendering" });
       return;
     }
@@ -1836,7 +1891,7 @@ router.post(
     const [version] = await db
       .select()
       .from(tandemVideoTimelineVersionsTable)
-      .where(eq(tandemVideoTimelineVersionsTable.id, timeline.currentVersionId))
+      .where(eq(tandemVideoTimelineVersionsTable.id, renderVersionId))
       .limit(1);
     const snapshot = (version?.snapshot ?? {}) as { clips?: Array<{ assetId?: string }> };
     const clips = snapshot.clips ?? [];
@@ -1851,6 +1906,7 @@ router.post(
       params.data.leg,
       body.data.format,
       headAssetId,
+      renderVersionId,
       timeline.currentVersionId,
     );
     const [job] = await db
@@ -2519,19 +2575,26 @@ router.post(
       })
       .returning();
 
-    await db
-      .update(tandemVideoTimelinesTable)
-      .set({ currentVersionId: version.id, updatedAt: new Date() })
-      .where(eq(tandemVideoTimelinesTable.id, timelineId));
+    // Review gate: the owner's round-trip push is authoritative and advances
+    // the leg immediately. A crew member's import stays a candidate — the
+    // submission below hands it to the Captain, and approval is what moves it
+    // onto the timeline.
+    const ownerImport = await isProjectOwner(params.data.projectId, userId);
+    if (ownerImport) {
+      await db
+        .update(tandemVideoTimelinesTable)
+        .set({ currentVersionId: version.id, status: "DRAFT", updatedAt: new Date() })
+        .where(eq(tandemVideoTimelinesTable.id, timelineId));
 
-    emitToProject(params.data.projectId, "timeline.saved", {
-      projectId: params.data.projectId,
-      leg: params.data.leg,
-      version: version.version,
-      versionId: version.id,
-      message: version.message,
-      createdById: userId,
-    });
+      emitToProject(params.data.projectId, "timeline.saved", {
+        projectId: params.data.projectId,
+        leg: params.data.leg,
+        version: version.version,
+        versionId: version.id,
+        message: version.message,
+        createdById: userId,
+      });
+    }
 
     // Default to submitting the imported cut for review (the round-trip push).
     let submissionId: string | null = null;
