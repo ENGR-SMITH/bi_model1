@@ -463,6 +463,50 @@ router.get(
       .limit(1);
 
     if (!proxy) {
+      // A file handed in for Captain review (submit-for-review uploads) is
+      // held as PENDING_REVIEW until the Captain decides — it has no proxy
+      // yet. Stream the staged original so the Captain (and the submitter)
+      // can preview the actual submission in the review canvas before
+      // deciding. Members only: the file is private until the decision;
+      // PUBLIC read-only access must not see a pending submission's bytes.
+      if (asset.status === "PENDING_REVIEW") {
+        const member = await requireMember(params.data.projectId, userId);
+        if (!member) {
+          res.status(403).json({ error: "Only project members can preview a pending submission" });
+          return;
+        }
+        const stagedPath = path.join(uploadDir(), asset.storageKey);
+        if (!fs.existsSync(stagedPath)) {
+          res.status(404).json({ error: "The submitted file is no longer available on the server" });
+          return;
+        }
+        const stat = fs.statSync(stagedPath);
+        const fileSize = stat.size;
+        const mimeType = asset.mimeType || "video/mp4";
+        const range = req.headers.range;
+        if (range) {
+          const parts = range.replace(/bytes=/, "").split("-");
+          const start = parseInt(parts[0] ?? "0", 10);
+          const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+          const chunkSize = end - start + 1;
+          res.writeHead(206, {
+            "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+            "Accept-Ranges": "bytes",
+            "Content-Length": chunkSize,
+            "Content-Type": mimeType,
+          });
+          fs.createReadStream(stagedPath, { start, end }).pipe(res);
+        } else {
+          res.writeHead(200, {
+            "Content-Length": fileSize,
+            "Content-Type": mimeType,
+            "Accept-Ranges": "bytes",
+          });
+          fs.createReadStream(stagedPath).pipe(res);
+        }
+        return;
+      }
+
       res.status(404).json({ error: "No proxy is available for this asset yet" });
       return;
     }

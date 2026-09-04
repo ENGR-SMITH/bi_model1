@@ -5,8 +5,8 @@
 //   Top row  — the SAME two-column template as the preview pages:
 //     · left column: the Big canvas with the Preview | Diff map toggle (and
 //       diff settings) above it — exactly the preview/video canvas (media +
-//       timecode + markers + pins), comparing the submitted version against
-//       the leg's head baseline.
+//       timecode + markers + pins, clips switching as the playhead moves),
+//       comparing the submitted version against the leg's head baseline.
 //     · right column: the submitter's DESCRIPTION — the message they wrote
 //       when handing the stage in.
 //   Bottom row (where the preview pages run the version carousel) — split
@@ -15,7 +15,7 @@
 // ---------------------------------------------------------------------------
 
 import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { ArrowLeft, AudioLines, FileUp, Image as ImageIcon, Play, Send } from 'lucide-react';
+import { ArrowLeft, AudioLines, Image as ImageIcon, Play, Send } from 'lucide-react';
 import {
   getGetVideoAssetQueryKey,
   getGetVideoTimelineVersionQueryKey,
@@ -42,6 +42,7 @@ import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/compone
 import { ReviewDecisionCard, ReviewRemarkCard } from '@/components/review-actions';
 import type { StudioLeg } from '@/components/role-oracle';
 import { RELAY_LEGS } from '@/components/shell';
+import { activeClipAt, type TimelineSnapshotLike } from '@/lib/diff';
 
 const VIDEO_KINDS = new Set(['RAW_VIDEO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE']);
 const AUDIO_KINDS = new Set(['RAW_AUDIO', 'VO_PICKUP']);
@@ -70,50 +71,109 @@ function fileSubmissionParts(submission: VideoSubmission): { fileName: string; m
   };
 }
 
-// ---------------------------------------------------------------------------
-// The media stage — the same Big canvas as the preview/video page: the
-// version's media plays in the frame player (audio legs in the waveform
-// player, THUMBNAIL as a design frame) with the playhead timecode in the
-// card header, review pins on the frame, and timecode markers under it.
-// ---------------------------------------------------------------------------
-
 type Marker = { id: string; ms: number; tone: 'danger' | 'teal'; label?: string };
+
+type ReviewSnapshot = {
+  clips?: Array<{ id?: string; assetId: string; inMs: number; outMs: number }>;
+  designs?: Array<{ assetId?: string }>;
+  music?: Array<{ id?: string; assetId: string; inMs: number; outMs: number }>;
+  pickups?: Array<{ id?: string; assetId: string; timeMs: number }>;
+};
+
+// ---------------------------------------------------------------------------
+// ReviewMediaStage — the SAME Big canvas as the preview/video page, for a
+// version submission: the snapshot's clip at the playhead streams in the
+// frame player (audio legs in the waveform player, THUMBNAIL as a design
+// frame), switching clips as the playhead moves, with the playhead timecode
+// in the card header, review pins on the frame, and timecode markers under it.
+// ---------------------------------------------------------------------------
 
 function ReviewMediaStage({
   projectId,
   submission,
-  assetId,
-  detail,
   leg,
-  isAudio,
   version,
-  playheadMs,
-  onSeek,
+  snapshot,
+  assets,
   annotationHeaderRef,
-  markers,
 }: {
   projectId: string;
   submission: VideoSubmission;
-  assetId: string;
-  detail?: VideoAssetDetail;
   leg: StudioLeg;
-  /** Whether the resolved asset is an audio file (waveform view). */
-  isAudio: boolean;
   /** Submitted version number (v2, v3…) for the canvas label. */
   version: number | null;
-  playheadMs: number;
-  onSeek: (ms: number) => void;
+  /** The submitted version's snapshot (its timeline document). */
+  snapshot: ReviewSnapshot | null;
+  assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
   /** The annotate pencil portals here (shared with the diff map's pencil). */
   annotationHeaderRef: RefObject<HTMLDivElement | null>;
-  /** Review markers: this PR's timecode comments + clip boundaries. */
-  markers: Marker[];
 }) {
+  const [playheadMs, setPlayheadMs] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const comments = useListVideoComments(projectId);
+
+  const clips = useMemo(() => (Array.isArray(snapshot?.clips) ? snapshot!.clips! : []), [snapshot]);
+  const design = Array.isArray(snapshot?.designs) ? snapshot!.designs![0] ?? null : null;
+  const music = Array.isArray(snapshot?.music) ? snapshot!.music! : [];
+  const pickups = Array.isArray(snapshot?.pickups) ? snapshot!.pickups! : [];
+
+  // Follow the playhead into the right clip, exactly like preview/video.
+  const activeClip = activeClipAt({ clips } as TimelineSnapshotLike, playheadMs) ?? clips[0] ?? null;
+
+  const mediaKinds = leg === 'SOUND' ? AUDIO_KINDS : leg === 'THUMBNAIL' ? IMAGE_KINDS : VIDEO_KINDS;
+  const fallbackAsset =
+    assets.find((a) => mediaKinds.has(a.kind) && a.status === 'PROCESSED')?.id ??
+    assets.find((a) => mediaKinds.has(a.kind))?.id ??
+    '';
+  const clipAssetId = activeClip?.assetId && assets.some((a) => a.id === activeClip.assetId) ? activeClip.assetId : '';
+  const assetId =
+    leg === 'THUMBNAIL'
+      ? (design?.assetId && assets.some((a) => a.id === design.assetId) ? design.assetId : '') || fallbackAsset
+      : clipAssetId ||
+        (leg === 'SOUND'
+          ? (music[0]?.assetId && assets.some((a) => a.id === music[0].assetId) ? music[0].assetId : '') ||
+            (pickups[0]?.assetId && assets.some((a) => a.id === pickups[0].assetId) ? pickups[0].assetId : '')
+          : '') ||
+        fallbackAsset;
+
+  const detail = useGetVideoAsset(projectId, assetId, {
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, assetId),
+      enabled: Boolean(assetId),
+      // Keep fetching until the proxy finishes, then stop on its own — same
+      // behaviour as the vault player.
+      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+    },
+  });
+  const onSeek = (ms: number) => {
+    setPlayheadMs(ms);
+    if (videoRef.current) videoRef.current.currentTime = ms / 1000;
+  };
+  const assetKind = assets.find((a) => a.id === assetId)?.kind ?? '';
+  const isAudio = AUDIO_KINDS.has(assetKind);
+
+  // Red ticks = annotation timecodes for this PR on the asset; teal ticks =
+  // clip boundaries — the exact marker set the preview pages draw.
+  const markers = useMemo<Marker[]>(() => {
+    const list: Marker[] = [];
+    for (const comment of comments.data ?? []) {
+      if (comment.timecodeMs == null || comment.submissionId !== submission.id || comment.assetId !== assetId) continue;
+      list.push({ id: `note-${comment.id}`, ms: comment.timecodeMs, tone: 'danger' });
+    }
+    clips.forEach((clip, index) => list.push({ id: `clip-${index}`, ms: clip.inMs, tone: 'teal' }));
+    if (leg === 'SOUND') {
+      music.forEach((track, index) => list.push({ id: `music-${index}`, ms: track.inMs, tone: 'teal' }));
+      pickups.forEach((pickup, index) => list.push({ id: `pickup-${index}`, ms: pickup.timeMs, tone: 'danger' }));
+    }
+    return list;
+  }, [comments.data, submission.id, assetId, clips, leg, music, pickups]);
+
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="captain-review-media">
       <div className="inline-heading">
         <span className="eyebrow">
-          {isAudio ? <AudioLines size={13} /> : leg === 'THUMBNAIL' ? <ImageIcon size={13} /> : <Play size={13} />}
+          {leg === 'THUMBNAIL' ? <ImageIcon size={13} /> : isAudio ? <AudioLines size={13} /> : <Play size={13} />}
           Big canvas{version ? ` · ${leg} v${version}` : ''}
         </span>
         {!isAudio && leg !== 'THUMBNAIL' && (
@@ -121,8 +181,145 @@ function ReviewMediaStage({
         )}
       </div>
       <div className="pv-stage-player mt-2">
-        {leg === 'THUMBNAIL' ? (
-          <ImageStage src={proxyUrlFor(projectId, assetId)}>
+        {assetId ? (
+          leg === 'THUMBNAIL' ? (
+            <ImageStage src={proxyUrlFor(projectId, assetId)}>
+              <AnnotationCanvas
+                projectId={projectId}
+                leg={leg}
+                assetId={assetId}
+                playheadMs={null}
+                timelineVersionId={submission.timelineVersionId}
+                submissionId={submission.id}
+                headerRef={annotationHeaderRef}
+                surfaceRef={stageRef}
+                glowPins
+              />
+              <FullscreenButton targetRef={stageRef} />
+            </ImageStage>
+          ) : isAudio ? (
+            <WaveformPlayer
+              projectId={projectId}
+              assetId={assetId}
+              detail={detail.data}
+              playheadMs={playheadMs}
+              onTimeUpdate={onSeek}
+              onPlayheadChange={onSeek}
+              markers={markers}
+            >
+              <AnnotationCanvas
+                projectId={projectId}
+                leg={leg}
+                assetId={assetId}
+                playheadMs={playheadMs}
+                onSeek={onSeek}
+                timelineVersionId={submission.timelineVersionId}
+                submissionId={submission.id}
+                headerRef={annotationHeaderRef}
+                surfaceRef={stageRef}
+                dropLine
+              />
+              <FullscreenButton targetRef={stageRef} />
+            </WaveformPlayer>
+          ) : (
+            <AssetPlayer
+              projectId={projectId}
+              assetId={assetId}
+              detail={detail.data}
+              videoRef={videoRef}
+              playheadMs={playheadMs}
+              onTimeUpdate={setPlayheadMs}
+              markers={markers}
+            >
+              <AnnotationCanvas
+                projectId={projectId}
+                leg={leg}
+                assetId={assetId}
+                playheadMs={playheadMs}
+                onSeek={onSeek}
+                timelineVersionId={submission.timelineVersionId}
+                submissionId={submission.id}
+                headerRef={annotationHeaderRef}
+                surfaceRef={stageRef}
+                timecodeReveal
+                glowPins
+              />
+            </AssetPlayer>
+          )
+        ) : (
+          <EmptyPlayer>
+            <p className="text-sm font-semibold">
+              {leg === 'SOUND' ? 'No audio in this hand-in yet.' : leg === 'THUMBNAIL' ? 'No design in this hand-in yet.' : 'No video in this hand-in yet.'}
+            </p>
+          </EmptyPlayer>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ReviewFileStage — the Big canvas for a FILE submission (submit-for-review
+// uploads held as PENDING_REVIEW). The staged original streams straight from
+// the server (the proxy route now serves pending files to members) so the
+// Captain reviews the actual submission in the same canvas as everything else.
+// There is no snapshot to diff yet — the toggle simply stays on Preview, and
+// Accept moves the file into the vault / Reject deletes it.
+// ---------------------------------------------------------------------------
+
+function ReviewFileStage({
+  projectId,
+  submission,
+  leg,
+  assetId,
+  detail,
+  annotationHeaderRef,
+}: {
+  projectId: string;
+  submission: VideoSubmission;
+  leg: StudioLeg;
+  /** The staged pending asset id (from the `ASSET:` sentinel). */
+  assetId: string;
+  detail?: VideoAssetDetail;
+  annotationHeaderRef: RefObject<HTMLDivElement | null>;
+}) {
+  const [playheadMs, setPlayheadMs] = useState(0);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const comments = useListVideoComments(projectId);
+  const fileParts = fileSubmissionParts(submission);
+
+  // Media kind of the staged file drives the player (audio wave / image frame
+  // / video with its own native controls).
+  const kind = detail?.kind ?? '';
+  const mime = detail?.mimeType ?? '';
+  const isAudio = AUDIO_KINDS.has(kind);
+  const isImage = !isAudio && (IMAGE_KINDS.has(kind) || mime.startsWith('image/'));
+
+  const markers = useMemo<Marker[]>(
+    () =>
+      (comments.data ?? [])
+        .filter((c) => c.timecodeMs != null && c.submissionId === submission.id && c.assetId === assetId)
+        .map((c) => ({ id: c.id, ms: c.timecodeMs as number, tone: 'danger' as const, label: c.label ?? undefined })),
+    [comments.data, submission.id, assetId],
+  );
+
+  const directStreamUrl = proxyUrlFor(projectId, assetId);
+
+  return (
+    <div className="paper-card pv-stage" ref={stageRef} data-testid="captain-review-file">
+      <div className="inline-heading">
+        <span className="eyebrow">
+          {isAudio ? <AudioLines size={13} /> : isImage ? <ImageIcon size={13} /> : <Play size={13} />}
+          Big canvas · {fileParts.fileName}
+        </span>
+        {!isAudio && !isImage && (
+          <span className="mono-label">{formatTimecode(playheadMs)}</span>
+        )}
+      </div>
+      <div className="pv-stage-player mt-2">
+        {isImage ? (
+          <ImageStage src={directStreamUrl}>
             <AnnotationCanvas
               projectId={projectId}
               leg={leg}
@@ -142,8 +339,8 @@ function ReviewMediaStage({
             assetId={assetId}
             detail={detail}
             playheadMs={playheadMs}
-            onTimeUpdate={onSeek}
-            onPlayheadChange={onSeek}
+            onTimeUpdate={setPlayheadMs}
+            onPlayheadChange={setPlayheadMs}
             markers={markers}
           >
             <AnnotationCanvas
@@ -151,7 +348,7 @@ function ReviewMediaStage({
               leg={leg}
               assetId={assetId}
               playheadMs={playheadMs}
-              onSeek={onSeek}
+              onSeek={setPlayheadMs}
               timelineVersionId={submission.timelineVersionId}
               submissionId={submission.id}
               headerRef={annotationHeaderRef}
@@ -165,16 +362,18 @@ function ReviewMediaStage({
             projectId={projectId}
             assetId={assetId}
             detail={detail}
+            videoRef={videoRef}
             playheadMs={playheadMs}
-            onTimeUpdate={onSeek}
+            onTimeUpdate={setPlayheadMs}
             markers={markers}
+            directStreamUrl={directStreamUrl}
           >
             <AnnotationCanvas
               projectId={projectId}
               leg={leg}
               assetId={assetId}
               playheadMs={playheadMs}
-              onSeek={onSeek}
+              onSeek={setPlayheadMs}
               timelineVersionId={submission.timelineVersionId}
               submissionId={submission.id}
               headerRef={annotationHeaderRef}
@@ -214,12 +413,12 @@ export function CaptainReviewSurface({
   onBack: () => void;
 }) {
   const project = useGetVideoProject(projectId);
-  const comments = useListVideoComments(projectId);
   const leg = submission.leg as StudioLeg;
   // A file handed in for review carries an `ASSET:<assetId>` sentinel — there
   // is no snapshot to play or diff until the Captain decides (accept moves it
   // into the vault, reject deletes it and sends it back).
   const isAssetSubmission = submission.timelineVersionId.startsWith('ASSET:');
+  const pendingAssetId = isAssetSubmission ? submission.timelineVersionId.slice('ASSET:'.length) : '';
   const fileParts = isAssetSubmission ? fileSubmissionParts(submission) : null;
 
   // The submitted version + the leg's head version (diff baseline).
@@ -231,69 +430,16 @@ export function CaptainReviewSurface({
   });
   const legVersions = useListVideoTimelineVersions(projectId, leg);
 
-  // Media-friendly snapshot shape so the canvas only reads what it needs —
-  // clips (video/audio legs), designs (THUMBNAIL), music/pickups (SOUND).
-  type ReviewSnapshot = {
-    clips?: Array<{ id?: string; assetId?: string; inMs: number; outMs: number }>;
-    designs?: Array<{ assetId?: string }>;
-    music?: Array<{ id?: string; assetId?: string; inMs?: number; outMs?: number }>;
-    pickups?: Array<{ id?: string; assetId?: string; timeMs?: number }>;
-  };
-  const snapshot = (version.data?.snapshot ?? null) as ReviewSnapshot | null;
-  const clips = useMemo(() => (Array.isArray(snapshot?.clips) ? snapshot!.clips! : []), [snapshot]);
-  const design = Array.isArray(snapshot?.designs) ? snapshot!.designs![0] ?? null : null;
-  const soundMusic = Array.isArray(snapshot?.music) ? snapshot!.music! : [];
-  const soundPickups = Array.isArray(snapshot?.pickups) ? snapshot!.pickups! : [];
-
-  // Resolve the media to play: the snapshot's first clip / design, validated
-  // against the vault, then a processed fallback of the right media kind.
-  const assets = project.data?.assets ?? [];
-  const validAsset = (id?: string | null): string =>
-    id && assets.some((a) => a.id === id) ? id : '';
-  const mediaKinds = leg === 'SOUND' ? AUDIO_KINDS : leg === 'THUMBNAIL' ? IMAGE_KINDS : VIDEO_KINDS;
-  const fallbackAsset =
-    assets.find((a) => mediaKinds.has(a.kind) && a.status === 'PROCESSED')?.id ??
-    assets.find((a) => mediaKinds.has(a.kind))?.id ??
-    '';
-  const assetId = isAssetSubmission
-    ? ''
-    : leg === 'THUMBNAIL'
-      ? validAsset(design?.assetId) || fallbackAsset
-      : validAsset(clips[0]?.assetId) ||
-        (leg === 'SOUND' ? validAsset(soundMusic[0]?.assetId) || validAsset(soundPickups[0]?.assetId) : '') ||
-        fallbackAsset;
-
-  const detail = useGetVideoAsset(projectId, assetId, {
+  // The staged pending file's detail — only for file submissions (it has no
+  // proxy row and never transitions to PROCESSED, so no polling loop).
+  const pendingDetail = useGetVideoAsset(projectId, pendingAssetId, {
     query: {
-      queryKey: getGetVideoAssetQueryKey(projectId, assetId),
-      enabled: Boolean(assetId) && !isAssetSubmission,
-      refetchInterval: (query) => pollWhileProcessing(query.state.data),
+      queryKey: getGetVideoAssetQueryKey(projectId, pendingAssetId),
+      enabled: isAssetSubmission && Boolean(pendingAssetId),
     },
   });
 
-  // Media kind drives the surface: audio files play in the waveform player.
-  const assetKind = assets.find((a) => a.id === assetId)?.kind ?? '';
-  const isAudio = AUDIO_KINDS.has(assetKind);
-
-  const [playheadMs, setPlayheadMs] = useState(0);
-  const onSeek = (ms: number) => setPlayheadMs(ms);
-  const annotationHeaderRef = useRef<HTMLDivElement>(null);
-
-  // Timecode markers under the media, exactly like the preview pages: red
-  // ticks for this PR's comments on the asset + teal ticks at clip boundaries.
-  const markers = useMemo<Marker[]>(() => {
-    const list: Marker[] = [];
-    for (const comment of comments.data ?? []) {
-      if (comment.timecodeMs == null || comment.submissionId !== submission.id || comment.assetId !== assetId) continue;
-      list.push({ id: `note-${comment.id}`, ms: comment.timecodeMs, tone: 'danger' });
-    }
-    clips.forEach((clip, index) => list.push({ id: `clip-${index}`, ms: clip.inMs, tone: 'teal' }));
-    if (leg === 'SOUND') {
-      soundMusic.forEach((track, index) => list.push({ id: `music-${index}`, ms: track.inMs ?? 0, tone: 'teal' }));
-      soundPickups.forEach((pickup, index) => list.push({ id: `pickup-${index}`, ms: pickup.timeMs ?? 0, tone: 'danger' }));
-    }
-    return list;
-  }, [comments.data, submission.id, assetId, clips, leg, soundMusic, soundPickups]);
+  const snapshot = (version.data?.snapshot ?? null) as ReviewSnapshot | null;
 
   // ---- The diff map: the submitted version vs the leg's head baseline ----
   const audioLeg = leg === 'SOUND';
@@ -338,6 +484,8 @@ export function CaptainReviewSurface({
 
   // Fallback assets of the right media kind — for the diff map when either
   // snapshot references no explicit clip/design.
+  const assets = project.data?.assets ?? [];
+  const mediaKinds = leg === 'SOUND' ? AUDIO_KINDS : leg === 'THUMBNAIL' ? IMAGE_KINDS : VIDEO_KINDS;
   const fallbackAssetIds = useMemo(
     () => assets.filter((a) => mediaKinds.has(a.kind)).map((a) => a.id),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -345,52 +493,51 @@ export function CaptainReviewSurface({
   );
 
   const versionNo = version.data?.version ?? null;
+  const annotationHeaderRef = useRef<HTMLDivElement>(null);
 
-  // A file held for review can't play or diff until a decision.
   let canvasBody: ReactNode;
   if (isAssetSubmission) {
     canvasBody = (
-      <div className="paper-card pv-stage" data-testid="captain-review-file">
-        <div className="inline-heading">
-          <span className="eyebrow"><FileUp size={13} /> {fileParts?.fileName}</span>
-        </div>
-        <div className="pv-stage-player mt-2">
-          <EmptyPlayer>
-            <p className="text-sm font-semibold">Held for your decision.</p>
-          </EmptyPlayer>
-        </div>
-      </div>
-    );
-  } else if (!assetId) {
-    canvasBody = (
-      <div className="paper-card pv-stage" data-testid="captain-review-empty">
-        <div className="pv-stage-player">
-          <EmptyPlayer>
-            <p className="text-sm font-semibold">No media to review in this hand-in.</p>
-          </EmptyPlayer>
-        </div>
-      </div>
+      <ReviewFileStage
+        projectId={projectId}
+        submission={submission}
+        leg={leg}
+        assetId={pendingAssetId}
+        detail={pendingDetail.data}
+        annotationHeaderRef={annotationHeaderRef}
+      />
     );
   } else {
     canvasBody = (
       <ReviewMediaStage
         projectId={projectId}
         submission={submission}
-        assetId={assetId}
-        detail={detail.data}
         leg={leg}
-        isAudio={isAudio}
         version={versionNo}
-        playheadMs={playheadMs}
-        onSeek={onSeek}
+        snapshot={snapshot}
+        assets={assets}
         annotationHeaderRef={annotationHeaderRef}
-        markers={markers}
       />
     );
   }
 
   return (
     <div className="page pv-page review-page" data-testid="review-workbench">
+      {/* Slim back control above the grid — the column header itself is the
+          exact preview/video head (Big canvas eyebrow + annotate + toggle). */}
+      <div className="review-topbar">
+        <button
+          type="button"
+          className="pv-review-back"
+          onClick={onBack}
+          title="Back to the queue"
+          aria-label="Back to the queue"
+          data-testid="review-back"
+        >
+          <ArrowLeft size={14} />
+        </button>
+      </div>
+
       <div className="pv-top">
         {/* First column — the Big canvas with Preview | Diff map, exactly like
             the preview pages. */}
@@ -399,18 +546,7 @@ export function CaptainReviewSurface({
             view={view}
             onViewChange={setView}
             hasDiff={hasDiff}
-            eyebrow={
-              <button
-                type="button"
-                className="pv-review-back"
-                onClick={onBack}
-                title="Back to the queue"
-                aria-label="Back to the queue"
-                data-testid="review-back"
-              >
-                <ArrowLeft size={14} />
-              </button>
-            }
+            eyebrow={<span className="eyebrow">Big canvas</span>}
             annotationHeaderRef={annotationHeaderRef}
             settings={hasDiff ? diffSettings : undefined}
             onSettingsChange={hasDiff ? setDiffSettings : undefined}

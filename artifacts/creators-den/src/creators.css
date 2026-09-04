@@ -4439,6 +4439,15 @@ select optgroup {
    of the carousel) — with a tighter frame than the standard preview pages. */
 .review-page { padding: 8px clamp(6px, 1vw, 12px) 8px; }
 
+/* Slim back-to-queue strip above the grid, so the canvas column header stays
+   the exact preview/video head (Big canvas eyebrow + annotate + toggle). */
+.review-topbar {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+
 /* The compact back-to-queue control in the column header (icon only). */
 .pv-review-back {
   display: inline-flex;
