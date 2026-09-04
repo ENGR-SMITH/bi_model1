@@ -476,6 +476,7 @@ router.post(
     try {
       await exchangeChannelOauth(params.data.channelId, body.data.state, body.data.code);
     } catch (error) {
+      req.log.warn({ err: error instanceof Error ? error.message : String(error) }, "channel oauth exchange failed");
       res.status(400).json({ error: error instanceof Error ? error.message : "Could not link the YouTube channel" });
       return;
     }
