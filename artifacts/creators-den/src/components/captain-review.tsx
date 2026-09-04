@@ -508,11 +508,22 @@ export function CaptainReviewSurface({
   }, [hasDiff]);
 
   // Fallback assets of the right media kind — for the diff map when either
-  // snapshot references no explicit clip/design.
+  // snapshot references no explicit clip/design (or references media that
+  // left the vault). Playable (PROCESSED) files first, newest first, and no
+  // pending-review uploads: the diff must never try to stream a proxy that
+  // can't exist yet, which is what made the desk's canvas 404 while the same
+  // footage played fine in the vault.
   const assets = project.data?.assets ?? [];
   const mediaKinds = leg === 'SOUND' ? AUDIO_KINDS : leg === 'THUMBNAIL' ? IMAGE_KINDS : VIDEO_KINDS;
   const fallbackAssetIds = useMemo(
-    () => assets.filter((a) => mediaKinds.has(a.kind)).map((a) => a.id),
+    () =>
+      assets
+        .filter((a) => mediaKinds.has(a.kind) && a.status !== 'PENDING_REVIEW')
+        .sort((a, b) => {
+          const playable = (x: { status: string }) => (x.status === 'PROCESSED' ? 0 : 1);
+          return playable(a) - playable(b) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        })
+        .map((a) => a.id),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [assets],
   );
