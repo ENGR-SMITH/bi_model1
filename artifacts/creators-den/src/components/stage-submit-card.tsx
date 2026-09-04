@@ -14,7 +14,7 @@
 //     merges it to the timeline; reject sends it back with the Captain's note).
 // ---------------------------------------------------------------------------
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
@@ -106,6 +106,9 @@ export function StageSubmitCard({
   const [leg, setLeg] = useState<StudioLeg>(legs[0]);
   const [description, setDescription] = useState('');
   const [includeResolved, setIncludeResolved] = useState(true);
+  // What the server actually answered on the last file hand-in — the card must
+  // not wait for a list refetch to tell the member what happened to their file.
+  const [fileResult, setFileResult] = useState<{ fileName: string; review: boolean } | null>(null);
   // The server pins the stage's current head snapshot — with none saved there
   // is nothing to hand in yet.
   const versions = useListVideoTimelineVersions(projectId, leg);
@@ -114,6 +117,11 @@ export function StageSubmitCard({
   const canSubmit =
     project.data?.myRoles?.includes('CAPTAIN') ||
     project.data?.myRoles?.includes(LEG_ROLE[leg]);
+
+  // A different pick resets the last upload's result note.
+  useEffect(() => {
+    setFileResult(null);
+  }, [pendingFile?.file.name]);
 
   // Review notes from earlier passes that the member marked as done — these
   // are listed and auto-included so the Captain sees what was addressed.
@@ -183,8 +191,17 @@ export function StageSubmitCard({
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const response = data as { submissionId?: string; review?: boolean };
       setDescription('');
+      setFileResult({
+        fileName: pendingFile?.file.name ?? 'Your file',
+        // A submit-for-review upload answers with review: true + a
+        // submissionId. Without it the file went straight into the vault — the
+        // uploader is this project's Captain (their uploads skip review), or
+        // the server predates the review flow.
+        review: response.review === true || Boolean(response.submissionId),
+      });
       queryClient.invalidateQueries({ queryKey: getListVideoSubmissionsQueryKey(projectId) });
       queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(projectId) });
       // The crew's own /review list ("Your submissions") should show the new
@@ -382,6 +399,31 @@ export function StageSubmitCard({
             : `Pins the current ${legLabel(leg)} snapshot — the Captain reviews it, then Accept merges it to the timeline or Reject sends it back with their note.`}
         </span>
       </div>
+      {fileResult && !pending && (
+        <div
+          className={`stage-submit-banner ${fileResult.review ? 'is-pending' : 'is-approved'}`}
+          role="status"
+          data-testid={fileResult.review ? 'stage-submit-file-in-review' : 'stage-submit-file-direct'}
+        >
+          {fileResult.review ? <Clock3 size={14} /> : <CheckCircle2 size={14} />}
+          <span>
+            {fileResult.review ? (
+              <>
+                <b>{fileResult.fileName} was submitted for review</b>
+                It&apos;s on the Captain&apos;s desk now — the decision and any improvement note will
+                appear on your /review page.
+              </>
+            ) : (
+              <>
+                <b>{fileResult.fileName} went straight into the project vault</b>
+                No review submission was created — this happens when the upload is made by the
+                project&apos;s Captain (their files skip review), or when the app/server build you&apos;re
+                using predates the review flow. Ask your Captain to update if you expected a review.
+              </>
+            )}
+          </span>
+        </div>
+      )}
       {!hasSnapshot && !pendingFile && !pending && (
         <p className="setting-copy" role="status" data-testid="stage-submit-no-snapshot">
           This stage has no saved snapshot yet — save a version of the {legLabel(leg)} in the preview
