@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, FileText, Megaphone, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Megaphone, X } from 'lucide-react';
 import {
   getGetArenaPostQueryKey,
   getListMyArenaApplicationsQueryKey,
@@ -63,7 +63,7 @@ export default function ArenaMinePage() {
           </p>
         </div>
         <Link href="/arena" className="secondary-btn" data-testid="mine-back-board">
-          <ArrowRight size={14} /> Back to the arena
+          <ArrowLeft size={14} /> Back to the arena
         </Link>
       </div>
 

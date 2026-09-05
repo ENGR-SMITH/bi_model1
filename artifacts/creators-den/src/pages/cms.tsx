@@ -4,8 +4,8 @@ import {
   ArrowRight,
   CheckCircle2,
   Film,
+  Globe,
   Link2,
-  Mic2,
   Plus,
   RefreshCw,
   Trash2,
@@ -605,9 +605,9 @@ function ArenaDoorwayRow() {
       className="arena-doorway"
       data-testid="card-arena-doorway"
     >
-      <span className="arena-doorway-icon" aria-hidden><Mic2 size={18} /></span>
+      <span className="arena-doorway-icon" aria-hidden><Globe size={18} /></span>
       <span className="arena-doorway-copy">
-        <span className="eyebrow"><Mic2 size={11} /> Collaboration / Audition Arena</span>
+        <span className="eyebrow"><Globe size={11} /> Collaboration / Audition Arena</span>
         <b className="arena-doorway-title">Audition for open roles on creators' channels.</b>
         <span className="arena-doorway-sub">
           Video, audio, script, and thumbnail seats — pitch with your work, preview the project read-only while

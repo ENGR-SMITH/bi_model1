@@ -6,6 +6,7 @@ import {
   Download,
   FileVideo2,
   Film,
+  Globe,
   History,
   Loader2,
   LockKeyhole,
@@ -704,13 +705,16 @@ function ArenaProjectPanel({ projectId, projectName }: { projectId: string; proj
 
   return (
     <div className="paper-card arena-vault-card mt-6" data-testid="panel-arena-project">
-      <div className="inline-heading">
-        <span className="eyebrow"><Megaphone size={13} /> Collaboration / Audition Arena</span>
+      <div className="arena-vault-head">
+        <span className="arena-vault-icon" aria-hidden><Globe size={17} /></span>
+        <div className="arena-vault-head-copy min-w-0">
+          <span className="eyebrow">Collaboration / Audition Arena</span>
+          <b className="arena-vault-title">Hire for this project from the arena.</b>
+        </div>
         <span className={`den-tag ${posts.length > 0 ? 'accent' : 'muted'}`}>{posts.length} open</span>
       </div>
       <p className="setting-copy mt-1">
-        Hire for this project from the public arena — anyone signed in can audition and preview the
-        project read-only (timeline + preview) while the post is live.
+        Anyone signed in can audition — and preview this project read-only — while a post is live.
       </p>
 
       {posts.length > 0 && (
