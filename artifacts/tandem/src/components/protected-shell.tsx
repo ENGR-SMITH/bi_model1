@@ -86,8 +86,8 @@ function PrivateShell({ children }: { children: ReactNode }) {
           bar is a rounded, blurred, border-lit card floating under the top
           edge instead of a full-width strip. */}
       <header className="sticky top-0 z-30">
-        <div className="mx-auto w-full max-w-[1400px] px-4 pt-3 sm:px-6 sm:pt-4 lg:px-8">
-          <div className="relative flex h-[60px] items-center gap-4 rounded-2xl border border-white/10 bg-[#0d0d0d]/85 px-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_12px_40px_-16px_rgba(0,0,0,0.9),0_0_50px_-20px_rgba(59,130,246,0.45)] backdrop-blur-xl sm:px-4">
+        <div className="mx-auto w-full max-w-[1400px] px-4 pt-3 sm:px-5 sm:pt-4 lg:px-6">
+          <div className="relative flex h-[72px] items-center gap-4 rounded-2xl border border-white/10 bg-[#0d0d0d]/85 px-4 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_12px_40px_-16px_rgba(0,0,0,0.9),0_0_50px_-20px_rgba(59,130,246,0.45)] backdrop-blur-xl sm:px-5">
             <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/40 to-transparent" />
             <TandemLogo />
 
@@ -126,7 +126,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
 
           {/* Mobile dropdown menu — same card treatment as the home page */}
           {menuOpen && (
-            <div className="absolute inset-x-4 top-[78px] rounded-2xl border border-white/10 bg-[#0d0d0d]/95 p-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_24px_60px_-20px_rgba(0,0,0,0.95),0_0_60px_-24px_rgba(59,130,246,0.5)] backdrop-blur-xl sm:inset-x-8 md:hidden lg:inset-x-10">
+            <div className="absolute inset-x-4 top-[88px] rounded-2xl border border-white/10 bg-[#0d0d0d]/95 p-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_24px_60px_-20px_rgba(0,0,0,0.95),0_0_60px_-24px_rgba(59,130,246,0.5)] backdrop-blur-xl sm:inset-x-8 md:hidden lg:inset-x-10">
               <span className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/50 to-transparent" />
               {mobileNav.map((item) => {
                 const Icon = item.icon;
@@ -160,7 +160,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      <main className="mx-auto max-w-[1400px] px-4 py-10 sm:px-6 lg:px-8 lg:pb-14">{children}</main>
+      <main className="mx-auto max-w-[1400px] px-4 py-10 sm:px-5 lg:px-6 lg:pb-14">{children}</main>
     </div>
   );
 }

@@ -29,7 +29,7 @@ export default function RoomPage() {
     <main className="min-h-[100dvh] overflow-hidden bg-[#0a0a0a]">
       <div className="hero-glow absolute inset-x-0 top-0 h-[600px]" />
       <HouseNav />
-      <section className="relative mx-auto max-w-[1400px] px-4 pb-16 pt-12 sm:px-6 sm:pt-20 lg:px-8 lg:pb-24 lg:pt-24">
+      <section className="relative mx-auto max-w-[1400px] px-4 pb-16 pt-12 sm:px-5 sm:pt-20 lg:px-6 lg:pb-24 lg:pt-24">
         <Link href="/" className="group inline-flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500 transition-colors hover:text-[#3b82f6]" data-testid="link-return-house">
           <PiArrowLeftDuotone className="h-4 w-4 transition-transform group-hover:-translate-x-1" /> Back to the house
         </Link>
@@ -64,7 +64,7 @@ export default function RoomPage() {
         </div>
       </section>
       <section className="border-y border-white/5 bg-[#0d0d0d]">
-        <div className="mx-auto grid max-w-[1400px] gap-10 px-4 py-16 sm:px-6 lg:grid-cols-[.7fr_1.3fr] lg:px-8 lg:py-24">
+        <div className="mx-auto grid max-w-[1400px] gap-10 px-4 py-16 sm:px-5 lg:grid-cols-[.7fr_1.3fr] lg:px-6 lg:py-24">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">A room can wait</p>
             <h2 className="mt-5 max-w-[12ch] text-4xl font-bold leading-[.94] tracking-[-0.04em] text-white sm:text-5xl">The house is open before every door is.</h2>
@@ -82,7 +82,7 @@ export default function RoomPage() {
           </div>
         </div>
       </section>
-      <section className="mx-auto max-w-[1400px] px-4 py-16 sm:px-6 lg:px-8 lg:py-24">
+      <section className="mx-auto max-w-[1400px] px-4 py-16 sm:px-5 lg:px-6 lg:py-24">
         <div className="flex items-end justify-between gap-5">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">Keep wandering</p>

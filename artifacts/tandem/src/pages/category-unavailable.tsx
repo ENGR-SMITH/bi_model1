@@ -60,7 +60,7 @@ export default function CategoryUnavailable() {
   const errorMessage = apiError?.response?.data?.error || apiError?.message || 'We could not save that just yet. Try once more.';
 
   return (
-    <div className="mx-auto max-w-[980px]">
+    <div className="mx-auto max-w-[1180px]">
       <Link href="/dashboard" className="focus-house group inline-flex items-center gap-2 rounded-full py-2 text-xs font-bold text-zinc-500 hover:text-white" data-testid="link-back-dashboard">
         <PiArrowLeftDuotone className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-1" />
         Back to the atrium

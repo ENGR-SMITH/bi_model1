@@ -44,7 +44,7 @@ export default function Home() {
     <main className="min-h-[100dvh] overflow-x-clip bg-[#0a0a0a]">
       <div className="hero-glow absolute inset-x-0 top-0 h-[600px]" />
       <HouseNav />
-      <section className="relative mx-auto max-w-[1400px] px-4 pb-20 pt-12 sm:px-6 sm:pt-20 lg:px-8 lg:pb-32 lg:pt-24">
+      <section className="relative mx-auto max-w-[1400px] px-4 pb-20 pt-12 sm:px-5 sm:pt-20 lg:px-6 lg:pb-32 lg:pt-24">
         <div className="grid items-center gap-14 lg:grid-cols-[1.02fr_.98fr] lg:gap-10">
           <div className="reveal max-w-[670px]">
             <h1 className="mt-7 max-w-[12ch] text-[4.4rem] font-bold leading-[.92] tracking-[-0.05em] text-white sm:text-[6.4rem] lg:text-[7.8rem]">
@@ -71,7 +71,7 @@ export default function Home() {
       </section>
 
       <section id="how-it-works" className="border-y border-white/5 bg-[#0d0d0d]">
-        <div className="mx-auto grid max-w-[1400px] gap-10 px-4 py-20 sm:px-6 lg:grid-cols-[.7fr_1.3fr] lg:px-8 lg:py-28">
+        <div className="mx-auto grid max-w-[1400px] gap-10 px-4 py-20 sm:px-5 lg:grid-cols-[.7fr_1.3fr] lg:px-6 lg:py-28">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">The method</p>
             <h2 className="mt-5 max-w-[10ch] text-5xl font-bold leading-[.92] tracking-[-0.04em] text-white sm:text-6xl">A little less knowing. A lot more discovering.</h2>
@@ -108,7 +108,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="rooms" className="mx-auto max-w-[1400px] px-4 py-20 sm:px-6 lg:px-8 lg:py-32">
+      <section id="rooms" className="mx-auto max-w-[1400px] px-4 py-20 sm:px-5 lg:px-6 lg:py-32">
         <div className="flex flex-col justify-between gap-7 sm:flex-row sm:items-end">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">The rooms</p>
@@ -148,7 +148,7 @@ export default function Home() {
       </section>
 
       <section className="border-t border-white/5 bg-[#0d0d0d]">
-        <div className="mx-auto grid max-w-[1400px] gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[1fr_.8fr] lg:items-end lg:px-8 lg:py-28">
+        <div className="mx-auto grid max-w-[1400px] gap-12 px-4 py-20 sm:px-5 lg:grid-cols-[1fr_.8fr] lg:items-end lg:px-6 lg:py-28">
           <div>
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">A note from the platform</p>
             <blockquote className="mt-7 max-w-[14ch] text-5xl font-semibold leading-[.94] text-white sm:text-7xl">"The point is not to disappear into the machine. It is to become more visible to one another."</blockquote>
@@ -161,7 +161,7 @@ export default function Home() {
             </Link>
           </div>
         </div>
-        <footer className="mx-auto flex max-w-[1400px] flex-col gap-4 border-t border-white/5 px-4 py-7 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+        <footer className="mx-auto flex max-w-[1400px] flex-col gap-4 border-t border-white/5 px-4 py-7 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-5 lg:px-6">
           <TandemLogo />
           <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em]">A platform for creative connection / 2025</span>
         </footer>
