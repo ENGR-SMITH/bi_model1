@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Megaphone, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Check, Megaphone, X } from 'lucide-react';
 import {
   getListArenaPostsQueryKey,
   useCreateArenaPost,
@@ -18,9 +18,10 @@ import { ARENA_ROLE_META } from '@/components/arena-apply-modal';
 //   - Project picker (Arena board): pass `projects`; the Captain picks which
 //     of their channel projects to post on.
 //
-// The composer picks one of the four content roles and writes the pitch. The
-// server enforces one OPEN post per (project, role); roles that already have
-// one are disabled with an \"open\" badge, fetched live for the active project.
+// The composer lets the Captain pick ONE or MORE of the four content roles —
+// every selected role is posted (one post per role) on submit. The server
+// enforces one OPEN post per (project, role); roles that already have one are
+// disabled with an \"open\" badge, fetched live for the active project.
 // ---------------------------------------------------------------------------
 
 const ROLES: ArenaRole[] = ['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL'];
@@ -53,8 +54,10 @@ export function PostArenaRoleModal({
 }: PostArenaRoleModalProps) {
   const pickerMode = Boolean(projects && projects.length > 0);
   const [selectedProjectId, setSelectedProjectId] = useState(projects?.[0]?.id ?? projectId ?? '');
-  const [role, setRole] = useState<ArenaRole | null>(null);
+  const [roles, setRoles] = useState<ArenaRole[]>([]);
   const [pitch, setPitch] = useState('');
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const activeProjectId = pickerMode ? selectedProjectId : (projectId ?? '');
   const activeProject = projects?.find((p) => p.id === activeProjectId);
@@ -70,12 +73,29 @@ export function PostArenaRoleModal({
     },
   );
   const alreadyOpenRoles = ((openOnProject.data ?? []) as ArenaPostSummary[]).map((post) => post.role);
-  const allRolesOpen = pickerMode && Boolean(activeProjectId) && alreadyOpenRoles.length >= ROLES.length;
+  const allRolesOpen = Boolean(activeProjectId) && alreadyOpenRoles.length >= ROLES.length;
+
+  // The roles queued for creation on this submit pass. Each mutate() call
+  // posts one role; onSuccess advances the queue and onCreated fires after
+  // the LAST one lands.
+  const queueRef = useRef<ArenaRole[]>([]);
+  const abortedRef = useRef(false);
 
   const create = useCreateArenaPost({
     mutation: {
-      onSuccess: (post) => onCreated(post),
+      onSuccess: (post) => {
+        const rest = queueRef.current.slice(1);
+        queueRef.current = rest;
+        setPendingCount(rest.length);
+        // An earlier role in this pass failed — stay open and let the error
+        // message carry the news instead of navigating away.
+        if (abortedRef.current) return;
+        if (rest.length === 0) onCreated(post);
+      },
       onError: (error) => {
+        abortedRef.current = true;
+        queueRef.current = [];
+        setPendingCount(0);
         const messageFromServer =
           (error as { response?: { data?: { error?: string } } })?.response?.data?.error ?? null;
         setServerError(
@@ -84,34 +104,47 @@ export function PostArenaRoleModal({
       },
     },
   });
-  const [serverError, setServerError] = useState<string | null>(null);
 
-  const selected = role ? ARENA_ROLE_META[role] : null;
+  const busy = pendingCount > 0;
   const pitchLength = pitch.length;
   const canSubmit =
-    Boolean(role) &&
+    roles.length > 0 &&
     Boolean(activeProjectId) &&
     pitchLength >= PITCH_MIN &&
     pitchLength <= PITCH_MAX &&
-    !create.isPending &&
+    !busy &&
     !allRolesOpen;
+
+  const toggleRole = (candidate: ArenaRole, disabled: boolean) => {
+    if (disabled || busy) return;
+    setServerError(null);
+    setRoles((current) =>
+      current.includes(candidate)
+        ? current.filter((role) => role !== candidate)
+        : [...current, candidate],
+    );
+  };
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!canSubmit || !role || !activeProjectId) return;
+    if (!canSubmit || roles.length === 0 || !activeProjectId) return;
     setServerError(null);
-    create.mutate({ data: { projectId: activeProjectId, role, pitch: pitch.trim() } });
+    abortedRef.current = false;
+    const queue = roles.slice();
+    queueRef.current = queue;
+    setPendingCount(queue.length);
+    queue.forEach((role) => create.mutate({ data: { projectId: activeProjectId, role, pitch: pitch.trim() } }));
   };
 
-  const title = pickerMode ? 'Open a role on one of your projects.' : `Open a role on “${projectName}”.`;
+  const title = pickerMode ? 'Open roles on your projects.' : `Open a role on “${projectName}”.`;
   const copy = pickerMode
-    ? 'Pick the project, then the seat you want to fill. Anyone signed in can audition while the post is open — and can preview that project read-only (timeline + preview only) until you fill the seat or close it.'
-    : 'Anyone signed in can audition while the post is open — and can preview this project read-only (timeline + preview only) until you fill the seat or close it.';
+    ? 'Pick a project and every seat you’re hiring for — one audition post per role.'
+    : 'Anyone signed in can audition — and preview this project read-only — while a post is live.';
 
   return (
-    <div className="modal-backdrop" onClick={create.isPending ? undefined : onClose} data-testid="arena-post-composer">
+    <div className="modal-backdrop" onClick={busy ? undefined : onClose} data-testid="arena-post-composer">
       <div className="modal project-modal arena-apply-modal" onClick={(event) => event.stopPropagation()}>
-        <button type="button" className="modal-close" onClick={onClose} disabled={create.isPending} aria-label="Close">
+        <button type="button" className="modal-close" onClick={onClose} disabled={busy} aria-label="Close">
           <X size={16} />
         </button>
         <div className="project-modal-heading">
@@ -127,12 +160,12 @@ export function PostArenaRoleModal({
                 value={selectedProjectId}
                 onChange={(event) => {
                   setSelectedProjectId(event.target.value);
-                  setRole(null);
+                  setRoles([]);
                   setPitch('');
                   setServerError(null);
                 }}
                 className="den-select"
-                disabled={create.isPending}
+                disabled={busy}
                 data-testid="arena-composer-project"
               >
                 {projects.map((project) => (
@@ -143,7 +176,7 @@ export function PostArenaRoleModal({
               </select>
             </div>
           )}
-          {activeProjectId && allRolesOpen && (
+          {allRolesOpen && (
             <p className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))' }} data-testid="arena-composer-full">
               Every role already has an open audition on {pickerMode ? `“${activeProject?.name}”` : 'this project'}. Close
               or fill one before posting another.
@@ -151,22 +184,20 @@ export function PostArenaRoleModal({
           )}
 
           <div className="field">
-            <span>Which role are you hiring for?</span>
-            <div className="role-tabs arena-composer-roles" role="group" aria-label="Role to post">
+            <span>Which roles are you hiring for? <em className="arena-composer-hint">— pick as many as you need</em></span>
+            <div className="role-tabs arena-composer-roles" role="group" aria-label="Roles to post">
               {ROLES.map((candidate) => {
                 const alreadyOpen = alreadyOpenRoles.includes(candidate);
-                const disabled = alreadyOpen || allRolesOpen || !activeProjectId;
+                const disabled = alreadyOpen || allRolesOpen || !activeProjectId || busy;
+                const isSelected = roles.includes(candidate);
                 return (
                   <button
                     key={candidate}
                     type="button"
-                    className={role === candidate ? 'active' : ''}
-                    onClick={() => {
-                      if (disabled) return;
-                      setRole(candidate);
-                      setServerError(null);
-                    }}
+                    className={isSelected ? 'active' : ''}
+                    onClick={() => toggleRole(candidate, disabled)}
                     disabled={disabled}
+                    aria-pressed={isSelected}
                     title={
                       !activeProjectId
                         ? 'Pick a project first'
@@ -176,18 +207,26 @@ export function PostArenaRoleModal({
                     }
                     data-testid={`arena-composer-role-${candidate.toLowerCase()}`}
                   >
+                    <span className="arena-composer-check" aria-hidden>{isSelected ? <Check size={11} /> : null}</span>
                     {ARENA_ROLE_META[candidate].label}
                     {alreadyOpen && <span className="leg-badge">open</span>}
                   </button>
                 );
               })}
             </div>
-            {selected && <span className="channel-name-hint">{selected.blurb}</span>}
+            {roles.length === 1 && (
+              <span className="channel-name-hint">{ARENA_ROLE_META[roles[0]].blurb}</span>
+            )}
+            {roles.length > 1 && (
+              <span className="channel-name-hint">
+                {roles.length} roles selected — one audition post each, shared pitch.
+              </span>
+            )}
           </div>
 
           <div className="field">
             <span>
-              Your pitch ({pitchLength}/{PITCH_MAX} — at least {PITCH_MIN} characters)
+              Pitch ({pitchLength}/{PITCH_MAX} — min {PITCH_MIN})
             </span>
             <textarea
               value={pitch}
@@ -195,7 +234,7 @@ export function PostArenaRoleModal({
               placeholder="I'm looking for an editor who loves documentary pacing. We ship weekly and you'd own the cut from selects to picture lock…"
               maxLength={PITCH_MAX}
               rows={5}
-              disabled={create.isPending}
+              disabled={busy}
               data-testid="input-arena-post-pitch"
             />
           </div>
@@ -207,7 +246,11 @@ export function PostArenaRoleModal({
           )}
 
           <button type="submit" disabled={!canSubmit} className="primary-btn modal-submit" data-testid="button-arena-post">
-            {create.isPending ? 'Opening the audition…' : 'Post open role'}
+            {busy
+              ? `Posting ${pendingCount} role${pendingCount === 1 ? '' : 's'}…`
+              : roles.length > 1
+                ? `Post ${roles.length} open roles`
+                : 'Post open role'}
             <Megaphone size={15} />
           </button>
         </form>

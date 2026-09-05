@@ -6447,3 +6447,290 @@ select optgroup {
   border-top: 1px dashed hsl(var(--border) / .85);
 }
 .arena-hero-facts { margin-top: 2px; }
+
+/* ============================================================================
+   ARENA POLISH 2 — board cards, post hero, audition rows, vault arena card,
+   modal scroll fixes, and the top-nav Analytics pill.
+   ============================================================================ */
+
+/* ---- Role-tinted accents per content seat ---- */
+.arena-card[data-role='VIDEO'] { --arena-role: hsl(var(--accent)); }
+.arena-card[data-role='AUDIO'] { --arena-role: hsl(164 45% 52%); }
+.arena-card[data-role='SCRIPT'] { --arena-role: hsl(48 96% 58%); }
+.arena-card[data-role='THUMBNAIL'] { --arena-role: hsl(var(--muted-foreground)); }
+
+/* ---- Board cards: a proper card with a role rail + live chip ---- */
+.arena-card {
+  position: relative;
+  overflow: hidden;
+  padding: 17px 19px 17px 21px;
+  border: 1px solid hsl(var(--border));
+  border-left: 3px solid var(--arena-role, hsl(var(--border)));
+  border-radius: 13px;
+  background: linear-gradient(150deg, hsl(var(--card) / .92), hsl(var(--card) / .72));
+  box-shadow: var(--shadow-xs);
+  text-decoration: none;
+  color: inherit;
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.arena-card::before {
+  /* Faint role wash that strengthens on hover. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--arena-role, hsl(var(--border))) 9%, transparent) 0%, transparent 46%);
+  opacity: .8;
+  transition: opacity .16s ease;
+}
+.arena-card:hover {
+  border-color: color-mix(in srgb, var(--arena-role, hsl(var(--primary))) 55%, hsl(var(--border)));
+  border-left-color: var(--arena-role);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--arena-role, hsl(var(--primary))) 16%, transparent), var(--shadow-sm);
+}
+.arena-card:hover::before { opacity: 1; }
+.arena-card-main,
+.arena-card-side { position: relative; }
+.arena-card-topline { gap: 11px; }
+.arena-channel-avatar {
+  width: 38px; height: 38px;
+  border-radius: 11px;
+  border: 1px solid hsl(var(--accent) / .22);
+  box-shadow: 0 3px 10px hsl(0 0% 0% / .28), inset 0 1px 0 hsl(0 0% 100% / .08);
+  background: linear-gradient(180deg, hsl(var(--accent) / .2), hsl(var(--accent) / .06));
+}
+.arena-card-channel { font: 800 12px var(--app-font-sans); letter-spacing: .01em; }
+.arena-card-project { font-size: 12.5px; }
+.arena-card-live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 700 8px var(--app-font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: hsl(152 45% 55%);
+  background: hsl(152 45% 40% / .12);
+  border: 1px solid hsl(152 45% 45% / .35);
+  border-radius: 999px;
+  padding: 3px 8px;
+  flex: 0 0 auto;
+}
+.arena-card-live i {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: hsl(152 60% 55%);
+  box-shadow: 0 0 6px hsl(152 60% 55% / .9);
+  animation: arenaLivePulse 1.8s ease infinite;
+}
+@keyframes arenaLivePulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.arena-card-roleline { gap: 9px; }
+.arena-card-seat { font: 12px/1.4 var(--app-font-sans); }
+.arena-card-pitch {
+  padding-right: 4px;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  line-height: 1.55;
+}
+.arena-card-foot { margin-top: 4px; padding-top: 9px; border-top: 1px dashed hsl(var(--border) / .7); }
+.arena-card-poster { font-weight: 600; }
+.arena-card-arrow {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--arena-role, hsl(var(--accent))) 42%, transparent);
+  color: var(--arena-role, hsl(var(--accent)));
+  background: color-mix(in srgb, var(--arena-role, hsl(var(--accent))) 8%, transparent);
+  transition: background .14s ease, border-color .14s ease, transform .14s ease;
+}
+.arena-card:hover .arena-card-arrow {
+  background: color-mix(in srgb, var(--arena-role, hsl(var(--accent))) 16%, transparent);
+  border-color: color-mix(in srgb, var(--arena-role, hsl(var(--accent))) 60%, transparent);
+  transform: translateX(2px);
+}
+.arena-card-side { gap: 8px; }
+.arena-count {
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font: 800 8.5px var(--app-font-mono);
+  letter-spacing: .06em;
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .04);
+}
+.arena-count b { font-size: 12px; }
+.arena-count.applied { color: hsl(164 45% 52%); background: hsl(164 45% 40% / .14); }
+
+/* ---- Composer: multi-select role chips with a check box ---- */
+.arena-composer-check {
+  display: inline-grid;
+  place-items: center;
+  width: 14px; height: 14px;
+  flex: 0 0 auto;
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  color: hsl(var(--primary-foreground));
+  background: transparent;
+}
+.role-tabs button.active .arena-composer-check {
+  border-color: hsl(var(--primary-foreground) / .75);
+  background: hsl(var(--primary-foreground) / .16);
+}
+.role-tabs button:disabled .arena-composer-check { opacity: .5; }
+.arena-composer-hint {
+  font-style: normal;
+  font: 9.5px var(--app-font-mono);
+  letter-spacing: .04em;
+  text-transform: none;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ---- Post hero: softer panel, role edge, richer count ---- */
+.arena-hero {
+  border: 1px solid hsl(var(--border));
+  background: linear-gradient(150deg, hsl(var(--card) / .96), hsl(var(--card) / .55));
+  box-shadow: var(--shadow-xs);
+}
+.arena-hero[data-role='VIDEO'] { --arena-role: hsl(var(--accent)); }
+.arena-hero[data-role='AUDIO'] { --arena-role: hsl(164 45% 52%); }
+.arena-hero[data-role='SCRIPT'] { --arena-role: hsl(48 96% 58%); }
+.arena-hero[data-role='THUMBNAIL'] { --arena-role: hsl(var(--muted-foreground)); }
+.arena-fact {
+  background: hsl(var(--muted) / .55);
+  border: 1px solid hsl(var(--border) / .7);
+}
+.arena-count-big {
+  border: 1px solid hsl(var(--accent) / .24);
+  background: linear-gradient(180deg, hsl(var(--accent) / .1), hsl(var(--card) / .45));
+}
+.arena-count-big b { color: hsl(var(--accent)); }
+
+/* ---- Captain controls: yellow Close, red Remove/Reject, teal Accept ---- */
+.arena-close-btn {
+  color: hsl(48 96% 62%) !important;
+  border-color: hsl(48 96% 52% / .75) !important;
+  background: hsl(48 96% 52% / .08);
+}
+.arena-close-btn:hover {
+  color: hsl(48 96% 70%) !important;
+  border-color: hsl(48 96% 58%) !important;
+  background: hsl(48 96% 52% / .16);
+}
+.arena-remove-btn,
+.arena-remove-confirm {
+  color: hsl(var(--destructive)) !important;
+  border-color: hsl(var(--destructive) / .6) !important;
+}
+.arena-remove-btn:hover,
+.arena-remove-confirm:hover {
+  border-color: hsl(var(--destructive)) !important;
+  color: hsl(var(--destructive)) !important;
+  background: hsl(var(--destructive) / .12);
+}
+.arena-decline {
+  color: hsl(var(--destructive)) !important;
+  border-color: hsl(var(--destructive) / .6) !important;
+}
+.arena-decline:hover {
+  border-color: hsl(var(--destructive)) !important;
+  color: hsl(var(--destructive)) !important;
+  background: hsl(var(--destructive) / .12);
+}
+.arena-accept {
+  color: hsl(164 45% 52%) !important;
+  border-color: hsl(164 45% 52% / .55) !important;
+}
+.arena-accept:hover {
+  border-color: hsl(164 45% 52%) !important;
+  color: hsl(164 45% 52%) !important;
+  background: hsl(164 45% 40% / .12);
+}
+
+/* ---- Audition rows (Captain panel + My Auditions): carded, hover lift ---- */
+.arena-app-row {
+  border-radius: 12px;
+  background: linear-gradient(150deg, hsl(var(--card) / .92), hsl(var(--card) / .7));
+  box-shadow: var(--shadow-xs);
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.arena-app-row:hover {
+  border-color: hsl(var(--accent) / .35);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+.arena-app-avatar {
+  width: 38px; height: 38px;
+  border-radius: 11px;
+  border: 1px solid hsl(var(--accent) / .2);
+  box-shadow: 0 3px 10px hsl(0 0% 0% / .26);
+}
+.arena-app-topline b { font: 700 13.5px var(--app-font-sans); }
+.arena-app-actions { justify-content: center; }
+.arena-withdraw.is-armed { border-color: hsl(0 72% 60%) !important; color: hsl(0 72% 64%) !important; }
+
+/* ---- Vault "Collaboration / Audition Arena" card: globe tile head ---- */
+.arena-vault-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid hsl(var(--accent) / .28);
+  background: linear-gradient(140deg, hsl(var(--card)), hsl(var(--accent) / .05));
+}
+.arena-vault-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; }
+.arena-vault-icon {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, hsl(var(--accent) / .2), hsl(var(--accent) / .06));
+  border: 1px solid hsl(var(--accent) / .35);
+  color: hsl(var(--accent));
+  box-shadow: 0 5px 14px hsl(var(--accent) / .16), inset 0 1px 0 hsl(0 0% 100% / .08);
+}
+.arena-vault-head-copy { display: flex; flex-direction: column; gap: 2px; }
+.arena-vault-title { font: 700 15px var(--app-font-serif); letter-spacing: -.01em; }
+.arena-vault-head > .den-tag { margin-left: auto; }
+.arena-vault-card .arena-open-row {
+  padding: 11px 13px;
+  border: 1px solid hsl(var(--border) / .75);
+  border-radius: 11px;
+  background: hsl(var(--card) / .7);
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+.arena-vault-card .arena-open-row:hover { border-color: hsl(var(--accent) / .4); background: hsl(var(--card)); transform: translateY(-1px); }
+
+/* ---- Modals: contain scroll so a tall modal never drags the page ---- */
+.modal-backdrop,
+.modal { overscroll-behavior: contain; }
+.agent-upload-modal { overscroll-behavior: contain; }
+
+/* ---- Top-nav Analytics pill: matches the chrome row (38px search height) ---- */
+.cd-topnav-analytics-chrome {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 15px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--destructive) / .55);
+  background: hsl(var(--destructive) / .16);
+  color: hsl(0 0% 96%);
+  font: 700 11px var(--app-font-sans);
+  letter-spacing: .01em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+}
+.cd-topnav-analytics-chrome svg { flex: 0 0 auto; }
+.cd-topnav-analytics-chrome:hover {
+  background: hsl(var(--destructive) / .26);
+  border-color: hsl(var(--destructive) / .85);
+  transform: translateY(-1px);
+}
+.cd-topnav-analytics-chrome.active {
+  border-color: hsl(var(--destructive));
+  box-shadow: 0 0 0 3px hsl(var(--destructive) / .22);
+}
+@media (max-width: 760px) {
+  .cd-topnav-analytics-chrome { width: 38px; padding: 0; justify-content: center; }
+  .cd-topnav-analytics-chrome span { display: none; }
+}

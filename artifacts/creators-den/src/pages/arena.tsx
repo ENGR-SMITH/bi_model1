@@ -175,6 +175,7 @@ function PostCard({ post }: { post: ArenaPostSummary }) {
     <Link
       href={`/arena/posts/${post.id}`}
       className="arena-card"
+      data-role={post.role}
       data-testid={`arena-post-${post.id}`}
     >
       <span className="arena-card-main">
@@ -186,6 +187,7 @@ function PostCard({ post }: { post: ArenaPostSummary }) {
             <span className="arena-card-channel">{post.channelName}</span>
             <span className="arena-card-project">{post.projectName}</span>
           </span>
+          <span className="arena-card-live" aria-hidden><i /> live</span>
         </span>
 
         <span className="arena-card-roleline">
@@ -214,7 +216,7 @@ function PostCard({ post }: { post: ArenaPostSummary }) {
             {post.myApplication === 'accepted' ? 'You’re on this team' : 'Audition sent'}
           </span>
         ) : null}
-        <span className={`arena-count ${applied ? 'is-applied' : ''}`}>
+        <span className={`arena-count ${applied ? 'is-applied' : ''}`} data-testid={`arena-count-num-${post.id}`}>
           {post.applicantCount > 0 ? (
             <>
               <b>{post.applicantCount}</b>

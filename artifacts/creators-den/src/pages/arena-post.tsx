@@ -132,7 +132,7 @@ export default function ArenaPostPage() {
       </div>
 
       {/* Hero: the pitch + live count + actions. */}
-      <div className="paper-card arena-hero" data-testid="arena-post-hero">
+      <div className="paper-card arena-hero" data-role={post.role} data-testid="arena-post-hero">
         <div className="arena-hero-main">
           <p className="arena-hero-blurb">{meta.blurb}</p>
 
@@ -388,7 +388,7 @@ function CaptainPanel({
           {post.status === 'OPEN' ? (
             <button
               type="button"
-              className="secondary-btn"
+              className="secondary-btn arena-close-btn"
               onClick={() => updatePost.mutate({ postId: post.id, data: { status: 'CLOSED' } })}
               disabled={updatePost.isPending}
               data-testid="button-arena-close"
