@@ -438,17 +438,17 @@ Deep links target the video analytics page (rules 1–2) or the channel analytic
 
 ### Phase 3 — Analytics ingestion + APIs
 
-- [ ] `youtube/client.ts` + `youtube/sync.ts` (§8.3, §9.1): catalog sync, incremental daily metrics, report caches, background interval + manual sync endpoint, sync-state rows.
-- [ ] Analytics GET routes + overview/videos/detail/report endpoints (§11.3) + spec/codegen.
-- [ ] Anomaly rules + notifications (§14).
-- [ ] Analytics route tests with canned YouTube payloads (§15.1).
+- [x] `youtube/client.ts` + `youtube/sync.ts` (§8.3, §9.1): catalog sync, incremental daily metrics, report caches, background interval + manual sync endpoint, sync-state rows. **Completed: `artifacts/api-server/src/youtube/client.ts` (fetchYoutubeJson + report normalization), `youtube/sync.ts` (catalog crawl w/ videos.list enrichment, incremental channel+video daily metrics, report TTL refresh, anomaly rules, per-channel sync-state upserts), `youtube/analytics-runner.ts` (YT_SYNC_INTERVAL_MINUTES loop, wired in `index.ts`), manual sync endpoint with ~1/min throttle. Schema: `tandem_channel_videos` / `_daily_metrics` / `_reports` / `tandem_channel_syncs` / `tandem_channel_alerts` + migration `0005_channel_analytics.sql` + sqlite mirror. Verified: sync tests green.**
+- [x] Analytics GET routes + overview/videos/detail/report endpoints (§11.3) + spec/codegen. **Completed: `artifacts/api-server/src/routes/channel-analytics.ts` (overview, video table w/ search/sort/cursor, video detail w/ channel medians, report cache w/ stale→sync, owner sync POST), openapi `channel-analytics` tag + codegen regenerated.**
+- [x] Anomaly rules + notifications (§14). **Completed: WATCH_TIME_DROP / VIDEO_UNDERPERFORMING / UPLOAD_GAP rules run inside the sync, deduped via `tandem_channel_alerts` (channel, rule, period_start) and delivered through `notify()`-style `tandemVideoNotifications` + `emitToUser`; deep links target the channel/video analytics pages.**
+- [x] Analytics route tests with canned YouTube payloads (§15.1). **Completed: `channels-analytics.test.ts` (12 tests): auth/membership, first-sync backfill, incremental second sync, 403 degradation → ERROR state + stored partials, DB-backed reads with zero YouTube calls, report freshness/stale, owner-only sync + throttle, anomaly dedupe.**
 
 ### Phase 4 — Analytics UI
 
-- [ ] Channel analytics page: stat cards, filters, video table (§12.6) + Analytics notch + home CTA wiring.
-- [ ] Video analytics page + report sections with recharts.
-- [ ] Freshness/refresh states + "new uploads detected" banner.
-- [ ] Frontend helper tests; visual pass at desktop/mobile widths.
+- [x] Channel analytics page: stat cards, filters, video table (§12.6) + Analytics notch + home CTA wiring. **Completed: `pages/analytics/index.tsx` (KPI stat cards, 7/28/90-day range chips, search + sort toolbar, views/watch-time recharts day chart, video table w/ thumbnail/title/kind/duration + published/views/watch-time/AVD/likes/CTR/retention/revenue, cursor "Load more"). Analytics notch (`nav-analytics`) and channel-home CTA (`link-channel-analytics`) were already wired in Phase 1 and kept.**
+- [x] Video analytics page + report sections with recharts. **Completed: `pages/analytics/video.tsx` (header w/ thumbnail + kind/duration/date + channel-level sub movement, 9 KPI cards, views/watch-time day chart, report sections — audience retention curve, traffic sources, playback locations, age/gender demographics, devices, revenue w/ RPM/CPM chips; anomaly banner vs channel medians). recharts ^2.15.2 added + `components/ui/chart.tsx` ported (shadcn wrapper) with `lib/utils.ts` `cn`.**
+- [x] Freshness/refresh states + "new uploads detected" banner. **Completed: freshness bar (Last synced / Never synced), owner-only "Refresh now" + SYNCING spinner, ERROR banner w/ message, "N new uploads detected" tag, per-report "Refreshing…" auto-refetch when the cache is stale.**
+- [x] Frontend helper tests; visual pass at desktop/mobile widths. **Completed: `lib/analytics-format.ts` + 10 unit tests (number/watch-time/percent/currency/date/duration formatting, below-median anomaly math, thumbnail picker) — creators-den suite 84/84 green. Visual pass pending live credentials (§15.2 walkthrough).**
 
 ### Phase 5 — Verification and handoff
 

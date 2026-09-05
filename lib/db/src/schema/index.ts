@@ -28,3 +28,4 @@ export * from "./account";
 export * from "./tickets";
 export * from "./subscriptions";
 export * from "./channels";
+export * from "./channel-analytics";
