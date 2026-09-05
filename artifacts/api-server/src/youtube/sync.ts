@@ -533,7 +533,7 @@ async function fireAlert(channel: TandemChannel, rule: string, periodStart: stri
       deepLink,
     })
     .returning();
-  emitToUser(channel.ownerId, "notification.new", notification);
+  emitToUser(channel.ownerId, "notification.new", { ...notification, source: "creators" });
   logger.info({ channelId: channel.id, rule }, "Channel analytics alert fired");
 }
 

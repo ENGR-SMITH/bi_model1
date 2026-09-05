@@ -215,6 +215,7 @@ function App() {
       preview: params.get("preview") ?? "",
       openProject: params.get("project") ?? "",
       chat: params.get("chat") === "1",
+      notifications: params.get("notifications") === "1",
     };
   });
   const [publishDraft, setPublishDraft] = useState<Project | null>(null);
@@ -282,6 +283,9 @@ function App() {
     });
   }, [tutorialProjectActive, previewActive, view, projectId, tutorialStep]);
   useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(""), 2400); return () => clearTimeout(timer); }, [toast]);
+  // The Tandem inbox links its Author Den notices here with ?notifications=1
+  // so the studio opens straight on the notifications page.
+  useEffect(() => { if (intent.notifications) setView("notifications"); }, [intent.notifications]);
   // “Publish a seed” from the pitch board lands here with ?publish=1 and
   // triggers the same “A NEW ROOM FOR WORDS” card as clicking New project.
   useEffect(() => { if (intent.publish && !preview) { setDraftNudge(false); setModal("project"); } }, [intent.publish]);

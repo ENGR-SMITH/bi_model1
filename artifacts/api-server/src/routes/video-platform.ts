@@ -106,7 +106,9 @@ async function notify(
       resourceId: resourceId ?? null,
     })
     .returning();
-  emitToUser(recipientId, "notification.new", notification);
+  // `source` tells clients which den wrote the notice so a toast/inbox row
+  // can label it correctly (the collaboration feed carries "authors").
+  emitToUser(recipientId, "notification.new", { ...notification, source: "creators" });
 }
 
 // POST /video/projects/:projectId/assets/:assetId/reference-analyze — queue

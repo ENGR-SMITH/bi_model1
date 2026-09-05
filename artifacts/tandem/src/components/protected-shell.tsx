@@ -1,5 +1,11 @@
 import { useAuth, useClerk, useUser } from '@clerk/react';
 import {
+  getGetCollaborationInboxQueryKey,
+  getListVideoNotificationsQueryKey,
+  useGetCollaborationInbox,
+  useListVideoNotifications,
+} from '@workspace/api-client-react';
+import {
   PiChartLineUpDuotone,
   PiListDuotone,
   PiSignOutDuotone,
@@ -49,6 +55,34 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
   }
 
   return <PrivateShell>{children}</PrivateShell>;
+}
+
+/** Live unread badge for the Inbox nav link. Counts unread notices from both
+ * dens (Author Den collaboration + Creators Den video); the app-wide
+ * NotificationCenter invalidates both feeds the instant a notification.new
+ * streams in, so the number updates without polling or a reload. `overlay`
+ * positions the pill on the icon (mobile tab bar) instead of inline. */
+function InboxBadge({ overlay = false }: { overlay?: boolean }) {
+  const collabQ = useGetCollaborationInbox({
+    query: { queryKey: getGetCollaborationInboxQueryKey() },
+  });
+  const videoQ = useListVideoNotifications({
+    query: { queryKey: getListVideoNotificationsQueryKey() },
+  });
+  const collabUnread = (collabQ.data ?? []).filter((n: any) => !n.read).length;
+  const videoUnread = (videoQ.data ?? []).filter((n: any) => !n.readAt).length;
+  const count = collabUnread + videoUnread;
+  if (count <= 0) return null;
+  return (
+    <span
+      className={`rounded-full bg-red-500 px-1.5 py-0.5 font-mono-ui text-[9px] font-bold leading-none text-white shadow-[0_0_12px_-2px_rgba(239,68,68,0.8)] ${
+        overlay ? 'absolute -right-2 -top-1' : 'ml-1.5'
+      }`}
+      data-testid="nav-inbox-badge"
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
 }
 
 function UserChip() {
@@ -105,6 +139,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
                   >
                     <Icon className={`h-4 w-4 ${active ? 'text-[#60a5fa]' : 'text-zinc-500 group-hover:text-zinc-200'}`} />
                     {item.label}
+                    {item.label === 'Inbox' && <InboxBadge />}
                     <span className={`absolute inset-x-4 bottom-0.5 h-px bg-gradient-to-r from-[#3b82f6]/80 to-[#8b5cf6]/80 transition-opacity duration-200 ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
                   </Link>
                 );
@@ -134,6 +169,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
                   <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}>
                     <Icon className="h-4 w-4 text-zinc-500" />
                     {item.label}
+                    {item.label === 'Inbox' && <InboxBadge />}
                   </Link>
                 );
               })}
@@ -152,7 +188,10 @@ function PrivateShell({ children }: { children: ReactNode }) {
             const active = location === item.href;
             return (
               <Link key={item.href} href={item.href} className={`focus-house flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] font-medium ${active ? 'text-[#3b82f6]' : 'text-zinc-500'}`} data-testid={`link-mobile-${item.label.toLowerCase()}`}>
-                <Icon className={`h-5 w-5 ${active ? 'text-[#3b82f6]' : 'text-zinc-500'}`} />
+                <span className="relative">
+                  <Icon className={`h-5 w-5 ${active ? 'text-[#3b82f6]' : 'text-zinc-500'}`} />
+                  {item.label === 'Inbox' && <InboxBadge overlay />}
+                </span>
                 {item.label}
               </Link>
             );

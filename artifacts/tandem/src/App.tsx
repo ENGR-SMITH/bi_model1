@@ -1,6 +1,7 @@
 import { type ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 import { ClerkProvider, useAuth, useClerk } from '@clerk/react';
+import { NotificationCenter } from '@/components/notification-center';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -120,6 +121,10 @@ function ClerkProviderWithRoutes() {
             <RouterWithAuth />
           </RoutedErrorBoundary>
           <Toaster />
+          {/* One realtime socket for the whole app: keeps the inbox feeds
+              current and pops a brief toast when a new notice lands from
+              either den (Creators Den or Author Den). */}
+          <NotificationCenter />
         </TooltipProvider>
       </QueryClientProvider>
     </ClerkProvider>
