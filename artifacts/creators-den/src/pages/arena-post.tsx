@@ -62,7 +62,6 @@ export default function ArenaPostPage() {
   const postId = params.postId ?? '';
   const { user } = useUser();
   const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
 
   const postQuery = useGetArenaPost(postId, {
     query: { queryKey: getGetArenaPostQueryKey(postId), enabled: Boolean(postId) },
@@ -230,6 +229,7 @@ export default function ArenaPostPage() {
               dataTestId="arena-watch-menu"
             />
           </div>
+          {isCaptain && <CaptainHeroControls post={post} onChanged={refreshPost} />}
           {canApply && (
             <p className="arena-apply-hint">
               {mine === 'rejected'
@@ -337,6 +337,84 @@ function HireReviewCta({
   );
 }
 
+// Captain controls inside the hero's button column — Close/Reopen (yellow)
+// and Remove post (red, two-step confirm) sit on their own row directly
+// below the Share + Watch row.
+function CaptainHeroControls({ post, onChanged }: { post: ArenaPostDetail; onChanged: () => void }) {
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const updatePost = useUpdateArenaPost({ mutation: { onSuccess: onChanged } });
+  const removePost = useDeleteArenaPost();
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  return (
+    <div className="arena-captain-row">
+      {post.status === 'OPEN' ? (
+        <button
+          type="button"
+          className="secondary-btn arena-close-btn"
+          onClick={() => updatePost.mutate({ postId: post.id, data: { status: 'CLOSED' } })}
+          disabled={updatePost.isPending}
+          data-testid="button-arena-close"
+        >
+          <Clock size={14} /> Close auditions
+        </button>
+      ) : post.status === 'CLOSED' ? (
+        <button
+          type="button"
+          className="secondary-btn arena-close-btn"
+          onClick={() => updatePost.mutate({ postId: post.id, data: { status: 'OPEN' } })}
+          disabled={updatePost.isPending}
+          data-testid="button-arena-reopen"
+        >
+          Reopen auditions
+        </button>
+      ) : null}
+      {post.status !== 'FILLED' &&
+        (confirmRemove ? (
+          <span className="arena-captain-confirm">
+            <button
+              type="button"
+              className="secondary-btn arena-remove-confirm"
+              onClick={() =>
+                removePost.mutate(
+                  { postId: post.id },
+                  {
+                    onSuccess: () => {
+                      setConfirmRemove(false);
+                      void queryClient.invalidateQueries({ queryKey: getListArenaPostsQueryKey() });
+                      setLocation('/arena');
+                    },
+                  },
+                )
+              }
+              disabled={removePost.isPending}
+              data-testid="button-arena-remove-confirm"
+            >
+              <Trash2 size={13} /> {removePost.isPending ? 'Removing…' : 'Confirm remove'}
+            </button>
+            <button type="button" className="secondary-btn" onClick={() => setConfirmRemove(false)}>Keep</button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="secondary-btn arena-remove-btn"
+            onClick={() => setConfirmRemove(true)}
+            title="Remove this post from the Arena entirely"
+            data-testid="button-arena-remove"
+          >
+            <Trash2 size={13} /> Remove post
+          </button>
+        ))}
+      {removePost.isError && (
+        <p className="setting-copy arena-captain-error" role="alert">
+          {(removePost.error as { response?: { data?: { error?: string } } } | null)?.response?.data?.error || 'The post could not be removed.'}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Captain panel — the full audition list with decisions.
 function CaptainPanel({
   post,
@@ -349,13 +427,6 @@ function CaptainPanel({
   loading: boolean;
   onChanged: () => void;
 }) {
-  const [, setLocation] = useLocation();
-  const queryClient = useQueryClient();
-  const updatePost = useUpdateArenaPost({
-    mutation: { onSuccess: onChanged },
-  });
-  const removePost = useDeleteArenaPost();
-  const [confirmRemove, setConfirmRemove] = useState(false);
   const pending = applications.filter((app) => app.status === 'PENDING');
   const hire = applications.find((app) => app.status === 'ACCEPTED');
 
@@ -384,71 +455,7 @@ function CaptainPanel({
               : 'No pending auditions.'}
           </h2>
         </div>
-        <div className="flex items-center gap-2">
-          {post.status === 'OPEN' ? (
-            <button
-              type="button"
-              className="secondary-btn arena-close-btn"
-              onClick={() => updatePost.mutate({ postId: post.id, data: { status: 'CLOSED' } })}
-              disabled={updatePost.isPending}
-              data-testid="button-arena-close"
-            >
-              <Clock size={14} /> Close auditions
-            </button>
-          ) : post.status === 'CLOSED' ? (
-            <button
-              type="button"
-              className="secondary-btn"
-              onClick={() => updatePost.mutate({ postId: post.id, data: { status: 'OPEN' } })}
-              disabled={updatePost.isPending}
-              data-testid="button-arena-reopen"
-            >
-              Reopen auditions
-            </button>
-          ) : null}
-          {post.status !== 'FILLED' &&
-            (confirmRemove ? (
-              <span className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="secondary-btn arena-remove-confirm"
-                  onClick={() =>
-                    removePost.mutate(
-                      { postId: post.id },
-                      {
-                        onSuccess: () => {
-                          setConfirmRemove(false);
-                          void queryClient.invalidateQueries({ queryKey: getListArenaPostsQueryKey() });
-                          setLocation('/arena');
-                        },
-                      },
-                    )
-                  }
-                  disabled={removePost.isPending}
-                  data-testid="button-arena-remove-confirm"
-                >
-                  <Trash2 size={13} /> {removePost.isPending ? 'Removing…' : 'Confirm remove'}
-                </button>
-                <button type="button" className="secondary-btn" onClick={() => setConfirmRemove(false)}>Keep</button>
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="secondary-btn arena-remove-btn"
-                onClick={() => setConfirmRemove(true)}
-                title="Remove this post from the Arena entirely"
-                data-testid="button-arena-remove"
-              >
-                <Trash2 size={13} /> Remove post
-              </button>
-            ))}
-        </div>
       </div>
-      {removePost.isError && (
-        <p className="setting-copy mt-2" role="alert">
-          {(removePost.error as { response?: { data?: { error?: string } } } | null)?.response?.data?.error || 'The post could not be removed.'}
-        </p>
-      )}
 
       {loading ? (
         <div className="panel-empty">Loading auditions…</div>
