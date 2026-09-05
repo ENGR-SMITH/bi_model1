@@ -1275,6 +1275,250 @@ export interface ChannelPerson {
 }
 
 /**
+ * Daily metric values; keys are absent where YouTube reports null (e.g. non-monetized rows)
+ */
+export interface ChannelAnalyticsMetrics {
+  views?: number;
+  watchTimeMinutes?: number;
+  averageViewDurationSeconds?: number;
+  subscribersGained?: number;
+  subscribersLost?: number;
+  estimatedRevenueUsd?: number;
+  estimatedAdRevenueUsd?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  impressions?: number;
+  impressionsClickThroughRate?: number;
+  averageViewPercentage?: number;
+}
+
+export type ChannelAnalyticsOverviewSeriesItem = {
+  day: string;
+  /** @nullable */
+  views?: number | null;
+  /** @nullable */
+  watchTimeMinutes?: number | null;
+  /** @nullable */
+  subscribersGained?: number | null;
+  /** @nullable */
+  subscribersLost?: number | null;
+  /** @nullable */
+  estimatedRevenueUsd?: number | null;
+};
+
+/**
+ * @nullable
+ */
+export type ChannelAnalyticsOverviewStatus = typeof ChannelAnalyticsOverviewStatus[keyof typeof ChannelAnalyticsOverviewStatus] | null;
+
+
+export const ChannelAnalyticsOverviewStatus = {
+  IDLE: 'IDLE',
+  SYNCING: 'SYNCING',
+  ERROR: 'ERROR',
+} as const;
+
+/**
+ * Channel overview — summed KPIs, day series, and sync freshness
+ */
+export interface ChannelAnalyticsOverview {
+  channelId: string;
+  from: string;
+  to: string;
+  kpis: ChannelAnalyticsMetrics;
+  series: ChannelAnalyticsOverviewSeriesItem[];
+  /** @nullable */
+  lastSyncedAt: string | null;
+  /** @nullable */
+  status: ChannelAnalyticsOverviewStatus;
+  /** @nullable */
+  error: string | null;
+  newVideosSeen: number;
+}
+
+export type ChannelAnalyticsVideoRowContentKind = typeof ChannelAnalyticsVideoRowContentKind[keyof typeof ChannelAnalyticsVideoRowContentKind];
+
+
+export const ChannelAnalyticsVideoRowContentKind = {
+  LONG_FORM: 'LONG_FORM',
+  SHORT: 'SHORT',
+  LIVE: 'LIVE',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ChannelAnalyticsVideoRowThumbnails = { [key: string]: unknown } | null;
+
+/**
+ * One video-table row — catalog fields plus metrics summed over the window (or the latest day when no window is given)
+ */
+export interface ChannelAnalyticsVideoRow {
+  videoRowId: string;
+  youtubeVideoId: string;
+  title: string;
+  /** @nullable */
+  publishedAt: string | null;
+  contentKind: ChannelAnalyticsVideoRowContentKind;
+  /** @nullable */
+  durationSeconds: number | null;
+  /** @nullable */
+  thumbnails: ChannelAnalyticsVideoRowThumbnails;
+  /** @nullable */
+  views: number | null;
+  /** @nullable */
+  watchTimeMinutes: number | null;
+  /** @nullable */
+  averageViewDurationSeconds: number | null;
+  /** @nullable */
+  likes: number | null;
+  /** @nullable */
+  comments: number | null;
+  /** @nullable */
+  shares: number | null;
+  /** @nullable */
+  impressions: number | null;
+  /** @nullable */
+  impressionsClickThroughRate: number | null;
+  /** @nullable */
+  averageViewPercentage: number | null;
+  /** @nullable */
+  estimatedRevenueUsd: number | null;
+}
+
+/**
+ * A page of video-table rows
+ */
+export interface ChannelAnalyticsVideoList {
+  items: ChannelAnalyticsVideoRow[];
+  /** @nullable */
+  nextCursor: string | null;
+}
+
+/**
+ * @nullable
+ */
+export type ChannelAnalyticsVideoDetailThumbnails = { [key: string]: unknown } | null;
+
+export type ChannelAnalyticsVideoDetailContentKind = typeof ChannelAnalyticsVideoDetailContentKind[keyof typeof ChannelAnalyticsVideoDetailContentKind];
+
+
+export const ChannelAnalyticsVideoDetailContentKind = {
+  LONG_FORM: 'LONG_FORM',
+  SHORT: 'SHORT',
+  LIVE: 'LIVE',
+} as const;
+
+export type ChannelAnalyticsVideoDetailSeriesItem = {
+  day: string;
+  metrics: ChannelAnalyticsMetrics;
+};
+
+export type ChannelAnalyticsVideoDetailChannelMedians = {
+  /** @nullable */
+  impressionsClickThroughRate: number | null;
+  /** @nullable */
+  averageViewDurationSeconds: number | null;
+};
+
+/**
+ * @nullable
+ */
+export type ChannelAnalyticsVideoDetailStatus = typeof ChannelAnalyticsVideoDetailStatus[keyof typeof ChannelAnalyticsVideoDetailStatus] | null;
+
+
+export const ChannelAnalyticsVideoDetailStatus = {
+  IDLE: 'IDLE',
+  SYNCING: 'SYNCING',
+  ERROR: 'ERROR',
+} as const;
+
+/**
+ * Per-video analytics — window/lifetime totals, day series, and channel-median context for anomaly banners
+ */
+export interface ChannelAnalyticsVideoDetail {
+  videoRowId: string;
+  youtubeVideoId: string;
+  title: string;
+  description: string;
+  /** @nullable */
+  thumbnails: ChannelAnalyticsVideoDetailThumbnails;
+  /** @nullable */
+  publishedAt: string | null;
+  contentKind: ChannelAnalyticsVideoDetailContentKind;
+  /** @nullable */
+  durationSeconds: number | null;
+  /** @nullable */
+  privacyStatus: string | null;
+  /** @nullable */
+  categoryId: string | null;
+  /** @nullable */
+  defaultLanguage: string | null;
+  totals: ChannelAnalyticsMetrics;
+  series: ChannelAnalyticsVideoDetailSeriesItem[];
+  channelMedians: ChannelAnalyticsVideoDetailChannelMedians;
+  /** @nullable */
+  lastSyncedAt: string | null;
+  /** @nullable */
+  status: ChannelAnalyticsVideoDetailStatus;
+  /** @nullable */
+  error: string | null;
+}
+
+export type ChannelAnalyticsReportKind = typeof ChannelAnalyticsReportKind[keyof typeof ChannelAnalyticsReportKind];
+
+
+export const ChannelAnalyticsReportKind = {
+  RETENTION: 'RETENTION',
+  TRAFFIC: 'TRAFFIC',
+  PLAYBACK_LOCATION: 'PLAYBACK_LOCATION',
+  DEMOGRAPHICS: 'DEMOGRAPHICS',
+  DEVICES: 'DEVICES',
+  REVENUE: 'REVENUE',
+  SUBS: 'SUBS',
+} as const;
+
+export type ChannelAnalyticsReportRowsItem = {[key: string]: string | number | null};
+
+/**
+ * One report section from the cache; stale=true means a refresh sync was kicked and the client should re-query shortly
+ */
+export interface ChannelAnalyticsReport {
+  kind: ChannelAnalyticsReportKind;
+  periodStart: string;
+  periodEnd: string;
+  /** @nullable */
+  fetchedAt: string | null;
+  /** Row objects keyed by column name */
+  rows: ChannelAnalyticsReportRowsItem[];
+  stale: boolean;
+}
+
+export type ChannelSyncStateStatus = typeof ChannelSyncStateStatus[keyof typeof ChannelSyncStateStatus];
+
+
+export const ChannelSyncStateStatus = {
+  IDLE: 'IDLE',
+  SYNCING: 'SYNCING',
+  ERROR: 'ERROR',
+} as const;
+
+/**
+ * The per-channel analytics sync state + the latest run outcome
+ */
+export interface ChannelSyncState {
+  status: ChannelSyncStateStatus;
+  /** @nullable */
+  error: string | null;
+  newVideosSeen: number;
+  /** @nullable */
+  lastVideoSyncAt: string | null;
+  /** @nullable */
+  lastMetricsSyncAt: string | null;
+}
+
+/**
  * A discoverable Creator Den user (has public track history), with social counts for the viewer
  */
 export interface VideoCreatorSummary {
@@ -2128,6 +2372,108 @@ channelId?: string;
  */
 unlinked?: string;
 };
+
+export type GetChannelAnalyticsOverviewParams = {
+/**
+ * Inclusive window start (YYYY-MM-DD). Defaults to the first stored day.
+ */
+from?: string;
+/**
+ * Inclusive window end (YYYY-MM-DD). Defaults to today.
+ */
+to?: string;
+};
+
+export type ListChannelAnalyticsVideosParams = {
+/**
+ * Title substring search
+ */
+q?: string;
+/**
+ * Sort key
+ */
+sort?: ListChannelAnalyticsVideosSort;
+/**
+ * Sort direction
+ */
+dir?: ListChannelAnalyticsVideosDir;
+/**
+ * Inclusive metric window start (YYYY-MM-DD)
+ */
+from?: string;
+/**
+ * Inclusive metric window end (YYYY-MM-DD)
+ */
+to?: string;
+/**
+ * Page size (default 25, max 100)
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * Opaque cursor from the previous page
+ */
+cursor?: string;
+};
+
+export type ListChannelAnalyticsVideosSort = typeof ListChannelAnalyticsVideosSort[keyof typeof ListChannelAnalyticsVideosSort];
+
+
+export const ListChannelAnalyticsVideosSort = {
+  views: 'views',
+  watchTime: 'watchTime',
+  likes: 'likes',
+  ctr: 'ctr',
+  retention: 'retention',
+  revenue: 'revenue',
+  publishedAt: 'publishedAt',
+} as const;
+
+export type ListChannelAnalyticsVideosDir = typeof ListChannelAnalyticsVideosDir[keyof typeof ListChannelAnalyticsVideosDir];
+
+
+export const ListChannelAnalyticsVideosDir = {
+  asc: 'asc',
+  desc: 'desc',
+} as const;
+
+export type GetChannelAnalyticsVideoParams = {
+/**
+ * Inclusive window start (YYYY-MM-DD)
+ */
+from?: string;
+/**
+ * Inclusive window end (YYYY-MM-DD)
+ */
+to?: string;
+};
+
+export type GetChannelAnalyticsVideoReportParams = {
+/**
+ * The report section
+ */
+kind: GetChannelAnalyticsVideoReportKind;
+/**
+ * Window length in days ending today (defaults per kind: 28 for RETENTION, 90 for the rest)
+ * @minimum 1
+ * @maximum 90
+ */
+period?: number;
+};
+
+export type GetChannelAnalyticsVideoReportKind = typeof GetChannelAnalyticsVideoReportKind[keyof typeof GetChannelAnalyticsVideoReportKind];
+
+
+export const GetChannelAnalyticsVideoReportKind = {
+  RETENTION: 'RETENTION',
+  TRAFFIC: 'TRAFFIC',
+  PLAYBACK_LOCATION: 'PLAYBACK_LOCATION',
+  DEMOGRAPHICS: 'DEMOGRAPHICS',
+  DEVICES: 'DEVICES',
+  REVENUE: 'REVENUE',
+  SUBS: 'SUBS',
+} as const;
 
 export type ListVideoActivityParams = {
 /**

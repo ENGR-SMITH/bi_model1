@@ -5,6 +5,7 @@ import { logger } from "./lib/logger";
 import { initRealtime } from "./realtime";
 import { startVideoWorker } from "./video/worker";
 import { startStorageMaintenance } from "./video/storage-maintenance-runner";
+import { startChannelAnalyticsSync } from "./youtube/analytics-runner";
 
 const rawPort = process.env["PORT"];
 
@@ -34,4 +35,5 @@ server.listen(port, () => {
   initRealtime(server);
   startVideoWorker();
   startStorageMaintenance();
+  startChannelAnalyticsSync();
 });

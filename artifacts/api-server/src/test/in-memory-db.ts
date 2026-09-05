@@ -60,6 +60,98 @@ export const tandemChannelOauthTable = sqliteTable(
   }),
 );
 
+// ---- Channel analytics (Phase 3) — mirrors lib/db/src/schema/channel-analytics.ts
+// jsonb → TEXT, date → TEXT (YYYY-MM-DD), timestamp → INTEGER mode "timestamp".
+
+export const tandemChannelVideosTable = sqliteTable(
+  "tandem_channel_videos",
+  {
+    id: text("id").primaryKey(),
+    channelId: text("channel_id").notNull(),
+    youtubeVideoId: text("youtube_video_id").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    thumbnails: text("thumbnails", { mode: "json" }),
+    publishedAt: integer("published_at", { mode: "timestamp" }),
+    durationSeconds: integer("duration_seconds"),
+    privacyStatus: text("privacy_status"),
+    categoryId: text("category_id"),
+    defaultLanguage: text("default_language"),
+    contentKind: text("content_kind").notNull().default("LONG_FORM"),
+    lastSyncedAt: integer("last_synced_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    channelVideoUnique: unique("tandem_channel_video_channel_video").on(table.channelId, table.youtubeVideoId),
+  }),
+);
+
+export const tandemChannelDailyMetricsTable = sqliteTable(
+  "tandem_channel_daily_metrics",
+  {
+    channelId: text("channel_id").notNull(),
+    day: text("day").notNull(),
+    metrics: text("metrics", { mode: "json" }).notNull(),
+    source: text("source").notNull().default("youtube"),
+  },
+  (table) => ({
+    channelDayUnique: unique("tandem_channel_daily_metric_channel_day").on(table.channelId, table.day),
+  }),
+);
+
+export const tandemVideoDailyMetricsTable = sqliteTable(
+  "tandem_video_daily_metrics",
+  {
+    videoRowId: text("video_row_id").notNull(),
+    day: text("day").notNull(),
+    metrics: text("metrics", { mode: "json" }).notNull(),
+  },
+  (table) => ({
+    videoDayUnique: unique("tandem_video_daily_metric_video_day").on(table.videoRowId, table.day),
+  }),
+);
+
+export const tandemAnalyticsReportsTable = sqliteTable(
+  "tandem_analytics_reports",
+  {
+    id: text("id").primaryKey(),
+    channelId: text("channel_id").notNull(),
+    videoRowId: text("video_row_id"),
+    kind: text("kind").notNull(),
+    periodStart: text("period_start").notNull(),
+    periodEnd: text("period_end").notNull(),
+    payload: text("payload", { mode: "json" }).notNull(),
+    fetchedAt: integer("fetched_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    reportUnique: unique("tandem_analytics_report_channel_kind_period").on(table.channelId, table.videoRowId, table.kind, table.periodStart, table.periodEnd),
+  }),
+);
+
+export const tandemChannelSyncsTable = sqliteTable("tandem_channel_syncs", {
+  channelId: text("channel_id").primaryKey(),
+  lastVideoSyncAt: integer("last_video_sync_at", { mode: "timestamp" }),
+  lastMetricsSyncAt: integer("last_metrics_sync_at", { mode: "timestamp" }),
+  status: text("status").notNull().default("IDLE"),
+  error: text("error"),
+  newVideosSeen: integer("new_videos_seen").notNull().default(0),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const tandemChannelAlertsTable = sqliteTable(
+  "tandem_channel_alerts",
+  {
+    id: text("id").primaryKey(),
+    channelId: text("channel_id").notNull(),
+    rule: text("rule").notNull(),
+    message: text("message").notNull(),
+    periodStart: text("period_start").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    ruleWindowUnique: unique("tandem_channel_alert_rule_window").on(table.channelId, table.rule, table.periodStart),
+  }),
+);
+
 export const tandemVideoStorageSnapshotsTable = sqliteTable(
   "tandem_video_storage_snapshots",
   {
@@ -772,6 +864,45 @@ export async function buildInMemoryDb() {
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
       UNIQUE (channel_id)
     );
+    CREATE TABLE tandem_channel_videos (
+      id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
+      youtube_video_id TEXT NOT NULL,
+      title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+      thumbnails TEXT, published_at INTEGER, duration_seconds INTEGER,
+      privacy_status TEXT, category_id TEXT, default_language TEXT,
+      content_kind TEXT NOT NULL DEFAULT 'LONG_FORM',
+      last_synced_at INTEGER NOT NULL,
+      UNIQUE (channel_id, youtube_video_id)
+    );
+    CREATE TABLE tandem_channel_daily_metrics (
+      channel_id TEXT NOT NULL, day TEXT NOT NULL,
+      metrics TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'youtube',
+      UNIQUE (channel_id, day)
+    );
+    CREATE TABLE tandem_video_daily_metrics (
+      video_row_id TEXT NOT NULL, day TEXT NOT NULL,
+      metrics TEXT NOT NULL,
+      UNIQUE (video_row_id, day)
+    );
+    CREATE TABLE tandem_analytics_reports (
+      id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
+      video_row_id TEXT, kind TEXT NOT NULL,
+      period_start TEXT NOT NULL, period_end TEXT NOT NULL,
+      payload TEXT NOT NULL, fetched_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_channel_syncs (
+      channel_id TEXT PRIMARY KEY NOT NULL,
+      last_video_sync_at INTEGER, last_metrics_sync_at INTEGER,
+      status TEXT NOT NULL DEFAULT 'IDLE', error TEXT,
+      new_videos_seen INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_channel_alerts (
+      id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
+      rule TEXT NOT NULL, message TEXT NOT NULL,
+      period_start TEXT NOT NULL, created_at INTEGER NOT NULL,
+      UNIQUE (channel_id, rule, period_start)
+    );
     CREATE TABLE tandem_video_projects (
       id TEXT PRIMARY KEY NOT NULL, channel_id TEXT,
       owner_id TEXT NOT NULL,
@@ -988,6 +1119,12 @@ export async function buildInMemoryDb() {
     tandemChannelsTable,
     tandemChannelMembersTable,
     tandemChannelOauthTable,
+    tandemChannelVideosTable,
+    tandemChannelDailyMetricsTable,
+    tandemVideoDailyMetricsTable,
+    tandemAnalyticsReportsTable,
+    tandemChannelSyncsTable,
+    tandemChannelAlertsTable,
     tandemVideoFollowsTable,
     tandemVideoMembersTable,
     tandemVideoAssetsTable,

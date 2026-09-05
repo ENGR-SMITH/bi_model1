@@ -2377,6 +2377,237 @@ export const ListChannelProjectsResponse = zod.array(ListChannelProjectsResponse
 
 
 /**
+ * Serves the channel's KPI cards and views / watch-time / subs / revenue day series from the snapshot tables, plus the latest sync state. Never calls YouTube on a page load; freshness is surfaced via lastSyncedAt and status.
+ * @summary Channel analytics KPIs + daily series (DB-backed)
+ */
+
+
+
+export const GetChannelAnalyticsOverviewParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const GetChannelAnalyticsOverviewQueryParams = zod.object({
+  "from": zod.coerce.string().optional().describe('Inclusive window start (YYYY-MM-DD). Defaults to the first stored day.'),
+  "to": zod.coerce.string().optional().describe('Inclusive window end (YYYY-MM-DD). Defaults to today.')
+})
+
+export const GetChannelAnalyticsOverviewResponse = zod.object({
+  "channelId": zod.string(),
+  "from": zod.string(),
+  "to": zod.string(),
+  "kpis": zod.object({
+  "views": zod.number().optional(),
+  "watchTimeMinutes": zod.number().optional(),
+  "averageViewDurationSeconds": zod.number().optional(),
+  "subscribersGained": zod.number().optional(),
+  "subscribersLost": zod.number().optional(),
+  "estimatedRevenueUsd": zod.number().optional(),
+  "estimatedAdRevenueUsd": zod.number().optional(),
+  "likes": zod.number().optional(),
+  "comments": zod.number().optional(),
+  "shares": zod.number().optional(),
+  "impressions": zod.number().optional(),
+  "impressionsClickThroughRate": zod.number().optional(),
+  "averageViewPercentage": zod.number().optional()
+}).describe('Daily metric values; keys are absent where YouTube reports null (e.g. non-monetized rows)'),
+  "series": zod.array(zod.object({
+  "day": zod.string(),
+  "views": zod.number().nullish(),
+  "watchTimeMinutes": zod.number().nullish(),
+  "subscribersGained": zod.number().nullish(),
+  "subscribersLost": zod.number().nullish(),
+  "estimatedRevenueUsd": zod.number().nullish()
+})),
+  "lastSyncedAt": zod.coerce.date().nullable(),
+  "status": zod.enum(['IDLE', 'SYNCING', 'ERROR']).nullable(),
+  "error": zod.string().nullable(),
+  "newVideosSeen": zod.number().int()
+}).describe('Channel overview — summed KPIs, day series, and sync freshness')
+
+
+/**
+ * Merges the video catalog with metrics summed over the window (or the latest day). Supports title search, date range, sort chips (views / watchTime / likes / ctr / retention / revenue / publishedAt), direction, and a simple opaque cursor.
+ * @summary Video table rows with filters, sort, and cursor pagination
+ */
+
+
+
+export const ListChannelAnalyticsVideosParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const listChannelAnalyticsVideosQuerySortDefault = `publishedAt`;
+export const listChannelAnalyticsVideosQueryDirDefault = `desc`;
+export const listChannelAnalyticsVideosQueryLimitDefault = 25;
+export const listChannelAnalyticsVideosQueryLimitMax = 100;
+
+
+
+export const ListChannelAnalyticsVideosQueryParams = zod.object({
+  "q": zod.coerce.string().optional().describe('Title substring search'),
+  "sort": zod.enum(['views', 'watchTime', 'likes', 'ctr', 'retention', 'revenue', 'publishedAt']).default(listChannelAnalyticsVideosQuerySortDefault).describe('Sort key'),
+  "dir": zod.enum(['asc', 'desc']).default(listChannelAnalyticsVideosQueryDirDefault).describe('Sort direction'),
+  "from": zod.coerce.string().optional().describe('Inclusive metric window start (YYYY-MM-DD)'),
+  "to": zod.coerce.string().optional().describe('Inclusive metric window end (YYYY-MM-DD)'),
+  "limit": zod.coerce.number().int().min(1).max(listChannelAnalyticsVideosQueryLimitMax).default(listChannelAnalyticsVideosQueryLimitDefault).describe('Page size (default 25, max 100)'),
+  "cursor": zod.coerce.string().optional().describe('Opaque cursor from the previous page')
+})
+
+export const ListChannelAnalyticsVideosResponse = zod.object({
+  "items": zod.array(zod.object({
+  "videoRowId": zod.string(),
+  "youtubeVideoId": zod.string(),
+  "title": zod.string(),
+  "publishedAt": zod.string().nullable(),
+  "contentKind": zod.enum(['LONG_FORM', 'SHORT', 'LIVE']),
+  "durationSeconds": zod.number().int().nullable(),
+  "thumbnails": zod.object({
+
+}).passthrough().nullable(),
+  "views": zod.number().nullable(),
+  "watchTimeMinutes": zod.number().nullable(),
+  "averageViewDurationSeconds": zod.number().nullable(),
+  "likes": zod.number().nullable(),
+  "comments": zod.number().nullable(),
+  "shares": zod.number().nullable(),
+  "impressions": zod.number().nullable(),
+  "impressionsClickThroughRate": zod.number().nullable(),
+  "averageViewPercentage": zod.number().nullable(),
+  "estimatedRevenueUsd": zod.number().nullable()
+}).describe('One video-table row — catalog fields plus metrics summed over the window (or the latest day when no window is given)')),
+  "nextCursor": zod.string().nullable()
+}).describe('A page of video-table rows')
+
+
+/**
+ * Lifetime + window totals, the day series, and the channel's median CTR / average view duration for anomaly context. All DB-backed.
+ * @summary Per-video analytics detail (KPIs, day series, channel-median context)
+ */
+
+
+
+
+export const GetChannelAnalyticsVideoParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id'),
+  "videoRowId": zod.coerce.string().min(1).describe('The tandem_channel_videos row id (chanvid_…) of a catalog video')
+})
+
+export const GetChannelAnalyticsVideoQueryParams = zod.object({
+  "from": zod.coerce.string().optional().describe('Inclusive window start (YYYY-MM-DD)'),
+  "to": zod.coerce.string().optional().describe('Inclusive window end (YYYY-MM-DD)')
+})
+
+export const GetChannelAnalyticsVideoResponse = zod.object({
+  "videoRowId": zod.string(),
+  "youtubeVideoId": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "thumbnails": zod.object({
+
+}).passthrough().nullable(),
+  "publishedAt": zod.string().nullable(),
+  "contentKind": zod.enum(['LONG_FORM', 'SHORT', 'LIVE']),
+  "durationSeconds": zod.number().int().nullable(),
+  "privacyStatus": zod.string().nullable(),
+  "categoryId": zod.string().nullable(),
+  "defaultLanguage": zod.string().nullable(),
+  "totals": zod.object({
+  "views": zod.number().optional(),
+  "watchTimeMinutes": zod.number().optional(),
+  "averageViewDurationSeconds": zod.number().optional(),
+  "subscribersGained": zod.number().optional(),
+  "subscribersLost": zod.number().optional(),
+  "estimatedRevenueUsd": zod.number().optional(),
+  "estimatedAdRevenueUsd": zod.number().optional(),
+  "likes": zod.number().optional(),
+  "comments": zod.number().optional(),
+  "shares": zod.number().optional(),
+  "impressions": zod.number().optional(),
+  "impressionsClickThroughRate": zod.number().optional(),
+  "averageViewPercentage": zod.number().optional()
+}).describe('Daily metric values; keys are absent where YouTube reports null (e.g. non-monetized rows)'),
+  "series": zod.array(zod.object({
+  "day": zod.string(),
+  "metrics": zod.object({
+  "views": zod.number().optional(),
+  "watchTimeMinutes": zod.number().optional(),
+  "averageViewDurationSeconds": zod.number().optional(),
+  "subscribersGained": zod.number().optional(),
+  "subscribersLost": zod.number().optional(),
+  "estimatedRevenueUsd": zod.number().optional(),
+  "estimatedAdRevenueUsd": zod.number().optional(),
+  "likes": zod.number().optional(),
+  "comments": zod.number().optional(),
+  "shares": zod.number().optional(),
+  "impressions": zod.number().optional(),
+  "impressionsClickThroughRate": zod.number().optional(),
+  "averageViewPercentage": zod.number().optional()
+}).describe('Daily metric values; keys are absent where YouTube reports null (e.g. non-monetized rows)')
+})),
+  "channelMedians": zod.object({
+  "impressionsClickThroughRate": zod.number().nullable(),
+  "averageViewDurationSeconds": zod.number().nullable()
+}),
+  "lastSyncedAt": zod.coerce.date().nullable(),
+  "status": zod.enum(['IDLE', 'SYNCING', 'ERROR']).nullable(),
+  "error": zod.string().nullable()
+}).describe('Per-video analytics — window\/lifetime totals, day series, and channel-median context for anomaly banners')
+
+
+/**
+ * Serves the report from the cache for the requested period. When the cache is missing or older than YT_REPORT_TTL_MINUTES and a sync is allowed, kicks a background sync and returns stale=true so the UI can show refreshing and re-query.
+ * @summary One report section (retention / traffic / demographics / devices / revenue)
+ */
+
+
+
+
+export const GetChannelAnalyticsVideoReportParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id'),
+  "videoRowId": zod.coerce.string().min(1).describe('The tandem_channel_videos row id (chanvid_…) of a catalog video')
+})
+
+export const getChannelAnalyticsVideoReportQueryPeriodMax = 90;
+
+
+
+export const GetChannelAnalyticsVideoReportQueryParams = zod.object({
+  "kind": zod.enum(['RETENTION', 'TRAFFIC', 'PLAYBACK_LOCATION', 'DEMOGRAPHICS', 'DEVICES', 'REVENUE', 'SUBS']).describe('The report section'),
+  "period": zod.coerce.number().int().min(1).max(getChannelAnalyticsVideoReportQueryPeriodMax).optional().describe('Window length in days ending today (defaults per kind: 28 for RETENTION, 90 for the rest)')
+})
+
+export const GetChannelAnalyticsVideoReportResponse = zod.object({
+  "kind": zod.enum(['RETENTION', 'TRAFFIC', 'PLAYBACK_LOCATION', 'DEMOGRAPHICS', 'DEVICES', 'REVENUE', 'SUBS']),
+  "periodStart": zod.string(),
+  "periodEnd": zod.string(),
+  "fetchedAt": zod.string().nullable(),
+  "rows": zod.array(zod.record(zod.string(), zod.union([zod.string(),zod.number()]).nullable())).describe('Row objects keyed by column name'),
+  "stale": zod.boolean()
+}).describe('One report section from the cache; stale=true means a refresh sync was kicked and the client should re-query shortly')
+
+
+/**
+ * Runs the full sync pipeline — catalog crawl, incremental daily metrics, stale report refresh, anomaly rules — and returns the new sync state. Non-owners get 403; repeated calls within a minute get 429.
+ * @summary Manually run the analytics sync (owner, throttled ~1/min)
+ */
+
+
+
+export const RunChannelAnalyticsSyncParams = zod.object({
+  "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id')
+})
+
+export const RunChannelAnalyticsSyncResponse = zod.object({
+  "status": zod.enum(['IDLE', 'SYNCING', 'ERROR']),
+  "error": zod.string().nullable(),
+  "newVideosSeen": zod.number().int(),
+  "lastVideoSyncAt": zod.coerce.date().nullable(),
+  "lastMetricsSyncAt": zod.coerce.date().nullable()
+}).describe('The per-channel analytics sync state + the latest run outcome')
+
+
+/**
  * Legacy projects created before the multi-channel restructure have no channel. The Captain attaches them to a channel they own so the project appears on that channel home (and the CMS grid) again.
  * @summary Attach a legacy unlinked project to one of the Captain's channels
  */

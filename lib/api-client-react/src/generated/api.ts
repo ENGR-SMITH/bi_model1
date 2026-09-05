@@ -31,11 +31,16 @@ import type {
   AdminPromoUpdate,
   AdminSession,
   AuthorProjectDocument,
+  ChannelAnalyticsOverview,
+  ChannelAnalyticsReport,
+  ChannelAnalyticsVideoDetail,
+  ChannelAnalyticsVideoList,
   ChannelInput,
   ChannelOauthExchangeInput,
   ChannelOauthStartResponse,
   ChannelPerson,
   ChannelSummary,
+  ChannelSyncState,
   ChannelUpdate,
   CollaborationAnnotation,
   CollaborationAnnotationInput,
@@ -56,8 +61,12 @@ import type {
   ErrorResponse,
   ExploreAuthor,
   GenealogyEntry,
+  GetChannelAnalyticsOverviewParams,
+  GetChannelAnalyticsVideoParams,
+  GetChannelAnalyticsVideoReportParams,
   HealthStatus,
   InboxThread,
+  ListChannelAnalyticsVideosParams,
   ListCollaborationSeedsParams,
   ListVideoActivityParams,
   ListVideoProjectsParams,
@@ -6955,6 +6964,448 @@ export function useListChannelProjects<TData = Awaited<ReturnType<typeof listCha
 
 
 
+
+export const getGetChannelAnalyticsOverviewUrl = (channelId: string,
+    params?: GetChannelAnalyticsOverviewParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/channels/${channelId}/analytics/overview?${stringifiedParams}` : `/api/channels/${channelId}/analytics/overview`
+}
+
+/**
+ * Serves the channel's KPI cards and views / watch-time / subs / revenue day series from the snapshot tables, plus the latest sync state. Never calls YouTube on a page load; freshness is surfaced via lastSyncedAt and status.
+ * @summary Channel analytics KPIs + daily series (DB-backed)
+ */
+export const getChannelAnalyticsOverview = async (channelId: string,
+    params?: GetChannelAnalyticsOverviewParams, options?: Parameters<typeof customFetch>[1]): Promise<ChannelAnalyticsOverview> => {
+
+  return customFetch<ChannelAnalyticsOverview>(getGetChannelAnalyticsOverviewUrl(channelId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChannelAnalyticsOverviewQueryKey = (channelId: string,
+    params?: GetChannelAnalyticsOverviewParams,) => {
+    return [
+    `/api/channels/${channelId}/analytics/overview`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetChannelAnalyticsOverviewQueryOptions = <TData = Awaited<ReturnType<typeof getChannelAnalyticsOverview>>, TError = ErrorType<ErrorResponse>>(channelId: string,
+    params?: GetChannelAnalyticsOverviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannelAnalyticsOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChannelAnalyticsOverviewQueryKey(channelId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChannelAnalyticsOverview>>> = ({ signal }) => getChannelAnalyticsOverview(channelId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: channelId !== null && channelId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChannelAnalyticsOverview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChannelAnalyticsOverviewQueryResult = NonNullable<Awaited<ReturnType<typeof getChannelAnalyticsOverview>>>
+export type GetChannelAnalyticsOverviewQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Channel analytics KPIs + daily series (DB-backed)
+ */
+
+export function useGetChannelAnalyticsOverview<TData = Awaited<ReturnType<typeof getChannelAnalyticsOverview>>, TError = ErrorType<ErrorResponse>>(
+ channelId: string,
+    params?: GetChannelAnalyticsOverviewParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannelAnalyticsOverview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChannelAnalyticsOverviewQueryOptions(channelId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListChannelAnalyticsVideosUrl = (channelId: string,
+    params?: ListChannelAnalyticsVideosParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/channels/${channelId}/analytics/videos?${stringifiedParams}` : `/api/channels/${channelId}/analytics/videos`
+}
+
+/**
+ * Merges the video catalog with metrics summed over the window (or the latest day). Supports title search, date range, sort chips (views / watchTime / likes / ctr / retention / revenue / publishedAt), direction, and a simple opaque cursor.
+ * @summary Video table rows with filters, sort, and cursor pagination
+ */
+export const listChannelAnalyticsVideos = async (channelId: string,
+    params?: ListChannelAnalyticsVideosParams, options?: Parameters<typeof customFetch>[1]): Promise<ChannelAnalyticsVideoList> => {
+
+  return customFetch<ChannelAnalyticsVideoList>(getListChannelAnalyticsVideosUrl(channelId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChannelAnalyticsVideosQueryKey = (channelId: string,
+    params?: ListChannelAnalyticsVideosParams,) => {
+    return [
+    `/api/channels/${channelId}/analytics/videos`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListChannelAnalyticsVideosQueryOptions = <TData = Awaited<ReturnType<typeof listChannelAnalyticsVideos>>, TError = ErrorType<ErrorResponse>>(channelId: string,
+    params?: ListChannelAnalyticsVideosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChannelAnalyticsVideos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChannelAnalyticsVideosQueryKey(channelId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChannelAnalyticsVideos>>> = ({ signal }) => listChannelAnalyticsVideos(channelId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: channelId !== null && channelId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChannelAnalyticsVideos>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChannelAnalyticsVideosQueryResult = NonNullable<Awaited<ReturnType<typeof listChannelAnalyticsVideos>>>
+export type ListChannelAnalyticsVideosQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Video table rows with filters, sort, and cursor pagination
+ */
+
+export function useListChannelAnalyticsVideos<TData = Awaited<ReturnType<typeof listChannelAnalyticsVideos>>, TError = ErrorType<ErrorResponse>>(
+ channelId: string,
+    params?: ListChannelAnalyticsVideosParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChannelAnalyticsVideos>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChannelAnalyticsVideosQueryOptions(channelId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetChannelAnalyticsVideoUrl = (channelId: string,
+    videoRowId: string,
+    params?: GetChannelAnalyticsVideoParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/channels/${channelId}/analytics/videos/${videoRowId}?${stringifiedParams}` : `/api/channels/${channelId}/analytics/videos/${videoRowId}`
+}
+
+/**
+ * Lifetime + window totals, the day series, and the channel's median CTR / average view duration for anomaly context. All DB-backed.
+ * @summary Per-video analytics detail (KPIs, day series, channel-median context)
+ */
+export const getChannelAnalyticsVideo = async (channelId: string,
+    videoRowId: string,
+    params?: GetChannelAnalyticsVideoParams, options?: Parameters<typeof customFetch>[1]): Promise<ChannelAnalyticsVideoDetail> => {
+
+  return customFetch<ChannelAnalyticsVideoDetail>(getGetChannelAnalyticsVideoUrl(channelId,videoRowId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChannelAnalyticsVideoQueryKey = (channelId: string,
+    videoRowId: string,
+    params?: GetChannelAnalyticsVideoParams,) => {
+    return [
+    `/api/channels/${channelId}/analytics/videos/${videoRowId}`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetChannelAnalyticsVideoQueryOptions = <TData = Awaited<ReturnType<typeof getChannelAnalyticsVideo>>, TError = ErrorType<ErrorResponse>>(channelId: string,
+    videoRowId: string,
+    params?: GetChannelAnalyticsVideoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannelAnalyticsVideo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChannelAnalyticsVideoQueryKey(channelId,videoRowId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChannelAnalyticsVideo>>> = ({ signal }) => getChannelAnalyticsVideo(channelId,videoRowId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: channelId !== null && channelId !== undefined && videoRowId !== null && videoRowId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChannelAnalyticsVideo>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChannelAnalyticsVideoQueryResult = NonNullable<Awaited<ReturnType<typeof getChannelAnalyticsVideo>>>
+export type GetChannelAnalyticsVideoQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Per-video analytics detail (KPIs, day series, channel-median context)
+ */
+
+export function useGetChannelAnalyticsVideo<TData = Awaited<ReturnType<typeof getChannelAnalyticsVideo>>, TError = ErrorType<ErrorResponse>>(
+ channelId: string,
+    videoRowId: string,
+    params?: GetChannelAnalyticsVideoParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannelAnalyticsVideo>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChannelAnalyticsVideoQueryOptions(channelId,videoRowId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetChannelAnalyticsVideoReportUrl = (channelId: string,
+    videoRowId: string,
+    params: GetChannelAnalyticsVideoReportParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/channels/${channelId}/analytics/videos/${videoRowId}/report?${stringifiedParams}` : `/api/channels/${channelId}/analytics/videos/${videoRowId}/report`
+}
+
+/**
+ * Serves the report from the cache for the requested period. When the cache is missing or older than YT_REPORT_TTL_MINUTES and a sync is allowed, kicks a background sync and returns stale=true so the UI can show refreshing and re-query.
+ * @summary One report section (retention / traffic / demographics / devices / revenue)
+ */
+export const getChannelAnalyticsVideoReport = async (channelId: string,
+    videoRowId: string,
+    params: GetChannelAnalyticsVideoReportParams, options?: Parameters<typeof customFetch>[1]): Promise<ChannelAnalyticsReport> => {
+
+  return customFetch<ChannelAnalyticsReport>(getGetChannelAnalyticsVideoReportUrl(channelId,videoRowId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChannelAnalyticsVideoReportQueryKey = (channelId: string,
+    videoRowId: string,
+    params?: GetChannelAnalyticsVideoReportParams,) => {
+    return [
+    `/api/channels/${channelId}/analytics/videos/${videoRowId}/report`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetChannelAnalyticsVideoReportQueryOptions = <TData = Awaited<ReturnType<typeof getChannelAnalyticsVideoReport>>, TError = ErrorType<ErrorResponse>>(channelId: string,
+    videoRowId: string,
+    params: GetChannelAnalyticsVideoReportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannelAnalyticsVideoReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChannelAnalyticsVideoReportQueryKey(channelId,videoRowId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChannelAnalyticsVideoReport>>> = ({ signal }) => getChannelAnalyticsVideoReport(channelId,videoRowId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: channelId !== null && channelId !== undefined && videoRowId !== null && videoRowId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChannelAnalyticsVideoReport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChannelAnalyticsVideoReportQueryResult = NonNullable<Awaited<ReturnType<typeof getChannelAnalyticsVideoReport>>>
+export type GetChannelAnalyticsVideoReportQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary One report section (retention / traffic / demographics / devices / revenue)
+ */
+
+export function useGetChannelAnalyticsVideoReport<TData = Awaited<ReturnType<typeof getChannelAnalyticsVideoReport>>, TError = ErrorType<ErrorResponse>>(
+ channelId: string,
+    videoRowId: string,
+    params: GetChannelAnalyticsVideoReportParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannelAnalyticsVideoReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChannelAnalyticsVideoReportQueryOptions(channelId,videoRowId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getRunChannelAnalyticsSyncUrl = (channelId: string,) => {
+
+
+
+
+  return `/api/channels/${channelId}/analytics/sync`
+}
+
+/**
+ * Runs the full sync pipeline — catalog crawl, incremental daily metrics, stale report refresh, anomaly rules — and returns the new sync state. Non-owners get 403; repeated calls within a minute get 429.
+ * @summary Manually run the analytics sync (owner, throttled ~1/min)
+ */
+export const runChannelAnalyticsSync = async (channelId: string, options?: Parameters<typeof customFetch>[1]): Promise<ChannelSyncState> => {
+
+  return customFetch<ChannelSyncState>(getRunChannelAnalyticsSyncUrl(channelId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRunChannelAnalyticsSyncMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runChannelAnalyticsSync>>, TError,{channelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof runChannelAnalyticsSync>>, TError,{channelId: string}, TContext> => {
+
+const mutationKey = ['runChannelAnalyticsSync'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runChannelAnalyticsSync>>, {channelId: string}> = (props) => {
+          const {channelId} = props ?? {};
+
+          return  runChannelAnalyticsSync(channelId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RunChannelAnalyticsSyncMutationResult = NonNullable<Awaited<ReturnType<typeof runChannelAnalyticsSync>>>
+
+    export type RunChannelAnalyticsSyncMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Manually run the analytics sync (owner, throttled ~1/min)
+ */
+export const useRunChannelAnalyticsSync = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runChannelAnalyticsSync>>, TError,{channelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof runChannelAnalyticsSync>>,
+        TError,
+        {channelId: string},
+        TContext
+      > => {
+      return useMutation(getRunChannelAnalyticsSyncMutationOptions(options));
+    }
 
 export const getAttachVideoProjectChannelUrl = (projectId: string,) => {
 

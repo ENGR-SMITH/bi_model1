@@ -4,7 +4,8 @@ import { CreatorsShell, SectionEyebrow } from '@/components/shell';
 import { LegacyProjectGate } from '@/components/legacy-project-gate';
 import CmsPage from '@/pages/cms';
 import ChannelHomePage from '@/pages/channel-home';
-import ChannelAnalyticsPage from '@/pages/analytics';
+import ChannelAnalyticsPage from '@/pages/analytics/index';
+import VideoAnalyticsPage from '@/pages/analytics/video';
 import OauthCallbackPage from '@/pages/oauth-callback';
 import VaultPage from '@/pages/vault';
 import ActivityPage from '@/pages/activity';
@@ -101,6 +102,7 @@ export default function App() {
           <Route path="/" component={CmsPage} />
           <Route path="/channels/:channelId" component={ChannelHomePage} />
           <Route path="/channels/:channelId/analytics" component={ChannelAnalyticsPage} />
+          <Route path="/channels/:channelId/analytics/videos/:videoRowId" component={VideoAnalyticsPage} />
           {CHANNEL_PROJECT_SUFFIXES.map(([suffix, Page]) => (
             <Route
               key={`c${suffix}`}
