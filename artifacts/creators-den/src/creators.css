@@ -1370,8 +1370,49 @@ select optgroup {
 .cd-topnav-workspace-col {
   grid-column: 1;
   display: flex; align-items: stretch; justify-content: flex-start;
+  gap: var(--sp-1);
   min-width: 0;
 }
+
+/* The blob icon in front of the channel dropdown — organic mark that takes
+   you to the MCNs grid (all channels). Morphs on hover like a living blob. */
+.cd-topnav-chip .cd-topnav-blob {
+  position: relative; isolation: isolate;
+  display: flex; align-items: center; justify-content: center;
+  width: 46px; height: 100%;
+  color: hsl(var(--foreground) / .85);
+  transition: color 140ms ease;
+}
+.cd-topnav-chip .cd-topnav-blob::before {
+  content: "";
+  position: absolute; inset: 0; z-index: -1;
+  background: hsl(var(--card) / .35);
+  clip-path: polygon(0 0, calc(100% - var(--sp-3)) 0, 100% 100%, 0 100%);
+}
+.cd-topnav-blob-mark {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 44% 56% 62% 38% / 52% 44% 56% 48%;
+  color: hsl(var(--sidebar-primary-foreground));
+  background: linear-gradient(150deg, hsl(var(--sidebar-primary)), hsl(var(--sidebar-primary) / .55));
+  box-shadow: 0 0 0 4px hsl(var(--sidebar-primary) / .1), 0 6px 16px hsl(var(--sidebar-primary) / .28);
+  transition: border-radius .3s ease, transform .2s cubic-bezier(.22, 1, .36, 1);
+}
+.cd-topnav-blob:hover .cd-topnav-blob-mark {
+  border-radius: 56% 44% 38% 62% / 48% 52% 48% 56%;
+  transform: rotate(-6deg) scale(1.06);
+}
+.cd-topnav-blob:hover { color: hsl(var(--accent)); }
+
+/* The OAuth callback renders standalone (no den chrome): a quiet, centered
+   card so the exchange/redirect hop never looks like a broken page. */
+.oauth-standalone {
+  min-height: 100dvh;
+  display: grid; place-items: center;
+  padding: 24px;
+  background: hsl(var(--background));
+}
+.oauth-standalone .oauth-card { width: min(460px, 100%); margin: 0; }
 .cd-topnav-signout-col {
   grid-column: 3;
   display: flex; align-items: stretch; justify-content: flex-end;

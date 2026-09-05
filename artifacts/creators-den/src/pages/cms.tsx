@@ -37,6 +37,20 @@ import { NotificationsPanel } from '@/components/notifications-panel';
 // owner still has to attach to a channel.
 // ---------------------------------------------------------------------------
 
+// Modals are portaled to <body> so their fixed backdrops are viewport-relative
+// (no ancestor transform can stretch the page), and body scrolling is locked
+// while one is open so the page behind never scrolls.
+function useLockBodyScroll(active: boolean) {
+  useEffect(() => {
+    if (!active) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [active]);
+}
+
 // The Google "G" mark for the sign-in button (four brand colors, no icon lib).
 function GoogleG() {
   return (
@@ -53,6 +67,7 @@ function NewChannelModal({ onClose, onCreated }: { onClose: () => void; onCreate
   const create = useCreateChannel();
   const start = useStartChannelOauth();
   const queryClient = useQueryClient();
+  useLockBodyScroll(true);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   // Google-first linking (no typed name): the consent URL runs against a
@@ -123,7 +138,7 @@ function NewChannelModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   const busy = create.isPending || start.isPending;
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={busy ? undefined : onClose}>
       <div className="modal project-modal" onClick={(event) => event.stopPropagation()}>
         <span className="project-modal-orbit"><span /><i /><b>C</b></span>
@@ -199,7 +214,8 @@ function NewChannelModal({ onClose, onCreated }: { onClose: () => void; onCreate
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -211,6 +227,7 @@ function NewChannelModal({ onClose, onCreated }: { onClose: () => void; onCreate
 function ConnectChannelModal({ channel, onClose, autoBegin }: { channel: ChannelSummary; onClose: () => void; autoBegin?: boolean }) {
   const start = useStartChannelOauth();
   const queryClient = useQueryClient();
+  useLockBodyScroll(true);
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [popupBlocked, setPopupBlocked] = useState(false);
@@ -258,7 +275,7 @@ function ConnectChannelModal({ channel, onClose, autoBegin }: { channel: Channel
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel.youtubeConnected]);
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal project-modal" onClick={(event) => event.stopPropagation()}>
         <span className="project-modal-orbit"><span /><i /><b>Y</b></span>
@@ -300,7 +317,8 @@ function ConnectChannelModal({ channel, onClose, autoBegin }: { channel: Channel
           {error && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--destructive))' }} role="alert" data-testid="connect-error">{error}</p>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -309,6 +327,7 @@ function ChannelCardMenu({ channel }: { channel: ChannelSummary }) {
   const remove = useDeleteChannel();
   const disconnect = useDisconnectChannelOauth();
   const [confirming, setConfirming] = useState<'delete' | 'disconnect' | null>(null);
+  useLockBodyScroll(confirming !== null);
   const [busyMessage, setBusyMessage] = useState('');
 
   const isOwner = channel.myRole === 'OWNER';

@@ -137,18 +137,13 @@ function ChannelRow({ channel, selected, onOpen }: { channel: ChannelSummary; se
   );
 }
 
-// The workspace dropdown: every channel on the CMS grid, then the current
-// context's projects underneath — the den's "switch spaces" surface.
-function WorkspaceMenu({ channelId, projectId }: { channelId?: string; projectId?: string }) {
+// The channel dropdown: every channel on the CMS grid, plus the grid itself.
+// Selecting one jumps into that channel's den.
+function ChannelMenu({ channelId }: { channelId?: string }) {
   const [, setLocation] = useLocation();
   const channels = useListChannels();
-  // Inside a channel the project list matches that channel home (owner sees
-  // everything, editors their memberships); elsewhere it is the global list.
-  const projects = useListVideoProjects(channelId ? { channelId } : undefined);
-  const list = projects.data ?? [];
-
   return (
-    <div className="workspace-menu" data-testid="workspace-menu">
+    <div className="workspace-menu" data-testid="channel-menu">
       <button
         type="button"
         className="menu-home"
@@ -158,10 +153,9 @@ function WorkspaceMenu({ channelId, projectId }: { channelId?: string; projectId
         <LayoutGrid size={15} />
         <span>
           <b>All channels</b>
-          <small>Back to the CMS grid</small>
+          <small>Back to the MCNs grid</small>
         </span>
       </button>
-      <span className="menu-caption">Channels</span>
       {(channels.data ?? []).map((channel) => (
         <ChannelRow
           key={channel.id}
@@ -170,7 +164,27 @@ function WorkspaceMenu({ channelId, projectId }: { channelId?: string; projectId
           onOpen={() => setLocation(`/channels/${channel.id}`)}
         />
       ))}
-      <span className="menu-caption">Projects in this space</span>
+    </div>
+  );
+}
+
+// The project dropdown: ONLY the projects inside the currently selected
+// channel (the den context's channel home; the CMS has no channel selected).
+function ProjectMenu({ channelId, projectId }: { channelId?: string; projectId?: string }) {
+  const [, setLocation] = useLocation();
+  const projects = useListVideoProjects(channelId ? { channelId } : undefined);
+  const list = projects.data ?? [];
+
+  if (!channelId) {
+    return (
+      <div className="workspace-menu" data-testid="project-menu">
+        <span className="menu-empty-caption">Open a channel to see its projects.</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="workspace-menu" data-testid="project-menu">
       {list.map((project) => {
         const selected = project.id === projectId;
         return (
@@ -190,23 +204,7 @@ function WorkspaceMenu({ channelId, projectId }: { channelId?: string; projectId
           </button>
         );
       })}
-      {list.length === 0 && (
-        <span className="menu-empty-caption">No projects here yet.</span>
-      )}
-      <button
-        type="button"
-        className="menu-new"
-        onClick={() => {
-          // New project opens from the channel home (owner) or the CMS.
-          setLocation(channelId ? `/channels/${channelId}` : '/');
-        }}
-      >
-        <Clapperboard size={15} />
-        <span>
-          <b>New project</b>
-          <small>{channelId ? 'Open one in this channel' : 'Open a channel first'}</small>
-        </span>
-      </button>
+      {list.length === 0 && <span className="menu-empty-caption">No projects here yet.</span>}
     </div>
   );
 }
@@ -245,7 +243,8 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   const { signOut } = useClerk();
   const { user } = useUser();
   const [location] = useLocation();
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
+  const [channelOpen, setChannelOpen] = useState(false);
+  const [projectOpen, setProjectOpen] = useState(false);
   const info = denRouteInfo(location);
 
   const channelId = info.mode === 'channel' || info.mode === 'channel-project' ? info.channelId : undefined;
@@ -290,7 +289,6 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   });
   const readOnly = Boolean(projectId) && Boolean(detail.data) && (detail.data?.myRoles?.length ?? 0) === 0;
   const projectLabel = current?.name ?? detail.data?.name ?? channelLabel ?? 'Home';
-  const spaceLabel = current?.name ?? channelLabel;
 
   const logout = () => signOut({ redirectUrl: '/' });
 
@@ -349,25 +347,55 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
         {/* Tier 2 — the notch chips + section tabs. */}
         <div className="cd-topnav-secondary">
           <div className="cd-topnav-workspace-col">
+            {/* Blob icon in front of the channel dropdown → the MCNs grid. */}
+            <div className="cd-topnav-chip">
+              <Link href="/" className="cd-topnav-blob" aria-label="All channels" title="All channels (MCNs grid)" data-testid="nav-mcn">
+                <span className="cd-topnav-blob-mark"><LayoutGrid size={14} /></span>
+              </Link>
+            </div>
+            {/* Channel dropdown — every channel, one click to its den. */}
+            <div className="cd-topnav-chip">
+              <div className="top-workspace-wrap" onPointerLeave={() => setChannelOpen(false)}>
+                <button
+                  type="button"
+                  className="top-workspace"
+                  onClick={() => {
+                    setChannelOpen((open) => !open);
+                    setProjectOpen(false);
+                  }}
+                  data-testid="top-channel"
+                >
+                  <span>Channel</span>
+                  <b className="truncate">{channelLabel ?? 'All channels'}</b>
+                  <ChevronDown size={13} />
+                </button>
+                {channelOpen && <ChannelMenu channelId={channelId} />}
+              </div>
+            </div>
+            {/* Project dropdown — projects of the currently selected channel only. */}
+            <div className="cd-topnav-chip">
+              <div className="top-workspace-wrap" onPointerLeave={() => setProjectOpen(false)}>
+                <button
+                  type="button"
+                  className="top-workspace"
+                  onClick={() => {
+                    setProjectOpen((open) => !open);
+                    setChannelOpen(false);
+                  }}
+                  data-testid="top-project"
+                >
+                  <span>Project</span>
+                  <b className="truncate">{current?.name ?? (channelId ? 'No project' : 'No channel')}</b>
+                  <ChevronDown size={13} />
+                </button>
+                {projectOpen && <ProjectMenu channelId={channelId} projectId={projectId} />}
+              </div>
+            </div>
+            {/* Home notch — beside the project dropdown. */}
             <div className="cd-topnav-chip">
               <Link href={homeHref} className="cd-topnav-home-notch" aria-label={channelId ? 'Channel home' : 'Channels'} title={channelId ? 'Channel home' : 'All channels'} data-testid="nav-home-notch">
                 <Home size={15} />
               </Link>
-            </div>
-            <div className="cd-topnav-chip">
-              <div className="top-workspace-wrap" onPointerLeave={() => setWorkspaceOpen(false)}>
-                <button
-                  type="button"
-                  className="top-workspace"
-                  onClick={() => setWorkspaceOpen((open) => !open)}
-                  data-testid="top-workspace"
-                >
-                  <span>Workspace</span>
-                  <b className="truncate">{spaceLabel ?? 'Channels'}</b>
-                  <ChevronDown size={13} />
-                </button>
-                {workspaceOpen && <WorkspaceMenu channelId={channelId} projectId={projectId} />}
-              </div>
             </div>
             {/* The Analytics notch — only inside a channel (per the brief it
                 sits beside the workshop dropdown). */}
