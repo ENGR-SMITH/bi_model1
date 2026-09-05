@@ -81,10 +81,10 @@ function showMainWindow(): void {
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 880,
-    height: 720,
-    minWidth: 720,
-    minHeight: 560,
+    width: 1040,
+    height: 760,
+    minWidth: 860,
+    minHeight: 600,
     title: "Tandem Desktop Agent",
     // The agent has no File/Edit/View/Window/Help chrome — those menus belong
     // to document editors, not to this app, and only confuse users.
@@ -202,6 +202,10 @@ ipcMain.handle("agent:sign-in:begin", async () => {
       activeSignIn = null;
       if (session) {
         sessionCache = session;
+        // The sign-in finished in the system browser, which is now in front —
+        // bring the agent window back up so the user lands in the app instead
+        // of being left staring at the browser tab.
+        showMainWindow();
         sendAuthEvent({ type: "signed-in", email: session.email, name: session.name, imageUrl: session.imageUrl });
       } else {
         sendAuthEvent({ type: "expired" });
@@ -260,10 +264,16 @@ ipcMain.handle("agent:whoami", () => {
     : { signedIn: false };
 });
 
-ipcMain.handle("agent:list-projects", async () => {
+ipcMain.handle("agent:list-projects", async (_e, channelId?: string) => {
   const api = ensureAuthenticated();
-  const projects = await api.listProjects();
-  return projects;
+  return api.listProjects(typeof channelId === "string" && channelId.length > 0 ? channelId : undefined);
+});
+
+// The channels the signed-in user is on (owned + editor mirrors) — feeds the
+// Channel dropdown; the Project list is then scoped to the chosen channel.
+ipcMain.handle("agent:list-channels", async () => {
+  const api = ensureAuthenticated();
+  return api.listChannels();
 });
 
 ipcMain.handle("agent:list-assets", async (_e, projectId: string) => {
@@ -297,7 +307,9 @@ ipcMain.handle("agent:pick-file", async (_e, extensions?: string[]) => {
 ipcMain.handle("agent:project-roles", async (_e, projectId: string) => {
   const api = ensureAuthenticated();
   const detail = await api.getProject(String(projectId));
-  return { myRoles: detail.myRoles ?? [] };
+  // channelId lets the renderer switch its Channel dropdown to the project's
+  // own channel when a Creator Den launch names a project directly.
+  return { myRoles: detail.myRoles ?? [], channelId: detail.channelId ?? null };
 });
 
 // Metadata for a file the user picked or dropped: the renderer shows name +

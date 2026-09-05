@@ -110,16 +110,22 @@ export default function AgentSignInPage() {
       }
       try {
         // The desktop agent has no access to Clerk's user API, so it takes the
-        // display profile (name + avatar) from here — the page that owns the
-        // session — and shows it in the app's account card.
+        // display profile (name + email + avatar) from here — the page that
+        // owns the session — and shows it in the app's account card. The email
+        // matters because the agent's session JWT carries no email claim by
+        // default, and the name falls back to the username when Google hasn't
+        // filled in first/last name, so the app never has to show a raw id.
         const fullName = [user?.firstName ?? '', user?.lastName ?? ''].filter(Boolean).join(' ').trim();
+        const displayName = fullName || user?.username || null;
+        const email = user?.primaryEmailAddress?.emailAddress ?? null;
         const res = await fetch(`${attempt.loopback}/complete`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             state: attempt.state,
             token,
-            name: fullName || null,
+            name: displayName,
+            email,
             imageUrl: user?.imageUrl || null,
           }),
         });

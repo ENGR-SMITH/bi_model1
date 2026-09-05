@@ -140,8 +140,8 @@ configured `TANDEM_WEB_URL` origin.
 ## Auto-update
 
 The installed app checks for updates on launch (and via the **Check for updates**
-button in the footer) and downloads them in the background; when a new version is
-ready the button becomes **Restart & update**. Releases are published by the
+button in the **Agent updates** card on the right) and downloads them in the
+background; when a new version is ready the button becomes **Restart & update**. Releases are published by the
 `build-desktop-agent` CI workflow, which uploads the installer **plus the
 `latest*.yml` feed files and blockmaps** next to it — point `TANDEM_UPDATE_URL`
 (or the build-time `build.publish.url`) at that public directory.
@@ -155,17 +155,18 @@ installed app." instead.
 
 The agent can run a Grammarly-style floating bubble: a small always-on-top,
 draggable red circle that lives over whatever you're doing and opens the agent
-when clicked. Enable it from the **Floating widget** card at the bottom of the
-app — the bubble appears **immediately** (no restart needed):
+when clicked. Enable it from the **Floating widget** card (right column of the
+app) with the single **Widget** switch — the bubble appears **immediately** (no
+restart needed):
 
-- **Floating widget** — master on/off switch. When on, the app keeps running in
-  the tray after you close its window (click the tray icon to reopen, or **Quit
-  Tandem Agent** from its menu).
-- **Auto-show while a video plays** — when Windows reports a video playing in a
-  browser or media player (via the OS media-session feed), the bubble appears;
-  it disappears a few seconds after playback stops. Detection polls every ~3 s
-  and only matches apps it recognizes as video-capable, so plain music apps
-  don't summon it.
+- **Widget** — one switch controls the whole feature: when on, the app keeps
+  running in the tray after you close its window (click the tray icon to
+  reopen, or **Quit Tandem Agent** from its menu), and it **auto-shows while a
+  video plays** — when Windows reports a video playing in a browser or media
+  player (via the OS media-session feed), the bubble appears and disappears a
+  few seconds after playback stops. Detection polls every ~3 s and only matches
+  apps it recognizes as video-capable, so plain music apps don't summon it.
+  Turning the switch off disables the bubble and auto-show together.
 - **Fallbacks** — press `Ctrl+Alt+T` or use the tray menu to show/hide the
   bubble anytime. Drag it anywhere; its position is remembered.
 
@@ -182,17 +183,21 @@ style:
 2. Open the link in your normal browser on this machine — it opens the Tandem
    sign-up page (powered by the same Clerk instance as the web apps). Sign up,
    or switch to **Sign in** inside the page if you already have an account.
-3. When you finish, the page confirms, **auto-redirects you back to the app**
-   via the `tandem-agent://` deep link, and the app signs you in automatically —
-   your account **name and avatar** appear in the Account card. The link is
-   one-time: it's tied to the sign-in you started and expires after 10 minutes.
+3. When you finish, the agent **raises its own window and signs you in
+   automatically** — your account **name, email, and avatar** appear in the
+   Account card (the page also nudges the app via the `tandem-agent://` deep
+   link as a backup). The link is one-time: it's tied to the sign-in you
+   started and expires after 10 minutes.
 
-Until you're signed in, only the Account card is visible — the project, source
-file, upload, and widget cards stay hidden. Once signed in:
+Until you're signed in, only the Account card is visible — the workspace,
+source file, upload, and widget cards stay hidden. Once signed in:
 
-1. Pick the **project** you're uploading into (Workspace card). The card then
-   shows **your roles on that project** (e.g. Video · Audio) and what those
-   roles may upload.
+1. Pick the **channel** you're uploading into, then the **project** (Workspace
+   card). The Project list is scoped to the selected channel exactly like
+   Creator Den (editors only see the projects they're members of there);
+   **All channels** shows every project you can reach, including legacy
+   unlinked ones. The card then shows **your roles on that project**
+   (e.g. Video · Audio) and what those roles may upload.
 2. **Drag & drop** the file into the Source file card — or click it to choose
    from disk. The card shows the file's name and size.
 3. (Optional) Write a **note to the Captain** describing the file — what it is

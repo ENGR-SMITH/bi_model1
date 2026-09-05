@@ -68,6 +68,12 @@ export class WidgetController {
   /** Apply a settings patch, persisting it and (re)starting/stopping the widget. */
   update(patch: Partial<AgentSettings>): AgentSettings {
     this.settings = { ...loadSettings(), ...patch };
+    // The settings UI is a single "Widget" switch: ON means the floating
+    // bubble AND auto-show while a video plays; OFF disables both. Keep them
+    // in lockstep so a programmatic patch can never split the feature.
+    if (patch.widgetEnabled !== undefined) {
+      this.settings.widgetAutoShow = patch.widgetEnabled;
+    }
     if (process.platform !== "win32") {
       // Widget machinery is Windows-only; never let the toggle pretend otherwise.
       this.settings = { ...this.settings, widgetEnabled: false };
