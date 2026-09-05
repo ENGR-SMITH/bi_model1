@@ -2738,6 +2738,10 @@ export const ListArenaPostsSort = {
   most_applied: 'most_applied',
 } as const;
 
+export type DeleteArenaPost200 = {
+  removed: boolean;
+};
+
 export type ListArenaReviewsParams = {
 /**
  * The reviewee whose received reviews to list

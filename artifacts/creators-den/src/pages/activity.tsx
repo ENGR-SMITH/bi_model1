@@ -27,7 +27,7 @@ import {
   X,
 } from 'lucide-react';
 import { Link, useLocation, useParams } from 'wouter';
-import { useListVideoActivity } from '@workspace/api-client-react';
+import { getGetVideoProjectQueryKey, useGetVideoProject, useListVideoActivity } from '@workspace/api-client-react';
 import { SectionEyebrow, RELAY_LEGS } from '@/components/shell';
 import { VersionTimeline } from '@/components/version-timeline';
 import { useProjectRealtime } from '@/lib/realtime';
@@ -51,6 +51,9 @@ const EVENT_META: Record<string, { icon: typeof History; tone: string; label: st
   submission_approved: { icon: Check, tone: 'teal', label: 'Approvals' },
   submission_rejected: { icon: X, tone: 'danger', label: 'Rejections' },
   asset_uploaded: { icon: FileVideo2, tone: 'accent', label: 'Uploads' },
+  arena_post_opened: { icon: History, tone: 'muted', label: 'Arena posts' },
+  arena_post_closed: { icon: History, tone: 'muted', label: 'Arena posts' },
+  arena_post_removed: { icon: History, tone: 'muted', label: 'Arena posts' },
 };
 
 // Rail breakdown renders in this order; unseen types are skipped.
@@ -62,6 +65,9 @@ const TYPE_ORDER = [
   'submission_approved',
   'submission_rejected',
   'asset_uploaded',
+  'arena_post_opened',
+  'arena_post_closed',
+  'arena_post_removed',
 ];
 
 const FALLBACK_META = { icon: History, tone: 'muted', label: 'Other' } as const;
@@ -158,6 +164,17 @@ export default function ActivityPage() {
   const activity = useListVideoActivity(projectId, undefined);
   const events = (activity.data ?? []) as LedgerEvent[];
 
+  // Read-only window (audition preview or PUBLIC project): the timeline is a
+  // view-only record — the "The vault" jump is hidden because the vault itself
+  // is not part of that window, and nothing here is editable anyway.
+  const detail = useGetVideoProject(projectId ?? '', {
+    query: { queryKey: getGetVideoProjectQueryKey(projectId ?? ''), enabled: Boolean(projectId) },
+  });
+  const viewerAccess = detail.data?.viewerAccess;
+  const readOnly = Boolean(detail.data)
+    ? (viewerAccess === undefined ? (detail.data?.myRoles?.length ?? 0) === 0 : viewerAccess !== 'member')
+    : false;
+
   // Counts across the *whole* project — the summary and the shared filter
   // badges show the full picture even while both columns are narrowed.
   const legCounts = useMemo(() => {
@@ -214,10 +231,12 @@ export default function ActivityPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href={`/projects/${projectId}`} className="secondary-btn" data-testid="link-vault">
-            <ArrowLeft size={14} />
-            The vault
-          </Link>
+          {!readOnly && (
+            <Link href={`/projects/${projectId}`} className="secondary-btn" data-testid="link-vault">
+              <ArrowLeft size={14} />
+              The vault
+            </Link>
+          )}
           <span className="den-tag muted">
             <History size={12} />
             {events.length} on record

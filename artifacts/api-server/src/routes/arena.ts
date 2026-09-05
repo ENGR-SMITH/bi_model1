@@ -29,6 +29,8 @@ import {
   CreateArenaPostResponse,
   CreateArenaWatchBody,
   CreateArenaWatchResponse,
+  DeleteArenaPostParams,
+  DeleteArenaPostResponse,
   DeleteArenaWatchParams,
   GetArenaApplicationFileParams,
   GetArenaApplicationParams,
@@ -709,6 +711,78 @@ router.patch("/video/arena/posts/:postId", async (req: Request, res: Response): 
       totalApplications: totalByPost.get(updated.id) ?? 0,
     }),
   );
+});
+
+// DELETE /video/arena/posts/:postId — Captain only: remove a live post (and
+// its auditions) from the Arena entirely. The read-only audition preview
+// window closes with it, and the freed role can be posted again.
+router.delete("/video/arena/posts/:postId", async (req: Request, res: Response): Promise<void> => {
+  const userId = getAuth(req).userId;
+  if (!userId) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const params = DeleteArenaPostParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: "Invalid post id" });
+    return;
+  }
+
+  const [post] = await db
+    .select()
+    .from(tandemArenaPostsTable)
+    .where(eq(tandemArenaPostsTable.id, params.data.postId))
+    .limit(1);
+  if (!post) {
+    res.status(404).json({ error: "Post not found" });
+    return;
+  }
+  if (post.postedBy !== userId) {
+    res.status(403).json({ error: "Only the Captain who posted this audition can remove it" });
+    return;
+  }
+
+  // Best-effort cleanup of uploaded audition documents once the rows are gone.
+  const storageKeys: string[] = [];
+  await db.transaction(async (tx) => {
+    const applicationRows = await tx
+      .select({ id: tandemArenaApplicationsTable.id })
+      .from(tandemArenaApplicationsTable)
+      .where(eq(tandemArenaApplicationsTable.postId, post.id));
+    if (applicationRows.length > 0) {
+      const applicationIds = applicationRows.map((row) => row.id);
+      const fileRows = await tx
+        .select({ storageKey: tandemArenaApplicationFilesTable.storageKey })
+        .from(tandemArenaApplicationFilesTable)
+        .where(inArray(tandemArenaApplicationFilesTable.applicationId, applicationIds));
+      storageKeys.push(...fileRows.map((row) => row.storageKey));
+      await tx
+        .delete(tandemArenaApplicationFilesTable)
+        .where(inArray(tandemArenaApplicationFilesTable.applicationId, applicationIds));
+      await tx
+        .delete(tandemArenaApplicationsTable)
+        .where(eq(tandemArenaApplicationsTable.postId, post.id));
+    }
+    await tx.delete(tandemArenaPostsTable).where(eq(tandemArenaPostsTable.id, post.id));
+  });
+  for (const key of storageKeys) {
+    try {
+      fs.unlinkSync(path.join(uploadDir(), "arena", key));
+    } catch {
+      // Already gone or never written — nothing to clean up.
+    }
+  }
+
+  await recordVideoActivity({
+    projectId: post.projectId,
+    eventType: "arena_post_removed",
+    summary: `Removed the open ${ROLE_LABEL[post.role as ArenaRole].toLowerCase()} audition from the Arena`,
+    actorId: userId,
+    resourceId: post.id,
+  });
+
+  res.json(DeleteArenaPostResponse.parse({ removed: true }));
 });
 
 // POST /video/arena/posts/:postId/applications — audition for an open role

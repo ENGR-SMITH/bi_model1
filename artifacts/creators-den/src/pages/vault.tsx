@@ -16,6 +16,7 @@ import {
   Scissors,
   Sparkles,
   Trash2,
+  User,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -26,6 +27,7 @@ import {
   getGetChannelQueryKey,
   getGetVideoProjectQueryKey,
   getListExploreCreatorsQueryKey,
+  getListArenaPostsQueryKey,
   getListVideoDownloadsQueryKey,
   getListVideoGrantsQueryKey,
   useAddVideoProjectMember,
@@ -38,6 +40,7 @@ import {
   useRemoveVideoProjectMember,
   useRevokeVideoGrant,
   useListArenaPosts,
+  useDeleteArenaPost,
   useUpdateVideoProjectMemberRoles,
   type ArenaPostSummary,
 } from '@workspace/api-client-react';
@@ -222,60 +225,68 @@ function InviteForm({ projectId }: { projectId: string }) {
   const error = invite.error as { response?: { data?: { error?: string } } } | null;
 
   return (
-    <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto]" onSubmit={submit} data-testid="form-invite-member">
+    <form className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]" onSubmit={submit} data-testid="form-invite-member">
       <div className="min-w-0">
-        <div className="invite-pick">
-          <input
-            value={uid}
-            onChange={(event) => {
-              setUid(event.target.value.toUpperCase());
-              setSuggestOpen(true);
-            }}
-            onFocus={() => {
-              if (suggestBlur.current) window.clearTimeout(suggestBlur.current);
-              setSuggestOpen(true);
-            }}
-            onBlur={() => {
-              // Let a suggestion click land before the list closes.
-              suggestBlur.current = window.setTimeout(() => setSuggestOpen(false), 140);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape') setSuggestOpen(false);
-            }}
-            placeholder="Search by name or TANDEM ID…"
-            spellCheck={false}
-            autoCapitalize="characters"
-            className="font-mono uppercase tracking-wider"
-            aria-label="Teammate's unique Tandem ID"
-            data-testid="input-invite-uid"
-          />
-          {suggestions.length > 0 && suggestOpen && !valid && (
-            <div className="invite-suggest" onMouseDown={(event) => event.preventDefault()} data-testid="invite-suggest">
-              {suggestions.map((creator) => (
-                <button
-                  type="button"
-                  key={creator.userId}
-                  onClick={() => pick(creator.userId)}
-                  data-testid={`invite-suggest-${creator.userId}`}
-                >
-                  <span className="invite-suggest-avatar" aria-hidden>
-                    {creator.imageUrl ? <img src={creator.imageUrl} alt="" /> : creator.displayName.slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="min-w-0">
-                    <b>{creator.displayName}</b>
-                    <small>{tandemUid(creator.userId)}</small>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
+        <div className="invite-field">
+          {/* The field always reads as a search box: a person icon on the
+              left and a fixed "@" prefix so the Tandem ID slot is obvious. */}
+          <span className="invite-field-icon" aria-hidden><User size={14} /></span>
+          <div className="invite-pick">
+            <span className="invite-at" aria-hidden>@</span>
+            <input
+              value={uid}
+              onChange={(event) => {
+                setUid(event.target.value.toUpperCase());
+                setSuggestOpen(true);
+              }}
+              onFocus={() => {
+                if (suggestBlur.current) window.clearTimeout(suggestBlur.current);
+                setSuggestOpen(true);
+              }}
+              onBlur={() => {
+                // Let a suggestion click land before the list closes.
+                suggestBlur.current = window.setTimeout(() => setSuggestOpen(false), 140);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') setSuggestOpen(false);
+              }}
+              placeholder="Search by name or TANDEM ID…"
+              spellCheck={false}
+              autoCapitalize="characters"
+              className="font-mono uppercase tracking-wider"
+              aria-label="Teammate's unique Tandem ID"
+              data-testid="input-invite-uid"
+            />
+            {suggestions.length > 0 && suggestOpen && !valid && (
+              <div className="invite-suggest" onMouseDown={(event) => event.preventDefault()} data-testid="invite-suggest">
+                <span className="invite-suggest-caption">Matching teammates</span>
+                {suggestions.map((creator) => (
+                  <button
+                    type="button"
+                    key={creator.userId}
+                    onClick={() => pick(creator.userId)}
+                    data-testid={`invite-suggest-${creator.userId}`}
+                  >
+                    <span className="invite-suggest-avatar" aria-hidden>
+                      {creator.imageUrl ? <img src={creator.imageUrl} alt="" /> : creator.displayName.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="min-w-0">
+                      <b>{creator.displayName}</b>
+                      <small>@{tandemUid(creator.userId)}</small>
+                    </span>
+                    <span className="invite-suggest-pick">Pick</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         {touched && !valid && (
           <p className="setting-copy !text-[11px] mt-1" role="alert">
             {suggestions.length > 0 ? (
               <>Pick a teammate above, or type their full Tandem ID.</>
             ) : (
-              <>A Tandem ID looks like <span className="mono-label">TANDEM6EUHY</span> — find it on the teammate's profile.</>
+              <>A Tandem ID looks like <span className="mono-label">@TANDEM6EUHY</span> — find it on the teammate's profile.</>
             )}
           </p>
         )}
@@ -288,7 +299,7 @@ function InviteForm({ projectId }: { projectId: string }) {
       <button
         type="submit"
         disabled={invite.isPending || !valid}
-        className="secondary-btn"
+        className="secondary-btn invite-add-btn"
         data-testid="button-invite-member"
       >
         <UserPlus size={14} />
@@ -494,8 +505,8 @@ function GrantsPanel({ projectId, myRoles, members }: { projectId: string; myRol
         {activeGrants.length > 0 && <span className="den-tag teal">{activeGrants.length} active</span>}
       </div>
       <p className="setting-copy">
-        Grant a teammate a timed download of every file version under a role — say, all video files for an external
-        edit pass. Pick one role, several roles, or all roles; revoke anytime; every download is still audited.
+        Let a teammate download every file version under a role (or all roles) for a set number of hours.
+        Revoke anytime — every download stays audited.
       </p>
       <form className="grant-form mt-3" onSubmit={submit} data-testid="form-grant">
         <label className="grant-field">
@@ -624,6 +635,67 @@ function DownloadAuditPanel({ projectId, myRoles }: { projectId: string; myRoles
 // Arena — the collaboration/audition doorway on the vault. The Captain can
 // open a role for THIS project (one OPEN post per role); existing open posts
 // link straight into their Captain view for Accept/Reject.
+// One open post row on the vault's Arena card — the Captain can jump into
+// the audition list, or remove the live post entirely (two-step confirm, the
+// same arm/confirm pattern as the vault's delete buttons).
+function ArenaPostRow({ projectId, post }: { projectId: string; post: ArenaPostSummary }) {
+  const queryClient = useQueryClient();
+  const remove = useDeleteArenaPost();
+  const [confirming, setConfirming] = useState(false);
+
+  const onRemove = () => {
+    remove.mutate(
+      { postId: post.id },
+      {
+        onSuccess: () => {
+          setConfirming(false);
+          void queryClient.invalidateQueries({ queryKey: getListArenaPostsQueryKey({ projectId }) });
+          void queryClient.invalidateQueries({ queryKey: getListArenaPostsQueryKey() });
+        },
+      },
+    );
+  };
+
+  return (
+    <div className="list-row arena-open-row" key={post.id} data-testid={`arena-open-post-${post.id}`}>
+      <ArenaRoleTag role={post.role} />
+      <span className="flex-1 min-w-0">
+        <b className="truncate">{ARENA_ROLE_META[post.role].roleLabel}</b>
+        <small>
+          {post.applicantCount} applicant{post.applicantCount === 1 ? '' : 's'} now · {timeAgo(post.createdAt)}
+        </small>
+      </span>
+      <Link href={`/arena/posts/${post.id}`} className="secondary-btn" data-testid={`arena-open-post-manage-${post.id}`}>
+        Manage auditions
+      </Link>
+      {confirming ? (
+        <span className="flex gap-2 items-center">
+          <button type="button" className="secondary-btn arena-remove-confirm" onClick={onRemove} disabled={remove.isPending} data-testid={`arena-open-post-remove-confirm-${post.id}`}>
+            {remove.isPending ? 'Removing…' : 'Confirm remove'}
+          </button>
+          <button type="button" className="secondary-btn" onClick={() => setConfirming(false)}>Keep</button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          className="danger-icon"
+          title="Remove this live post"
+          aria-label={`Remove the ${ARENA_ROLE_META[post.role].roleLabel.toLowerCase()} post`}
+          onClick={() => setConfirming(true)}
+          data-testid={`arena-open-post-remove-${post.id}`}
+        >
+          <X size={14} />
+        </button>
+      )}
+      {remove.isError && (
+        <small className="text-danger" role="alert">
+          {(remove.error as { response?: { data?: { error?: string } } } | null)?.response?.data?.error || 'The post could not be removed.'}
+        </small>
+      )}
+    </div>
+  );
+}
+
 function ArenaProjectPanel({ projectId, projectName }: { projectId: string; projectName: string }) {
   const [, setLocation] = useLocation();
   const open = useListArenaPosts({ projectId });
@@ -631,31 +703,20 @@ function ArenaProjectPanel({ projectId, projectName }: { projectId: string; proj
   const posts = (open.data ?? []) as ArenaPostSummary[];
 
   return (
-    <div className="paper-card mt-6" data-testid="panel-arena-project">
+    <div className="paper-card arena-vault-card mt-6" data-testid="panel-arena-project">
       <div className="inline-heading">
         <span className="eyebrow"><Megaphone size={13} /> Collaboration / Audition Arena</span>
-        <span className="mono-label">{posts.length} open</span>
+        <span className={`den-tag ${posts.length > 0 ? 'accent' : 'muted'}`}>{posts.length} open</span>
       </div>
       <p className="setting-copy mt-1">
-        Hire for this project from the public arena. Anyone signed in can audition with a pitch and documents,
-        previewing the project read-only (timeline + preview) while the role is open.
+        Hire for this project from the public arena — anyone signed in can audition and preview the
+        project read-only (timeline + preview) while the post is live.
       </p>
 
       {posts.length > 0 && (
         <div className="den-stack mt-3">
           {posts.map((post) => (
-            <div className="list-row" key={post.id} data-testid={`arena-open-post-${post.id}`}>
-              <ArenaRoleTag role={post.role} />
-              <span className="flex-1 min-w-0">
-                <b className="truncate">{ARENA_ROLE_META[post.role].roleLabel}</b>
-                <small>
-                  {post.applicantCount} applicant{post.applicantCount === 1 ? '' : 's'} now · {timeAgo(post.createdAt)}
-                </small>
-              </span>
-              <Link href={`/arena/posts/${post.id}`} className="secondary-btn" data-testid={`arena-open-post-manage-${post.id}`}>
-                Manage auditions
-              </Link>
-            </div>
+            <ArenaPostRow key={post.id} projectId={projectId} post={post} />
           ))}
         </div>
       )}
@@ -804,7 +865,7 @@ export default function ContentCreatorsProjectPage() {
         {channel.data?.youtubeBannerUrl && <img className="cd-billboard-media" src={channel.data.youtubeBannerUrl} alt="" aria-hidden />}
         <div className="cd-billboard-scrim" />
         <div className="cd-billboard-body">
-          <SectionEyebrow>The vault · repository</SectionEyebrow>
+          <SectionEyebrow>Repository</SectionEyebrow>
           <h1>{p.name}</h1>
           {p.description && <p>{p.description}</p>}
           <div className="cd-metarow">
@@ -852,7 +913,7 @@ export default function ContentCreatorsProjectPage() {
       {/* Members & roles + temporary download grants sit right under the vault
           card — the repo overview first, then the people and access controls. */}
       <div className="grid gap-4 lg:grid-cols-2 mb-6" data-testid="vault-top-cards">
-        <div className="paper-card">
+        <div className="paper-card members-card">
           <div className="inline-heading">
             <span className="eyebrow"><UserPlus size={13} /> Members &amp; roles</span>
             <span className="mono-label">{p.members.length}</span>
@@ -871,7 +932,7 @@ export default function ContentCreatorsProjectPage() {
           {captain ? (
             <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
               <span className="eyebrow"><UserPlus size={12} /> Invite a teammate</span>
-              <p className="setting-copy mt-1">Assign one of the four roles — Video, Audio, Script, or Thumbnail. Inviting someone who is already a member adds the role to their set; you can edit or remove roles below. Invite with their unique Tandem ID (shown on their profile).</p>
+              <p className="setting-copy mt-1">Search by name or paste their Tandem ID, then assign a role — Video, Audio, Script, or Thumbnail. Inviting a current member just adds the role to their set.</p>
               <InviteForm projectId={p.id} />
             </div>
           ) : (

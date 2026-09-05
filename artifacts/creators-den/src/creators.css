@@ -6252,3 +6252,198 @@ select optgroup {
 }
 .cd-topnav-chip .cd-topnav-arena-notch:hover { filter: brightness(1.12); }
 .cd-topnav-chip .cd-topnav-arena-notch svg { flex: 0 0 auto; }
+
+/* ============================================================================
+   VAULT + CMS + ARENA POLISH (UX pass)
+   ----------------------------------------------------------------------------
+   - Invite-a-teammate field: person icon, fixed "@" prefix, an obvious input
+   - Members & roles card rows + role dropdown + Add member button
+   - Desktop agent link on the vault billboard
+   - CMS Arena doorway (microphone icon tile)
+   - Vault "Collaboration / Audition Arena" card + live-post remove buttons
+   - Arena post hero: facts row on top, pitch as the full-width second row
+   ============================================================================ */
+
+/* ---- Invite a teammate: the field reads as a search box ---- */
+.invite-field {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid hsl(var(--input));
+  border-radius: 9px;
+  background: hsl(var(--background) / .55);
+  transition: border-color .16s ease, box-shadow .16s ease, background .16s ease;
+}
+.invite-field:focus-within {
+  border-color: hsl(var(--accent) / .75);
+  background: hsl(var(--background) / .8);
+  box-shadow: 0 0 0 3px hsl(var(--accent) / .12);
+}
+.invite-field-icon {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  color: hsl(var(--muted-foreground));
+  border-right: 1px solid hsl(var(--border) / .7);
+  background: hsl(var(--muted) / .5);
+  border-radius: 8px 0 0 8px;
+}
+.invite-field .invite-pick { flex: 1 1 auto; min-width: 0; }
+.invite-field .invite-at {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  color: hsl(var(--muted-foreground));
+  font: 700 13px var(--app-font-mono);
+  pointer-events: none;
+}
+.invite-field input {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px 0 27px;
+  border: 0;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: 12.5px;
+  outline: none;
+  border-radius: 0 9px 9px 0;
+}
+.invite-field input::placeholder { color: hsl(var(--muted-foreground) / .85); }
+
+/* The teammate dropdown — caption, tighter rows, and a "Pick" affordance. */
+.invite-suggest { gap: 3px; padding: 6px; }
+.invite-suggest-caption {
+  display: block;
+  padding: 4px 8px 7px;
+  font: 8px var(--app-font-mono);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground) / .85);
+  border-bottom: 1px solid hsl(var(--border) / .7);
+  margin-bottom: 3px;
+}
+.invite-suggest button { gap: 10px; padding: 8px 9px; }
+.invite-suggest .invite-suggest-pick {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--accent) / .45);
+  color: hsl(var(--accent));
+  font: 700 8.5px var(--app-font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity .14s ease;
+}
+.invite-suggest button:hover .invite-suggest-pick { opacity: 1; }
+
+/* The role dropdown next to the field. */
+[data-testid='select-invite-role'] {
+  height: 40px;
+  min-width: 118px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 12.5px;
+  padding: 0 30px 0 12px;
+  cursor: pointer;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+[data-testid='select-invite-role']:focus {
+  border-color: hsl(var(--accent) / .75);
+  box-shadow: 0 0 0 3px hsl(var(--accent) / .12);
+  outline: none;
+}
+
+/* The Add member button — a clear primary action. */
+.invite-add-btn {
+  align-self: stretch;
+  height: 40px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, hsl(var(--primary)), hsl(357 92% 45%));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 4px 14px hsl(var(--primary) / .3), inset 0 1px 0 hsl(0 0% 100% / .16);
+  transition: filter .15s ease, transform .12s ease, box-shadow .15s ease;
+}
+.invite-add-btn:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); box-shadow: 0 6px 18px hsl(var(--primary) / .4), inset 0 1px 0 hsl(0 0% 100% / .16); }
+.invite-add-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---- Members & roles card: rows read as a clean crew list ---- */
+.members-card .den-stack .list-row {
+  padding: 10px 11px;
+  border: 1px solid hsl(var(--border) / .7);
+  border-radius: 10px;
+  background: hsl(var(--card) / .6);
+  transition: border-color .16s ease, background .16s ease;
+}
+.members-card .den-stack .list-row:hover { border-color: hsl(var(--border)); background: hsl(var(--card)); }
+.members-card .member-role-editor { background: hsl(var(--card) / .85); }
+
+/* ---- Desktop agent link on the vault billboard ---- */
+.cd-agent-link {
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  background: linear-gradient(180deg, hsl(var(--accent) / .18), hsl(var(--accent) / .06));
+  border-color: hsl(var(--accent) / .45);
+  box-shadow: 0 3px 12px hsl(var(--accent) / .14), inset 0 1px 0 hsl(0 0% 100% / .07);
+  transition: background .16s ease, border-color .16s ease, transform .14s ease, box-shadow .16s ease;
+}
+.cd-agent-link:hover {
+  background: hsl(var(--accent) / .24);
+  border-color: hsl(var(--accent) / .8);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px hsl(var(--accent) / .22), inset 0 1px 0 hsl(0 0% 100% / .09);
+}
+.cd-agent-link svg { flex: 0 0 auto; }
+
+/* ---- CMS Arena doorway: a microphone tile leads the card ---- */
+.arena-doorway-icon {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, hsl(var(--accent) / .22), hsl(var(--accent) / .08));
+  border: 1px solid hsl(var(--accent) / .4);
+  color: hsl(var(--accent));
+  box-shadow: 0 6px 16px hsl(var(--accent) / .18), inset 0 1px 0 hsl(0 0% 100% / .08);
+}
+/* The doorway now leads the channel wall — no top margin, air below instead. */
+.cms-split-main > .arena-doorway { margin-top: 0; margin-bottom: 18px; }
+
+/* ---- Vault "Collaboration / Audition Arena" card ---- */
+.arena-vault-card {
+  border: 1px solid hsl(var(--accent) / .25);
+  background: linear-gradient(140deg, hsl(var(--card)), hsl(var(--accent) / .04));
+}
+.arena-open-row {
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid hsl(var(--border) / .7);
+  border-radius: 10px;
+  background: hsl(var(--card) / .65);
+  flex-wrap: wrap;
+}
+.arena-remove-btn,
+.arena-remove-confirm { color: hsl(var(--foreground)); }
+.arena-remove-btn:hover,
+.arena-remove-confirm:hover { border-color: hsl(var(--destructive) / .6); color: hsl(var(--foreground)); background: hsl(var(--destructive) / .1); }
+
+/* ---- Arena post hero: the facts anchor the top row, the pitch reads as
+   the full-width second row beneath them (Share + Watch stay together in
+   the second column). ---- */
+.arena-hero-pitch {
+  margin-top: 4px;
+  padding-top: 13px;
+  border-top: 1px dashed hsl(var(--border) / .85);
+}
+.arena-hero-facts { margin-top: 2px; }

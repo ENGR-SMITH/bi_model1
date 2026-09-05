@@ -4498,6 +4498,22 @@ export const UpdateArenaPostResponse = zod.object({
 
 
 /**
+ * Deletes the post and its auditions from the Arena. The read-only audition preview window closes with it.
+ * @summary Remove a role post entirely (Captain only)
+ */
+
+
+
+export const DeleteArenaPostParams = zod.object({
+  "postId": zod.coerce.string().min(1)
+})
+
+export const DeleteArenaPostResponse = zod.object({
+  "removed": zod.boolean()
+})
+
+
+/**
  * Multipart. One PENDING audition per user per post; the per-week apply cap and per-Captain blocks are enforced server-side.
  * @summary Audition for an open role (message + up to 3 documents)
  */

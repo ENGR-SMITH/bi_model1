@@ -56,6 +56,14 @@ export default function ScriptPreviewPage() {
   const editorRef = useRef<HTMLDivElement>(null);
   const saveTimerRef = useRef<number | null>(null);
 
+  // Read-only window (audition preview / PUBLIC project): the script desk is
+  // view-only — no pin-note composer, no writing.
+  const viewerAccess = project.data?.viewerAccess;
+  const myRoles = project.data?.myRoles;
+  const readOnly = Boolean(project.data)
+    ? (viewerAccess === undefined ? (myRoles?.length ?? 0) === 0 : viewerAccess !== 'member')
+    : false;
+
   const [html, setHtml] = useState<string>(() => {
     try {
       return localStorage.getItem(storageKey(projectId)) ?? '';
@@ -132,6 +140,10 @@ export default function ScriptPreviewPage() {
 
   // A selection inside the editor raises the pin-note composer at its end.
   const onEditorSelect = () => {
+    if (readOnly) {
+      setComposer(null);
+      return;
+    }
     const el = editorRef.current;
     if (!el) return;
     const sel = window.getSelection();
@@ -243,7 +255,7 @@ export default function ScriptPreviewPage() {
               </span>
             </div>
 
-            {composer && (
+            {composer && !readOnly && (
               <div
                 className="script-pin-composer"
                 style={{ left: composer.x, top: composer.y }}
@@ -285,7 +297,7 @@ export default function ScriptPreviewPage() {
         </div>
       </div>
       <div className="pv-script-hint" data-testid="script-hint">
-        <span className="mono-label">view only</span> — the script is edited on the main Script page; highlight any passage to pin a note.
+        <span className="mono-label">view only</span> — the script is edited on the main Script page;{readOnly ? ' this preview is read-only, so notes are not available here.' : ' highlight any passage to pin a note.'}
       </div>
     </div>
   );
