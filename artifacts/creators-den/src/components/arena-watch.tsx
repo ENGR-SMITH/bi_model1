@@ -129,7 +129,7 @@ export function ArenaRoleWatchMenu({
         data-testid="button-arena-watch"
       >
         {anyWatch ? <BellRing size={14} /> : <Bell size={14} />}
-        <span className="arena-watch-label">{anyWatch ? 'Watching' : `Watch ${meta.label} auditions`}</span>
+        <span className="arena-watch-label">{anyWatch ? 'Watching' : 'Watch notification'}</span>
       </button>
       {open && (
         <div className="arena-watch-options" role="group" aria-label="Watch scope">

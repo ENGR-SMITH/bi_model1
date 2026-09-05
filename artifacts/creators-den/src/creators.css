@@ -6022,7 +6022,7 @@ select optgroup {
 .arena-filled-note,
 .arena-closed-note { display: flex; align-items: center; gap: 7px; margin: 2px 0 0; font: 11px var(--app-font-sans); color: hsl(var(--muted-foreground)); }
 .arena-filled-note svg { color: hsl(164 33% 39%); }
-.arena-closed-note svg { color: hsl(var(--muted-foreground)); }
+.arena-closed-note svg { color: hsl(0 72% 62%); }
 
 /* Captain-view fill state banner — the seat went to the ACCEPTED hire and
    the remaining PENDING auditions were auto-declined by the accept. */
@@ -6092,8 +6092,8 @@ select optgroup {
 
 @media (max-width: 860px) {
   .arena-hero { grid-template-columns: 1fr; }
-  .arena-card { flex-direction: column; gap: 10px; }
-  .arena-card-side { flex-direction: row; justify-content: flex-start; align-items: center; }
+  .arena-card-top { flex-wrap: wrap; }
+  .arena-card-topright { margin-left: 0; }
   .arena-card-arrow { margin-left: auto; }
 }
 
@@ -6165,16 +6165,36 @@ select optgroup {
 }
 .arena-doorway-copy { display: flex; flex-direction: column; gap: 4px; padding: 14px 20px 16px; }
 .arena-doorway-sub { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.55; max-width: 64ch; }
-.arena-doorway-go {
-  display: inline-flex;
+/* Footer: a stack of real captain avatars + a caption (no dead "browse" row). */
+.arena-doorway-foot {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding-top: 11px;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 12px;
   border-top: 1px solid hsl(var(--border));
-  color: hsl(var(--accent));
-  font: 700 11px var(--app-font-sans);
 }
+.arena-doorway-avatars { display: flex; align-items: center; }
+.arena-doorway-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-left: -7px;
+  border-radius: 50%;
+  border: 2px solid hsl(0 0% 9%);
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  font: 700 10px var(--app-font-sans);
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
+}
+.arena-doorway-avatar:first-child { margin-left: 0; }
+.arena-doorway-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.arena-doorway-avatar.more { background: hsl(0 0% 24%); color: hsl(var(--foreground)); font-size: 9px; }
+.arena-doorway-foot-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.arena-doorway-foot-text b { font: 700 12px var(--app-font-sans); color: hsl(var(--foreground)); }
+.arena-doorway-foot-text small { font: 10px var(--app-font-sans); color: hsl(var(--muted-foreground)); }
 
 .arena-composer-roles { flex-wrap: wrap; }
 
@@ -6472,10 +6492,42 @@ select optgroup {
   border-radius: 999px;
   font-weight: 700;
   letter-spacing: .01em;
-  background: linear-gradient(180deg, hsl(var(--accent) / .18), hsl(var(--accent) / .06));
-  border-color: hsl(var(--accent) / .45);
+  color: hsl(0 0% 100%);
+  background: linear-gradient(180deg, hsl(var(--accent) / .2), hsl(var(--accent) / .08));
+  border-color: hsl(var(--accent) / .5);
   box-shadow: 0 3px 12px hsl(var(--accent) / .14), inset 0 1px 0 hsl(0 0% 100% / .07);
   transition: background .16s ease, border-color .16s ease, transform .14s ease, box-shadow .16s ease;
+}
+.cd-agent-link:hover { background: hsl(var(--accent) / .24); color: hsl(0 0% 100%); }
+/* Live download animation: the arrow bobs while a bar fills beneath it. */
+.cd-agent-dl {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+}
+.cd-agent-dl svg { animation: cdAgentBob 1.4s ease-in-out infinite; }
+.cd-agent-dl-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: .9;
+  transform-origin: left center;
+  animation: cdAgentFill 1.4s ease-in-out infinite;
+}
+@keyframes cdAgentBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+@keyframes cdAgentFill {
+  0% { transform: scaleX(.1); opacity: .4; }
+  50%, 100% { transform: scaleX(1); opacity: .9; }
 }
 .cd-agent-link:hover {
   background: hsl(var(--accent) / .24);
@@ -6531,6 +6583,9 @@ select optgroup {
 .arena-card {
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
   padding: 17px 19px 17px 21px;
   border: 1px solid hsl(var(--border));
   border-left: 3px solid var(--arena-role, hsl(var(--border)));
@@ -6558,9 +6613,17 @@ select optgroup {
   box-shadow: 0 10px 26px color-mix(in srgb, var(--arena-role, hsl(var(--primary))) 16%, transparent), var(--shadow-sm);
 }
 .arena-card:hover::before { opacity: 1; }
-.arena-card-main,
-.arena-card-side { position: relative; }
-.arena-card-topline { gap: 11px; }
+.arena-card-main { position: relative; }
+.arena-card-top { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.arena-card-title { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.arena-card-topright {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+}
 .arena-channel-avatar {
   width: 38px; height: 38px;
   border-radius: 11px;
@@ -6571,7 +6634,6 @@ select optgroup {
 .arena-card-channel { font: 800 12px var(--app-font-sans); letter-spacing: .01em; }
 .arena-card-project { font-size: 12.5px; }
 .arena-card-live {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -6616,7 +6678,6 @@ select optgroup {
   border-color: color-mix(in srgb, var(--arena-role, hsl(var(--accent))) 60%, transparent);
   transform: translateX(2px);
 }
-.arena-card-side { gap: 8px; }
 .arena-count {
   gap: 6px;
   padding: 5px 11px;
@@ -6737,8 +6798,25 @@ select optgroup {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .arena-app-actions .secondary-btn { min-width: 0; }
+/* View portfolio sits on the same row as Accept / Reject, as a quiet chip. */
+.arena-app-actions .arena-app-portfolio {
+  margin-left: 0;
+  padding: 5px 9px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--muted) / .5);
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+.arena-app-actions .arena-app-portfolio:hover {
+  color: hsl(var(--accent));
+  border-color: hsl(var(--accent) / .45);
+  background: hsl(var(--accent) / .08);
+  text-decoration: none;
+}
 /* Accept + Reject glow: a slow colored halo pulses behind each decision. */
 @keyframes arenaGlowAccept {
   0%, 100% { box-shadow: 0 0 0 0 hsl(164 45% 52% / 0), var(--shadow-xs), var(--edge-hi); }
@@ -6780,12 +6858,15 @@ select optgroup {
 .arena-captain-confirm .secondary-btn { flex: 1; }
 .arena-captain-error { grid-column: 1 / -1; margin: 0; font-size: 10.5px; }
 
-/* ---- Vault "Collaboration / Audition Arena" card: globe tile head ---- */
+/* ---- Vault "Collaboration / Audition Arena" card: globe tile head. The
+   card's tint and shadow read cool blue instead of the theme's red, so it
+   never looks like it is bleeding over the section below. ---- */
 .arena-vault-card {
   position: relative;
   overflow: hidden;
-  border: 1px solid hsl(var(--accent) / .28);
-  background: linear-gradient(140deg, hsl(var(--card)), hsl(var(--accent) / .05));
+  border: 1px solid hsl(217 85% 60% / .3);
+  background: linear-gradient(140deg, hsl(var(--card)), hsl(217 85% 60% / .06));
+  box-shadow: 0 12px 30px hsl(217 85% 55% / .14), 0 3px 10px hsl(217 85% 55% / .08), var(--edge-hi);
 }
 .arena-vault-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
 .arena-vault-icon {
@@ -6794,10 +6875,10 @@ select optgroup {
   place-items: center;
   width: 40px; height: 40px;
   border-radius: 12px;
-  background: linear-gradient(180deg, hsl(var(--accent) / .2), hsl(var(--accent) / .06));
-  border: 1px solid hsl(var(--accent) / .35);
-  color: hsl(var(--accent));
-  box-shadow: 0 5px 14px hsl(var(--accent) / .16), inset 0 1px 0 hsl(0 0% 100% / .08);
+  background: linear-gradient(180deg, hsl(217 85% 55% / .2), hsl(217 85% 55% / .06));
+  border: 1px solid hsl(217 85% 62% / .4);
+  color: hsl(217 85% 66%);
+  box-shadow: 0 5px 14px hsl(217 85% 55% / .2), inset 0 1px 0 hsl(0 0% 100% / .08);
 }
 .arena-vault-head-copy { display: flex; flex-direction: column; gap: 2px; }
 .arena-vault-title { font: 700 15px var(--app-font-serif); letter-spacing: -.01em; }
@@ -6809,7 +6890,7 @@ select optgroup {
   background: hsl(var(--card) / .7);
   transition: border-color .15s ease, background .15s ease, transform .15s ease;
 }
-.arena-vault-card .arena-open-row:hover { border-color: hsl(var(--accent) / .4); background: hsl(var(--card)); transform: translateY(-1px); }
+.arena-vault-card .arena-open-row:hover { border-color: hsl(217 85% 60% / .45); background: hsl(var(--card)); transform: translateY(-1px); }
 
 /* ---- Modals: contain scroll so a tall modal never drags the page ---- */
 .modal-backdrop,

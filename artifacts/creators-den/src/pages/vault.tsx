@@ -756,6 +756,18 @@ function ArenaProjectPanel({ projectId, projectName }: { projectId: string; proj
   );
 }
 
+// The vault billboard's desktop-agent link wears a small live download
+// animation — the arrow bobs while a progress bar fills beneath it, instead
+// of a static icon.
+function AgentDownloadIcon() {
+  return (
+    <span className="cd-agent-dl" aria-hidden>
+      <Download size={12} />
+      <i className="cd-agent-dl-bar" />
+    </span>
+  );
+}
+
 function timeAgo(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
   if (seconds < 60) return 'just now';
@@ -869,7 +881,6 @@ export default function ContentCreatorsProjectPage() {
         {channel.data?.youtubeBannerUrl && <img className="cd-billboard-media" src={channel.data.youtubeBannerUrl} alt="" aria-hidden />}
         <div className="cd-billboard-scrim" />
         <div className="cd-billboard-body">
-          <SectionEyebrow>Repository</SectionEyebrow>
           <h1>{p.name}</h1>
           {p.description && <p>{p.description}</p>}
           <div className="cd-metarow">
@@ -889,7 +900,7 @@ export default function ContentCreatorsProjectPage() {
                     className="cd-agent-link"
                     data-testid="link-download-desktop-agent"
                   >
-                    <Download size={12} /> Desktop agent for large files
+                    <AgentDownloadIcon /> Desktop agent for large files
                   </a>
                 );
               })()}

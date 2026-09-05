@@ -594,10 +594,24 @@ function UnlinkedProjects() {
 }
 
 // The doorway row under the channel wall: the public collaboration/audition
-// arena, with the live count of open roles across every channel.
+// arena, with the live count of open roles across every channel. The footer
+// stacks the real avatars of up to five captains currently posting, so the
+// card reads as people at work rather than a dead link.
 function ArenaDoorwayRow() {
   const arena = useListArenaPosts();
-  const openCount = ((arena.data ?? []) as ArenaPostSummary[]).length;
+  const posts = (arena.data ?? []) as ArenaPostSummary[];
+  const openCount = posts.length;
+
+  // Distinct captains currently posting (the arena list only carries poster
+  // faces, not applicant ones) — dedupe and cap at five + a "+N" bubble.
+  const distinct = new Map<string, { id: string; name: string; imageUrl: string | null }>();
+  for (const post of posts) {
+    if (!distinct.has(post.postedBy)) {
+      distinct.set(post.postedBy, { id: post.postedBy, name: post.posterName, imageUrl: post.posterImageUrl });
+    }
+  }
+  const posters = [...distinct.values()].slice(0, 5);
+  const morePosters = Math.max(0, distinct.size - posters.length);
 
   return (
     <Link
@@ -624,8 +638,28 @@ function ArenaDoorwayRow() {
           Video, audio, script, and thumbnail seats — pitch with your work, preview the project read-only while
           it's open, and get hired straight onto the team.
         </span>
-        <span className="arena-doorway-go">
-          Browse the arena <ArrowRight size={14} />
+        <span className="arena-doorway-foot">
+          {posters.length > 0 ? (
+            <>
+              <span className="arena-doorway-avatars" aria-hidden>
+                {posters.map((poster) => (
+                  <span key={poster.id} className="arena-doorway-avatar">
+                    {poster.imageUrl ? <img src={poster.imageUrl} alt="" /> : poster.name.slice(0, 1).toUpperCase()}
+                  </span>
+                ))}
+                {morePosters > 0 && <span className="arena-doorway-avatar more">+{morePosters}</span>}
+              </span>
+              <span className="arena-doorway-foot-text">
+                <b>{posters.length === 1 ? 'A captain is posting right now' : `${posters.length} captains are posting right now`}</b>
+                <small>Tap to see every open role — and audition.</small>
+              </span>
+            </>
+          ) : (
+            <span className="arena-doorway-foot-text">
+              <b>Be the first to post an open role</b>
+              <small>The board opens the moment a captain posts.</small>
+            </span>
+          )}
         </span>
       </span>
     </Link>

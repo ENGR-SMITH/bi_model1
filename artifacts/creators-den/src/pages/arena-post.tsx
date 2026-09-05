@@ -514,11 +514,6 @@ function ApplicationRow({
           <span className={`den-tag ${decisionLabel[application.status].tone}`} data-testid={`arena-app-status-${application.id}`}>
             {decisionLabel[application.status].label}
           </span>
-          {pending && (
-            <Link href={`/profile/${application.applicantId}`} className="arena-app-portfolio" data-testid={`arena-app-portfolio-${application.id}`}>
-              View portfolio <ExternalLink size={11} />
-            </Link>
-          )}
         </div>
         <p className="arena-app-message">{application.message}</p>
         {application.files.length > 0 && (
@@ -565,6 +560,14 @@ function ApplicationRow({
           >
             <X size={14} /> {reject.isPending ? 'Declining…' : 'Reject'}
           </button>
+          {/* On the same row as the decisions — not floating above them. */}
+          <Link
+            href={`/profile/${application.applicantId}`}
+            className="arena-app-portfolio"
+            data-testid={`arena-app-portfolio-${application.id}`}
+          >
+            View portfolio <ExternalLink size={11} />
+          </Link>
         </div>
       ) : reviewable ? (
         <div className="arena-app-actions">
