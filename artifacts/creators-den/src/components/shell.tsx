@@ -1,7 +1,8 @@
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useClerk, useUser } from '@clerk/react';
 import {
   Activity,
+  ArrowRight,
   BarChart3,
   Bell,
   Check,
@@ -26,11 +27,15 @@ import { Link, useLocation } from 'wouter';
 import {
   getGetChannelQueryKey,
   getGetVideoProjectQueryKey,
+  getListExploreCreatorsQueryKey,
+  getListExploreProjectsQueryKey,
   getListVideoNotificationsQueryKey,
   getListVideoReviewQueueQueryKey,
   useGetChannel,
   useGetVideoProject,
   useListChannels,
+  useListExploreCreators,
+  useListExploreProjects,
   useListVideoNotifications,
   useListVideoProjects,
   useListVideoReviewQueue,
@@ -39,6 +44,7 @@ import {
 import { useChannelPresence, useProjectPresence, useRealtimeNotifications, useRealtimeSocket } from '@/lib/realtime';
 import { ProjectChat } from '@/components/project-chat';
 import { denRouteInfo, projectUrl } from '@/lib/den-urls';
+import { matchesCreatorQuery, matchesProjectQuery } from '@/lib/explore-search';
 
 export function SectionEyebrow({ children }: { children: ReactNode }) {
   return <span className="eyebrow">{children}</span>;
@@ -210,32 +216,122 @@ function ProjectMenu({ channelId, projectId }: { channelId?: string; projectId?:
   );
 }
 
-// A long, always-visible search field in the centre of the top bar.
+// A long, always-visible search field in the centre of the top bar. Typing
+// opens a LIVE results dropdown (matching creators + public projects, fetched
+// on first keystroke); Enter or the telescope still opens the full Explore
+// results page.
 function ExploreSearch() {
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const blurTimer = useRef<number | null>(null);
+  const searching = query.trim().length > 0;
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const q = query.trim();
-    setLocation(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
+  const creators = useListExploreCreators({ query: { queryKey: getListExploreCreatorsQueryKey(), enabled: searching } });
+  const projects = useListExploreProjects({ query: { queryKey: getListExploreProjectsQueryKey(), enabled: searching } });
+
+  const creatorHits = searching ? (creators.data ?? []).filter((c) => matchesCreatorQuery(c, query)).slice(0, 5) : [];
+  const projectHits = searching ? (projects.data ?? []).filter((p) => matchesProjectQuery(p, query)).slice(0, 4) : [];
+  // Wait for both explore lists to resolve so a loading flicker never shows
+  // a premature “no results”.
+  const showDrop = open && searching && creators.isSuccess && projects.isSuccess;
+
+  const go = (href: string) => {
     setQuery('');
+    setOpen(false);
+    setLocation(href);
+  };
+
+  const submit = (event?: React.FormEvent<HTMLFormElement>) => {
+    event?.preventDefault();
+    const q = query.trim();
+    go(q ? `/explore?q=${encodeURIComponent(q)}` : '/explore');
   };
 
   return (
     <div className="cd-explore-search">
-      <form className="cd-explore-search-box" role="search" onSubmit={submit} data-testid="nav-explore">
-        <button type="submit" className="cd-explore-search-icon" aria-label="Search the den" data-testid="nav-explore-toggle">
-          <Search size={15} />
-        </button>
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search creators and projects…"
-          aria-label="Search creators and projects"
-          data-testid="nav-explore-input"
-        />
-      </form>
+      <div className="cd-explore-search-wrap">
+        <form className="cd-explore-search-box" role="search" onSubmit={submit} data-testid="nav-explore">
+          <button type="submit" className="cd-explore-search-icon" aria-label="Search the den" data-testid="nav-explore-toggle">
+            <Search size={15} />
+          </button>
+          <input
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => {
+              // Let a click on a suggestion land before the dropdown closes.
+              blurTimer.current = window.setTimeout(() => setOpen(false), 140);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setOpen(false);
+            }}
+            placeholder="Search creators and projects…"
+            aria-label="Search creators and projects"
+            data-testid="nav-explore-input"
+          />
+        </form>
+        {showDrop && (
+          <div className="cd-search-drop" onMouseDown={(event) => event.preventDefault()} data-testid="nav-explore-drop">
+            {creatorHits.length === 0 && projectHits.length === 0 ? (
+              <p className="cd-search-drop-empty">No creators or projects match “{query.trim()}”.</p>
+            ) : (
+              <>
+                {creatorHits.length > 0 && (
+                  <div className="cd-search-drop-group">
+                    <p className="cd-search-drop-label">Creators</p>
+                    {creatorHits.map((creator) => (
+                      <button
+                        type="button"
+                        key={creator.userId}
+                        className="cd-search-drop-item"
+                        onClick={() => go(`/profile/${creator.userId}`)}
+                        data-testid={`nav-search-creator-${creator.userId}`}
+                      >
+                        <span className="cd-search-drop-avatar" aria-hidden>
+                          {creator.imageUrl ? <img src={creator.imageUrl} alt="" /> : creator.displayName.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="min-w-0">
+                          <b>{creator.displayName}</b>
+                          <small>{creator.publicProjectCount} public project{creator.publicProjectCount === 1 ? '' : 's'}</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {projectHits.length > 0 && (
+                  <div className="cd-search-drop-group">
+                    <p className="cd-search-drop-label">Projects</p>
+                    {projectHits.map((project) => (
+                      <button
+                        type="button"
+                        key={project.id}
+                        className="cd-search-drop-item"
+                        onClick={() => go(`/projects/${project.id}`)}
+                        data-testid={`nav-search-project-${project.id}`}
+                      >
+                        <span className="cd-search-drop-avatar" aria-hidden>
+                          {project.ownerImageUrl ? <img src={project.ownerImageUrl} alt="" /> : project.name.slice(0, 1).toUpperCase()}
+                        </span>
+                        <span className="min-w-0">
+                          <b>{project.name}</b>
+                          <small>{project.ownerName} · public</small>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <button type="button" className="cd-search-drop-all" onClick={() => submit()} data-testid="nav-explore-drop-all">
+                  See all results on Explore <ArrowRight size={12} />
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -326,7 +422,11 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
         {/* Tier 1 — chrome: brand · search · account. */}
         <div className="cd-topnav-chrome">
           <Link href={homeHref} className="cd-brand" data-testid="nav-home">
-            <span className="brand-mark">C</span>
+            {/* Inside a channel the frame carries that channel's profile image;
+                the "C" mark is kept only where "Creators Den" is written. */}
+            <span className={`brand-mark ${channelId && channelData?.youtubeAvatarUrl ? 'has-avatar' : ''}`} aria-hidden>
+              {channelId && channelData?.youtubeAvatarUrl ? <img src={channelData.youtubeAvatarUrl} alt="" /> : 'C'}
+            </span>
             <span className="brand-copy">
               <span className="block brand-name">{brandTitle}</span>
               <span className="block brand-sub truncate" title={brandSub}>{brandSub}</span>

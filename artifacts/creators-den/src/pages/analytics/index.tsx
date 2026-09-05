@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -155,6 +155,18 @@ export default function ChannelAnalyticsPage() {
     setAppliedQ(nextQ);
     setSort(nextSort as ListChannelAnalyticsVideosSort);
   };
+
+  // Live search: the video table re-queries as you type (debounced) instead
+  // of waiting for Enter — Enter still applies immediately via the form.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setExtraRows([]);
+      setCursor(null);
+      setAppliedQ(q.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
 
   const chartData = series.map((s) => ({ day: s.day.slice(5), views: s.views ?? 0, watchTime: s.watchTimeMinutes ?? 0 }));
 

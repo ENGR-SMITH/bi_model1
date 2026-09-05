@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   ArrowLeft,
   Check,
@@ -24,12 +24,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetChannelQueryKey,
   getGetVideoProjectQueryKey,
+  getListExploreCreatorsQueryKey,
   getListVideoDownloadsQueryKey,
   getListVideoGrantsQueryKey,
   useAddVideoProjectMember,
   useCreateVideoGrant,
   useGetChannel,
   useGetVideoProject,
+  useListExploreCreators,
   useListVideoDownloads,
   useListVideoGrants,
   useRemoveVideoProjectMember,
@@ -40,6 +42,7 @@ import { SectionEyebrow } from '@/components/shell';
 import { useProjectRealtime } from '@/lib/realtime';
 import { isAudioKind, proxyUrlFor } from '@/components/asset-preview';
 import { MemberAvatar } from '@/components/member-avatar';
+import { matchesCreatorQuery } from '@/lib/explore-search';
 import { isTandemUid, normalizeTandemUid, tandemUid } from '@/lib/tandem-uid';
 import {
   ALL_ROLES,
@@ -176,10 +179,26 @@ function InviteForm({ projectId }: { projectId: string }) {
   const invite = useAddVideoProjectMember();
   const [uid, setUid] = useState('');
   const [role, setRole] = useState<(typeof INVITE_ROLES)[number]>('VIDEO');
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const suggestBlur = useRef<number | null>(null);
 
   const normalized = normalizeTandemUid(uid);
   const valid = isTandemUid(normalized);
   const touched = uid.trim().length > 0;
+
+  // Live teammate search: as the Captain types, matching creators (with their
+  // real avatars) are offered right under the field — pick one to fill in its
+  // Tandem ID. Typing the ID manually still works for anyone not listed.
+  const creators = useListExploreCreators({
+    query: { queryKey: getListExploreCreatorsQueryKey(), enabled: touched },
+  });
+  const suggestions = touched
+    ? (creators.data ?? []).filter((creator) => matchesCreatorQuery(creator, uid)).slice(0, 6)
+    : [];
+  const pick = (userId: string) => {
+    setUid(tandemUid(userId));
+    setSuggestOpen(false);
+  };
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -200,19 +219,59 @@ function InviteForm({ projectId }: { projectId: string }) {
   return (
     <form className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto_auto]" onSubmit={submit} data-testid="form-invite-member">
       <div className="min-w-0">
-        <input
-          value={uid}
-          onChange={(event) => setUid(event.target.value.toUpperCase())}
-          placeholder="TANDEM6EUHY"
-          spellCheck={false}
-          autoCapitalize="characters"
-          className="font-mono uppercase tracking-wider"
-          aria-label="Teammate's unique Tandem ID"
-          data-testid="input-invite-uid"
-        />
+        <div className="invite-pick">
+          <input
+            value={uid}
+            onChange={(event) => {
+              setUid(event.target.value.toUpperCase());
+              setSuggestOpen(true);
+            }}
+            onFocus={() => {
+              if (suggestBlur.current) window.clearTimeout(suggestBlur.current);
+              setSuggestOpen(true);
+            }}
+            onBlur={() => {
+              // Let a suggestion click land before the list closes.
+              suggestBlur.current = window.setTimeout(() => setSuggestOpen(false), 140);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') setSuggestOpen(false);
+            }}
+            placeholder="Search by name or TANDEM ID…"
+            spellCheck={false}
+            autoCapitalize="characters"
+            className="font-mono uppercase tracking-wider"
+            aria-label="Teammate's unique Tandem ID"
+            data-testid="input-invite-uid"
+          />
+          {suggestions.length > 0 && suggestOpen && !valid && (
+            <div className="invite-suggest" onMouseDown={(event) => event.preventDefault()} data-testid="invite-suggest">
+              {suggestions.map((creator) => (
+                <button
+                  type="button"
+                  key={creator.userId}
+                  onClick={() => pick(creator.userId)}
+                  data-testid={`invite-suggest-${creator.userId}`}
+                >
+                  <span className="invite-suggest-avatar" aria-hidden>
+                    {creator.imageUrl ? <img src={creator.imageUrl} alt="" /> : creator.displayName.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="min-w-0">
+                    <b>{creator.displayName}</b>
+                    <small>{tandemUid(creator.userId)}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {touched && !valid && (
           <p className="setting-copy !text-[11px] mt-1" role="alert">
-            A Tandem ID looks like <span className="mono-label">TANDEM6EUHY</span> — find it on the teammate's profile.
+            {suggestions.length > 0 ? (
+              <>Pick a teammate above, or type their full Tandem ID.</>
+            ) : (
+              <>A Tandem ID looks like <span className="mono-label">TANDEM6EUHY</span> — find it on the teammate's profile.</>
+            )}
           </p>
         )}
       </div>
