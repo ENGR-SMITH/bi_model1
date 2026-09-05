@@ -69,10 +69,10 @@ function NewProjectModal({ channelId, onClose }: { channelId: string; onClose: (
   const error = create.error as { response?: { data?: { error?: string } } } | null;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={create.isPending ? undefined : onClose}>
       <div className="modal project-modal" onClick={(event) => event.stopPropagation()}>
         <span className="project-modal-orbit"><span /><i /><b>C</b></span>
-        <button type="button" className="modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
+        <button type="button" className="modal-close" onClick={onClose} disabled={create.isPending} aria-label="Close"><X size={16} /></button>
         <div className="project-modal-heading">
           <span className="eyebrow">New locked project</span>
           <h2>A new repo <em>for footage.</em></h2>
@@ -88,6 +88,7 @@ function NewProjectModal({ channelId, onClose }: { channelId: string; onClose: (
               maxLength={120}
               required
               autoFocus
+              disabled={create.isPending}
               data-testid="input-video-project-name"
             />
           </div>
@@ -99,6 +100,7 @@ function NewProjectModal({ channelId, onClose }: { channelId: string; onClose: (
               placeholder="What are we making?"
               maxLength={2000}
               rows={3}
+              disabled={create.isPending}
               data-testid="input-video-project-description"
             />
           </div>

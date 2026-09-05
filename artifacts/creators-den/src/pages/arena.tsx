@@ -3,6 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { useUser } from '@clerk/react';
 import { ArrowRight, CheckCircle2, Clapperboard, Megaphone, Users } from 'lucide-react';
 import {
+  getListArenaPostsQueryKey,
   useListArenaPosts,
   useListChannels,
   useListVideoProjects,
@@ -36,9 +37,10 @@ export default function ArenaBoardPage() {
   const [sort, setSort] = useState<ListArenaPostsSort>('newest');
   const [composerOpen, setComposerOpen] = useState(false);
 
-  const posts = useListArenaPosts({
-    role: roleFilter === 'ALL' ? undefined : roleFilter,
-    sort,
+  // Polled so the live applicant counts and new posts stream in.
+  const listParams = { role: roleFilter === 'ALL' ? undefined : roleFilter, sort };
+  const posts = useListArenaPosts(listParams, {
+    query: { queryKey: getListArenaPostsQueryKey(listParams), refetchInterval: 15000 },
   });
   const rows = (posts.data ?? []) as ArenaPostSummary[];
 

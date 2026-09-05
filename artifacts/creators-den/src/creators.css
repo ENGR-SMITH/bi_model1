@@ -6239,27 +6239,24 @@ select optgroup {
 .role-tabs .arena-watch-bell:hover { color: hsl(var(--accent)); transform: translateY(-1px); }
 .role-tabs .arena-watch-bell.is-watching { color: hsl(var(--accent)); background: hsl(var(--accent) / .14); }
 
-/* ---- Post hero secondary actions: Share (blue) + Watch side by side on
-   one row, with the Captain's Close/Remove row directly beneath. The row
-   buttons carry the same height/padding as every other button. ---- */
+/* ---- Post hero secondary actions: Share (blue) then Watch, each spanning
+   the full button column so every hero action is the same width. ---- */
 .arena-actions-secondary {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-top: 2px;
   padding-top: 10px;
   border-top: 1px dashed hsl(var(--border));
 }
 .arena-actions-secondary .secondary-btn {
-  min-width: 0;
+  width: 100%;
   justify-content: center;
   gap: 6px;
-  padding: 10px 12px;
-  font-size: 11px;
+  padding: 10px 14px;
+  font-size: 12px;
   white-space: nowrap;
 }
-/* The hero's button column widens so the standard-size row buttons fit. */
-.arena-hero { grid-template-columns: minmax(0, 1fr) 380px; }
 .arena-actions-secondary .arena-watch-label {
   min-width: 0;
   overflow: hidden;
@@ -6844,8 +6841,8 @@ select optgroup {
 
 /* ---- Captain controls row under Share + Watch (hero side) ---- */
 .arena-captain-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-top: 2px;
   padding-top: 10px;
@@ -6853,20 +6850,44 @@ select optgroup {
 }
 .arena-captain-row:empty { display: none; }
 .arena-captain-row .secondary-btn {
-  min-width: 0;
+  width: 100%;
   justify-content: center;
   gap: 6px;
-  padding: 7px 8px;
-  font-size: 10.5px;
+  padding: 10px 14px;
+  font-size: 12px;
   white-space: nowrap;
 }
 .arena-captain-confirm {
-  grid-column: 1 / -1;
   display: flex;
   gap: 8px;
 }
 .arena-captain-confirm .secondary-btn { flex: 1; }
-.arena-captain-error { grid-column: 1 / -1; margin: 0; font-size: 10.5px; }
+.arena-captain-error { margin: 0; font-size: 10.5px; }
+
+/* ---- Apply modal: role-tinted like the composer (seat-colored accents) ---- */
+.arena-apply-modal[data-role='VIDEO'] { --arena-role: hsl(var(--accent)); }
+.arena-apply-modal[data-role='AUDIO'] { --arena-role: hsl(164 45% 52%); }
+.arena-apply-modal[data-role='SCRIPT'] { --arena-role: hsl(48 96% 58%); }
+.arena-apply-modal[data-role='THUMBNAIL'] { --arena-role: hsl(var(--muted-foreground)); }
+.arena-apply-modal::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--arena-role, hsl(var(--accent)));
+  border-radius: 19px 19px 0 0;
+  pointer-events: none;
+}
+.arena-apply-modal .eyebrow { color: var(--arena-role, hsl(var(--accent))); }
+.arena-apply-modal .project-modal-heading h2 em { color: var(--arena-role, hsl(var(--accent))); }
+.arena-apply-modal .project-modal-orbit b { color: var(--arena-role, hsl(var(--accent))); }
+.arena-apply-modal .project-modal-orbit span {
+  background: var(--arena-role, hsl(var(--accent)));
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--arena-role, hsl(var(--accent))) 14%, transparent);
+}
+.arena-apply-modal .project-modal-orbit::before,
+.arena-apply-modal .project-modal-orbit::after { border-color: color-mix(in srgb, var(--arena-role, hsl(var(--accent))) 55%, transparent); }
+.arena-apply-modal .arena-file-pick { align-self: flex-start; }
 
 /* ---- Vault "Collaboration / Audition Arena" card: globe tile head. The
    card's tint and shadow read cool blue instead of the theme's red, so it

@@ -1,7 +1,8 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { useClerk, useUser } from '@clerk/react';
+import { useUser } from '@clerk/react';
 import {
   Activity,
+  ArrowLeft,
   ArrowRight,
   BarChart3,
   Bell,
@@ -15,7 +16,6 @@ import {
   Home,
   Image,
   LayoutGrid,
-  LogOut,
   Megaphone,
   Mic2,
   Package,
@@ -339,7 +339,6 @@ function ExploreSearch() {
 }
 
 export function CreatorsShell({ children }: { children: ReactNode }) {
-  const { signOut } = useClerk();
   const { user } = useUser();
   const [location] = useLocation();
   const [channelOpen, setChannelOpen] = useState(false);
@@ -412,7 +411,11 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
         ? (channelData?.myRole === 'OWNER' ? 'Your channel' : 'You’re an editor')
         : 'video version control';
 
-  const logout = () => signOut({ redirectUrl: '/' });
+  // EXIT leaves the den and lands back inside Tandem — the account stays
+  // signed in; the atrium handles the routing, so no Clerk sign-out here.
+  const exitToTandem = () => {
+    window.location.assign('/');
+  };
 
   // Base for project links: channel-scoped when inside a channel, flat for
   // legacy/public pages so the workspace stays coherent either way.
@@ -613,8 +616,8 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
 
           <div className="cd-topnav-signout-col">
             <div className="cd-topnav-chip">
-              <button type="button" className="cd-signout" onClick={logout} data-testid="button-creators-logout">
-                <LogOut size={14} />
+              <button type="button" className="cd-signout" onClick={exitToTandem} data-testid="button-creators-logout">
+                <ArrowLeft size={14} />
                 <span>EXIT</span>
               </button>
             </div>

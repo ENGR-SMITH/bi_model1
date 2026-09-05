@@ -707,7 +707,12 @@ function ArenaProjectPanel({
   members: Array<{ id: string; userId: string; name?: string | null; roles?: string[] }>;
 }) {
   const [, setLocation] = useLocation();
-  const open = useListArenaPosts({ projectId });
+  // Polled so the live post rows, applicant counts, and the member avatar
+  // stack stay current without a manual refresh.
+  const open = useListArenaPosts(
+    { projectId },
+    { query: { queryKey: getListArenaPostsQueryKey({ projectId }), refetchInterval: 15000 } },
+  );
   const [composerOpen, setComposerOpen] = useState(false);
   const posts = (open.data ?? []) as ArenaPostSummary[];
 
