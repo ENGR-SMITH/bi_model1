@@ -19,11 +19,19 @@ const api = {
 
   signOut: () => ipcRenderer.invoke("agent:sign-out"),
   whoami: () => ipcRenderer.invoke("agent:whoami"),
-  listProjects: () => ipcRenderer.invoke("agent:list-projects"),
+  /** Projects, optionally scoped to a channel (omitting channelId = all). */
+  listProjects: (channelId?: string) => ipcRenderer.invoke("agent:list-projects", channelId),
+  /** The channels the signed-in user is on (owned + editor mirrors). */
+  listChannels: () => ipcRenderer.invoke("agent:list-channels"),
   listAssets: (projectId: string) => ipcRenderer.invoke("agent:list-assets", projectId),
-  /** Roles the signed-in viewer holds on a project (drives the upload gate). */
+  /** Roles the signed-in viewer holds on a project (drives the upload gate).
+   * Also returns the project's channel so a Creator Den launch can switch to
+   * the right channel before preselecting the project. */
   projectRoles: (projectId: string) =>
-    ipcRenderer.invoke("agent:project-roles", projectId) as Promise<{ myRoles: string[] }>,
+    ipcRenderer.invoke("agent:project-roles", projectId) as Promise<{
+      myRoles: string[];
+      channelId: string | null;
+    }>,
   pickFile: (extensions?: string[]) => ipcRenderer.invoke("agent:pick-file", extensions),
   /** Metadata (path/name/size) for a picked or dropped file — stat happens in main. */
   fileInfo: (filePath: string) =>

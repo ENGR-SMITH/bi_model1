@@ -223,8 +223,10 @@ async function refreshWho() {
 
   if (who.signedIn) {
     authCard.classList.add("signed-in");
-    whoSpan.textContent = accountLabel || who.userId || "Signed in";
-    setAvatar(accountLabel || who.email || who.userId || "T", who.imageUrl);
+    // Never surface the raw Clerk user id — fall back to the email address
+    // (now handed over by the sign-in page) instead.
+    whoSpan.textContent = accountLabel || "Signed in";
+    setAvatar(accountLabel || "T", who.imageUrl);
     const sub = $("auth-sub");
     if (who.name && who.email) {
       sub.textContent = who.email;
@@ -307,36 +309,117 @@ async function beginAutoReSignIn(): Promise<void> {
 // ---------------------------------------------------------------------------
 // Projects
 // ---------------------------------------------------------------------------
-async function loadProjects() {
+/** Populate the Channel dropdown from the user's channels (owned + editor
+ * mirrors). The first entry, "All channels", keeps every project the user
+ * owns or is a member of in one place (including legacy unlinked projects). */
+async function loadChannels(): Promise<void> {
+  const ch = $("channel") as HTMLSelectElement;
+  ch.length = 0;
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = "All channels";
+  ch.appendChild(all);
+  try {
+    const list = (await window.tandemAgent.listChannels()) as Array<{
+      id: string;
+      name: string | null;
+      youtubeTitle: string | null;
+    }>;
+    for (const c of list) {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      // A connected channel shows its real YouTube name, exactly like Creator Den.
+      opt.textContent = c.youtubeTitle || c.name || "Untitled channel";
+      ch.appendChild(opt);
+    }
+  } catch {
+    // Channel list unavailable — "All channels" alone still works below.
+  }
+}
+
+/** Reload the Project dropdown for the currently selected channel. Mirrors
+ * Creator Den's scoping: a channel shows its own projects, and editors only
+ * see the projects they are members of there. */
+async function loadProjects(): Promise<void> {
+  const chId = ($("channel") as HTMLSelectElement).value;
   const sel = $("project") as HTMLSelectElement;
-  const projects = await window.tandemAgent.listProjects();
-  sel.length = 1;
+  sel.length = 0;
+  const ph = document.createElement("option");
+  ph.value = "";
+  ph.textContent = "— choose a project —";
+  sel.appendChild(ph);
   // Repopulating the list wipes any previous selection — clear the role gate
   // state so nothing stale leaks into the next project pick.
   projectRoles = { status: "idle" };
   chosenFile = null;
-  for (const p of projects) {
-    const opt = document.createElement("option");
-    opt.value = p.id;
-    opt.textContent = p.name;
-    sel.appendChild(opt);
+  try {
+    const projects = (await window.tandemAgent.listProjects(chId || undefined)) as Array<{
+      id: string;
+      name: string;
+    }>;
+    for (const p of projects) {
+      const opt = document.createElement("option");
+      opt.value = p.id;
+      opt.textContent = p.name;
+      sel.appendChild(opt);
+    }
+  } catch (err) {
+    setAuthNote(`Failed to load projects: ${(err as Error).message}`, "err");
   }
-  if (pendingLaunchProjectId) preselectProject(pendingLaunchProjectId);
   renderRoles();
   setFileChip();
 }
 
-function preselectProject(projectId: string): void {
+/** Full workspace bootstrap: channels first, then the project list. Keeps the
+ * channel the user had selected, falling back to "All channels". */
+async function loadWorkspace(): Promise<void> {
+  const ch = $("channel") as HTMLSelectElement;
+  const previous = ch.value;
+  await loadChannels();
+  ch.value = previous && ch.querySelector(`option[value="${previous}"]`) ? previous : "";
+  await loadProjects();
+}
+
+/** Preselect a project that Creator Den handed over. If it isn't in the
+ * current list (e.g. the selected channel is a different one), resolve the
+ * project's own channel from the server and switch to it first. */
+async function preselectProject(projectId: string): Promise<void> {
   const sel = $("project") as HTMLSelectElement;
   if (sel.querySelector(`option[value="${projectId}"]`)) {
     sel.value = projectId;
     pendingLaunchProjectId = null;
     void loadRolesFor(projectId);
-  } else {
-    // The project list may not be loaded yet — apply it once it populates.
-    pendingLaunchProjectId = projectId;
+    setStatus("Opened from Creator Den — drop your file and upload.", "status");
+    return;
   }
-  updateUploadEnabled();
+  if (pendingLaunchProjectId) return; // a previous hand-off is still resolving
+  pendingLaunchProjectId = projectId;
+  try {
+    const detail = (await window.tandemAgent.projectRoles(projectId)) as { channelId: string | null };
+    const wanted = detail?.channelId ?? "";
+    const ch = $("channel") as HTMLSelectElement;
+    const onAListedChannel = wanted === "" || Boolean(ch.querySelector(`option[value="${wanted}"]`));
+    if (!onAListedChannel) {
+      pendingLaunchProjectId = null;
+      setStatus("That project isn't on any of your channels here — pick it again from Creator Den.", "err");
+      return;
+    }
+    if (ch.value !== wanted) ch.value = wanted;
+    await loadProjects();
+    const fresh = $("project") as HTMLSelectElement;
+    if (fresh.querySelector(`option[value="${projectId}"]`)) {
+      fresh.value = projectId;
+      pendingLaunchProjectId = null;
+      await loadRolesFor(projectId);
+      setStatus("Opened from Creator Den — drop your file and upload.", "status");
+    } else if (pendingLaunchProjectId === projectId) {
+      pendingLaunchProjectId = null;
+      setStatus("That project isn't available on this computer — pick another one from the list.", "err");
+    }
+  } catch (err) {
+    if (pendingLaunchProjectId === projectId) pendingLaunchProjectId = null;
+    setStatus(`Opened from Creator Den, but that project could not be loaded: ${(err as Error).message}`, "err");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -637,18 +720,17 @@ function handleUpdate(u: UpdateEvent) {
 // ---------------------------------------------------------------------------
 async function syncWidgetSettings(s: AgentSettings) {
   const enable = $("widget-enable") as HTMLInputElement;
-  const auto = $("widget-auto") as HTMLInputElement;
   const windows = appInfo.platform === "win32";
   const note = $("platform-note");
 
   note.textContent = windows
-    ? "Requires Windows."
+    ? "Turn it on and the bubble appears over other apps right away."
     : "Only available on Windows — on this platform the agent runs as a regular window.";
 
+  // The single "Widget" switch controls the whole feature — the floating
+  // bubble AND auto-show while a video plays stay in lockstep.
   enable.checked = s.widgetEnabled && windows;
-  auto.checked = s.widgetAutoShow;
   enable.disabled = !windows;
-  auto.disabled = !windows || !s.widgetEnabled;
 }
 
 async function loadWidgetSettings() {
@@ -696,7 +778,7 @@ function initListeners() {
     if (evt.type === "signed-in") {
       closeSigninPanel();
       setAuthNote("Signed in.", "ok");
-      void refreshWho().then(() => loadProjects());
+      void refreshWho().then(() => loadWorkspace());
     } else if (evt.type === "expired") {
       closeSigninPanel();
       setAuthNote("The sign-in link expired. Click Sign up for a fresh one.", "err");
@@ -741,6 +823,13 @@ function initListeners() {
       renderRoles();
     }
   });
+
+  // Picking a channel narrows the Project dropdown to that channel's projects
+  // (the same scoping Creator Den applies inside a channel's workspace).
+  ($("channel") as HTMLSelectElement).addEventListener("change", () => {
+    ($("project") as HTMLSelectElement).value = "";
+    void loadProjects();
+  });
   $("upload").addEventListener("click", () => void runUpload());
 
   // Auto-update
@@ -757,15 +846,12 @@ function initListeners() {
     }
   });
 
-  // Widget toggles
+  // Widget — one switch. Turning it on starts the widget and pops the bubble
+  // onto the screen immediately; turning it off stops the bubble and the
+  // video auto-show together (the main process keeps them in lockstep).
   ($("widget-enable") as HTMLInputElement).addEventListener("change", async () => {
     const enabled = ($("widget-enable") as HTMLInputElement).checked;
     const s = await window.tandemAgent.setWidget({ widgetEnabled: enabled });
-    await syncWidgetSettings(s);
-  });
-  ($("widget-auto") as HTMLInputElement).addEventListener("change", async () => {
-    const autoShow = ($("widget-auto") as HTMLInputElement).checked;
-    const s = await window.tandemAgent.setWidget({ widgetAutoShow: autoShow });
     await syncWidgetSettings(s);
   });
 }
@@ -810,25 +896,23 @@ async function main() {
   await refreshWho();
   if (signedIn) {
     try {
-      await loadProjects();
+      await loadWorkspace();
     } catch (err) {
-      setAuthNote(`Failed to load projects: ${(err as Error).message}`, "err");
+      setAuthNote(`Failed to load your workspace: ${(err as Error).message}`, "err");
     }
   }
 
   window.tandemAgent.onJobProgress(handleProgress);
   window.tandemAgent.onUpdateEvent(handleUpdate);
 
-  // Creator Den opened the app for an upload — preselect the project and tell
-  // the user the hand-off worked.
+  // Creator Den opened the app for an upload — preselect the project (and its
+  // channel) and tell the user the hand-off worked.
   window.tandemAgent.onLaunchContext((ctx) => {
-    if (ctx.projectId) preselectProject(ctx.projectId);
-    setStatus(
-      ctx.projectId
-        ? "Opened from Creator Den — drop your file and upload."
-        : "Opened from Creator Den — pick a project, drop your file, and upload.",
-      "status",
-    );
+    if (ctx.projectId) {
+      void preselectProject(ctx.projectId);
+    } else {
+      setStatus("Opened from Creator Den — pick a project, drop your file, and upload.", "status");
+    }
   });
 }
 

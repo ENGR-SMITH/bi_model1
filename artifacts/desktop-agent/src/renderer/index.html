@@ -42,9 +42,9 @@
 
       /* --- Layout --- */
       .shell {
-        max-width: 1020px;
+        max-width: 1180px;
         margin: 0 auto;
-        padding: 26px 30px 34px;
+        padding: 26px 34px 34px;
         animation: fadeUp 0.35s ease both;
       }
       @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -90,12 +90,32 @@
         color: var(--muted-fg);
       }
       .card-title::before {
-        content: ""; width: 3px; height: 13px; border-radius: 2px;
+        content: "";
+        width: 3px; height: 13px; border-radius: 2px;
         background: linear-gradient(180deg, var(--accent-2), var(--accent));
         box-shadow: 0 0 8px rgba(230, 21, 10, 0.5);
       }
+      .card-lead {
+        font-size: 12px; color: var(--muted-fg); line-height: 1.6;
+        margin: -6px 0 14px;
+      }
+      .card-lead b { color: var(--fg); font-weight: 600; }
 
       .stack { display: grid; gap: 14px; align-content: start; }
+
+      /* Feature area: the upload flow on the left, the agent extras (widget +
+         updates) on the right — no more single squeezed column. */
+      .feature-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.55fr) minmax(0, 0.72fr);
+        gap: 16px;
+        align-items: start;
+        margin-top: 16px;
+      }
+      .feature-col { display: grid; gap: 14px; align-content: start; min-width: 0; }
+      @media (max-width: 980px) {
+        .feature-grid { grid-template-columns: minmax(0, 1fr); }
+      }
 
       /* --- Form rows --- */
       .field { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; align-items: center; }
@@ -130,6 +150,11 @@
       .field textarea::placeholder { color: var(--faint-fg); }
       .field textarea:disabled { opacity: 0.55; cursor: not-allowed; }
 
+      /* Channel + Project side by side, each with its label above the select. */
+      .fields-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+      .fields-2 .field { grid-template-columns: minmax(0, 1fr); gap: 7px; align-items: stretch; }
+      .fields-2 select { width: 100%; }
+
       select, input[type="text"], input[type="url"] {
         font: 500 13px var(--font-sans);
         color: var(--fg);
@@ -158,7 +183,7 @@
       /* --- Roles on the selected project --- */
       .roles-row {
         display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-        margin-top: 12px; padding-top: 12px;
+        margin-top: 13px; padding-top: 13px;
         border-top: 1px dashed var(--border);
       }
       .role-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
@@ -268,7 +293,6 @@
       }
       .auth-id { min-width: 0; flex: 1; }
       .auth-id #who { font: 600 14px var(--font-sans); color: var(--fg); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .auth-id #who .auth-email { font: 500 13px var(--font-mono); color: var(--muted-fg); }
       .auth-sub { font-size: 11.5px; color: var(--muted-fg); margin-top: 2px; display: block; }
       .auth-actions { display: flex; gap: 8px; flex-shrink: 0; }
       #sign-in.btn-primary { min-width: 118px; }
@@ -300,14 +324,14 @@
         display: flex; align-items: center; gap: 9px;
       }
       .signin-wait::before {
-        content: ""; width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+        content: "";
+        width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
         border: 2px solid var(--border-strong); border-top-color: var(--accent-2);
         animation: spinDot 0.9s linear infinite;
       }
       @keyframes spinDot { to { transform: rotate(360deg); } }
 
       /* --- Workspace + drop zone --- */
-      .project-row { display: flex; gap: 8px; align-items: center; }
       .dropzone {
         display: grid; place-items: center; text-align: center;
         gap: 6px;
@@ -366,12 +390,12 @@
       #status { margin-top: 10px; }
 
       /* --- Widget settings card --- */
-      .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 0; }
-      .setting-row + .setting-row { border-top: 1px solid var(--border); }
+      .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; }
       .setting-name { font: 600 13px var(--font-sans); display: block; }
       .setting-desc { font-size: 11.5px; color: var(--muted-fg); line-height: 1.55; margin-top: 2px; }
+      .platform-note { display: block; color: var(--faint-fg); margin-top: 4px; font-size: 11px; }
       .widget-hint {
-        margin-top: 13px; padding: 11px 13px; border-radius: 10px;
+        margin-top: 6px; padding: 11px 13px; border-radius: 10px;
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid var(--border);
         font-size: 11.5px; color: var(--muted-fg); line-height: 1.7;
@@ -410,9 +434,18 @@
       .switch input:disabled + .slider { opacity: 0.4; cursor: not-allowed; }
       .switch input:disabled:checked + .slider { filter: grayscale(0.7); }
 
+      /* --- Updates card --- */
+      .update-row {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        padding-top: 2px;
+      }
+      .update-row .btn-secondary { flex-shrink: 0; }
+      .update-row .status { flex: 1 1 100%; margin-top: 2px; }
+      #update-status { font-size: 11.5px; }
+
       /* --- Footer --- */
       .footer {
-        margin-top: 20px; padding-top: 16px;
+        margin-top: 22px; padding-top: 16px;
         border-top: 1px solid var(--border);
         display: flex; align-items: center; justify-content: space-between; gap: 12px;
       }
@@ -426,7 +459,6 @@
         border: 1px solid var(--border); background: rgba(255,255,255,0.03);
         padding: 5px 10px; border-radius: 999px;
       }
-      #update-status { margin-top: 12px; font-size: 11.5px; text-align: right; }
       button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
         outline: 2px solid rgba(255, 95, 77, 0.7); outline-offset: 2px;
       }
@@ -481,78 +513,92 @@
       </div>
 
       <!-- Signed-in feature area (hidden until auth completes) -->
-      <div id="feature-cards" class="hidden" style="margin-top: 14px;">
-        <div class="stack">
-          <!-- Workspace: pick the project -->
-          <div class="card">
-            <p class="card-title">Workspace</p>
-            <div class="field">
-              <label for="project">Project</label>
-              <div class="project-row">
-                <select id="project"><option>— load a project —</option></select>
+      <div id="feature-cards" class="hidden">
+        <div class="feature-grid">
+          <!-- Main column: workspace → source file → submit -->
+          <div class="feature-col">
+            <!-- Workspace: pick the channel, then a project in it -->
+            <div class="card">
+              <p class="card-title">Workspace</p>
+              <div class="fields-2">
+                <div class="field">
+                  <label for="channel">Channel</label>
+                  <select id="channel"><option value="">All channels</option></select>
+                </div>
+                <div class="field">
+                  <label for="project">Project</label>
+                  <select id="project"><option value="">— choose a project —</option></select>
+                </div>
+              </div>
+              <div class="roles-row hidden" id="roles-row">
+                <span id="role-chips" class="role-chips"></span>
+                <span id="roles-note" class="roles-note"></span>
               </div>
             </div>
-            <div class="roles-row hidden" id="roles-row">
-              <span id="role-chips" class="role-chips"></span>
-              <span id="roles-note" class="roles-note"></span>
+
+            <!-- Drop your file card -->
+            <div class="card">
+              <p class="card-title">Source file</p>
+              <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Choose or drop a file to upload">
+                <span class="dz-icon">▣</span>
+                <div>
+                  <span class="dz-title" id="dz-title">Drag &amp; drop your file here</span>
+                  <span class="dz-sub" id="dz-sub">or <b>click to choose</b> — a file from your PC to hand in for review</span>
+                </div>
+                <span class="dz-change" id="dz-change" style="display:none;">Change</span>
+              </div>
+            </div>
+
+            <!-- Submit for review card -->
+            <div class="card">
+              <p class="card-title" id="review-card-title">Submit for review</p>
+              <p id="review-copy" style="font-size:11.5px;color:var(--muted-fg);line-height:1.55;margin-bottom:12px;">
+                The file and your note go to the Captain&apos;s review desk — the vault only changes once it is approved.
+              </p>
+              <div class="field" id="note-field" style="align-items:flex-start;">
+                <label for="upload-note">Note to the Captain <span class="opt">optional</span></label>
+                <textarea id="upload-note" rows="3" placeholder="Describe this file — what it is, what it is for, and anything the Captain should look at…"></textarea>
+              </div>
+              <button id="upload" class="btn-primary" disabled>Submit for review</button>
+              <div class="bar"><div id="barfill"></div></div>
+              <div id="progress-label" class="progress-label hidden"></div>
+              <div id="status" class="status"></div>
             </div>
           </div>
 
-          <!-- Drop your file card -->
-          <div class="card">
-            <p class="card-title">Source file</p>
-            <div class="dropzone" id="dropzone" role="button" tabindex="0" aria-label="Choose or drop a file to upload">
-              <span class="dz-icon">▣</span>
-              <div>
-                <span class="dz-title" id="dz-title">Drag &amp; drop your file here</span>
-                <span class="dz-sub" id="dz-sub">or <b>click to choose</b> — a file from your PC to hand in for review</span>
+          <!-- Side column: widget + updates -->
+          <div class="feature-col">
+            <!-- Floating widget -->
+            <div class="card">
+              <p class="card-title">Floating widget</p>
+              <p class="card-lead">
+                A compact bubble over other apps — one click back to Tandem.
+                <span id="platform-note" class="platform-note"></span>
+              </p>
+              <div class="setting-row">
+                <div>
+                  <span class="setting-name">Widget</span>
+                  <span class="setting-desc">Show the bubble and auto-show it while a video plays</span>
+                </div>
+                <label class="switch"><input type="checkbox" id="widget-enable" /><span class="slider"></span></label>
               </div>
-              <span class="dz-change" id="dz-change" style="display:none;">Change</span>
+              <div class="widget-hint" id="widget-hint">
+                Turning <b>Widget</b> on pops the bubble onto the screen right away.
+                Drag it to reposition — it stays where you put it. Press <b>Ctrl+Alt+T</b> or use
+                the tray icon (red dot) to show/hide it anytime. With the widget on, closing this
+                window keeps the agent running in the tray
+                (tray menu → <b>Quit Tandem Agent</b> to exit).
+              </div>
             </div>
-          </div>
 
-          <!-- Submit for review card -->
-          <div class="card">
-            <p class="card-title" id="review-card-title">Submit for review</p>
-            <p id="review-copy" style="font-size:11.5px;color:var(--muted-fg);line-height:1.55;margin-bottom:12px;">
-              The file and your note go to the Captain&apos;s review desk — the vault only changes once it is approved.
-            </p>
-            <div class="field" id="note-field" style="align-items:flex-start;">
-              <label for="upload-note">Note to the Captain <span class="opt">optional</span></label>
-              <textarea id="upload-note" rows="3" placeholder="Describe this file — what it is, what it is for, and anything the Captain should look at…"></textarea>
-            </div>
-            <button id="upload" class="btn-primary" disabled>Submit for review</button>
-            <div class="bar"><div id="barfill"></div></div>
-            <div id="progress-label" class="progress-label hidden"></div>
-            <div id="status" class="status"></div>
-          </div>
-
-          <!-- Floating widget — bottom row -->
-          <div class="card">
-            <p class="card-title">Floating widget</p>
-            <p style="font-size:12px;color:var(--muted-fg);line-height:1.6;margin-bottom:2px;">
-              A compact bubble that pops up over other apps so Tandem is one click away.
-              <span id="platform-note" style="color:var(--faint-fg);"></span>
-            </p>
-            <div class="setting-row">
-              <div>
-                <span class="setting-name">Floating widget</span>
-                <span class="setting-desc">Show a draggable Tandem bubble over other apps</span>
+            <!-- Updates -->
+            <div class="card">
+              <p class="card-title">Agent updates</p>
+              <p class="card-lead">Keep the desktop agent current — new versions install on restart.</p>
+              <div class="update-row">
+                <button id="update-btn" class="btn-secondary">Check for updates</button>
+                <span id="update-status" class="status"></span>
               </div>
-              <label class="switch"><input type="checkbox" id="widget-enable" /><span class="slider"></span></label>
-            </div>
-            <div class="setting-row">
-              <div>
-                <span class="setting-name">Auto-show while a video plays</span>
-                <span class="setting-desc">Pop the bubble up when Windows detects video playback</span>
-              </div>
-              <label class="switch"><input type="checkbox" id="widget-auto" /><span class="slider"></span></label>
-            </div>
-            <div class="widget-hint" id="widget-hint">
-              Click the bubble to open the agent. Drag it to reposition — it stays where you put it.
-              Press <b>Ctrl+Alt+T</b> or use the tray icon (red dot) to show/hide it anytime.
-              With the widget on, closing this window keeps the agent running in the tray
-              (tray menu → <b>Quit Tandem Agent</b> to exit).
             </div>
           </div>
         </div>
@@ -562,12 +608,10 @@
       <footer class="footer">
         <span class="version">v<span id="version">0.0.0</span> · Tandem Desktop Agent</span>
         <div class="footer-actions">
-          <button id="update-btn" class="btn-ghost">Check for updates</button>
           <span id="footer-account" class="footer-account hidden"></span>
           <button id="sign-out" class="btn-secondary hidden">Sign out</button>
         </div>
       </footer>
-      <div id="update-status" class="status" style="text-align:right;"></div>
     </div>
 
     <script src="./renderer.js"></script>

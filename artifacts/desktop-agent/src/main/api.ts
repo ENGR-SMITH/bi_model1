@@ -13,8 +13,19 @@ export interface ProjectDetail {
   id: string;
   name: string;
   status: string;
+  /** The workspace channel this project lives in (null for legacy unlinked projects). */
+  channelId: string | null;
   /** The viewer's roles in this project, e.g. ["VIDEO", "THUMBNAIL"]. */
   myRoles: string[];
+}
+
+/** A Creator Den channel the signed-in user is on (owned + editor mirrors). */
+export interface ChannelItem {
+  id: string;
+  name: string | null;
+  youtubeTitle: string | null;
+  youtubeAvatarUrl: string | null;
+  myRole: "OWNER" | "EDITOR";
 }
 
 export interface Asset {
@@ -64,8 +75,18 @@ export class ApiClient {
     return (await res.json()) as T;
   }
 
-  async listProjects(): Promise<Project[]> {
-    return this.request<Project[]>("GET", "/video/projects");
+  /** The user's projects. Without a channel it lists every owned/member
+   * project (including legacy unlinked ones); with one it is scoped to that
+   * channel exactly like Creator Den (owner sees all, editors only their own
+   * memberships there). */
+  async listProjects(channelId?: string): Promise<Project[]> {
+    const query = channelId ? `?channelId=${encodeURIComponent(channelId)}` : "";
+    return this.request<Project[]>("GET", `/video/projects${query}`);
+  }
+
+  /** The channels the signed-in user belongs to (for the Channel dropdown). */
+  async listChannels(): Promise<ChannelItem[]> {
+    return this.request<ChannelItem[]>("GET", "/channels");
   }
 
   /** Project detail — includes the viewer's own roles (`myRoles`). */

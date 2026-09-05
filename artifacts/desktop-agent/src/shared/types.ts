@@ -5,7 +5,9 @@
 export interface AgentSettings {
   /** Master switch for the floating widget (bubble + tray + detection). */
   widgetEnabled: boolean;
-  /** Auto-show the bubble while a video is playing on the OS. */
+  /** Auto-show the bubble while a video is playing on the OS. The settings UI
+   * is a single "Widget" switch, so this moves in lockstep with
+   * `widgetEnabled` — on enables auto-show, off disables it. */
   widgetAutoShow: boolean;
   /** Last position of the floating bubble, saved so it stays where the user dragged it. */
   widgetPos: { x: number; y: number } | null;

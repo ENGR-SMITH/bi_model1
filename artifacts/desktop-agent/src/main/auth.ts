@@ -142,9 +142,15 @@ export async function beginBrowserSignIn(
         if (body.length > MAX_BODY_BYTES) req.destroy();
       });
       req.on("end", () => {
-        let parsed: { state?: unknown; token?: unknown; name?: unknown; imageUrl?: unknown };
+        let parsed: { state?: unknown; token?: unknown; name?: unknown; imageUrl?: unknown; email?: unknown };
         try {
-          parsed = JSON.parse(body) as { state?: unknown; token?: unknown; name?: unknown; imageUrl?: unknown };
+          parsed = JSON.parse(body) as {
+            state?: unknown;
+            token?: unknown;
+            name?: unknown;
+            imageUrl?: unknown;
+            email?: unknown;
+          };
         } catch {
           res.writeHead(400, { ...corsHeaders, "Content-Type": "application/json" });
           res.end(JSON.stringify({ ok: false, error: "Invalid request body." }));
@@ -184,7 +190,7 @@ export async function beginBrowserSignIn(
  * tokens.
  */
 function completeFromPost(
-  body: { state?: unknown; token?: unknown; name?: unknown; imageUrl?: unknown },
+  body: { state?: unknown; token?: unknown; name?: unknown; imageUrl?: unknown; email?: unknown },
   expectedState: string,
   expectedIss: string,
   webOrigin: string,
@@ -198,15 +204,24 @@ function completeFromPost(
     typeof body.imageUrl === "string" && /^https?:\/\//.test(body.imageUrl)
       ? body.imageUrl.slice(0, 500)
       : null;
+  // The Clerk session JWT carries no email by default, so the sign-in page
+  // hands the primary email over explicitly. Claims stay as a fallback for
+  // instances that add the email to the session token.
+  const bodyEmail =
+    typeof body.email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email.trim())
+      ? body.email.trim().slice(0, 320)
+      : null;
+  const email =
+    bodyEmail ??
+    (typeof claims.email === "string"
+      ? claims.email
+      : typeof claims.email_address === "string"
+        ? claims.email_address
+        : null);
   return {
     token: body.token,
     userId: typeof claims.sub === "string" ? claims.sub : "unknown",
-    email:
-      typeof claims.email === "string"
-        ? claims.email
-        : typeof claims.email_address === "string"
-          ? claims.email_address
-          : null,
+    email,
     name,
     imageUrl,
   };
