@@ -3,6 +3,9 @@ import { Link, useLocation } from 'wouter';
 import { useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  getGetCollaborationInboxQueryKey,
+  getListVideoNotificationsQueryKey,
+  getListContinuationsQueryKey,
   useGetCollaborationInbox,
   useListCollaborationProjects,
   useListCollaborationThreads,
@@ -10,8 +13,6 @@ import {
   useListVideoNotifications,
   useMarkCollaborationNotificationRead,
   useMarkVideoNotificationRead,
-  getListVideoNotificationsQueryKey,
-  getListContinuationsQueryKey,
 } from '@workspace/api-client-react';
 import type { VideoNotification } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/protected-shell';
@@ -62,7 +63,15 @@ export default function InboxPage() {
   const threadsQ = useListCollaborationThreads({ query: { queryKey: ['collaboration-inbox-threads'] } });
   const projectsQ = useListCollaborationProjects();
   const continuationsQ = useListContinuations({ query: { queryKey: getListContinuationsQueryKey() } });
-  const mark = useMarkCollaborationNotificationRead();
+  const mark = useMarkCollaborationNotificationRead({
+    mutation: {
+      onSuccess: () => {
+        // Keep the nav badge + other live surfaces in sync when reading here.
+        void queryClient.invalidateQueries({ queryKey: getGetCollaborationInboxQueryKey() });
+        void queryClient.invalidateQueries({ queryKey: ['collaboration-inbox'] });
+      },
+    },
+  });
   const markVideo = useMarkVideoNotificationRead({
     mutation: {
       onSuccess: () => {
