@@ -38,7 +38,6 @@ import {
 } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
 import { useChannelPresence } from '@/lib/realtime';
-import { NotificationsPanel } from '@/components/notifications-panel';
 import { channelProjectUrl } from '@/lib/den-urls';
 
 // The five relay stages — kept from the old room page as the education rail.
@@ -381,10 +380,6 @@ export default function ChannelHomePage() {
             );
           })}
         </div>
-      </div>
-
-      <div className="mt-8">
-        <NotificationsPanel />
       </div>
 
       {modalOpen && <NewProjectModal channelId={channelId} onClose={() => setModalOpen(false)} />}

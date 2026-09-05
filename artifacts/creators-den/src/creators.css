@@ -5387,7 +5387,7 @@ select optgroup {
 .cd-inbox-row.unread { background: hsl(var(--secondary) / .4); }
 .cd-inbox-row.unread::before {
   content: ""; position: absolute; left: 0; top: 10px; bottom: 10px;
-  width: 3px; border-radius: 3px; background: hsl(var(--foreground) / .85);
+  width: 3px; border-radius: 3px; background: hsl(var(--destructive));
 }
 .cd-inbox-row-icon {
   width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
@@ -5402,7 +5402,7 @@ select optgroup {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .cd-inbox-row-copy em { font: 9px var(--app-font-mono); font-style: normal; letter-spacing: .05em; color: hsl(var(--muted-foreground) / .75); }
-.cd-inbox-unread-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; margin-top: 5px; background: hsl(var(--foreground) / .9); }
+.cd-inbox-unread-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; margin-top: 4px; background: hsl(var(--destructive)); box-shadow: 0 0 0 3px hsl(var(--destructive) / .16); }
 .cd-inbox-empty { display: flex; align-items: center; gap: 9px; padding: 20px 8px; color: hsl(var(--muted-foreground)); font-size: 11.5px; line-height: 1.5; }
 .cd-inbox-empty svg { color: hsl(var(--muted-foreground) / .7); flex: 0 0 auto; }
 
@@ -5463,22 +5463,24 @@ select optgroup {
 .channel-card-menu-wrap .cd-card-delete { position: static; opacity: 0; }
 .cd-card:hover .channel-card-menu-wrap .cd-card-delete { opacity: 1; }
 
-/* ---- Analytics pill (chrome row, beside the brand name) ----
-   A quiet bordered pill that lights up red when the analytics page is open
-   — YouTube-dark: solid accent only on the active state. */
+/* ---- Analytics pill (chrome row, beside the name) ------------------------
+   Solid red in the YouTube subscribe style — unmissable — with a clear gap
+   from the channel/project name written in the brand lockup beside it. */
 .cd-topnav-analytics-chrome {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 7px 13px; border-radius: 999px;
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card) / .35);
-  color: hsl(var(--muted-foreground));
-  font: 700 11px var(--app-font-sans); letter-spacing: .01em;
+  margin-left: calc(var(--sp-4) + 4px);
+  padding: 7px 14px; border-radius: 999px;
+  border: 1px solid hsl(var(--destructive));
+  background: hsl(var(--destructive));
+  color: #fff;
+  font: 800 11px var(--app-font-sans); letter-spacing: .01em;
   text-decoration: none; white-space: nowrap;
-  transition: color .15s ease, border-color .15s ease, background .15s ease;
+  box-shadow: 0 6px 18px hsl(var(--destructive) / .28);
+  transition: filter .15s ease, box-shadow .15s ease;
 }
-.cd-topnav-analytics-chrome svg { flex: 0 0 auto; opacity: .85; }
-.cd-topnav-analytics-chrome:hover { color: hsl(var(--foreground)); border-color: hsl(var(--border)); background: hsl(var(--foreground) / .05); }
-.cd-topnav-analytics-chrome.active { color: hsl(var(--accent)); border-color: hsl(var(--accent) / .5); background: hsl(var(--accent) / .12); }
+.cd-topnav-analytics-chrome svg { flex: 0 0 auto; }
+.cd-topnav-analytics-chrome:hover { filter: brightness(1.1); box-shadow: 0 8px 22px hsl(var(--destructive) / .4); }
+.cd-topnav-analytics-chrome.active { box-shadow: 0 0 0 3px hsl(var(--destructive) / .25), 0 8px 22px hsl(var(--destructive) / .45); }
 
 /* Nav bar brand copy: keep the channel name on one line next to the lockup. */
 .cd-brand .brand-copy .truncate { max-width: min(260px, 28vw); }
@@ -5673,3 +5675,208 @@ select optgroup {
 }
 .google-btn:hover { transform: translateY(-1px); background: #f7f7f7; border-color: hsl(var(--border)); }
 .google-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+/* ============================================================================
+   Creator-Den UI pass — flat YouTube-dark modals, live-search dropdowns, the
+   channel-branded nav frame, and the cross-channel notice feed.
+   ============================================================================ */
+
+/* ---- Brand frame: inside a channel the mark becomes its profile image --- */
+.cd-brand .brand-mark {
+  display: grid; place-items: center;
+  font: italic 700 15px var(--app-font-serif);
+}
+.cd-brand .brand-mark.has-avatar {
+  border-radius: 50%; overflow: hidden;
+  background: hsl(var(--secondary));
+  box-shadow: 0 0 0 1px hsl(var(--foreground) / .14), 0 4px 14px rgba(0, 0, 0, .35);
+}
+.cd-brand .brand-mark.has-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ---- Notice feed (CMS): red unread indicators + per-channel attribution - */
+.cd-inbox-head .cd-inbox-unread-pill {
+  margin-left: auto; flex: 0 0 auto;
+  min-width: 21px; height: 21px; padding: 0 7px;
+  display: inline-grid; place-items: center;
+  border-radius: 999px;
+  background: hsl(var(--destructive));
+  color: #fff;
+  font: 800 11px var(--app-font-sans);
+  box-shadow: 0 4px 12px hsl(var(--destructive) / .4);
+}
+.cd-inbox-row-meta {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 2px;
+}
+.cd-inbox-channel {
+  display: inline-flex; align-items: center; gap: 5px;
+  max-width: 190px; overflow: hidden;
+  padding: 2px 8px 2px 3px; border-radius: 999px;
+  background: hsl(var(--foreground) / .07);
+  color: hsl(var(--muted-foreground));
+  font: 600 9.5px var(--app-font-sans); letter-spacing: .01em;
+}
+.cd-inbox-channel-avatar {
+  width: 17px; height: 17px; border-radius: 50%; overflow: hidden; flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground)); font: 700 9px var(--app-font-sans);
+}
+.cd-inbox-channel-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cd-inbox-row-copy .cd-inbox-row-meta em {
+  font: 9px var(--app-font-mono); letter-spacing: .05em;
+  color: hsl(var(--muted-foreground) / .75);
+}
+.cd-inbox-foot {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+  font: 700 11px var(--app-font-sans);
+  text-decoration: none;
+  transition: color .15s ease;
+}
+.cd-inbox-foot:hover { color: hsl(var(--foreground)); }
+
+/* ---- Top-nav search: live results dropdown ------------------------------ */
+.cd-explore-search-wrap { position: relative; width: 100%; max-width: 440px; }
+.cd-search-drop {
+  position: absolute; top: calc(100% + 10px); left: 0; right: 0; z-index: 70;
+  padding: 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+  background: hsl(0 0% 12.5%);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, .55), var(--edge-hi);
+  max-height: min(70vh, 520px); overflow: auto;
+  animation: cdModalIn .18s cubic-bezier(.22, 1, .36, 1) both;
+}
+.cd-search-drop-group { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; }
+.cd-search-drop-label {
+  padding: 7px 10px 3px;
+  color: hsl(var(--muted-foreground));
+  font: 700 9px var(--app-font-mono); letter-spacing: .14em; text-transform: uppercase;
+}
+.cd-search-drop-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 7px 8px; border: 0; border-radius: 10px;
+  background: transparent; color: hsl(var(--foreground));
+  text-align: left; cursor: pointer;
+  transition: background .14s ease;
+}
+.cd-search-drop-item:hover { background: hsl(var(--foreground) / .07); }
+.cd-search-drop-avatar {
+  width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground)); font: 700 12px var(--app-font-sans);
+}
+.cd-search-drop-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cd-search-drop-item b, .cd-search-drop-item small { display: block; }
+.cd-search-drop-item b { font: 600 12.5px var(--app-font-sans); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-search-drop-item small { margin-top: 1px; font: 10px var(--app-font-sans); color: hsl(var(--muted-foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-search-drop-all {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin-top: 4px; padding: 9px;
+  border: 0; border-top: 1px solid hsl(var(--border));
+  background: transparent; color: hsl(var(--muted-foreground));
+  font: 700 11.5px var(--app-font-sans); cursor: pointer;
+  transition: color .14s ease;
+}
+.cd-search-drop-all:hover { color: hsl(var(--foreground)); }
+.cd-search-drop-empty { padding: 16px 12px; text-align: center; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.6; }
+
+/* ---- Invite-a-teammate: live suggestions with avatars ------------------- */
+.invite-pick { position: relative; }
+.invite-suggest {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40;
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 6px; max-height: 264px; overflow: auto;
+  border: 1px solid hsl(var(--border)); border-radius: 12px;
+  background: hsl(0 0% 12.5%);
+  box-shadow: 0 20px 46px rgba(0, 0, 0, .5), var(--edge-hi);
+  animation: cdModalIn .16s cubic-bezier(.22, 1, .36, 1) both;
+}
+.invite-suggest button {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 7px 8px; border: 0; border-radius: 9px;
+  background: transparent; color: hsl(var(--foreground));
+  text-align: left; cursor: pointer;
+  transition: background .14s ease;
+}
+.invite-suggest button:hover { background: hsl(var(--foreground) / .07); }
+.invite-suggest-avatar {
+  width: 26px; height: 26px; border-radius: 50%; overflow: hidden; flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground)); font: 700 11px var(--app-font-sans);
+}
+.invite-suggest-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.invite-suggest b { font: 600 12.5px var(--app-font-sans); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.invite-suggest small { display: block; margin-top: 1px; font: 9px var(--app-font-mono); letter-spacing: .05em; color: hsl(var(--muted-foreground)); }
+
+/* ---- Modals: flat YouTube-dark panels ----------------------------------- */
+@keyframes cdModalIn {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+.modal-backdrop { background: hsl(0 0% 0% / .78); backdrop-filter: blur(8px); }
+.modal {
+  border: 1px solid hsl(var(--border));
+  border-radius: 20px;
+  padding: 32px 34px;
+  background: hsl(0 0% 12.5%);
+  box-shadow: 0 40px 100px rgba(0, 0, 0, .6), var(--edge-hi);
+  animation: cdModalIn .22s cubic-bezier(.22, 1, .36, 1) both;
+}
+.project-modal { background: linear-gradient(180deg, hsl(0 0% 13.5%), hsl(0 0% 11.8%)); }
+.project-modal::before { display: none; }
+.project-modal-orbit { display: none; }
+.project-modal-heading { max-width: 520px; margin-bottom: 22px; }
+.project-modal-heading h2 { font: 700 25px/1.16 var(--app-font-sans); letter-spacing: -.02em; margin-top: 10px; }
+.project-modal-heading h2 em { color: hsl(var(--muted-foreground)); font-weight: 600; font-style: normal; }
+.project-modal-heading p { margin-top: 12px; line-height: 1.6; }
+.project-modal-fields { padding-top: 20px; }
+.project-modal .modal-submit { margin-top: 24px; }
+.modal-close {
+  top: 18px; right: 18px;
+  width: 32px; height: 32px;
+  border: 1px solid transparent; border-radius: 50%;
+  background: transparent;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.modal-close:hover { background: hsl(var(--foreground) / .07); border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
+@media (max-width: 700px) {
+  .modal { padding: 24px 20px; }
+  .project-modal-heading h2 { font-size: 22px; }
+}
+
+/* ---- “Hand this stage in”: pinned head + scrollable body ------------------
+   The top row (title + the submit action in its top-right corner) is fixed —
+   it never scrolls. Only the body below scrolls, so the submit button stays
+   in reach no matter how long the description/notes get. */
+.stage-submit-card { gap: 0; }
+.stage-submit-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.stage-submit-title { display: inline-flex; align-items: center; gap: 6px; }
+.stage-submit-top {
+  flex: 0 0 auto;
+  padding: 8px 15px;
+  border-radius: 999px;
+  box-shadow: 0 6px 16px hsl(var(--primary) / .22);
+}
+.stage-submit-scroll {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  padding-top: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.role-notes-bar > .stage-submit-card { overflow: hidden; }
+.stage-submit-note { margin: 0; }
+@media (max-width: 1180px) {
+  .role-notes-bar > .stage-submit-card { overflow: hidden; max-height: min(62vh, 540px); }
+}
