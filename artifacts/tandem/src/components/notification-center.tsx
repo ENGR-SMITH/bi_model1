@@ -42,6 +42,36 @@ type NoticePayload = {
   readAt?: unknown;
 };
 
+/** A soft two-pip chime for an incoming notice (Web Audio — no asset file
+ * needed, mirrors Author Den's message beep). Skipped when the browser
+ * hasn't allowed audio yet (e.g. before any user gesture); it never throws. */
+function playChime(): void {
+  try {
+    const AudioCtx =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    void ctx.resume();
+    const pip = (frequency: number, at: number, duration: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + at);
+      gain.gain.exponentialRampToValueAtTime(0.05, ctx.currentTime + at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + duration);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + at);
+      osc.stop(ctx.currentTime + at + duration + 0.05);
+    };
+    pip(660, 0, 0.16);
+    pip(880, 0.2, 0.2);
+  } catch {
+    // audio unavailable — the toast still shows
+  }
+}
+
 /** Marks a notice read in whichever den wrote it, then opens its den page. */
 function openDenNotice(
   payload: NoticePayload,
@@ -109,6 +139,7 @@ export function NotificationCenter() {
         // On the inbox page the notice appears in the list live — a popup on
         // top of it is redundant. Elsewhere, show the brief toast.
         if (location === '/inbox') return;
+        playChime();
         const world = worldFromPayload(payload);
         const meta = metaFor(world, typeof payload?.category === 'string' ? payload.category : '');
         const noticeTitle =
