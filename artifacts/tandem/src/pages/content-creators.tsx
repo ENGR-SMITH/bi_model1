@@ -1,7 +1,6 @@
 import { PiArrowUpRightDuotone, PiDownloadSimpleDuotone, PiFilmSlateDuotone, PiMicrophoneStageDuotone, PiPaletteDuotone, PiScissorsDuotone } from 'react-icons/pi';
 import { Link } from 'wouter';
 import { useUser } from '@clerk/react';
-import { SectionEyebrow } from '@/components/protected-shell';
 
 const LEGS = [
   { number: '01', role: 'Story Architect', studio: 'Selects & structure', icon: PiFilmSlateDuotone },
@@ -24,7 +23,6 @@ export default function ContentCreatorsPage() {
 
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-stretch">
           <div className="flex flex-col justify-center">
-            <SectionEyebrow>Content creators / the room</SectionEyebrow>
             <h1 className="mt-3 max-w-[10ch] text-5xl font-extrabold leading-[.9] tracking-[-0.07em] text-white sm:text-6xl">
               Your footage has a room.
             </h1>

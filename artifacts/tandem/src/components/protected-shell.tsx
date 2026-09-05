@@ -1,6 +1,5 @@
 import { useAuth, useClerk, useUser } from '@clerk/react';
 import {
-  PiArrowLeftDuotone,
   PiChartLineUpDuotone,
   PiListDuotone,
   PiSignOutDuotone,
@@ -112,15 +111,11 @@ function PrivateShell({ children }: { children: ReactNode }) {
               })}
             </nav>
 
-            {/* Right cluster — authors shortcut, user chip, sign out */}
+            {/* Right cluster — user chip, sign out */}
             <div className="ml-auto flex items-center gap-2">
-              <Link href="/categories/authors" className="focus-house group hidden items-center gap-2 rounded-full px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100 lg:flex" data-testid="link-header-authors">
-                <PiArrowLeftDuotone className="h-3.5 w-3.5 text-zinc-500 transition-transform group-hover:-translate-x-0.5" />
-                Author's Atrium
-              </Link>
               <UserChip />
-              <button type="button" onClick={logout} className="focus-house group hidden items-center gap-2 rounded-full border border-white/10 px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-100 sm:flex" data-testid="button-header-logout">
-                <PiSignOutDuotone className="h-3.5 w-3.5 text-zinc-500 transition-transform group-hover:-translate-x-0.5 group-hover:translate-y-0.5" />
+              <button type="button" onClick={logout} className="focus-house group hidden items-center gap-2 rounded-full border border-red-500/40 px-3 py-2 text-xs font-medium text-red-400 transition-colors hover:border-red-400 hover:bg-red-500/10 hover:text-red-300 sm:flex" data-testid="button-header-logout">
+                <PiSignOutDuotone className="h-3.5 w-3.5 text-red-400 transition-transform group-hover:-translate-x-0.5 group-hover:translate-y-0.5" />
                 Sign out
               </button>
               <button type="button" onClick={() => setMenuOpen((open) => !open)} className="focus-house rounded-lg border border-white/10 p-2 md:hidden" aria-label="Open menu" data-testid="button-mobile-profile-menu">
@@ -143,8 +138,7 @@ function PrivateShell({ children }: { children: ReactNode }) {
                 );
               })}
               <div className="my-1 h-px bg-white/5" />
-              <Link href="/categories/authors" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid="link-mobile-authors"><PiArrowLeftDuotone className="h-4 w-4 text-zinc-500" />Author's Atrium</Link>
-              <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-400 hover:bg-white/5" data-testid="button-mobile-logout"><PiSignOutDuotone className="h-4 w-4" />Sign out</button>
+              <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-red-400 hover:bg-white/5 hover:text-red-300" data-testid="button-mobile-logout"><PiSignOutDuotone className="h-4 w-4 text-red-400" />Sign out</button>
             </div>
           )}
         </div>

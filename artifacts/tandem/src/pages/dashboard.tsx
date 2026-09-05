@@ -1,7 +1,6 @@
 import { PiArrowUpRightDuotone, PiCompassRoseDuotone } from 'react-icons/pi';
 import { useUser } from '@clerk/react';
 import { Link } from 'wouter';
-import { SectionEyebrow } from '@/components/protected-shell';
 import { tandemCategories } from '@/data/categories';
 
 // Premium dark theme — Resend/Framer inspired
@@ -32,11 +31,12 @@ export default function Dashboard() {
     <div className="mx-auto max-w-[1320px]">
       <div className="reveal flex flex-col justify-between gap-6 border-b border-white/5 pb-10 md:flex-row md:items-end">
         <div>
-          <SectionEyebrow>The private platform / {tandemCategories.length} rooms</SectionEyebrow>
           <h1 className="mt-5 max-w-[12ch] text-6xl font-bold leading-[.9] tracking-[-0.05em] text-white sm:text-8xl">Welcome, {name}.</h1>
         </div>
-        <div className="max-w-sm border-l border-white/10 pl-5 text-sm leading-[1.8] text-zinc-400">
-          <p>The platform is opening one room at a time. Start where your practice already has a pulse.</p>
+        {/* The footer-card treatment, moved up beside the welcome line. */}
+        <div className="grid max-w-md gap-5 sm:grid-cols-[auto_1fr] sm:items-center">
+          <PiCompassRoseDuotone className="h-7 w-7 animate-spin-slow text-[#3b82f6]" />
+          <p className="text-sm leading-relaxed text-zinc-500">Every room starts with two. Tandem keeps the contribution visible, the connection human, and the strange route an idea took intact.</p>
         </div>
       </div>
 
@@ -78,11 +78,6 @@ export default function Dashboard() {
             </Link>
           );
         })}
-      </div>
-
-      <div className="reveal reveal-2 mt-16 grid gap-5 border-t border-white/5 pt-8 sm:grid-cols-[auto_1fr] sm:items-center">
-        <PiCompassRoseDuotone className="h-7 w-7 animate-spin-slow text-[#3b82f6]" />
-        <p className="max-w-2xl text-sm leading-relaxed text-zinc-500">Every room starts with two. Tandem keeps the contribution visible, the connection human, and the strange route an idea took intact.</p>
       </div>
     </div>
   );
