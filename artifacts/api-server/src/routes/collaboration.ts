@@ -11,6 +11,7 @@ import {
   or,
 } from "drizzle-orm";
 import { Router, type IRouter, type Request, type Response } from "express";
+import { emitToUser } from "../realtime";
 import {
   collaborationActivityEventsTable,
   collaborationGenealogyTable,
@@ -139,14 +140,30 @@ async function notify(
   deepLink: string,
   resourceId: string | null,
 ) {
+  const id = crypto.randomUUID();
   await db.insert(collaborationNotificationsTable).values({
-    id: crypto.randomUUID(),
+    id,
     recipientId,
     category,
     title,
     body,
     deepLink,
     resourceId,
+  });
+  // Stream the notice to the recipient's personal socket room (`user:{id}`)
+  // so open tabs — the Author Den bell and the Tandem inbox — update the
+  // moment it is written, no polling needed. Shape matches the inbox REST
+  // response (read is false until the recipient marks it). No-ops when the
+  // socket server isn't running (isolated route tests).
+  emitToUser(recipientId, "notification.new", {
+    id,
+    category,
+    title,
+    body,
+    deepLink,
+    resourceId,
+    read: false,
+    createdAt: new Date().toISOString(),
   });
 }
 

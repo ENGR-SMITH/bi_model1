@@ -15,6 +15,7 @@ import {
 } from '@workspace/api-client-react';
 import type { VideoNotification } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/protected-shell';
+import { useInboxRealtime } from '@/lib/use-inbox-realtime';
 
 function roleLabel(project: any, role: string) {
   return project.creatorId === role ? project.creatorName : project.respondentName;
@@ -85,14 +86,11 @@ export default function InboxPage() {
   const { user } = useUser();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  // Both feeds refresh every 20s while the inbox is open, so a new notice on
-  // either den shows up here without a reload.
-  const inboxQ = useGetCollaborationInbox({
-    query: { queryKey: ['collaboration-inbox'], refetchInterval: 20_000 },
-  });
-  const videoQ = useListVideoNotifications({
-    query: { queryKey: getListVideoNotificationsQueryKey(), refetchInterval: 20_000 },
-  });
+  // A live Socket.IO connection keeps both feeds current — a new notification
+  // from either den refetches them the moment it is written (no polling).
+  useInboxRealtime();
+  const inboxQ = useGetCollaborationInbox({ query: { queryKey: ['collaboration-inbox'] } });
+  const videoQ = useListVideoNotifications({ query: { queryKey: getListVideoNotificationsQueryKey() } });
   const threadsQ = useListCollaborationThreads({ query: { queryKey: ['collaboration-inbox-threads'] } });
   const projectsQ = useListCollaborationProjects();
   const continuationsQ = useListContinuations({ query: { queryKey: getListContinuationsQueryKey() } });
