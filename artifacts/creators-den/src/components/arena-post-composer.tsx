@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, Megaphone, X } from 'lucide-react';
 import {
   getListArenaPostsQueryKey,
@@ -52,6 +53,7 @@ export function PostArenaRoleModal({
   onClose,
   onCreated,
 }: PostArenaRoleModalProps) {
+  const queryClient = useQueryClient();
   const pickerMode = Boolean(projects && projects.length > 0);
   const [selectedProjectId, setSelectedProjectId] = useState(projects?.[0]?.id ?? projectId ?? '');
   const [roles, setRoles] = useState<ArenaRole[]>([]);
@@ -75,35 +77,10 @@ export function PostArenaRoleModal({
   const alreadyOpenRoles = ((openOnProject.data ?? []) as ArenaPostSummary[]).map((post) => post.role);
   const allRolesOpen = Boolean(activeProjectId) && alreadyOpenRoles.length >= ROLES.length;
 
-  // The roles queued for creation on this submit pass. Each mutate() call
-  // posts one role; onSuccess advances the queue and onCreated fires after
-  // the LAST one lands.
+  // The roles still queued for creation on this submit pass.
   const queueRef = useRef<ArenaRole[]>([]);
-  const abortedRef = useRef(false);
 
-  const create = useCreateArenaPost({
-    mutation: {
-      onSuccess: (post) => {
-        const rest = queueRef.current.slice(1);
-        queueRef.current = rest;
-        setPendingCount(rest.length);
-        // An earlier role in this pass failed — stay open and let the error
-        // message carry the news instead of navigating away.
-        if (abortedRef.current) return;
-        if (rest.length === 0) onCreated(post);
-      },
-      onError: (error) => {
-        abortedRef.current = true;
-        queueRef.current = [];
-        setPendingCount(0);
-        const messageFromServer =
-          (error as { response?: { data?: { error?: string } } })?.response?.data?.error ?? null;
-        setServerError(
-          messageFromServer ?? 'We could not open this audition just yet. Try again.',
-        );
-      },
-    },
-  });
+  const create = useCreateArenaPost();
 
   const busy = pendingCount > 0;
   const pitchLength = pitch.length;
@@ -125,15 +102,43 @@ export function PostArenaRoleModal({
     );
   };
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  // One role at a time: the shared mutation hook can only track a single
+  // in-flight request, so firing them all at once drops the callbacks for
+  // every call but the last. Sequential mutateAsync posts every selected role
+  // and only navigates away after the final one lands.
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!canSubmit || roles.length === 0 || !activeProjectId) return;
     setServerError(null);
-    abortedRef.current = false;
     const queue = roles.slice();
     queueRef.current = queue;
     setPendingCount(queue.length);
-    queue.forEach((role) => create.mutate({ data: { projectId: activeProjectId, role, pitch: pitch.trim() } }));
+    let lastPost: ArenaPostDetail | null = null;
+    for (const role of queue) {
+      try {
+        lastPost = await create.mutateAsync({
+          data: { projectId: activeProjectId, role, pitch: pitch.trim() },
+        });
+        queueRef.current = queueRef.current.slice(1);
+        setPendingCount(queueRef.current.length);
+      } catch (error) {
+        queueRef.current = [];
+        setPendingCount(0);
+        const messageFromServer =
+          (error as { response?: { data?: { error?: string } } })?.response?.data?.error ?? null;
+        setServerError(
+          messageFromServer
+            ? `${ARENA_ROLE_META[role].roleLabel}: ${messageFromServer}`
+            : `We could not open the ${ARENA_ROLE_META[role].roleLabel.toLowerCase()} audition just yet — the other roles went through.`,
+        );
+        // The roles that already went live must now read as open/disabled.
+        void queryClient.invalidateQueries({
+          queryKey: getListArenaPostsQueryKey({ projectId: activeProjectId }),
+        });
+        return;
+      }
+    }
+    if (lastPost) onCreated(lastPost);
   };
 
   const title = pickerMode ? 'Open roles on your projects.' : `Open a role on “${projectName}”.`;

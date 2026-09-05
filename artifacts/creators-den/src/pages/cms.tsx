@@ -639,25 +639,19 @@ function ArenaDoorwayRow() {
           it's open, and get hired straight onto the team.
         </span>
         <span className="arena-doorway-foot">
+          {/* Just the people — avatars stacked side by side, no caption. */}
           {posters.length > 0 ? (
-            <>
-              <span className="arena-doorway-avatars" aria-hidden>
-                {posters.map((poster) => (
-                  <span key={poster.id} className="arena-doorway-avatar">
-                    {poster.imageUrl ? <img src={poster.imageUrl} alt="" /> : poster.name.slice(0, 1).toUpperCase()}
-                  </span>
-                ))}
-                {morePosters > 0 && <span className="arena-doorway-avatar more">+{morePosters}</span>}
-              </span>
-              <span className="arena-doorway-foot-text">
-                <b>{posters.length === 1 ? 'A captain is posting right now' : `${posters.length} captains are posting right now`}</b>
-                <small>Tap to see every open role — and audition.</small>
-              </span>
-            </>
+            <span className="arena-doorway-avatars" aria-hidden>
+              {posters.map((poster) => (
+                <span key={poster.id} className="arena-doorway-avatar">
+                  {poster.imageUrl ? <img src={poster.imageUrl} alt="" /> : poster.name.slice(0, 1).toUpperCase()}
+                </span>
+              ))}
+              {morePosters > 0 && <span className="arena-doorway-avatar more">+{morePosters}</span>}
+            </span>
           ) : (
             <span className="arena-doorway-foot-text">
               <b>Be the first to post an open role</b>
-              <small>The board opens the moment a captain posts.</small>
             </span>
           )}
         </span>
