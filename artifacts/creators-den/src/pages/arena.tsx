@@ -178,53 +178,53 @@ function PostCard({ post }: { post: ArenaPostSummary }) {
       data-role={post.role}
       data-testid={`arena-post-${post.id}`}
     >
-      <span className="arena-card-main">
-        <span className="arena-card-topline">
-          <span className="arena-channel-avatar" aria-hidden>
-            {post.channelAvatarUrl ? <img src={post.channelAvatarUrl} alt="" /> : post.channelName.slice(0, 1).toUpperCase()}
-          </span>
-          <span className="min-w-0">
-            <span className="arena-card-channel">{post.channelName}</span>
-            <span className="arena-card-project">{post.projectName}</span>
-          </span>
+      {/* Top row: channel avatar + channel/project titles on the left, the
+          live chip and applicant count anchored to the right edge. */}
+      <span className="arena-card-top">
+        <span className="arena-channel-avatar" aria-hidden>
+          {post.channelAvatarUrl ? <img src={post.channelAvatarUrl} alt="" /> : post.channelName.slice(0, 1).toUpperCase()}
+        </span>
+        <span className="arena-card-title min-w-0">
+          <span className="arena-card-channel">{post.channelName}</span>
+          <span className="arena-card-project">{post.projectName}</span>
+        </span>
+        <span className="arena-card-topright">
           <span className="arena-card-live" aria-hidden><i /> live</span>
-        </span>
-
-        <span className="arena-card-roleline">
-          <ArenaRoleTag role={post.role} />
-          <span className="arena-card-seat">looking for a {meta.roleLabel.toLowerCase()}</span>
-        </span>
-
-        <span className="arena-card-pitch">{post.pitch}</span>
-
-        <span className="arena-card-foot">
-          <span className="arena-card-poster">
-            {post.posterImageUrl ? <img src={post.posterImageUrl} alt="" /> : <i>{post.posterName.slice(0, 1)}</i>}
-            {post.posterName}
-          </span>
-          <span className="arena-card-time">{timeAgo(post.createdAt)}</span>
-          <span className="arena-card-arrow">
-            Open audition <ArrowRight size={13} />
-          </span>
+          {applied ? (
+            <span className="arena-count applied" data-testid={`arena-count-${post.id}`}>
+              <CheckCircle2 size={13} />
+              {post.myApplication === 'accepted' ? 'You’re on this team' : 'Audition sent'}
+            </span>
+          ) : (
+            <span className="arena-count" data-testid={`arena-count-num-${post.id}`}>
+              {post.applicantCount > 0 ? (
+                <>
+                  <b>{post.applicantCount}</b>
+                  already applied
+                </>
+              ) : (
+                <>Be the first to audition</>
+              )}
+            </span>
+          )}
         </span>
       </span>
 
-      <span className="arena-card-side">
-        {applied ? (
-          <span className="arena-count applied" data-testid={`arena-count-${post.id}`}>
-            <CheckCircle2 size={13} />
-            {post.myApplication === 'accepted' ? 'You’re on this team' : 'Audition sent'}
-          </span>
-        ) : null}
-        <span className={`arena-count ${applied ? 'is-applied' : ''}`} data-testid={`arena-count-num-${post.id}`}>
-          {post.applicantCount > 0 ? (
-            <>
-              <b>{post.applicantCount}</b>
-              already applied
-            </>
-          ) : (
-            <>Be the first to audition</>
-          )}
+      <span className="arena-card-roleline">
+        <ArenaRoleTag role={post.role} />
+        <span className="arena-card-seat">looking for a {meta.roleLabel.toLowerCase()}</span>
+      </span>
+
+      <span className="arena-card-pitch">{post.pitch}</span>
+
+      <span className="arena-card-foot">
+        <span className="arena-card-poster">
+          {post.posterImageUrl ? <img src={post.posterImageUrl} alt="" /> : <i>{post.posterName.slice(0, 1)}</i>}
+          {post.posterName}
+        </span>
+        <span className="arena-card-time">{timeAgo(post.createdAt)}</span>
+        <span className="arena-card-arrow">
+          Open audition <ArrowRight size={13} />
         </span>
       </span>
     </Link>
