@@ -79,6 +79,32 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      {/* Footer card — a quiet closing note with the way into the foundation. */}
+      <div className="reveal reveal-2 mt-16 overflow-hidden rounded-3xl border border-[#3b82f6]/25 bg-gradient-to-br from-[#3b82f6]/10 to-transparent p-7 sm:p-9">
+        <span className="card-spot" />
+        <div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-5">
+            <span className="icon-chip h-12 w-12 shrink-0 text-[#60a5fa]">
+              <PiCompassRoseDuotone className="h-6 w-6 animate-spin-slow" />
+            </span>
+            <div>
+              <p className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#3b82f6]">A blueprint for a new kind of making</p>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-zinc-400">
+                The Engine is being built first — the other doors are already on the blueprint, waiting for their first lights. Every room starts with two.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/room/engine"
+            className="focus-house group inline-flex shrink-0 items-center gap-2 rounded-full bg-[#3b82f6] px-5 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-[#2563eb] hover:shadow-[0_0_30px_-5px_rgba(59,130,246,0.5)]"
+            data-testid="link-dashboard-footer-engine"
+          >
+            Visit the foundation
+            <PiArrowUpRightDuotone className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
