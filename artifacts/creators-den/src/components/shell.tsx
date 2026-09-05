@@ -354,6 +354,12 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
         {/* Tier 2 — the notch chips + section tabs. */}
         <div className="cd-topnav-secondary">
           <div className="cd-topnav-workspace-col">
+            {/* Globe icon in front of the Channel dropdown → the MCNs grid. */}
+            <div className="cd-topnav-chip">
+              <Link href="/" className="cd-topnav-home-notch" aria-label="All channels" title="All channels (MCNs grid)" data-testid="nav-mcn">
+                <Globe size={15} />
+              </Link>
+            </div>
             {/* Channel dropdown — every channel, one click to its den. */}
             <div className="cd-topnav-chip">
               <div className="top-workspace-wrap" onPointerLeave={() => setChannelOpen(false)}>
@@ -399,12 +405,6 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 </button>
                 {projectOpen && <ProjectMenu channelId={channelId} projectId={projectId} />}
               </div>
-            </div>
-            {/* Globe icon — beside the project dropdown, home-styled, → MCNs grid. */}
-            <div className="cd-topnav-chip">
-              <Link href="/" className="cd-topnav-home-notch" aria-label="All channels" title="All channels (MCNs grid)" data-testid="nav-mcn">
-                <Globe size={15} />
-              </Link>
             </div>
             {/* The Analytics notch — only inside a channel (per the brief it
                 sits beside the workshop dropdown). */}
