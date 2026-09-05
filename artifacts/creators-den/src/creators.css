@@ -5534,3 +5534,18 @@ select optgroup {
 }
 .cd-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 14px; margin-top: 14px; }
 .cd-va-rate-chips { display: flex; gap: 8px; margin-bottom: 8px; }
+
+/* New-channel modal: the name field with the "Sign in with Google" option
+   beside it (create-and-link when a name is typed, Google-first when not). */
+.channel-name-row { display: flex; align-items: stretch; gap: 8px; }
+.channel-name-row input { flex: 1 1 auto; min-width: 0; }
+.channel-name-hint { font: 10px var(--app-font-mono); letter-spacing: .03em; color: hsl(var(--muted-foreground)); }
+.google-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid hsl(var(--border)); background: #ffffff; color: #1f1f1f;
+  border-radius: 4px; padding: 10px 13px; font-size: 12px; font-weight: 600;
+  white-space: nowrap; cursor: pointer;
+  transition: transform .18s, background .18s, border-color .18s;
+}
+.google-btn:hover { transform: translateY(-1px); background: #f7f7f7; border-color: hsl(var(--border)); }
+.google-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }

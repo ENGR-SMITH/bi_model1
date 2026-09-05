@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import {
   db,
   tandemChannelsTable,
+  tandemChannelMembersTable,
   tandemChannelOauthTable,
 } from "@workspace/db";
 import { encryptSecret, decryptSecret } from "../lib/secrets";
@@ -65,6 +66,9 @@ export function oauthConfigured(): boolean {
 
 interface PendingConnect {
   channelId: string;
+  // Who started the link (the pending owner). A channel-less Google-first
+  // start is bound to the starter, and only they may complete the exchange.
+  userId: string;
   codeVerifier: string;
   expiresAt: number;
 }
@@ -136,7 +140,11 @@ export function parseYoutubeChannelBranding(items: YoutubeChannelItem[]): Youtub
     id: item.id,
     title: item.snippet?.title ?? "",
     description: item.snippet?.description ?? null,
-    avatarUrl: item.snippet?.thumbnails?.high?.url ?? item.snippet?.thumbnails?.default?.url ?? null,
+    avatarUrl:
+      item.snippet?.thumbnails?.high?.url ??
+      item.snippet?.thumbnails?.medium?.url ??
+      item.snippet?.thumbnails?.default?.url ??
+      null,
     bannerUrl: item.brandingSettings?.image?.bannerExternalUrl ?? null,
     country: item.snippet?.country ?? null,
   };
@@ -144,7 +152,10 @@ export function parseYoutubeChannelBranding(items: YoutubeChannelItem[]): Youtub
 
 /**
  * Build the Google consent URL for a channel. Only the channel owner can
- * start; a channel that is already connected must disconnect first.
+ * start; a channel that is already connected must disconnect first. A
+ * channel id with no row yet is a Google-first creation ("+ New channel"
+ * with no name typed): the consent runs against the provisional id and the
+ * workspace is created on exchange, named from the real YouTube channel.
  * Returns null when Google OAuth credentials are not configured.
  */
 export async function startChannelOauth(
@@ -160,22 +171,27 @@ export async function startChannelOauth(
     .from(tandemChannelsTable)
     .where(eq(tandemChannelsTable.id, channelId))
     .limit(1);
-  if (!channel) return { error: "Channel not found" };
-  if (channel.ownerId !== userId) return { error: "Only the channel owner can link a YouTube channel" };
-
-  const [existing] = await db
-    .select()
-    .from(tandemChannelOauthTable)
-    .where(eq(tandemChannelOauthTable.channelId, channelId))
-    .limit(1);
-  if (existing && existing.status === "ACTIVE") {
-    return { error: "This channel is already connected — disconnect it before re-linking" };
+  // An existing row must belong to the caller and not already be connected;
+  // a missing row is fine — that is the Google-first creation path above.
+  if (channel) {
+    if (channel.ownerId !== userId) {
+      return { error: "Only the channel owner can link a YouTube channel" };
+    }
+    const [existing] = await db
+      .select()
+      .from(tandemChannelOauthTable)
+      .where(eq(tandemChannelOauthTable.channelId, channelId))
+      .limit(1);
+    if (existing && existing.status === "ACTIVE") {
+      return { error: "This channel is already connected — disconnect it before re-linking" };
+    }
   }
 
   const codeVerifier = newCodeVerifier();
   const state = signState(channelId);
   pending.set(state, {
     channelId,
+    userId,
     codeVerifier,
     expiresAt: Date.now() + PENDING_TTL_MS,
   });
@@ -198,12 +214,15 @@ export async function startChannelOauth(
 /**
  * Exchange the consent code for tokens, bind the returned YouTube channel to
  * this workspace channel (CONNECTED + branding), and store the tokens
- * encrypted. Throws with a user-presentable message on failure.
+ * encrypted. When the channel row does not exist yet (a Google-first start
+ * with no typed name) the workspace is created here, named after the real
+ * YouTube channel. Throws with a user-presentable message on failure.
  */
 export async function exchangeChannelOauth(
   channelId: string,
   state: string,
   code: string,
+  userId: string,
 ): Promise<void> {
   const signed = verifyState(state);
   if (!signed || signed.channelId !== channelId) {
@@ -212,6 +231,9 @@ export async function exchangeChannelOauth(
   const entry = pending.get(state);
   if (!entry || entry.channelId !== channelId || entry.expiresAt < Date.now()) {
     throw new Error("This link request expired — start over from the channel card");
+  }
+  if (entry.userId !== userId) {
+    throw new Error("This link request belongs to another account — start it again from your channels");
   }
   pending.delete(state);
 
@@ -224,7 +246,9 @@ export async function exchangeChannelOauth(
     .from(tandemChannelsTable)
     .where(eq(tandemChannelsTable.id, channelId))
     .limit(1);
-  if (!channel) throw new Error("Channel not found");
+  // No row yet = Google-first creation: the workspace is created below from
+  // the picked YouTube channel's branding (name, logo, banner).
+  const creating = !channel;
 
   const tokenResponse = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
@@ -279,9 +303,33 @@ export async function exchangeChannelOauth(
 
   const expiresAt = new Date(Date.now() + (token.expires_in ?? 3600) * 1000);
   await db.transaction(async (tx) => {
-    await tx
-      .delete(tandemChannelOauthTable)
-      .where(eq(tandemChannelOauthTable.channelId, channelId));
+    if (creating) {
+      // Google-first: mint the workspace + OWNER membership now, connected
+      // and branded, with the real channel's title as its name.
+      await tx.insert(tandemChannelsTable).values({
+        id: channelId,
+        ownerId: userId,
+        status: "CONNECTED",
+        name: branding.title.trim() || "My YouTube channel",
+        youtubeChannelId: branding.id,
+        youtubeTitle: branding.title || null,
+        youtubeDescription: branding.description,
+        youtubeAvatarUrl: branding.avatarUrl,
+        youtubeBannerUrl: branding.bannerUrl,
+        youtubeCountry: branding.country,
+        updatedAt: new Date(),
+      });
+      await tx.insert(tandemChannelMembersTable).values({
+        id: crypto.randomUUID(),
+        channelId,
+        userId,
+        role: "OWNER",
+      });
+    } else {
+      await tx
+        .delete(tandemChannelOauthTable)
+        .where(eq(tandemChannelOauthTable.channelId, channelId));
+    }
     await tx.insert(tandemChannelOauthTable).values({
       id: crypto.randomUUID(),
       channelId,
@@ -291,22 +339,24 @@ export async function exchangeChannelOauth(
       scope: token.scope ?? "",
       status: "ACTIVE",
       expiresAt,
-      linkedByUserId: channel.ownerId,
+      linkedByUserId: creating ? userId : (channel?.ownerId ?? userId),
       lastRefreshedAt: new Date(),
     });
-    await tx
-      .update(tandemChannelsTable)
-      .set({
-        status: "CONNECTED",
-        youtubeChannelId: branding.id,
-        youtubeTitle: branding.title || null,
-        youtubeDescription: branding.description,
-        youtubeAvatarUrl: branding.avatarUrl,
-        youtubeBannerUrl: branding.bannerUrl,
-        youtubeCountry: branding.country,
-        updatedAt: new Date(),
-      })
-      .where(eq(tandemChannelsTable.id, channelId));
+    if (!creating) {
+      await tx
+        .update(tandemChannelsTable)
+        .set({
+          status: "CONNECTED",
+          youtubeChannelId: branding.id,
+          youtubeTitle: branding.title || null,
+          youtubeDescription: branding.description,
+          youtubeAvatarUrl: branding.avatarUrl,
+          youtubeBannerUrl: branding.bannerUrl,
+          youtubeCountry: branding.country,
+          updatedAt: new Date(),
+        })
+        .where(eq(tandemChannelsTable.id, channelId));
+    }
   });
 }
 
