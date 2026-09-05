@@ -263,11 +263,38 @@ export function StageSubmitCard({
       className={`paper-card stage-submit-card ${locked ? 'is-locked' : ''}`}
       data-testid="stage-submit-card"
     >
-      <div className="inline-heading">
-        <span className="eyebrow"><Send size={13} /> Hand this stage in</span>
-        <span className="den-tag gold">submit for review</span>
+      {/* Top row — pinned: it never scrolls with the body below, and the
+          submit action lives in its top-right corner beside the title so it
+          is always in reach. */}
+      <div className="stage-submit-head">
+        <span className="eyebrow stage-submit-title"><Send size={13} /> Hand this stage in</span>
+        {!pending && (
+          <button
+            type="button"
+            className="primary-btn stage-submit-top"
+            onClick={onSubmit}
+            disabled={
+              submitting ||
+              !canSubmit ||
+              pendingFileOverCap ||
+              (!hasSnapshot && !pendingFile) ||
+              (!description.trim() && resolvedNotes.length === 0)
+            }
+            data-testid="stage-submit-button"
+          >
+            {submitting ? <Clock3 size={13} className="spin" /> : <Send size={13} />}
+            {submitting
+              ? pendingFile
+                ? 'Submitting file…'
+                : 'Submitting…'
+              : pendingFile
+                ? 'Submit file for review'
+                : 'Submit for review'}
+          </button>
+        )}
       </div>
 
+      <div className="stage-submit-scroll">
       {/* While the hand-in awaits the Captain, the status line is the ONLY
           content of the card — no description box, no resolved-notes list, no
           submit row. The card targets the leg that is actually being worked
@@ -334,35 +361,11 @@ export function StageSubmitCard({
             </div>
           )}
 
-          <div className="stage-submit-row">
-            <button
-              type="button"
-              className="primary-btn"
-              onClick={onSubmit}
-              disabled={
-                submitting ||
-                !canSubmit ||
-                pendingFileOverCap ||
-                (!hasSnapshot && !pendingFile) ||
-                (!description.trim() && resolvedNotes.length === 0)
-              }
-              data-testid="stage-submit-button"
-            >
-              {submitting ? <Clock3 size={13} className="spin" /> : <Send size={13} />}
-              {submitting
-                ? pendingFile
-                  ? 'Submitting file…'
-                  : 'Submitting…'
-                : pendingFile
-                  ? 'Submit file for review'
-                  : 'Submit for review'}
-            </button>
-            {pendingFile && (
-              <span className="setting-copy">
-                Sends the file and your description to the Captain — Accept adds it to the vault, Reject deletes it and sends it back with their note.
-              </span>
-            )}
-          </div>
+          {pendingFile && (
+            <p className="setting-copy stage-submit-note">
+              Sends the file and your description to the Captain — Accept adds it to the vault, Reject deletes it and sends it back with their note.
+            </p>
+          )}
           {fileResult && (
             <div
               className={`stage-submit-banner ${fileResult.review ? 'is-pending' : 'is-approved'}`}
@@ -400,6 +403,7 @@ export function StageSubmitCard({
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

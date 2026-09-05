@@ -5849,3 +5849,34 @@ select optgroup {
   .modal { padding: 24px 20px; }
   .project-modal-heading h2 { font-size: 22px; }
 }
+
+/* ---- “Hand this stage in”: pinned head + scrollable body ------------------
+   The top row (title + the submit action in its top-right corner) is fixed —
+   it never scrolls. Only the body below scrolls, so the submit button stays
+   in reach no matter how long the description/notes get. */
+.stage-submit-card { gap: 0; }
+.stage-submit-head {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.stage-submit-title { display: inline-flex; align-items: center; gap: 6px; }
+.stage-submit-top {
+  flex: 0 0 auto;
+  padding: 8px 15px;
+  border-radius: 999px;
+  box-shadow: 0 6px 16px hsl(var(--primary) / .22);
+}
+.stage-submit-scroll {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  padding-top: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.role-notes-bar > .stage-submit-card { overflow: hidden; }
+.stage-submit-note { margin: 0; }
+@media (max-width: 1180px) {
+  .role-notes-bar > .stage-submit-card { overflow: hidden; max-height: min(62vh, 540px); }
+}
