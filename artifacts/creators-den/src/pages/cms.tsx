@@ -625,32 +625,38 @@ export default function CmsPage() {
         </div>
       </div>
 
-      {channels.isLoading ? (
-        <div className="panel-empty">Opening your channels…</div>
-      ) : sorted.length > 0 ? (
-        <div className="cms-grid" data-testid="cms-grid">
-          {sorted.map((channel) => <ChannelCard key={channel.id} channel={channel} />)}
-          <button type="button" className="cms-new-card" onClick={() => setModalOpen(true)} data-testid="card-new-channel">
-            <span className="cms-new-icon"><Plus size={18} /></span>
-            <b>New channel</b>
-            <small>Link a YouTube channel and run its den</small>
-          </button>
-        </div>
-      ) : (
-        <div className="empty-state" data-testid="empty-channels">
-          <Users size={22} />
-          <h3>No channels yet.</h3>
-          <p>Create a channel, link it to the YouTube channel it belongs to, and its den — projects, contributors, and analytics — all live inside it.</p>
-          <button type="button" className="primary-btn mt-3" onClick={() => setModalOpen(true)}>
-            <Plus size={14} /> New channel
-          </button>
-        </div>
-      )}
+      {/* 70/30 split: the channel wall on the left, the notice feed on the
+          right — side by side instead of stacked rows. */}
+      <div className="cms-split" data-testid="cms-split">
+        <div className="cms-split-main">
+          {channels.isLoading ? (
+            <div className="panel-empty">Opening your channels…</div>
+          ) : sorted.length > 0 ? (
+            <div className="cms-grid" data-testid="cms-grid">
+              {sorted.map((channel) => <ChannelCard key={channel.id} channel={channel} />)}
+              <button type="button" className="cms-new-card" onClick={() => setModalOpen(true)} data-testid="card-new-channel">
+                <span className="cms-new-icon"><Plus size={18} /></span>
+                <b>New channel</b>
+                <small>Link a YouTube channel and run its den</small>
+              </button>
+            </div>
+          ) : (
+            <div className="empty-state" data-testid="empty-channels">
+              <Users size={22} />
+              <h3>No channels yet.</h3>
+              <p>Create a channel, link it to the YouTube channel it belongs to, and its den — projects, contributors, and analytics — all live inside it.</p>
+              <button type="button" className="primary-btn mt-3" onClick={() => setModalOpen(true)}>
+                <Plus size={14} /> New channel
+              </button>
+            </div>
+          )}
 
-      <UnlinkedProjects />
+          <UnlinkedProjects />
+        </div>
 
-      <div className="mt-8">
-        <NotificationsPanel />
+        <aside className="cms-split-side">
+          <NotificationsPanel />
+        </aside>
       </div>
 
       {modalOpen && <NewChannelModal onClose={() => setModalOpen(false)} onCreated={onCreated} />}

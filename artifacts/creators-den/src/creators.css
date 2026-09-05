@@ -1359,7 +1359,9 @@ select optgroup {
    drops out and the two chips spread to the edges. */
 .cd-topnav-secondary {
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  /* The middle track leans slightly toward the sign-out side so the relay
+     deck never crowds the wider channel/project cluster on the left. */
+  grid-template-columns: minmax(auto, 1.15fr) auto minmax(auto, .85fr);
   align-items: stretch;
   gap: var(--sp-3);
   height: 46px;
@@ -5252,44 +5254,60 @@ select optgroup {
 .cms-sub { margin: 8px 0 0; color: hsl(var(--muted-foreground)); font-size: 13px; line-height: 1.6; max-width: 560px; }
 .cms-head-count { padding-bottom: 4px; }
 
+/* ---- CMS page: channels wall (70%) beside the notice feed (30%) ---- */
+.cms-split { display: grid; grid-template-columns: minmax(0, 70fr) minmax(0, 30fr); gap: 24px; align-items: start; }
+.cms-split-main { min-width: 0; }
+.cms-split-side { min-width: 0; }
+@media (max-width: 1020px) { .cms-split { grid-template-columns: minmax(0, 1fr); } }
+
 /* ---- Channel grid + cards ---- */
-.cms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(245px, 1fr)); gap: 16px; }
+.cms-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; }
 .cms-channel-card {
   position: relative;
   display: flex;
   flex-direction: column;
   border: 1px solid hsl(var(--border));
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  background: linear-gradient(180deg, hsl(0 0% 13%), hsl(0 0% 9.5%));
+  background: linear-gradient(180deg, hsl(0 0% 13.5%), hsl(0 0% 10%));
   box-shadow: var(--shadow-sm);
   transition: transform .24s cubic-bezier(.22,1,.36,1), box-shadow .24s ease, border-color .2s ease;
 }
-.cms-channel-card:hover { transform: translateY(-3px); border-color: hsl(var(--accent) / .55); box-shadow: 0 16px 40px rgba(0,0,0,.6), var(--accent-ring); }
+.cms-channel-card:hover { transform: translateY(-4px); box-shadow: 0 18px 44px rgba(0,0,0,.55); }
 .cms-channel-card.is-editor { border-color: hsl(164 33% 45% / .35); }
 .cms-channel-card.is-editor:hover { border-color: hsl(164 33% 45% / .6); }
 .cms-channel-hit { position: absolute; inset: 0; z-index: 2; }
-.cms-channel-banner { position: relative; height: 112px; background: linear-gradient(120deg, hsl(0 0% 16%), hsl(0 0% 8%)); overflow: hidden; }
-.cms-channel-banner-fallback { position: absolute; inset: 0; background: radial-gradient(80% 140% at 82% -30%, hsl(357 62% 24% / .55), transparent 60%), linear-gradient(120deg, hsl(0 0% 17%), hsl(0 0% 7%)); }
-.cms-channel-banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cms-channel-banner {
+  position: relative; height: 122px; overflow: hidden;
+  background: linear-gradient(120deg, hsl(0 0% 17%), hsl(0 0% 9%));
+}
+.cms-channel-banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.02); transition: transform .5s cubic-bezier(.22,1,.36,1); }
+.cms-channel-card:hover .cms-channel-banner img { transform: scale(1.06); }
+/* A quiet veil under the banner so the straddling avatar + chips read clean. */
+.cms-channel-banner::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, hsl(0 0% 0% / .16), transparent 48%, hsl(0 0% 5% / .78));
+  pointer-events: none;
+}
+.cms-channel-banner-fallback { position: absolute; inset: 0; background: radial-gradient(90% 150% at 82% -25%, hsl(0 0% 30%), transparent 55%), linear-gradient(120deg, hsl(0 0% 18%), hsl(0 0% 9%)); }
 .cms-channel-logo {
-  position: absolute; left: 14px; bottom: -23px; z-index: 3;
-  width: 54px; height: 54px; border-radius: 15px; overflow: hidden;
+  position: absolute; left: 16px; bottom: -25px; z-index: 3;
+  width: 56px; height: 56px; border-radius: 50%; overflow: hidden;
   border: 3px solid hsl(var(--card));
   background: hsl(var(--secondary));
   display: grid; place-items: center;
   font: 700 20px var(--app-font-serif); color: hsl(var(--foreground));
-  box-shadow: 0 4px 14px rgba(0,0,0,.5);
+  box-shadow: 0 6px 18px rgba(0,0,0,.55);
 }
 .cms-channel-logo img { width: 100%; height: 100%; object-fit: cover; }
 .cms-status-chip {
-  position: absolute; top: 9px; right: 9px; z-index: 3;
+  position: absolute; top: 10px; right: 10px; z-index: 3;
   display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 9px; border-radius: 999px;
-  background: hsl(0 0% 0% / .68); backdrop-filter: blur(6px);
+  background: hsl(0 0% 0% / .6); backdrop-filter: blur(6px);
   color: hsl(var(--muted-foreground)); font: 700 8px var(--app-font-mono); letter-spacing: .07em; text-transform: uppercase;
 }
-.cms-channel-card.is-owner .cms-status-chip:has(svg.lucide-check-circle-2), .cms-channel-card .cms-status-chip svg.lucide-check-circle-2 { color: hsl(164 33% 45%); }
+.cms-channel-card .cms-status-chip svg.lucide-check-circle-2 { color: hsl(164 33% 45%); }
 .cms-card-menu-btn {
   position: absolute; top: 8px; right: 8px; z-index: 4;
   width: 27px; height: 27px; display: grid; place-items: center;
@@ -5300,46 +5318,86 @@ select optgroup {
 }
 .cms-channel-card:hover .cms-card-menu-btn, .cms-card-menu-btn:focus-visible { opacity: 1; }
 .cms-card-menu-btn:hover { border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
-.cms-channel-card.is-owner .cms-status-chip { right: 42px; }
+.cms-channel-card.is-owner .cms-status-chip { right: 44px; }
 
-/* Connect-your-YouTube button on unlinked owner cards, and the disconnect
-   icon in the card menu (both must sit above the card's Link overlay). */
+/* Connect-your-YouTube button on unlinked owner cards — a filled white-on-red
+   pill (YouTube subscribe style), tucked bottom-right clear of the avatar. */
 .cms-connect-btn {
   position: absolute;
-  left: 10px;
-  bottom: 10px;
+  right: 12px;
+  bottom: 12px;
   z-index: 3;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  gap: 6px;
+  padding: 7px 13px;
   border-radius: 999px;
-  border: 1px solid hsl(var(--accent) / .45);
-  background: rgba(10, 10, 14, .72);
-  color: hsl(var(--accent));
-  font: 700 10.5px var(--app-font-sans);
-  letter-spacing: .01em;
-  backdrop-filter: blur(6px);
+  border: 0;
+  background: hsl(var(--destructive));
+  color: #fff;
+  font: 700 11px var(--app-font-sans);
+  box-shadow: 0 8px 20px hsl(var(--destructive) / .35);
   cursor: pointer;
-  transition: background .15s, border-color .15s, transform .15s;
+  transition: transform .15s ease, filter .15s ease, box-shadow .15s ease;
 }
-.cms-connect-btn:hover { background: hsl(var(--accent) / .18); border-color: hsl(var(--accent)); transform: translateY(-1px); }
-.cms-card-disconnect { right: 42px !important; }
+.cms-connect-btn:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 10px 26px hsl(var(--destructive) / .45); }
+.cms-card-disconnect { right: 44px !important; }
 .cms-card-disconnect:hover { color: hsl(var(--foreground)) !important; border-color: hsl(var(--border)) !important; }
-.cms-channel-body { display: flex; flex-direction: column; gap: 4px; padding: 30px 14px 14px; }
-.cms-channel-name { font: 700 15px var(--app-font-sans); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cms-channel-meta { color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }
-.cms-channel-open { display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; color: hsl(var(--accent)); font: 700 11px var(--app-font-sans); }
+.cms-channel-body { display: flex; flex-direction: column; gap: 4px; padding: 38px 16px 15px; }
+.cms-channel-name { font: 700 15px/1.25 var(--app-font-sans); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cms-channel-meta { color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); line-height: 1.6; }
+.cms-channel-open { display: inline-flex; align-items: center; gap: 5px; margin-top: 7px; color: hsl(var(--muted-foreground)); font: 700 11px var(--app-font-sans); transition: color .15s ease; }
+.cms-channel-card:hover .cms-channel-open { color: hsl(var(--foreground)); }
 .cms-new-card {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-  min-height: 224px; border: 1px dashed hsl(var(--border)); border-radius: 12px;
+  min-height: 224px; border: 1px dashed hsl(var(--border)); border-radius: 16px;
   background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer;
   transition: border-color .18s, color .18s, background .18s;
 }
-.cms-new-card:hover { border-color: hsl(var(--accent) / .65); color: hsl(var(--accent)); background: hsl(var(--accent) / .05); }
-.cms-new-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: hsl(var(--accent) / .12); color: hsl(var(--accent)); }
+.cms-new-card:hover { border-color: hsl(var(--border)); color: hsl(var(--foreground)); background: hsl(var(--secondary) / .4); }
+.cms-new-icon { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: hsl(var(--secondary)); color: hsl(var(--muted-foreground)); }
+.cms-new-card:hover .cms-new-icon { color: hsl(var(--foreground)); }
 .cms-new-card b { font: 700 14px var(--app-font-sans); color: inherit; }
 .cms-new-card small { font-size: 11px; color: hsl(var(--muted-foreground)); text-align: center; padding: 0 18px; }
+
+/* ---- The notice feed (CMS right rail + channel home) ---- */
+.cd-inbox { padding: 20px; border-radius: 16px; }
+.cd-inbox-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; padding: 0 2px; }
+.cd-inbox-head-mark { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.cd-inbox-head-copy { display: flex; flex-direction: column; gap: 1px; line-height: 1.2; min-width: 0; }
+.cd-inbox-head-copy b { font: 700 14px var(--app-font-sans); color: hsl(var(--foreground)); }
+.cd-inbox-head-copy small { font: 10px var(--app-font-mono); color: hsl(var(--muted-foreground)); }
+.cd-inbox-list { display: flex; flex-direction: column; gap: 2px; }
+.cd-inbox-row {
+  position: relative;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px; border-radius: 12px;
+  border: 1px solid transparent;
+  text-decoration: none; color: hsl(var(--foreground));
+  transition: background .15s ease;
+}
+.cd-inbox-row:hover { background: hsl(var(--secondary) / .65); }
+.cd-inbox-row.unread { background: hsl(var(--secondary) / .4); }
+.cd-inbox-row.unread::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px;
+  width: 3px; border-radius: 3px; background: hsl(var(--foreground) / .85);
+}
+.cd-inbox-row-icon {
+  width: 30px; height: 30px; border-radius: 9px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  background: hsl(var(--secondary)); color: hsl(var(--muted-foreground));
+}
+.cd-inbox-row.unread .cd-inbox-row-icon { background: hsl(var(--foreground) / .09); color: hsl(var(--foreground)); }
+.cd-inbox-row-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cd-inbox-row-copy b { font: 600 12.5px var(--app-font-sans); color: hsl(var(--foreground)); line-height: 1.3; }
+.cd-inbox-row-copy small {
+  font-size: 11px; color: hsl(var(--muted-foreground)); line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.cd-inbox-row-copy em { font: 9px var(--app-font-mono); font-style: normal; letter-spacing: .05em; color: hsl(var(--muted-foreground) / .75); }
+.cd-inbox-unread-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; margin-top: 5px; background: hsl(var(--foreground) / .9); }
+.cd-inbox-empty { display: flex; align-items: center; gap: 9px; padding: 20px 8px; color: hsl(var(--muted-foreground)); font-size: 11.5px; line-height: 1.5; }
+.cd-inbox-empty svg { color: hsl(var(--muted-foreground) / .7); flex: 0 0 auto; }
 
 /* ---- Dropdown selects (attach flows) ---- */
 .den-select {
@@ -5547,6 +5605,48 @@ select optgroup {
 }
 .cd-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 14px; margin-top: 14px; }
 .cd-va-rate-chips { display: flex; gap: 8px; margin-bottom: 8px; }
+
+/* ============================================================================
+   Neutral-text pass — Creator-Den reads with normal text; the theme's red
+   stays only as a FILL behind white content (buttons, badges, markers). These
+   overrides quiet every remaining red/red-tinted TEXT on the den.
+   ============================================================================ */
+.eyebrow { color: hsl(var(--muted-foreground)); }
+.world-symbol { color: hsl(var(--muted-foreground)); background: hsl(var(--secondary)); }
+/* Role/status pills: neutral surfaces, neutral text (teal approval keeps its
+   own hue; accent & gold resolve to the red family and go quiet). */
+.den-tag.accent,
+.den-tag.gold { color: hsl(var(--foreground)); background: hsl(var(--secondary)); }
+.cd-ledger-dot.accent,
+.cd-ledger-dot.gold,
+.notification-dot.accent,
+.notification-dot.gold { color: hsl(var(--foreground)); background: hsl(var(--secondary)); box-shadow: inset 0 0 0 1px hsl(var(--border)); }
+.timeline-block.tone-accent,
+.timeline-block.tone-gold,
+.timeline-block.tone-primary { border-color: hsl(var(--border)); background: hsl(var(--muted)); }
+.role-tabs .leg-badge { color: hsl(var(--muted-foreground)); background: hsl(var(--secondary)); }
+/* Initial-mark chips in the channel/project menus. */
+.workspace-menu .menu-project-mark { color: hsl(var(--muted-foreground)); background: hsl(var(--secondary)); }
+.workspace-menu button.menu-home > svg { color: hsl(var(--muted-foreground)); }
+/* Avatar initials + review-stage labels: text goes neutral, red stays only as
+   a line/playhead. */
+.cd-avatar { color: hsl(var(--foreground)); background: hsl(var(--secondary)); }
+.annotation-toggle { border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); }
+.den-tool-btn.active { border-color: hsl(var(--border)); background: hsl(var(--secondary)); color: hsl(var(--foreground)); }
+.den-tool-btn.active kbd { border-color: hsl(var(--border)); color: hsl(var(--muted-foreground)); }
+.oracle-answer-meta,
+.den-oracle-msg .oracle-answer-meta,
+.den-ai-result .oracle-answer-meta { color: hsl(var(--muted-foreground)); }
+.den-player-bar .mono-label { color: hsl(var(--muted-foreground)); }
+.den-oracle-chip:hover { border-color: hsl(var(--border)); color: hsl(var(--foreground)); background: hsl(var(--foreground) / .05); }
+.cd-rail-head .rail-more:hover,
+.cd-card-add:hover { color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
+.cd-actionbtn.is-active { border-color: hsl(var(--border)); color: hsl(var(--foreground)); background: hsl(var(--secondary)); }
+.timeline-block:hover { border-color: hsl(var(--border)); background: hsl(var(--foreground) / .05); }
+.timeline-block.selected { border-color: hsl(var(--border)); box-shadow: 0 0 0 2px hsl(var(--foreground) / .18), var(--shadow-xs); }
+.timeline-block.active { border-color: hsl(var(--border)); background: hsl(var(--foreground) / .08); box-shadow: 0 0 0 1px hsl(var(--foreground) / .2), inset 0 -3px hsl(var(--foreground) / .35); }
+.timeline-block.active .timeline-block-label,
+.timeline-playhead-label { color: hsl(var(--foreground)); }
 
 /* New-channel modal: the name field with the "Sign in with Google" option
    beside it (create-and-link when a name is typed, Google-first when not). */
