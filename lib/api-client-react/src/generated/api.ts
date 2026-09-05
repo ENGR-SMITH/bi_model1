@@ -68,6 +68,7 @@ import type {
   ContinuationSubmission,
   ContinuityAuditInput,
   ContinuityAuditResult,
+  DeleteArenaPost200,
   ErrorResponse,
   ExploreAuthor,
   GenealogyEntry,
@@ -12737,6 +12738,78 @@ export const useUpdateArenaPost = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getUpdateArenaPostMutationOptions(options));
+    }
+
+export const getDeleteArenaPostUrl = (postId: string,) => {
+
+
+
+
+  return `/api/video/arena/posts/${postId}`
+}
+
+/**
+ * Deletes the post and its auditions from the Arena. The read-only audition preview window closes with it.
+ * @summary Remove a role post entirely (Captain only)
+ */
+export const deleteArenaPost = async (postId: string, options?: Parameters<typeof customFetch>[1]): Promise<DeleteArenaPost200> => {
+
+  return customFetch<DeleteArenaPost200>(getDeleteArenaPostUrl(postId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteArenaPostMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArenaPost>>, TError,{postId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteArenaPost>>, TError,{postId: string}, TContext> => {
+
+const mutationKey = ['deleteArenaPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteArenaPost>>, {postId: string}> = (props) => {
+          const {postId} = props ?? {};
+
+          return  deleteArenaPost(postId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteArenaPostMutationResult = NonNullable<Awaited<ReturnType<typeof deleteArenaPost>>>
+
+    export type DeleteArenaPostMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Remove a role post entirely (Captain only)
+ */
+export const useDeleteArenaPost = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArenaPost>>, TError,{postId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteArenaPost>>,
+        TError,
+        {postId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteArenaPostMutationOptions(options));
     }
 
 export const getCreateArenaApplicationUrl = (postId: string,) => {

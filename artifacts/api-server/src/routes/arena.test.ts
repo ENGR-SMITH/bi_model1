@@ -519,6 +519,74 @@ describe("PATCH /video/arena/posts/:postId — close/reopen/pitch", () => {
   });
 });
 
+describe("DELETE /video/arena/posts/:postId — remove a live post", () => {
+  it("rejects non-Captains and unknown posts", async () => {
+    const a = await seedProject(CAPTAIN);
+    const post = await createPost(CAPTAIN, a.id, "VIDEO");
+
+    state.userId = ALICE;
+    const forbidden = await request(API).delete(`/api/video/arena/posts/${post.id}`);
+    expect(forbidden.status).toBe(403);
+
+    state.userId = CAPTAIN;
+    const missing = await request(API).delete("/api/video/arena/posts/nope");
+    expect(missing.status).toBe(404);
+  });
+
+  it("removes the post, its auditions, and frees the role for a new post", async () => {
+    const a = await seedProject(CAPTAIN);
+    const post = await createPost(CAPTAIN, a.id, "VIDEO");
+    await seedApplication(post, ALICE);
+
+    state.userId = CAPTAIN;
+    const res = await request(API).delete(`/api/video/arena/posts/${post.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.removed).toBe(true);
+
+    const posts = await state.db
+      .select()
+      .from(state.tables.tandemArenaPostsTable)
+      .where(eq(state.tables.tandemArenaPostsTable.id, post.id));
+    expect(posts.length).toBe(0);
+
+    const applications = await state.db
+      .select()
+      .from(state.tables.tandemArenaApplicationsTable)
+      .where(eq(state.tables.tandemArenaApplicationsTable.postId, post.id));
+    expect(applications.length).toBe(0);
+
+    // The seat is free again — the Captain can repost the same role.
+    const repost = await createPost(CAPTAIN, a.id, "VIDEO");
+    expect(repost.id).not.toBe(post.id);
+
+    const activity = await state.db
+      .select()
+      .from(state.tables.collaborationActivityEventsTable)
+      .where(eq(state.tables.collaborationActivityEventsTable.eventType, "arena_post_removed"));
+    expect(activity.length).toBe(1);
+  });
+
+  it("removes a FILLED post too (the hire's membership is a separate row)", async () => {
+    const a = await seedProject(CAPTAIN);
+    const post = await createPost(CAPTAIN, a.id, "VIDEO");
+    await state.db
+      .update(state.tables.tandemArenaPostsTable)
+      .set({ status: "FILLED" })
+      .where(eq(state.tables.tandemArenaPostsTable.id, post.id));
+
+    state.userId = CAPTAIN;
+    const res = await request(API).delete(`/api/video/arena/posts/${post.id}`);
+    expect(res.status).toBe(200);
+    expect(res.body.removed).toBe(true);
+
+    const posts = await state.db
+      .select()
+      .from(state.tables.tandemArenaPostsTable)
+      .where(eq(state.tables.tandemArenaPostsTable.id, post.id));
+    expect(posts.length).toBe(0);
+  });
+});
+
 describe("role watches — GET/POST/DELETE /video/arena/watches", () => {
   it("rejects without authentication", async () => {
     for (const method of ["get", "post", "delete"] as const) {

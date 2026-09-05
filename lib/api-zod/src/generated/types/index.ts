@@ -101,6 +101,7 @@ export * from './continuityAuditResult';
 export * from './continuityIssue';
 export * from './continuityIssueCategory';
 export * from './continuityIssueSeverity';
+export * from './deleteArenaPost200';
 export * from './errorResponse';
 export * from './exploreAuthor';
 export * from './genealogyEntry';

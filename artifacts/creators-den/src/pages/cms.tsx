@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Film,
   Link2,
+  Mic2,
   Plus,
   RefreshCw,
   Trash2,
@@ -604,8 +605,9 @@ function ArenaDoorwayRow() {
       className="arena-doorway"
       data-testid="card-arena-doorway"
     >
+      <span className="arena-doorway-icon" aria-hidden><Mic2 size={18} /></span>
       <span className="arena-doorway-copy">
-        <span className="eyebrow">Collaboration / Audition Arena</span>
+        <span className="eyebrow"><Mic2 size={11} /> Collaboration / Audition Arena</span>
         <b className="arena-doorway-title">Audition for open roles on creators' channels.</b>
         <span className="arena-doorway-sub">
           Video, audio, script, and thumbnail seats — pitch with your work, preview the project read-only while
@@ -667,6 +669,11 @@ export default function CmsPage() {
           right — side by side instead of stacked rows. */}
       <div className="cms-split" data-testid="cms-split">
         <div className="cms-split-main">
+          {/* The collaboration / audition arena — the doorway to the public
+              role board, kept at the top of the channel wall so every captain
+              sees it before their grid. */}
+          <ArenaDoorwayRow />
+
           {channels.isLoading ? (
             <div className="panel-empty">Opening your channels…</div>
           ) : sorted.length > 0 ? (
@@ -690,10 +697,6 @@ export default function CmsPage() {
           )}
 
           <UnlinkedProjects />
-
-          {/* The collaboration / audition arena — the doorway to the public
-              role board, always one row under the channel wall. */}
-          <ArenaDoorwayRow />
         </div>
 
         <aside className="cms-split-side">

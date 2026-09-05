@@ -22,6 +22,7 @@ export const VIDEO_ACTIVITY_EVENT_TYPES = [
   "arena_post_opened",
   "arena_post_closed",
   "arena_post_filled",
+  "arena_post_removed",
   "arena_application_rejected",
 ] as const;
 

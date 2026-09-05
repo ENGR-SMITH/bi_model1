@@ -4078,6 +4078,37 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: deleteArenaPost
+      tags: [arena]
+      summary: Remove a role post entirely (Captain only)
+      description: Deletes the post and its auditions from the Arena. The read-only audition preview window closes with it.
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Post removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  removed:
+                    type: boolean
+                required: [removed]
+        "403":
+          description: Not the Captain
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Post not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /video/arena/posts/{postId}/applications:
     post:
       operationId: createArenaApplication

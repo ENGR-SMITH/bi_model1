@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'wouter';
+import { Link, useLocation, useParams } from 'wouter';
 import { useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,6 +11,7 @@ import {
   Eye,
   FileText,
   Megaphone,
+  Trash2,
   Users,
   X,
 } from 'lucide-react';
@@ -19,6 +20,7 @@ import {
   getListArenaPostApplicationsQueryKey,
   getListArenaPostsQueryKey,
   useAcceptArenaApplication,
+  useDeleteArenaPost,
   useGetArenaPost,
   useListArenaPostApplications,
   useListMyArenaApplications,
@@ -60,6 +62,7 @@ export default function ArenaPostPage() {
   const postId = params.postId ?? '';
   const { user } = useUser();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const postQuery = useGetArenaPost(postId, {
     query: { queryKey: getGetArenaPostQueryKey(postId), enabled: Boolean(postId) },
@@ -132,7 +135,6 @@ export default function ArenaPostPage() {
       <div className="paper-card arena-hero" data-testid="arena-post-hero">
         <div className="arena-hero-main">
           <p className="arena-hero-blurb">{meta.blurb}</p>
-          <p className="arena-hero-pitch">{post.pitch}</p>
 
           <div className="arena-hero-facts">
             <span className="arena-fact">
@@ -151,6 +153,11 @@ export default function ArenaPostPage() {
               </b>
             </span>
           </div>
+
+          {/* The message area sits BELOW the Project / Channel / Posted by
+              facts row, spanning the same width — the facts anchor the post,
+              then the pitch tells the story. */}
+          <p className="arena-hero-pitch">{post.pitch}</p>
 
           {post.status === 'FILLED' && (
             <p className="arena-filled-note" data-testid="arena-filled-note">
@@ -342,9 +349,13 @@ function CaptainPanel({
   loading: boolean;
   onChanged: () => void;
 }) {
+  const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const updatePost = useUpdateArenaPost({
     mutation: { onSuccess: onChanged },
   });
+  const removePost = useDeleteArenaPost();
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const pending = applications.filter((app) => app.status === 'PENDING');
   const hire = applications.find((app) => app.status === 'ACCEPTED');
 
@@ -373,28 +384,71 @@ function CaptainPanel({
               : 'No pending auditions.'}
           </h2>
         </div>
-        {post.status === 'OPEN' ? (
-          <button
-            type="button"
-            className="secondary-btn"
-            onClick={() => updatePost.mutate({ postId: post.id, data: { status: 'CLOSED' } })}
-            disabled={updatePost.isPending}
-            data-testid="button-arena-close"
-          >
-            <Clock size={14} /> Close auditions
-          </button>
-        ) : post.status === 'CLOSED' ? (
-          <button
-            type="button"
-            className="secondary-btn"
-            onClick={() => updatePost.mutate({ postId: post.id, data: { status: 'OPEN' } })}
-            disabled={updatePost.isPending}
-            data-testid="button-arena-reopen"
-          >
-            Reopen auditions
-          </button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {post.status === 'OPEN' ? (
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => updatePost.mutate({ postId: post.id, data: { status: 'CLOSED' } })}
+              disabled={updatePost.isPending}
+              data-testid="button-arena-close"
+            >
+              <Clock size={14} /> Close auditions
+            </button>
+          ) : post.status === 'CLOSED' ? (
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => updatePost.mutate({ postId: post.id, data: { status: 'OPEN' } })}
+              disabled={updatePost.isPending}
+              data-testid="button-arena-reopen"
+            >
+              Reopen auditions
+            </button>
+          ) : null}
+          {post.status !== 'FILLED' &&
+            (confirmRemove ? (
+              <span className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="secondary-btn arena-remove-confirm"
+                  onClick={() =>
+                    removePost.mutate(
+                      { postId: post.id },
+                      {
+                        onSuccess: () => {
+                          setConfirmRemove(false);
+                          void queryClient.invalidateQueries({ queryKey: getListArenaPostsQueryKey() });
+                          setLocation('/arena');
+                        },
+                      },
+                    )
+                  }
+                  disabled={removePost.isPending}
+                  data-testid="button-arena-remove-confirm"
+                >
+                  <Trash2 size={13} /> {removePost.isPending ? 'Removing…' : 'Confirm remove'}
+                </button>
+                <button type="button" className="secondary-btn" onClick={() => setConfirmRemove(false)}>Keep</button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                className="secondary-btn arena-remove-btn"
+                onClick={() => setConfirmRemove(true)}
+                title="Remove this post from the Arena entirely"
+                data-testid="button-arena-remove"
+              >
+                <Trash2 size={13} /> Remove post
+              </button>
+            ))}
+        </div>
       </div>
+      {removePost.isError && (
+        <p className="setting-copy mt-2" role="alert">
+          {(removePost.error as { response?: { data?: { error?: string } } } | null)?.response?.data?.error || 'The post could not be removed.'}
+        </p>
+      )}
 
       {loading ? (
         <div className="panel-empty">Loading auditions…</div>
