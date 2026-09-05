@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Link2, XCircle } from 'lucide-react';
+import { Link2, XCircle } from 'lucide-react';
 import { getListChannelsQueryKey, useExchangeChannelOauth } from '@workspace/api-client-react';
 
 // ---------------------------------------------------------------------------
@@ -9,21 +9,24 @@ import { getListChannelsQueryKey, useExchangeChannelOauth } from '@workspace/api
 // screen: /creators-den/channels/oauth/callback?code=…&state=…  (or
 // ?error=access_denied when the user declined). Reads the code + signed state,
 // exchanges them server-side (tokens stored encrypted, channel → CONNECTED
-// with real branding), then returns to the CMS grid.
+// with real branding), then bounces the user straight into that channel's den
+// — no intermediate success page.
 // ---------------------------------------------------------------------------
 
 export default function OauthCallbackPage() {
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const exchange = useExchangeChannelOauth();
   const [params] = useState(() => new URLSearchParams(window.location.search));
-  const [phase, setPhase] = useState<'exchanging' | 'done' | 'error'>('exchanging');
+  const [phase, setPhase] = useState<'exchanging' | 'error'>('exchanging');
   const [message, setMessage] = useState('');
 
   const code = params.get('code');
   const state = params.get('state');
   const denied = params.get('error');
   // The channel being linked rides in the state token as a base64url JSON
-  // payload ({ channelId, exp }); decode it so we know which channel to exchange.
+  // payload ({ channelId, exp }); decode it so we know which channel to
+  // exchange and where to land afterwards.
   let channelId = '';
   try {
     const payload = (state ?? '').split('.')[0];
@@ -49,7 +52,8 @@ export default function OauthCallbackPage() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListChannelsQueryKey() });
-          setPhase('done');
+          // Straight into the linked channel's den (MCNs grid when unknown).
+          setLocation(channelId ? `/channels/${channelId}` : '/');
         },
         onError: (error) => {
           const err = error as { response?: { data?: { error?: string } } };
@@ -62,20 +66,12 @@ export default function OauthCallbackPage() {
   }, []);
 
   return (
-    <div className="page">
-      <div className="paper-card" style={{ maxWidth: 480, marginInline: 'auto', marginTop: 48 }} data-testid="oauth-callback-card">
+    <div className="oauth-standalone" data-testid="oauth-callback-card">
+      <div className="paper-card oauth-card">
         {phase === 'exchanging' && (
           <div className="panel-empty">
             <Link2 size={18} />
-            Linking your YouTube channel…
-          </div>
-        )}
-        {phase === 'done' && (
-          <div className="empty-state" data-testid="oauth-callback-success">
-            <CheckCircle2 size={22} />
-            <h3>YouTube channel linked.</h3>
-            <p>Its name, logo, and banner now show on the channel card — and Analytics can start tracking it.</p>
-            <Link href="/" className="primary-btn mt-3">Back to your channels</Link>
+            {channelId ? 'Opening your channel…' : 'Linking your YouTube channel…'}
           </div>
         )}
         {phase === 'error' && (
