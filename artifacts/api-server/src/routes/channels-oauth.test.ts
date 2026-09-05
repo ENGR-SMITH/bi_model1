@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
 import { eq } from "drizzle-orm";
-import { decryptSecret } from "../lib/secrets";
+import { decryptSecret, encryptSecret } from "../lib/secrets";
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -304,7 +304,11 @@ describe("channel YouTube OAuth", () => {
       .where(eq(state.tables.tandemChannelOauthTable.channelId, id));
     await state.db
       .update(state.tables.tandemChannelOauthTable)
-      .set({ accessTokenCipher: "stale", refreshTokenCipher: "expired-refresh", expiresAt: new Date(Date.now() - 1000) })
+      .set({
+        accessTokenCipher: encryptSecret("stale-token"),
+        refreshTokenCipher: encryptSecret("expired-refresh"),
+        expiresAt: new Date(Date.now() - 1000),
+      })
       .where(eq(state.tables.tandemChannelOauthTable.id, oauth.id));
 
     const { getChannelAccessToken } = await import("../channels/oauth");

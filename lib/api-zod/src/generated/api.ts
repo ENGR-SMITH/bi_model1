@@ -2257,7 +2257,8 @@ export const StartChannelOauthParams = zod.object({
 })
 
 export const StartChannelOauthResponse = zod.object({
-  "url": zod.string().describe('Full Google OAuth authorization URL (PKCE) to open in a new tab')
+  "url": zod.string().describe('Full Google OAuth authorization URL (PKCE) to open in a new tab'),
+  "channelId": zod.string().describe('The workspace channel being linked (rides along so the callback page can exchange without parsing the state token)')
 }).describe('The Google consent URL to open for the channel owner\'s YouTube link')
 
 

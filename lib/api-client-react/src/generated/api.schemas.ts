@@ -1236,6 +1236,8 @@ export interface ChannelUpdate {
 export interface ChannelOauthStartResponse {
   /** Full Google OAuth authorization URL (PKCE) to open in a new tab */
   url: string;
+  /** The workspace channel being linked (rides along so the callback page can exchange without parsing the state token) */
+  channelId: string;
 }
 
 /**
