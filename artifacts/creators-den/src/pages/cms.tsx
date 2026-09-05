@@ -17,6 +17,7 @@ import {
 import { Link } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  getListArenaPostsQueryKey,
   getListChannelsQueryKey,
   getListVideoProjectsQueryKey,
   useAttachVideoProjectChannel,
@@ -598,7 +599,12 @@ function UnlinkedProjects() {
 // stacks the real avatars of up to five captains currently posting, so the
 // card reads as people at work rather than a dead link.
 function ArenaDoorwayRow() {
-  const arena = useListArenaPosts();
+  // Polled so the live count and the captain avatar stack keep updating
+  // (new posts appear without a refresh; own actions also stream in via
+  // the notifications socket).
+  const arena = useListArenaPosts(undefined, {
+    query: { queryKey: getListArenaPostsQueryKey(), refetchInterval: 15000 },
+  });
   const posts = (arena.data ?? []) as ArenaPostSummary[];
   const openCount = posts.length;
 

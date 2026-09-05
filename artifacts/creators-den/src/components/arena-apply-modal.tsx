@@ -162,7 +162,8 @@ export function ApplyArenaModal({
 
   return (
     <div className="modal-backdrop" onClick={apply.isPending ? undefined : onClose} data-testid="arena-apply-modal">
-      <div className="modal project-modal arena-apply-modal" onClick={(event) => event.stopPropagation()}>
+      <div className="modal project-modal arena-apply-modal" data-role={role} onClick={(event) => event.stopPropagation()}>
+        <span className="project-modal-orbit"><span /><i /><b>{meta.label.slice(0, 1)}</b></span>
         <button type="button" className="modal-close" onClick={onClose} disabled={apply.isPending} aria-label="Close">
           <X size={16} />
         </button>
