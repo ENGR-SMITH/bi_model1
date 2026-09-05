@@ -47,10 +47,6 @@ export default function Home() {
       <section className="relative mx-auto max-w-[1400px] px-4 pb-20 pt-12 sm:px-6 sm:pt-20 lg:px-8 lg:pb-32 lg:pt-24">
         <div className="grid items-center gap-14 lg:grid-cols-[1.02fr_.98fr] lg:gap-10">
           <div className="reveal max-w-[670px]">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#3b82f6]/30 bg-[#3b82f6]/10 px-3 py-1.5">
-              <span className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-[#3b82f6] glow-dot" />
-              <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#60a5fa]">A platform for creative connection</span>
-            </div>
             <h1 className="mt-7 max-w-[12ch] text-[4.4rem] font-bold leading-[.92] tracking-[-0.05em] text-white sm:text-[6.4rem] lg:text-[7.8rem]">
               What if the best part is <span className="text-gradient-accent">the part you bring?</span>
             </h1>
