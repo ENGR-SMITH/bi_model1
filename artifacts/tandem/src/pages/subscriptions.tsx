@@ -172,23 +172,39 @@ export default function SubscriptionsPage() {
                 <span className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-zinc-600">0{index + 1}</span>
               </div>
               <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {groupPlans.map((plan) => {
+                {groupPlans.map((plan, planIndex) => {
                   const activeSub = activeByPlan.get(`${plan.kind}:${plan.planId}`);
+                  // The middle plan of a tier reads as the flagship price card.
+                  const popular = groupPlans.length > 1 && planIndex === 1;
                   return (
-                    <div key={`${plan.kind}:${plan.planId}`} className="soft-lift group flex flex-col card-surface overflow-hidden rounded-3xl p-6" data-testid={`plan-${plan.kind}-${plan.planId}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="text-xl font-semibold leading-none text-zinc-100">{plan.planLabel}</p>
-                        <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-500">{plan.intervalLabel}</span>
-                      </div>
-                      <p className="mt-2 min-h-[2.5rem] text-xs leading-relaxed text-zinc-500">{plan.detail}</p>
-                      <div className="mt-4 flex items-end justify-between">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-bold tracking-[-.03em] text-zinc-100">{price(plan.priceUsd)}</span>
-                          <span className="text-xs text-zinc-500">/ {plan.intervalLabel}</span>
+                    <div
+                      key={`${plan.kind}:${plan.planId}`}
+                      className={`soft-lift group relative flex flex-col overflow-hidden rounded-3xl p-6 ${popular ? 'glow-accent border border-[#3b82f6]/40' : 'card-surface border border-white/10'}`}
+                      data-testid={`plan-${plan.kind}-${plan.planId}`}
+                    >
+                      <span className="card-spot" />
+                      {popular && (
+                        <span className="absolute right-4 top-4 z-10 rounded-full bg-[#3b82f6] px-3 py-1 font-mono-ui text-[9px] font-semibold uppercase tracking-[.14em] text-white shadow-lg" data-testid={`plan-popular-${plan.planId}`}>
+                          Most popular
+                        </span>
+                      )}
+                      <div className="flex items-center gap-3 pr-24">
+                        <span className={`icon-chip h-10 w-10 ${popular ? 'text-[#3b82f6]' : 'text-zinc-300'}`}>
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-lg font-semibold text-zinc-100">{plan.planLabel}</p>
+                          <p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-zinc-500">{plan.intervalLabel}</p>
                         </div>
                       </div>
+                      <div className="mt-6 flex items-baseline gap-1.5">
+                        <span className="font-display text-[2.75rem] font-extrabold leading-none tracking-[-0.05em] text-white">{price(plan.priceUsd)}</span>
+                        <span className="text-sm text-zinc-500">/ {plan.intervalLabel}</span>
+                      </div>
+                      <p className="mt-3 min-h-[2.75rem] text-xs leading-relaxed text-zinc-500">{plan.detail}</p>
+                      <div className="card-divider my-5" />
                       {activeSub ? (
-                        <span className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#34d399]/10 px-4 py-2.5 text-center text-xs font-semibold text-[#34d399]" data-testid={`plan-active-${plan.planId}`}>
+                        <span className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#34d399]/10 px-4 py-3 text-center text-xs font-semibold text-[#34d399]" data-testid={`plan-active-${plan.planId}`}>
                           <PiCheckDuotone className="h-3.5 w-3.5" />
                           Active until {formatDate(activeSub.periodEnd)}
                         </span>
@@ -196,7 +212,7 @@ export default function SubscriptionsPage() {
                         <button
                           type="button"
                           onClick={() => setPaying(plan)}
-                          className="focus-house mt-4 rounded-xl bg-[#3b82f6] py-2.5 text-center text-xs font-semibold text-white transition-colors hover:bg-[#2563eb]"
+                          className={`focus-house mt-auto w-full rounded-xl py-3 text-center text-xs font-bold transition-colors ${popular ? 'bg-[#3b82f6] text-white hover:bg-[#2563eb]' : 'border border-white/10 bg-white/5 text-zinc-100 hover:border-white/20 hover:bg-white/10'}`}
                           data-testid={`plan-buy-${plan.planId}`}
                         >
                           Subscribe

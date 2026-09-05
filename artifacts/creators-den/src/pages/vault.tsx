@@ -697,11 +697,25 @@ function ArenaPostRow({ projectId, post }: { projectId: string; post: ArenaPostS
   );
 }
 
-function ArenaProjectPanel({ projectId, projectName }: { projectId: string; projectName: string }) {
+function ArenaProjectPanel({
+  projectId,
+  projectName,
+  members,
+}: {
+  projectId: string;
+  projectName: string;
+  members: Array<{ id: string; userId: string; name?: string | null; roles?: string[] }>;
+}) {
   const [, setLocation] = useLocation();
   const open = useListArenaPosts({ projectId });
   const [composerOpen, setComposerOpen] = useState(false);
   const posts = (open.data ?? []) as ArenaPostSummary[];
+
+  // The people behind this project — real avatars stacked like the MCNs
+  // doorway (deduped, capped at five, +N bubble for the rest).
+  const seen = new Set<string>();
+  const people = members.filter((member) => (seen.has(member.userId) ? false : (seen.add(member.userId), true))).slice(0, 5);
+  const morePeople = Math.max(0, seen.size - people.length);
 
   return (
     <div className="paper-card arena-vault-card mt-6" data-testid="panel-arena-project">
@@ -739,6 +753,20 @@ function ArenaProjectPanel({ projectId, projectName }: { projectId: string; proj
         <p className="den-footnote mt-2">
           One open audition per role — close or fill one before posting another of the same.
         </p>
+      )}
+
+      {/* The people, avatars only — sides overlaying the next, no caption. */}
+      {people.length > 0 && (
+        <div className="arena-vault-people" aria-hidden data-testid="arena-vault-people">
+          <span className="arena-doorway-avatars">
+            {people.map((person) => (
+              <span key={person.userId} className="arena-doorway-avatar">
+                <MemberAvatar userId={person.userId} name={person.name} size={22} />
+              </span>
+            ))}
+            {morePeople > 0 && <span className="arena-doorway-avatar more">+{morePeople}</span>}
+          </span>
+        </div>
       )}
 
       {composerOpen && (
@@ -884,7 +912,6 @@ export default function ContentCreatorsProjectPage() {
           <h1>{p.name}</h1>
           {p.description && <p>{p.description}</p>}
           <div className="cd-metarow">
-            <span className="den-tag accent"><LockKeyhole size={10} /> {p.status.replaceAll('_', ' ')}</span>
             <span className="cd-metatext">
               <b>{p.assets.length} asset{p.assets.length === 1 ? '' : 's'} · {p.members.length} member{p.members.length === 1 ? '' : 's'}</b>
               <small>you are the {rolesLabel(myRoles)}</small>
@@ -962,7 +989,7 @@ export default function ContentCreatorsProjectPage() {
 
       {/* The audition doorway — only the project owner (the channel Captain)
           can post roles; open roles always surface above the vault rails. */}
-      {viewerId === p.ownerId && <ArenaProjectPanel projectId={p.id} projectName={p.name} />}
+      {viewerId === p.ownerId && <ArenaProjectPanel projectId={p.id} projectName={p.name} members={p.members} />}
 
       <div className="cd-watch">
         <div className="cd-watch-main">

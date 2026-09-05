@@ -6114,7 +6114,7 @@ select optgroup {
 .arena-doorway:hover {
   transform: translateY(-4px);
   box-shadow: 0 18px 44px rgba(0, 0, 0, .55);
-  border-color: hsl(var(--accent) / .4);
+  border-color: hsl(217 85% 60% / .5);
 }
 .arena-doorway-banner {
   position: relative;
@@ -6122,7 +6122,7 @@ select optgroup {
   align-items: center;
   gap: 14px;
   padding: 16px 18px;
-  background: radial-gradient(90% 150% at 82% -25%, hsl(var(--accent) / .32), transparent 55%), linear-gradient(120deg, hsl(0 0% 17%), hsl(0 0% 9%));
+  background: radial-gradient(90% 150% at 82% -25%, hsl(217 85% 60% / .3), transparent 55%), linear-gradient(120deg, hsl(0 0% 17%), hsl(0 0% 9%));
 }
 .arena-doorway-logo {
   flex: 0 0 auto;
@@ -6131,11 +6131,13 @@ select optgroup {
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  border: 3px solid hsl(var(--accent) / .45);
-  background: linear-gradient(180deg, hsl(var(--accent) / .3), hsl(var(--accent) / .08));
-  color: hsl(var(--accent));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
+  border: 3px solid hsl(217 85% 62% / .5);
+  background: linear-gradient(180deg, hsl(217 85% 55% / .3), hsl(217 85% 55% / .1));
+  color: hsl(217 85% 68%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .5), 0 0 22px hsl(217 85% 60% / .2);
 }
+/* The eyebrow rides the same blue as the rest of the doorway. */
+.arena-doorway .eyebrow { color: hsl(217 85% 68%); }
 /* The heading hugs the globe — a tight 14px gap, no dead space mid-card. */
 .arena-doorway-heading { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .arena-doorway-title { font: 700 17px var(--app-font-serif); letter-spacing: -.02em; color: hsl(var(--foreground)); }
@@ -6165,7 +6167,7 @@ select optgroup {
 }
 .arena-doorway-copy { display: flex; flex-direction: column; gap: 4px; padding: 14px 20px 16px; }
 .arena-doorway-sub { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.55; max-width: 64ch; }
-/* Footer: a stack of real captain avatars + a caption (no dead "browse" row). */
+/* Footer: a stack of real captain avatars overlaying each other (no caption). */
 .arena-doorway-foot {
   display: flex;
   align-items: center;
@@ -6173,6 +6175,9 @@ select optgroup {
   margin-top: 6px;
   padding-top: 12px;
   border-top: 1px solid hsl(var(--border));
+}
+.arena-doorway-avatars .arena-doorway-avatar {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .5), 0 0 0 1px hsl(217 85% 60% / .22);
 }
 .arena-doorway-avatars { display: flex; align-items: center; }
 .arena-doorway-avatar {
@@ -6235,7 +6240,8 @@ select optgroup {
 .role-tabs .arena-watch-bell.is-watching { color: hsl(var(--accent)); background: hsl(var(--accent) / .14); }
 
 /* ---- Post hero secondary actions: Share (blue) + Watch side by side on
-   one row, with the Captain's Close/Remove row directly beneath. ---- */
+   one row, with the Captain's Close/Remove row directly beneath. The row
+   buttons carry the same height/padding as every other button. ---- */
 .arena-actions-secondary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6248,10 +6254,12 @@ select optgroup {
   min-width: 0;
   justify-content: center;
   gap: 6px;
-  padding: 7px 8px;
-  font-size: 10.5px;
+  padding: 10px 12px;
+  font-size: 11px;
   white-space: nowrap;
 }
+/* The hero's button column widens so the standard-size row buttons fit. */
+.arena-hero { grid-template-columns: minmax(0, 1fr) 380px; }
 .arena-actions-secondary .arena-watch-label {
   min-width: 0;
   overflow: hidden;
@@ -6545,6 +6553,8 @@ select optgroup {
   border: 1px solid hsl(var(--accent) / .25);
   background: linear-gradient(140deg, hsl(var(--card)), hsl(var(--accent) / .04));
 }
+/* Breathable air between the arena card and the vault rails below it. */
+.vault-page .cd-watch { margin-top: 18px; }
 .arena-open-row {
   gap: 10px;
   padding: 10px 11px;
@@ -6891,6 +6901,16 @@ select optgroup {
   transition: border-color .15s ease, background .15s ease, transform .15s ease;
 }
 .arena-vault-card .arena-open-row:hover { border-color: hsl(217 85% 60% / .45); background: hsl(var(--card)); transform: translateY(-1px); }
+/* The team's avatars, stacked like the MCNs doorway footer — avatars only. */
+.arena-vault-people {
+  display: flex;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid hsl(var(--border) / .8);
+}
+.arena-vault-people .arena-doorway-avatar .den-chat-avatar {
+  border-radius: 50%;
+}
 
 /* ---- Modals: contain scroll so a tall modal never drags the page ---- */
 .modal-backdrop,
