@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowRight,
@@ -94,17 +94,20 @@ function NewChannelModal({ onClose, onCreated }: { onClose: () => void; onCreate
 }
 
 // The Google consent window for linking a channel to its YouTube channel.
-// The owner clicks "Connect" → start returns the consent URL → a new tab opens
+// The owner clicks "Connect" (or lands here straight from creating the
+// channel, autoBegin) → start returns the consent URL → a new tab opens
 // Google → on return the oauth-callback page exchanges the code and lands back
 // on the CMS with the card now CONNECTED (real branding).
-function ConnectChannelModal({ channel, onClose }: { channel: ChannelSummary; onClose: () => void }) {
+function ConnectChannelModal({ channel, onClose, autoBegin }: { channel: ChannelSummary; onClose: () => void; autoBegin?: boolean }) {
   const start = useStartChannelOauth();
   const queryClient = useQueryClient();
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [popupBlocked, setPopupBlocked] = useState(false);
 
   const begin = () => {
     setError('');
+    setPopupBlocked(false);
     start.mutate(
       { channelId: channel.id },
       {
@@ -112,7 +115,10 @@ function ConnectChannelModal({ channel, onClose }: { channel: ChannelSummary; on
           setLinkUrl(result.url);
           // Open the consent screen; the user comes back through the
           // oauth-callback page, which redirects to the CMS once linked.
-          window.open(result.url, '_blank', 'noopener,noreferrer');
+          const opened = window.open(result.url, '_blank', 'noopener,noreferrer');
+          // window.open returns null when the browser blocked the popup — the
+          // "Reopen Google" link below still works as a fallback.
+          if (!opened) setPopupBlocked(true);
         },
         onError: (err) => {
           const e = err as { response?: { data?: { error?: string } } };
@@ -121,6 +127,13 @@ function ConnectChannelModal({ channel, onClose }: { channel: ChannelSummary; on
       },
     );
   };
+
+  // When the flow continues straight from "Create channel", kick the consent
+  // URL off right away so the user lands on Google without an extra click.
+  useEffect(() => {
+    if (autoBegin) begin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const refreshStatus = () => {
     queryClient.invalidateQueries({ queryKey: getListChannelsQueryKey() });
@@ -152,11 +165,13 @@ function ConnectChannelModal({ channel, onClose }: { channel: ChannelSummary; on
           ) : (
             <>
               <p className="setting-copy">
-                The consent screen opened in a new tab. Pick the channel there — this card updates the moment it's linked.
+                {popupBlocked
+                  ? 'Your browser blocked the pop-up — click below to open the Google consent screen in a new tab.'
+                  : 'The consent screen opened in a new tab. Pick the channel there — this card updates the moment it\'s linked.'}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <a href={linkUrl} target="_blank" rel="noreferrer" className="secondary-btn" data-testid="link-consent-reopen">
-                  <Youtube size={14} /> Reopen Google
+                  <Youtube size={14} /> {popupBlocked ? 'Open Google' : 'Reopen Google'}
                 </a>
                 <button type="button" className="secondary-btn" onClick={refreshStatus} data-testid="button-connect-refresh">
                   <RefreshCw size={13} /> I've linked it
@@ -438,6 +453,10 @@ export default function CmsPage() {
   const queryClient = useQueryClient();
   const channels = useListChannels();
   const [modalOpen, setModalOpen] = useState(false);
+  // The channel to link right after it was created: the "+ New channel" flow
+  // continues straight into the Google OAuth connect step instead of leaving
+  // the brand-new card unlinked.
+  const [connectTarget, setConnectTarget] = useState<ChannelSummary | null>(null);
 
   // The channel grid: owned channels first (the owner's cards), then the
   // editor mirror cards — real branding either way, straight from YouTube.
@@ -447,9 +466,11 @@ export default function CmsPage() {
     return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
   });
 
-  const onCreated = () => {
+  const onCreated = (channel: ChannelSummary) => {
     setModalOpen(false);
     queryClient.invalidateQueries({ queryKey: getListChannelsQueryKey() });
+    // Straight into the Google consent flow (plan §12.2).
+    setConnectTarget(channel);
   };
 
   return (
@@ -496,6 +517,13 @@ export default function CmsPage() {
       </div>
 
       {modalOpen && <NewChannelModal onClose={() => setModalOpen(false)} onCreated={onCreated} />}
+      {connectTarget && (
+        <ConnectChannelModal
+          channel={connectTarget}
+          onClose={() => setConnectTarget(null)}
+          autoBegin
+        />
+      )}
     </div>
   );
 }
