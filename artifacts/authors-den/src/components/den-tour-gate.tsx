@@ -36,15 +36,9 @@ const TOUR_LABEL: Record<TicketCategory, string> = {
 };
 
 const PAYWALL_PATH: Record<TicketCategory, string> = {
-  authors: '/authors',
-  'content-creators': '/content-creators',
+  authors: '/categories/authors',
+  'content-creators': '/categories/content-creators',
 };
-
-function fmtClock(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.max(0, totalSeconds % 60);
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-}
 
 type Phase = 'loading' | 'open' | 'tour' | 'expired';
 
@@ -153,10 +147,10 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
     <>
       {children}
 
-      {/* The slim top countdown bar while the tour is running — a quiet
-          timer ONLY. No ticket/pass CTA here: the free tour is not a sales
-          moment. The buy pop-up appears only once the tour is exhausted and
-          access is actually restricted. */}
+      {/* The slim top strip while the tour is running — quiet, with NO timer
+          and NO ticket/pass CTA: the free tour is not a sales moment. The
+          countdown runs server-side; the buy pop-up appears only once the
+          tour is exhausted and access is actually restricted. */}
       {inTour && (
         <div
           role="status"
@@ -181,11 +175,8 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
             boxShadow: '0 1px 0 rgba(255,255,255,.08), 0 6px 18px rgba(0,0,0,.35)',
           }}
         >
-          <Clock3 size={13} color="#f0c674" />
           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Preview tour of the {TOUR_LABEL[category]} ·{' '}
-            <b style={{ fontVariantNumeric: 'tabular-nums', color: '#f0c674' }}>{fmtClock(Math.ceil(remainingMs / 1000))}</b>{' '}
-            left
+            Preview tour of the {TOUR_LABEL[category]}
           </span>
         </div>
       )}

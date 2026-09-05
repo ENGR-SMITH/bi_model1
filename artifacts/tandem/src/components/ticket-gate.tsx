@@ -1,10 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiCreditCardDuotone, PiLockKeyDuotone, PiTicketDuotone, PiXDuotone } from 'react-icons/pi';
+import { PiArrowUpRightDuotone, PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiCreditCardDuotone, PiLockKeyDuotone, PiTicketDuotone, PiXDuotone } from 'react-icons/pi';
 import {
   getGetTicketStatusQueryKey,
+  getTicketCategoryAccessQueryKey,
   useGetTicketStatus,
   usePurchaseTicket,
+  useTicketCategoryAccess,
   useValidateTicketPromo,
 } from '@workspace/api-client-react';
 import type { TicketPromoValidateResponse, TicketPurchaseResponse } from '@workspace/api-client-react';
@@ -40,18 +42,72 @@ export function TicketGate({
   children: ReactNode;
 }) {
   const status = useGetTicketStatus();
+  const access = useTicketCategoryAccess(slug, {
+    query: { queryKey: getTicketCategoryAccessQueryKey(slug) },
+  });
   const active = status.data?.tickets.some((ticket) => ticket.category === slug) ?? false;
 
-  if (status.isLoading) return <>{children}</>;
+  if (status.isLoading || access.isLoading) return <>{children}</>;
+
+  // A visitor who has NOT spent their one-time free tour yet — either a fresh
+  // account (canStartTour) or a tour still running — must NOT get the paywall
+  // popup. The ticket only appears once the tour is exhausted and access is
+  // actually restricted; meanwhile they get a quiet free-preview strip.
+  const canPreview = !active && (access.data?.tourActive === true || access.data?.canStartTour === true);
 
   return (
     <>
-      {/* The room is dimmed behind the popup until a pass is active. */}
-      <div className={active ? '' : 'pointer-events-none select-none opacity-30 blur-[1px]'} aria-hidden={!active}>
+      {/* The room is dimmed behind the popup only when a pass is required. */}
+      <div className={active || canPreview ? '' : 'pointer-events-none select-none opacity-30 blur-[1px]'} aria-hidden={!active && !canPreview}>
         {children}
       </div>
-      {!active && <PassCoupon slug={slug} name={name} onPurchased={() => void status.refetch()} />}
+      {!active && canPreview && (
+        <FreePreviewStrip slug={slug} name={name} previewing={access.data?.tourActive === true} />
+      )}
+      {!active && !canPreview && <PassCoupon slug={slug} name={name} onPurchased={() => void status.refetch()} />}
     </>
+  );
+}
+
+function FreePreviewStrip({
+  slug,
+  name,
+  previewing,
+}: {
+  slug: 'authors' | 'content-creators';
+  name: string;
+  previewing: boolean;
+}) {
+  const denPath = slug === 'authors' ? '/authors-den/' : '/creators-den/';
+  return (
+    <div
+      className="mx-auto mt-4 flex max-w-[1320px] items-center justify-between gap-4 rounded-xl border border-[#3b82f6]/30 bg-[#3b82f6]/10 px-4 py-3"
+      data-testid="free-preview-strip"
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="icon-chip h-9 w-9 shrink-0 text-[#60a5fa]">
+          <PiTicketDuotone className="h-4 w-4" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-white">
+            {previewing ? `You're previewing ${name} free` : `Preview ${name} free for 10 minutes`}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+            {previewing
+              ? 'Your free tour is still running — no card needed yet.'
+              : 'Take the free tour before you buy — no card needed.'}
+          </p>
+        </div>
+      </div>
+      <a
+        href={denPath}
+        className="focus-house inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#3b82f6] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#2563eb]"
+        data-testid="link-start-free-tour"
+      >
+        {previewing ? 'Resume the tour' : 'Tour it free'}
+        <PiArrowUpRightDuotone className="h-3.5 w-3.5" />
+      </a>
+    </div>
   );
 }
 
@@ -217,26 +273,9 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <p className="mt-4 text-sm leading-relaxed text-zinc-400">
             A ticket unlocks the whole {name.toLowerCase()} category — <b>{weeks} weeks</b> of access. Renew anytime; a renewal extends the pass.
           </p>
-          {/* The one-time preview tour — a new visitor may look around the den
-              free for 10 minutes before buying. The den app starts the tour
-              (server-granted once per user per den) and returns them here when
-              it expires. */}
-          <div className="mt-4 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-white">New here? Preview it first.</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-                Take a free 10-minute tour of the {slug === 'authors' ? 'Authors Den' : 'Creators Den'} — no card needed.
-              </p>
-            </div>
-            <a
-              href={slug === 'authors' ? '/authors-den/' : '/creators-den/'}
-              className="focus-house inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#3b82f6]/50 px-3.5 py-2 text-xs font-bold text-[#60a5fa] transition-colors hover:border-[#3b82f6] hover:bg-[#3b82f6]/10"
-              data-testid="link-start-free-tour"
-            >
-              <PiTicketDuotone className="h-3.5 w-3.5" />
-              Tour it free
-            </a>
-          </div>
+          {/* The free tour is offered on the room page while the visitor is
+              still eligible — by the time this popup renders, the one-time
+              tour has been spent and only a pass opens the room again. */}
         </div>
 
         {/* Perforation */}
