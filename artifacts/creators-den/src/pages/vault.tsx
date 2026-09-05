@@ -22,11 +22,13 @@ import { Link, useParams } from 'wouter';
 import { useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  getGetChannelQueryKey,
   getGetVideoProjectQueryKey,
   getListVideoDownloadsQueryKey,
   getListVideoGrantsQueryKey,
   useAddVideoProjectMember,
   useCreateVideoGrant,
+  useGetChannel,
   useGetVideoProject,
   useListVideoDownloads,
   useListVideoGrants,
@@ -556,7 +558,15 @@ function DownloadAuditPanel({ projectId, myRoles }: { projectId: string; myRoles
 }
 
 export default function ContentCreatorsProjectPage() {
-  const { projectId } = useParams<{ projectId: string }>();
+  const { channelId, projectId } = useParams<{ channelId?: string; projectId: string }>();
+  // The vault's billboard wears the linked channel's real YouTube banner
+  // (shared query with the shell, so it is already warm).
+  const channel = useGetChannel(channelId ?? '', {
+    query: {
+      queryKey: getGetChannelQueryKey(channelId ?? ''),
+      enabled: Boolean(channelId),
+    },
+  });
   const queryClient = useQueryClient();
   const { user } = useUser();
   const viewerId = user?.id ?? '';
@@ -645,6 +655,7 @@ export default function ContentCreatorsProjectPage() {
   return (
     <div className="page vault-page">
       <div className="cd-billboard mb-6" data-testid="vault-billboard">
+        {channel.data?.youtubeBannerUrl && <img className="cd-billboard-media" src={channel.data.youtubeBannerUrl} alt="" aria-hidden />}
         <div className="cd-billboard-scrim" />
         <div className="cd-billboard-body">
           <SectionEyebrow>The vault · repository</SectionEyebrow>
@@ -766,7 +777,7 @@ export default function ContentCreatorsProjectPage() {
       </div>
 
       {deleteError && (
-        <p className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="vault-delete-error">
+        <p className="setting-copy" role="alert" style={{ color: 'hsl(var(--foreground))' }} data-testid="vault-delete-error">
           {deleteError}
         </p>
       )}
