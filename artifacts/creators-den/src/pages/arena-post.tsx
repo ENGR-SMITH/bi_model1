@@ -532,6 +532,17 @@ function ApplicationRow({
             ))}
           </div>
         )}
+        {pending && (
+          <span className="arena-app-portfolio-center">
+            <Link
+              href={`/profile/${application.applicantId}`}
+              className="arena-app-portfolio"
+              data-testid={`arena-app-portfolio-${application.id}`}
+            >
+              View portfolio <ExternalLink size={11} />
+            </Link>
+          </span>
+        )}
         {application.status !== 'PENDING' && application.decidedAt && (
           <p className="arena-app-decided">
             Decided {timeAgo(application.decidedAt)}
@@ -560,14 +571,6 @@ function ApplicationRow({
           >
             <X size={14} /> {reject.isPending ? 'Declining…' : 'Reject'}
           </button>
-          {/* On the same row as the decisions — not floating above them. */}
-          <Link
-            href={`/profile/${application.applicantId}`}
-            className="arena-app-portfolio"
-            data-testid={`arena-app-portfolio-${application.id}`}
-          >
-            View portfolio <ExternalLink size={11} />
-          </Link>
         </div>
       ) : reviewable ? (
         <div className="arena-app-actions">

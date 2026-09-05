@@ -6239,22 +6239,23 @@ select optgroup {
 .role-tabs .arena-watch-bell:hover { color: hsl(var(--accent)); transform: translateY(-1px); }
 .role-tabs .arena-watch-bell.is-watching { color: hsl(var(--accent)); background: hsl(var(--accent) / .14); }
 
-/* ---- Post hero secondary actions: Share (blue) then Watch, each spanning
-   the full button column so every hero action is the same width. ---- */
+/* ---- Post hero secondary actions: Share (blue) | Watch notification on
+   one two-column row, the same width as the Captain row beneath — all four
+   buttons share the same cell size. ---- */
 .arena-actions-secondary {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 2px;
   padding-top: 10px;
   border-top: 1px dashed hsl(var(--border));
 }
 .arena-actions-secondary .secondary-btn {
-  width: 100%;
+  min-width: 0;
   justify-content: center;
   gap: 6px;
-  padding: 10px 14px;
-  font-size: 12px;
+  padding: 10px 6px;
+  font-size: 10.5px;
   white-space: nowrap;
 }
 .arena-actions-secondary .arena-watch-label {
@@ -6720,8 +6721,10 @@ select optgroup {
   color: hsl(var(--muted-foreground));
 }
 
-/* ---- Post hero: softer panel, role edge, richer count ---- */
+/* ---- Post hero: softer panel, role edge, richer count. The side column
+   is wide enough for the two-column button rows below. ---- */
 .arena-hero {
+  grid-template-columns: minmax(0, 1fr) 360px;
   border: 1px solid hsl(var(--border));
   background: linear-gradient(150deg, hsl(var(--card) / .96), hsl(var(--card) / .55));
   box-shadow: var(--shadow-xs);
@@ -6808,22 +6811,9 @@ select optgroup {
   flex-wrap: wrap;
 }
 .arena-app-actions .secondary-btn { min-width: 0; }
-/* View portfolio sits on the same row as Accept / Reject, as a quiet chip. */
-.arena-app-actions .arena-app-portfolio {
-  margin-left: 0;
-  padding: 5px 9px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 8px;
-  background: hsl(var(--muted) / .5);
-  color: hsl(var(--muted-foreground));
-  white-space: nowrap;
-}
-.arena-app-actions .arena-app-portfolio:hover {
-  color: hsl(var(--accent));
-  border-color: hsl(var(--accent) / .45);
-  background: hsl(var(--accent) / .08);
-  text-decoration: none;
-}
+/* View portfolio sits centered under the audition, not on the card's edge. */
+.arena-app-portfolio-center { display: flex; justify-content: center; margin-top: 2px; }
+.arena-app-portfolio-center .arena-app-portfolio { margin-left: 0; }
 /* Accept + Reject glow: a slow colored halo pulses behind each decision. */
 @keyframes arenaGlowAccept {
   0%, 100% { box-shadow: 0 0 0 0 hsl(164 45% 52% / 0), var(--shadow-xs), var(--edge-hi); }
@@ -6839,10 +6829,11 @@ select optgroup {
 .arena-decline:hover { animation-play-state: paused; }
 .arena-withdraw.is-armed { border-color: hsl(0 72% 60%) !important; color: hsl(0 72% 64%) !important; }
 
-/* ---- Captain controls row under Share + Watch (hero side) ---- */
+/* ---- Captain controls row under Share + Watch (hero side): Close auditions
+   | Remove post on one two-column row, same cell width as the row above. ---- */
 .arena-captain-row {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 2px;
   padding-top: 10px;
@@ -6850,14 +6841,15 @@ select optgroup {
 }
 .arena-captain-row:empty { display: none; }
 .arena-captain-row .secondary-btn {
-  width: 100%;
+  min-width: 0;
   justify-content: center;
   gap: 6px;
-  padding: 10px 14px;
-  font-size: 12px;
+  padding: 10px 6px;
+  font-size: 10.5px;
   white-space: nowrap;
 }
 .arena-captain-confirm {
+  grid-column: 1 / -1;
   display: flex;
   gap: 8px;
 }
