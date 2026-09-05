@@ -104,7 +104,7 @@ function NewProjectModal({ channelId, onClose }: { channelId: string; onClose: (
             />
           </div>
           {create.isError && (
-            <p className="text-sm font-semibold" style={{ color: 'hsl(var(--destructive))' }} role="alert">
+            <p className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))' }} role="alert">
               {error?.response?.data?.error || 'We could not open that project just yet.'}
             </p>
           )}
@@ -330,7 +330,7 @@ export default function ChannelHomePage() {
         {projects.isLoading ? (
           <div className="panel-empty">Opening your projects…</div>
         ) : projects.isError ? (
-          <p className="setting-copy" style={{ color: 'hsl(var(--destructive))' }}>This channel’s projects could not be opened. Try again in a moment.</p>
+          <p className="setting-copy" style={{ color: 'hsl(var(--foreground))' }}>This channel’s projects could not be opened. Try again in a moment.</p>
         ) : recent.length > 0 ? (
           <div className="cd-rail-track">
             {recent.map((project) => (

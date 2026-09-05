@@ -677,7 +677,7 @@ export function RoleUploadCard({
           </button>
         ) : null}
         {error && (
-          <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--destructive))' }} data-testid="role-upload-error">{error}</span>
+          <span className="setting-copy" role="alert" style={{ color: 'hsl(var(--foreground))' }} data-testid="role-upload-error">{error}</span>
         )}
       </div>
     </div>

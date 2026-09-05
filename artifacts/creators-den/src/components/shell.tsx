@@ -10,6 +10,7 @@ import {
   Eye,
   Film,
   GitPullRequest,
+  Globe,
   Home,
   Image,
   LayoutGrid,
@@ -289,6 +290,14 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   });
   const readOnly = Boolean(projectId) && Boolean(detail.data) && (detail.data?.myRoles?.length ?? 0) === 0;
   const projectLabel = current?.name ?? detail.data?.name ?? channelLabel ?? 'Home';
+  // The brand reads "Creators Den" only on the MCNs grid; inside a channel it
+  // shows the channel's name, and inside a project the project's name.
+  const brandTitle = !channelId && !projectId ? 'Creators Den' : projectLabel;
+  const brandSub = projectId
+    ? (channelLabel ? `in ${channelLabel}` : 'channel project')
+    : channelId
+      ? (channelData?.myRole === 'OWNER' ? 'Your channel' : 'You’re an editor')
+      : 'video version control';
 
   const logout = () => signOut({ redirectUrl: '/' });
 
@@ -319,10 +328,8 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           <Link href={homeHref} className="cd-brand" data-testid="nav-home">
             <span className="brand-mark">C</span>
             <span className="brand-copy">
-              <span className="block brand-name">Creators Den</span>
-              <span className="block brand-sub truncate" title={channelLabel ?? 'video version control'}>
-                {channelLabel ?? 'video version control'}
-              </span>
+              <span className="block brand-name">{brandTitle}</span>
+              <span className="block brand-sub truncate" title={brandSub}>{brandSub}</span>
             </span>
           </Link>
 
@@ -347,12 +354,6 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
         {/* Tier 2 — the notch chips + section tabs. */}
         <div className="cd-topnav-secondary">
           <div className="cd-topnav-workspace-col">
-            {/* Blob icon in front of the channel dropdown → the MCNs grid. */}
-            <div className="cd-topnav-chip">
-              <Link href="/" className="cd-topnav-blob" aria-label="All channels" title="All channels (MCNs grid)" data-testid="nav-mcn">
-                <span className="cd-topnav-blob-mark"><LayoutGrid size={14} /></span>
-              </Link>
-            </div>
             {/* Channel dropdown — every channel, one click to its den. */}
             <div className="cd-topnav-chip">
               <div className="top-workspace-wrap" onPointerLeave={() => setChannelOpen(false)}>
@@ -371,6 +372,14 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 </button>
                 {channelOpen && <ChannelMenu channelId={channelId} />}
               </div>
+            </div>
+            {/* A quiet gap between the channel dropdown and the home icon. */}
+            <span className="cd-topnav-chip-gap" aria-hidden />
+            {/* Home icon — on the near side of the project dropdown. */}
+            <div className="cd-topnav-chip">
+              <Link href={homeHref} className="cd-topnav-home-notch" aria-label={channelId ? 'Channel home' : 'Channels'} title={channelId ? 'Channel home' : 'All channels'} data-testid="nav-home-notch">
+                <Home size={15} />
+              </Link>
             </div>
             {/* Project dropdown — projects of the currently selected channel only. */}
             <div className="cd-topnav-chip">
@@ -391,10 +400,10 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 {projectOpen && <ProjectMenu channelId={channelId} projectId={projectId} />}
               </div>
             </div>
-            {/* Home notch — beside the project dropdown. */}
+            {/* Globe icon — beside the project dropdown, home-styled, → MCNs grid. */}
             <div className="cd-topnav-chip">
-              <Link href={homeHref} className="cd-topnav-home-notch" aria-label={channelId ? 'Channel home' : 'Channels'} title={channelId ? 'Channel home' : 'All channels'} data-testid="nav-home-notch">
-                <Home size={15} />
+              <Link href="/" className="cd-topnav-home-notch" aria-label="All channels" title="All channels (MCNs grid)" data-testid="nav-mcn">
+                <Globe size={15} />
               </Link>
             </div>
             {/* The Analytics notch — only inside a channel (per the brief it

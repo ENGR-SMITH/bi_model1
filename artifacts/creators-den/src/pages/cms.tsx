@@ -201,7 +201,7 @@ function NewChannelModal({ onClose, onCreated }: { onClose: () => void; onCreate
               </div>
               <span className="channel-name-hint">Optional — leave it blank and the name comes from your YouTube channel.</span>
             </div>
-            {error && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--destructive))' }} role="alert" data-testid="new-channel-error">{error}</p>}
+            {error && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))' }} role="alert" data-testid="new-channel-error">{error}</p>}
             <button
               type="submit"
               disabled={create.isPending || !name.trim()}
@@ -314,7 +314,7 @@ function ConnectChannelModal({ channel, onClose, autoBegin }: { channel: Channel
               </div>
             </>
           )}
-          {error && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--destructive))' }} role="alert" data-testid="connect-error">{error}</p>}
+          {error && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))' }} role="alert" data-testid="connect-error">{error}</p>}
         </div>
       </div>
     </div>,
@@ -413,7 +413,7 @@ function ChannelCardMenu({ channel }: { channel: ChannelSummary }) {
                     <p>This removes the channel and its editor roster. It cannot be undone.</p>
                   )}
                 </div>
-                {busyMessage && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--destructive))', marginTop: 4 }} role="alert">{busyMessage}</p>}
+                {busyMessage && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))', marginTop: 4 }} role="alert">{busyMessage}</p>}
                 <div className="project-modal-fields" style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
                   <button type="button" className="secondary-btn" onClick={() => setConfirming(null)} disabled={remove.isPending}>Cancel</button>
                   <button
@@ -436,7 +436,7 @@ function ChannelCardMenu({ channel }: { channel: ChannelSummary }) {
                   <h2>Unlink “{channel.name}” <em>from YouTube?</em></h2>
                   <p>The channel stays — its projects, editors, and this card all remain. It just loses the YouTube link, branding, and analytics until you connect it again.</p>
                 </div>
-                {busyMessage && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--destructive))', marginTop: 4 }} role="alert">{busyMessage}</p>}
+                {busyMessage && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--foreground))', marginTop: 4 }} role="alert">{busyMessage}</p>}
                 <div className="project-modal-fields" style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
                   <button type="button" className="secondary-btn" onClick={() => setConfirming(null)} disabled={disconnect.isPending}>Cancel</button>
                   <button

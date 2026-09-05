@@ -57,7 +57,7 @@ select optgroup {
 .timeline-block.tone-primary { border-color: hsl(var(--primary) / .5); background: hsl(var(--primary) / .09); }
 .timeline-block.tone-teal { border-color: hsl(164 33% 45% / .55); background: hsl(164 33% 45% / .12); }
 .timeline-block.tone-gold { border-color: hsl(var(--sidebar-primary) / .65); background: hsl(var(--sidebar-primary) / .15); }
-.timeline-block.tone-danger { border-color: hsl(var(--destructive) / .5); background: hsl(var(--destructive) / .1); }
+.timeline-block.tone-danger { border-color: hsl(var(--border)); background: hsl(var(--muted)); }
 .timeline-block.tone-muted { border-color: hsl(var(--border)); background: hsl(var(--muted)); }
 .timeline-block-locked { opacity: .75; cursor: default; }
 .timeline-block-label { position: absolute; inset: 0; display: flex; align-items: center; gap: 7px; padding: 0 13px; font-size: 10px; font-weight: 700; color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
@@ -122,7 +122,7 @@ select optgroup {
 .den-chip-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .den-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); border-radius: 999px; font-size: 10px; color: hsl(var(--foreground)); }
 .den-chip button { border: 0; background: transparent; color: hsl(var(--muted-foreground)); display: inline-grid; place-items: center; padding: 0; }
-.den-chip button:hover { color: hsl(var(--destructive)); }
+.den-chip button:hover { color: hsl(var(--foreground)); }
 .den-drag-handle { cursor: grab; color: hsl(var(--muted-foreground)); display: inline-flex; }
 .den-drag-handle:active { cursor: grabbing; }
 
@@ -161,8 +161,8 @@ select optgroup {
 .den-upload-progress-bar { flex: 1; height: 6px; border-radius: 6px; overflow: hidden; background: hsl(var(--border)); }
 .den-upload-progress-bar span { display: block; height: 100%; background: hsl(var(--accent)); transition: width .2s ease; }
 .den-upload-progress b { font: 500 10px var(--app-font-mono); color: hsl(var(--muted-foreground)); white-space: nowrap; }
-.den-upload-cancel { flex: 0 0 auto; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--destructive)); padding: 4px 9px; border-radius: 5px; font-size: 10px; font-weight: 600; transition: border-color .16s, background .16s; }
-.den-upload-cancel:hover { border-color: hsl(var(--destructive) / .6); background: hsl(var(--destructive) / .08); }
+.den-upload-cancel { flex: 0 0 auto; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--muted-foreground)); padding: 4px 9px; border-radius: 5px; font-size: 10px; font-weight: 600; transition: border-color .16s, background .16s; }
+.den-upload-cancel:hover { border-color: hsl(var(--border)); background: hsl(var(--foreground) / .06); }
 
 /* ---- Waveform progress fill (Sound) ---- */
 .den-waveform .played { background: hsl(var(--accent)); }
@@ -199,7 +199,7 @@ select optgroup {
 .den-tag.accent { color: hsl(var(--accent)); background: hsl(var(--accent) / .12); }
 .den-tag.teal { color: hsl(164 33% 39%); background: hsl(164 33% 45% / .12); }
 .den-tag.gold { color: hsl(var(--sidebar-primary)); background: hsl(var(--sidebar-primary) / .14); }
-.den-tag.danger { color: hsl(var(--destructive)); background: hsl(var(--destructive) / .1); }
+.den-tag.danger { color: hsl(var(--foreground)); background: hsl(var(--secondary)); }
 .den-tag.muted { color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); }
 .den-rule { height: 1px; background: hsl(var(--border)); border: 0; margin: 18px 0; }
 .den-two-col { display: grid; grid-template-columns: 1.05fr .95fr; gap: 16px; align-items: start; }
@@ -218,7 +218,7 @@ select optgroup {
 
 /* ---- Tool cursors on the timeline ---- */
 .timeline-shell.tool-razor .timeline-block { cursor: crosshair; }
-.timeline-shell.tool-razor .timeline-block:hover { border-color: hsl(var(--destructive) / .7); background: hsl(var(--destructive) / .12); }
+.timeline-shell.tool-razor .timeline-block:hover { border-color: hsl(var(--border)); background: hsl(var(--secondary) / .5); }
 .timeline-shell.tool-razor .timeline-trim { display: none; }
 .timeline-shell.tool-grab .timeline-block { cursor: grab; }
 .timeline-shell.tool-grab .timeline-block.dragging { cursor: grabbing; }
@@ -257,7 +257,7 @@ select optgroup {
 .annotation-composer { position: absolute; width: 250px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid hsl(var(--accent) / .5); border-radius: 6px; background: hsl(var(--card) / .98); box-shadow: var(--shadow-md); pointer-events: auto; z-index: 6; }
 .annotation-toggle { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 1px solid hsl(var(--accent) / .5); border-radius: 999px; background: hsl(var(--card) / .92); color: hsl(var(--accent)); font: 700 9px var(--app-font-mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; pointer-events: auto; z-index: 5; box-shadow: var(--shadow-sm); }
 .annotation-toggle:hover { background: hsl(var(--accent) / .14); }
-.annotation-close-annotate { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 1px solid hsl(var(--destructive) / .5); border-radius: 999px; background: hsl(var(--card) / .92); color: hsl(var(--destructive)); font: 700 9px var(--app-font-mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; pointer-events: auto; z-index: 5; box-shadow: var(--shadow-sm); }
+.annotation-close-annotate { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 5px 9px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--card) / .92); color: hsl(var(--muted-foreground)); font: 700 9px var(--app-font-mono); letter-spacing: .05em; text-transform: uppercase; cursor: pointer; pointer-events: auto; z-index: 5; box-shadow: var(--shadow-sm); }
 .annotation-canvas.annotating .annotation-pin { cursor: pointer; }
 
 /* The red vertical selector line drawn on the audio wave at the point the
@@ -376,9 +376,9 @@ select optgroup {
    disarms. */
 .cd-card-delete { position: absolute; top: 8px; right: 8px; z-index: 3; width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(0 0% 0% / .68); color: hsl(var(--muted-foreground)); backdrop-filter: blur(6px); box-shadow: 0 2px 8px rgba(0, 0, 0, .45); cursor: pointer; transition: color .15s, border-color .15s, background .15s, transform .12s; opacity: 0; }
 .cd-card:hover .cd-card-delete, .cd-card-delete:focus-visible, .cd-card-delete.armed { opacity: 1; }
-.cd-card-delete:hover { color: hsl(var(--destructive)); border-color: hsl(var(--destructive) / .5); }
+.cd-card-delete:hover { color: hsl(var(--foreground)); border-color: hsl(var(--border)); }
 .cd-card-delete.armed { color: #fff; background: hsl(var(--destructive)); border-color: hsl(var(--destructive)); }
-.cd-card.is-deleting { border-color: hsl(var(--destructive) / .6); box-shadow: 0 0 0 1px hsl(var(--destructive) / .4); }
+.cd-card.is-deleting { border-color: hsl(var(--border)); box-shadow: 0 0 0 1px hsl(var(--border) / .5); }
 .cd-card.is-deleting .cd-card-delete { opacity: 1; }
 .cd-card-body { display: flex; flex-direction: column; gap: 4px; padding: 12px 13px 14px; }
 .cd-card-title { font: 700 14px var(--app-font-sans); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -736,9 +736,9 @@ select optgroup {
 }
 .sidebar-bottom .tutorial-btn:hover {
   transform: none;
-  border-color: hsl(var(--destructive) / .5);
-  background: hsl(var(--destructive) / .08);
-  color: hsl(var(--destructive));
+  border-color: hsl(var(--sidebar-foreground) / .3);
+  background: hsl(var(--sidebar-foreground) / .07);
+  color: hsl(var(--sidebar-foreground));
 }
 
 /* A neutral account tile — the lone red mark up top stays the brand's alone. */
@@ -824,7 +824,7 @@ select optgroup {
 .cd-ledger-dot.accent { color: hsl(var(--accent)); background: hsl(var(--accent) / .12); box-shadow: inset 0 0 0 1px hsl(var(--accent) / .32); }
 .cd-ledger-dot.teal { color: hsl(164 33% 44%); background: hsl(164 33% 45% / .13); box-shadow: inset 0 0 0 1px hsl(164 33% 45% / .32); }
 .cd-ledger-dot.gold { color: hsl(var(--sidebar-primary)); background: hsl(var(--sidebar-primary) / .14); box-shadow: inset 0 0 0 1px hsl(var(--sidebar-primary) / .32); }
-.cd-ledger-dot.danger { color: hsl(var(--destructive)); background: hsl(var(--destructive) / .12); box-shadow: inset 0 0 0 1px hsl(var(--destructive) / .32); }
+.cd-ledger-dot.danger { color: hsl(var(--foreground)); background: hsl(var(--secondary)); box-shadow: inset 0 0 0 1px hsl(var(--border)); }
 .cd-ledger-dot.muted { color: hsl(var(--muted-foreground)); }
 
 .cd-ledger-content { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -1077,24 +1077,23 @@ select optgroup {
   border-color: hsl(212 80% 60% / .42);
   background: linear-gradient(180deg, hsl(212 42% 12.5%), hsl(213 34% 9%));
 }
-/* Hover swaps the tone: a blue vault card turns red, a red repeat-upload card
-   turns blue — the two kinds cross-fade on hover. */
-.snake-card.is-upload:hover { border-color: hsl(var(--destructive) / .6); }
+/* Hover just brightens the border — neither kind bleeds into the other. */
+.snake-card.is-upload:hover { border-color: hsl(var(--border) / .8); }
 
-/* Later upload of the same file type — red "another take" design: same dashed
-   vault shape, but the red role tone so the original stays unmistakable. */
+/* Later upload of the same file type — a neutral "another take" design: the
+   dashed vault shape stays, the tone just stops shouting. */
 .snake-card.is-upload-later {
-  border-color: hsl(var(--destructive) / .45);
-  background: linear-gradient(180deg, hsl(0 55% 13%), hsl(0 42% 9%));
+  border-color: hsl(var(--border) / .8);
+  background: linear-gradient(180deg, hsl(0 0% 13%), hsl(0 0% 9.5%));
 }
-.snake-card.is-upload-later:hover { border-color: hsl(212 80% 62% / .6); }
-.snake-card.is-upload-later .snake-card-kind { color: hsl(var(--destructive) / .72); }
-.snake-card.is-upload-later .snake-card-meta { border-top-color: hsl(var(--destructive) / .26); }
-.snake-card.is-upload-later .snake-card-id:hover { color: hsl(var(--destructive) / .8); }
+.snake-card.is-upload-later:hover { border-color: hsl(var(--border)); }
+.snake-card.is-upload-later .snake-card-kind { color: hsl(var(--muted-foreground)); }
+.snake-card.is-upload-later .snake-card-meta { border-top-color: hsl(var(--border) / .6); }
+.snake-card.is-upload-later .snake-card-id:hover { color: hsl(var(--foreground)); }
 .snake-card.is-upload-later .snake-tag-upload {
-  color: hsl(var(--destructive) / .88);
-  background: hsl(var(--destructive) / .14);
-  box-shadow: inset 0 0 0 1px hsl(var(--destructive) / .34);
+  color: hsl(var(--foreground));
+  background: hsl(var(--secondary));
+  box-shadow: inset 0 0 0 1px hsl(var(--border));
 }
 
 .snake-card-head { display: flex; align-items: center; gap: var(--sp-2); }
@@ -1345,8 +1344,8 @@ select optgroup {
   font: 600 12px var(--app-font-sans);
   transition: color .18s ease, background .18s ease, border-color .18s ease;
 }
-.cd-signout:hover { color: hsl(var(--destructive)); border-color: hsl(var(--destructive) / .5); background: hsl(var(--destructive) / .08); }
-.cd-signout svg { color: hsl(var(--destructive)); }
+.cd-signout:hover { color: hsl(var(--foreground)); border-color: hsl(var(--border)); background: hsl(var(--foreground) / .05); }
+.cd-signout svg { color: hsl(var(--muted-foreground)); }
 /* Sign-out sits in the right column of the Tier-2 row, at the far right. */
 .cd-topnav-signout-col .cd-signout { flex: 0 0 auto; }
 
@@ -1374,35 +1373,8 @@ select optgroup {
   min-width: 0;
 }
 
-/* The blob icon in front of the channel dropdown — organic mark that takes
-   you to the MCNs grid (all channels). Morphs on hover like a living blob. */
-.cd-topnav-chip .cd-topnav-blob {
-  position: relative; isolation: isolate;
-  display: flex; align-items: center; justify-content: center;
-  width: 46px; height: 100%;
-  color: hsl(var(--foreground) / .85);
-  transition: color 140ms ease;
-}
-.cd-topnav-chip .cd-topnav-blob::before {
-  content: "";
-  position: absolute; inset: 0; z-index: -1;
-  background: hsl(var(--card) / .35);
-  clip-path: polygon(0 0, calc(100% - var(--sp-3)) 0, 100% 100%, 0 100%);
-}
-.cd-topnav-blob-mark {
-  width: 30px; height: 30px;
-  display: grid; place-items: center;
-  border-radius: 44% 56% 62% 38% / 52% 44% 56% 48%;
-  color: hsl(var(--sidebar-primary-foreground));
-  background: linear-gradient(150deg, hsl(var(--sidebar-primary)), hsl(var(--sidebar-primary) / .55));
-  box-shadow: 0 0 0 4px hsl(var(--sidebar-primary) / .1), 0 6px 16px hsl(var(--sidebar-primary) / .28);
-  transition: border-radius .3s ease, transform .2s cubic-bezier(.22, 1, .36, 1);
-}
-.cd-topnav-blob:hover .cd-topnav-blob-mark {
-  border-radius: 56% 44% 38% 62% / 48% 52% 48% 56%;
-  transform: rotate(-6deg) scale(1.06);
-}
-.cd-topnav-blob:hover { color: hsl(var(--accent)); }
+/* A quiet gap between the channel dropdown and the home icon. */
+.cd-topnav-chip-gap { flex: 0 0 auto; width: var(--sp-5); }
 
 /* The OAuth callback renders standalone (no den chrome): a quiet, centered
    card so the exchange/redirect hop never looks like a broken page. */
@@ -1665,8 +1637,8 @@ select optgroup {
 }
 .card-menu button:hover:not(:disabled) { background: hsl(var(--secondary)); }
 .card-menu button:disabled { opacity: .4; cursor: default; }
-.card-menu button.is-danger { color: hsl(var(--destructive)); }
-.card-menu button.is-danger:hover:not(:disabled) { background: hsl(var(--destructive) / .12); }
+.card-menu button.is-danger { color: hsl(var(--foreground)); }
+.card-menu button.is-danger:hover:not(:disabled) { background: hsl(var(--foreground) / .08); }
 
 @keyframes eyeOpenIn {
   0% { opacity: 0; transform: scale(.3) rotate(-14deg); }
@@ -1800,7 +1772,7 @@ select optgroup {
   background: hsl(var(--secondary));
   color: hsl(var(--muted-foreground));
 }
-.follow-btn.is-following:hover:not(:disabled) { border-color: hsl(var(--destructive) / .5); color: hsl(var(--destructive)); background: hsl(var(--destructive) / .08); }
+.follow-btn.is-following:hover:not(:disabled) { border-color: hsl(var(--border)); color: hsl(var(--foreground)); background: hsl(var(--foreground) / .05); }
 
 /* Explore project cards: owner row, body, visibility tag. */
 .explore-project { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
@@ -2692,7 +2664,7 @@ select optgroup {
 .agent-flow-note b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-flow-note .link-btn { flex: 0 0 auto; }
 .agent-flow-note.is-done { color: hsl(152 58% 40%); }
-.agent-flow-note.is-error { color: hsl(var(--destructive)); }
+.agent-flow-note.is-error { color: hsl(var(--foreground)); }
 
 /* Script desk — the agent upload option sits in a slim row under the header
    (below the transcribe toolbar), so it never crowds the editor tools. */
@@ -3793,8 +3765,8 @@ select optgroup {
   gap: 8px;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid hsl(var(--destructive) / .5);
-  background: hsl(var(--destructive) / .1);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / .7);
 }
 .den-chat-record-dot {
   width: 8px;
@@ -3810,21 +3782,21 @@ select optgroup {
   70% { box-shadow: 0 0 0 9px hsl(var(--destructive) / 0); }
   100% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0); }
 }
-.den-chat-record b { font: 700 10px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--destructive)); }
+.den-chat-record b { font: 700 10px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; color: hsl(var(--muted-foreground)); }
 .den-chat-record-timer { font: 500 12px var(--app-font-mono); color: hsl(var(--foreground)); }
 .den-chat-record .icon-btn {
   margin-left: auto;
   width: 26px;
   height: 26px;
-  border: 1px solid hsl(var(--destructive) / .55);
+  border: 1px solid hsl(var(--border));
   background: transparent;
-  color: hsl(var(--destructive));
+  color: hsl(var(--muted-foreground));
   border-radius: 50%;
   display: grid;
   place-items: center;
   cursor: pointer;
 }
-.den-chat-record .icon-btn:hover { background: hsl(var(--destructive) / .18); }
+.den-chat-record .icon-btn:hover { background: hsl(var(--foreground) / .08); }
 
 /* Voice note message — a proper voice note: play button + equalizer bar +
    elapsed/total time, instead of a bare native <audio controls> chip. */
@@ -4052,7 +4024,7 @@ select optgroup {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  color: hsl(var(--destructive));
+  color: hsl(var(--foreground));
 }
 .finish-error svg { flex: 0 0 auto; margin-top: 1px; }
 
@@ -4123,7 +4095,7 @@ select optgroup {
   padding: 7px 14px;
   border-top: 1px solid hsl(var(--border));
   font: 10px var(--app-font-mono);
-  color: hsl(var(--destructive));
+  color: hsl(var(--foreground));
 }
 
 /* ---------------------------------------------------------------------------
@@ -4281,7 +4253,7 @@ select optgroup {
 }
 .member-role-check input { accent-color: hsl(var(--accent)); margin: 0; }
 .member-role-check:has(input:checked) { background: hsl(var(--accent) / .12); color: hsl(var(--accent)); }
-.text-danger { color: hsl(0 72% 55%); }
+.text-danger { color: hsl(var(--foreground)); }
 
 /* ---------------------------------------------------------------------------
    Role access denied — two long red film strips crossed in an X.
@@ -4422,7 +4394,7 @@ select optgroup {
 .notification-dot.accent { color: hsl(var(--accent)); background: hsl(var(--accent) / .12); }
 .notification-dot.gold { color: hsl(var(--sidebar-primary)); background: hsl(var(--sidebar-primary) / .14); }
 .notification-dot.teal { color: hsl(164 33% 45%); background: hsl(164 33% 45% / .14); }
-.notification-dot.danger { color: hsl(var(--destructive)); background: hsl(var(--destructive) / .12); }
+.notification-dot.danger { color: hsl(var(--foreground)); background: hsl(var(--secondary)); }
 .notification-dot.muted { color: hsl(var(--muted-foreground)); background: hsl(var(--muted-foreground) / .12); }
 .notification-body {
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
@@ -4629,7 +4601,7 @@ select optgroup {
 }
 .review-decision-approve:disabled::before,
 .review-decision-reject:disabled::before { animation: none; opacity: 0; }
-.review-decision-error { margin: 0; color: hsl(var(--destructive)); }
+.review-decision-error { margin: 0; color: hsl(var(--foreground)); }
 
 /* The REMARK note field. */
 .review-oracle-note {
@@ -4680,7 +4652,7 @@ select optgroup {
 .buy-field input { border: 1px solid hsl(var(--border)); border-radius: 9px; padding: 10px 12px; font: inherit; font-size: 14px; background: hsl(var(--background) / .4); color: hsl(var(--foreground)); outline: none; }
 .buy-field input:focus { border-color: hsl(var(--accent)); box-shadow: 0 0 0 3px hsl(var(--accent) / .14); }
 .buy-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
-.buy-error { color: hsl(var(--destructive)); font-size: 12px; margin-top: 6px; }
+.buy-error { color: hsl(var(--foreground)); font-size: 12px; margin-top: 6px; }
 .plan-pending { display: flex; align-items: center; gap: 7px; color: hsl(var(--muted-foreground)); font-size: 11px; margin: 14px 0 0; }
 
 /* ---- Desktop-agent upload modal (files at/over the browser cap) ---- */
@@ -4978,8 +4950,8 @@ select optgroup {
 .stage-submit-banner b { display: block; }
 .stage-submit-banner.is-pending { background: hsl(var(--sidebar-primary) / .1); color: hsl(var(--sidebar-primary)); border-color: hsl(var(--sidebar-primary) / .3); }
 .stage-submit-banner.is-pending b { color: hsl(var(--sidebar-primary)); }
-.stage-submit-banner.is-rejected { background: hsl(var(--destructive) / .1); border-color: hsl(var(--destructive) / .3); }
-.stage-submit-banner.is-rejected b { color: hsl(var(--destructive)); }
+.stage-submit-banner.is-rejected { background: hsl(var(--card)); border-color: hsl(var(--border)); }
+.stage-submit-banner.is-rejected b { color: hsl(var(--foreground)); }
 .stage-submit-banner.is-approved { background: hsl(155 55% 38% / .1); border-color: hsl(155 55% 38% / .3); }
 .stage-submit-banner.is-approved b { color: hsl(155 55% 38%); }
 .stage-submit-banner span { color: hsl(var(--muted-foreground)); }
@@ -5068,7 +5040,7 @@ select optgroup {
 }
 .submission-row-card.status-submitted { border-left-color: hsl(var(--sidebar-primary) / .55); }
 .submission-row-card.status-approved { border-left-color: hsl(155 55% 38%); }
-.submission-row-card.status-rejected { border-left-color: hsl(var(--destructive) / .8); }
+.submission-row-card.status-rejected { border-left-color: hsl(var(--border)); }
 .submission-row { padding: 12px 14px; }
 .submission-row small { display: block; max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .submission-detail { padding: 0 14px 14px; border-top: 1px dashed hsl(var(--border)); }
@@ -5088,8 +5060,8 @@ select optgroup {
 .submission-decision small { color: hsl(var(--muted-foreground)); }
 .submission-decision.is-approved { background: hsl(155 55% 38% / .08); border-color: hsl(155 55% 38% / .3); }
 .submission-decision.is-approved b { color: hsl(155 55% 38%); }
-.submission-decision.is-rejected { background: hsl(var(--destructive) / .08); border-color: hsl(var(--destructive) / .3); }
-.submission-decision.is-rejected b { color: hsl(var(--destructive)); }
+.submission-decision.is-rejected { background: hsl(var(--card)); border-color: hsl(var(--border)); }
+.submission-decision.is-rejected b { color: hsl(var(--foreground)); }
 .submission-decision.is-pending { background: hsl(var(--sidebar-primary) / .07); border-color: hsl(var(--sidebar-primary) / .25); }
 .submission-decision.is-pending b { color: hsl(var(--sidebar-primary)); }
 .submission-detail > .link-btn { margin-top: 12px; }
@@ -5263,9 +5235,9 @@ select optgroup {
   height: 15px;
   display: grid;
   place-items: center;
-  color: hsl(var(--destructive));
+  color: hsl(var(--muted-foreground));
   border-radius: 999px;
-  background: hsl(var(--destructive) / .14);
+  background: hsl(var(--secondary));
 }
 
 /* ============================================================================
@@ -5322,12 +5294,12 @@ select optgroup {
   position: absolute; top: 8px; right: 8px; z-index: 4;
   width: 27px; height: 27px; display: grid; place-items: center;
   border: 1px solid hsl(var(--border)); border-radius: 7px;
-  background: hsl(0 0% 0% / .68); color: hsl(var(--destructive));
+  background: hsl(0 0% 0% / .68); color: hsl(var(--muted-foreground));
   cursor: pointer; opacity: 0; transition: opacity .15s, border-color .15s;
   backdrop-filter: blur(6px);
 }
 .cms-channel-card:hover .cms-card-menu-btn, .cms-card-menu-btn:focus-visible { opacity: 1; }
-.cms-card-menu-btn:hover { border-color: hsl(var(--destructive) / .6); }
+.cms-card-menu-btn:hover { border-color: hsl(var(--border)); color: hsl(var(--foreground)); }
 .cms-channel-card.is-owner .cms-status-chip { right: 42px; }
 
 /* Connect-your-YouTube button on unlinked owner cards, and the disconnect
@@ -5353,7 +5325,7 @@ select optgroup {
 }
 .cms-connect-btn:hover { background: hsl(var(--accent) / .18); border-color: hsl(var(--accent)); transform: translateY(-1px); }
 .cms-card-disconnect { right: 42px !important; }
-.cms-card-disconnect:hover { color: hsl(var(--destructive)) !important; border-color: hsl(var(--destructive) / .5) !important; }
+.cms-card-disconnect:hover { color: hsl(var(--foreground)) !important; border-color: hsl(var(--border)) !important; }
 .cms-channel-body { display: flex; flex-direction: column; gap: 4px; padding: 30px 14px 14px; }
 .cms-channel-name { font: 700 15px var(--app-font-sans); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cms-channel-meta { color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }
@@ -5451,7 +5423,7 @@ select optgroup {
 @keyframes cd-spin { to { transform: rotate(360deg); } }
 
 /* Error-state tag variant (sync failures, live badges). */
-.den-tag.alert { color: hsl(var(--destructive)); background: hsl(var(--destructive) / .1); box-shadow: inset 0 0 0 1px hsl(var(--destructive) / .3); }
+.den-tag.alert { color: hsl(var(--foreground)); background: hsl(var(--secondary)); box-shadow: inset 0 0 0 1px hsl(var(--border)); }
 
 /* Stack + freshness bar ---------------------------------------------------- */
 .cd-analytics-stack { display: flex; flex-direction: column; gap: 14px; }
@@ -5569,9 +5541,9 @@ select optgroup {
 .cd-anomaly-banner {
   display: flex; align-items: center; gap: 10px;
   padding: 10px 14px; border-radius: 10px; font-size: 13px;
-  color: hsl(var(--destructive));
-  background: hsl(var(--destructive) / .08);
-  border: 1px solid hsl(var(--destructive) / .3);
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
 }
 .cd-report-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 14px; margin-top: 14px; }
 .cd-va-rate-chips { display: flex; gap: 8px; margin-bottom: 8px; }
