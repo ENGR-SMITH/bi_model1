@@ -368,6 +368,44 @@ describe("channel YouTube OAuth", () => {
       .from(state.tables.tandemChannelOauthTable)
       .where(eq(state.tables.tandemChannelOauthTable.channelId, provisionalId));
     expect(oauth?.status).toBe("ACTIVE");
+
+    // The CMS grid (list endpoint) exposes the minted channel with the real
+    // branding so the card shows the actual banner, logo, and name.
+    const list = await request(API).get("/api/channels");
+    const row = list.body.find((c: { id: string }) => c.id === provisionalId);
+    expect(row).toMatchObject({
+      youtubeConnected: true,
+      name: "Ada Makes Games",
+      youtubeTitle: "Ada Makes Games",
+      youtubeAvatarUrl: "https://yt3.example/avatar-hi.jpg",
+      youtubeBannerUrl: "https://yt3.example/banner.jpg",
+    });
+  });
+
+  it("exposes the real YouTube branding on the CMS list and channel detail once linked", async () => {
+    // The workspace was typed as "My Den", but the card/chrome must show the
+    // real channel: name comes from youtubeTitle, images from YouTube.
+    const { id } = await createChannel("My Den");
+    const exchanged = await linkChannel(id);
+    expect(exchanged.status).toBe(200);
+
+    const list = await request(API).get("/api/channels");
+    expect(list.status).toBe(200);
+    const row = list.body.find((c: { id: string }) => c.id === id);
+    expect(row).toMatchObject({
+      youtubeConnected: true,
+      name: "My Den",
+      youtubeTitle: "Ada Makes Games",
+      youtubeAvatarUrl: "https://yt3.example/avatar-hi.jpg",
+      youtubeBannerUrl: "https://yt3.example/banner.jpg",
+    });
+
+    const detail = await request(API).get(`/api/channels/${id}`);
+    expect(detail.status).toBe(200);
+    expect(detail.body.youtubeConnected).toBe(true);
+    expect(detail.body.youtubeTitle).toBe("Ada Makes Games");
+    expect(detail.body.youtubeAvatarUrl).toBe("https://yt3.example/avatar-hi.jpg");
+    expect(detail.body.youtubeBannerUrl).toBe("https://yt3.example/banner.jpg");
   });
 
   it("Google-first exchange refuses a YouTube channel already linked elsewhere and leaves no row behind", async () => {

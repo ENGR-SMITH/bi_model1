@@ -247,8 +247,16 @@ function ConnectChannelModal({ channel, onClose, autoBegin }: { channel: Channel
 
   const refreshStatus = () => {
     queryClient.invalidateQueries({ queryKey: getListChannelsQueryKey() });
-    // Once the card flips to CONNECTED the modal closes on its own.
+    // The auto-close effect below fires once the refetch shows the card CONNECTED.
   };
+
+  // When the refetched channel summary flips to CONNECTED the link is done —
+  // close so the user lands on the grid and sees the real YouTube banner,
+  // logo, and name on the card.
+  useEffect(() => {
+    if (channel.youtubeConnected) onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel.youtubeConnected]);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

@@ -140,7 +140,11 @@ export function parseYoutubeChannelBranding(items: YoutubeChannelItem[]): Youtub
     id: item.id,
     title: item.snippet?.title ?? "",
     description: item.snippet?.description ?? null,
-    avatarUrl: item.snippet?.thumbnails?.high?.url ?? item.snippet?.thumbnails?.default?.url ?? null,
+    avatarUrl:
+      item.snippet?.thumbnails?.high?.url ??
+      item.snippet?.thumbnails?.medium?.url ??
+      item.snippet?.thumbnails?.default?.url ??
+      null,
     bannerUrl: item.brandingSettings?.image?.bannerExternalUrl ?? null,
     country: item.snippet?.country ?? null,
   };
