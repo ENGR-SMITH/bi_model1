@@ -83,64 +83,71 @@ function PrivateShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] bg-[#0a0a0a] text-zinc-100">
-      {/* Resend-style top navigation bar */}
-      <header className="sticky top-0 z-30 border-b border-white/5 bg-[#0a0a0a]/85 backdrop-blur-md">
-        <div className="mx-auto flex h-[60px] max-w-[1400px] items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <TandemLogo />
+      {/* Floating pill nav — same treatment as the home page's HouseNav: the
+          bar is a rounded, blurred, border-lit card floating under the top
+          edge instead of a full-width strip. */}
+      <header className="sticky top-0 z-30">
+        <div className="mx-auto w-full max-w-[1400px] px-4 pt-3 sm:px-6 sm:pt-4 lg:px-8">
+          <div className="relative flex h-[60px] items-center gap-4 rounded-2xl border border-white/10 bg-[#0d0d0d]/85 px-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08),0_12px_40px_-16px_rgba(0,0,0,0.9),0_0_50px_-20px_rgba(59,130,246,0.45)] backdrop-blur-xl sm:px-4">
+            <span className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/40 to-transparent" />
+            <TandemLogo />
 
-          {/* Desktop nav — pill tabs like Resend's dashboard nav */}
-          <nav className="hidden min-w-0 flex-1 items-center gap-1 md:flex" aria-label="Private navigation">
-            {desktopNav.map((item) => {
-              const Icon = item.icon;
-              const active = location === item.href;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`focus-house group flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${active ? 'bg-white/10 text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-100'}`}
-                  data-testid={`link-nav-${item.label.toLowerCase()}`}
-                >
-                  <Icon className={`h-4 w-4 ${active ? 'text-[#60a5fa]' : 'text-zinc-500 group-hover:text-zinc-200'}`} />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
+            {/* Desktop nav — home-style text tabs with the gradient underline */}
+            <nav className="hidden min-w-0 flex-1 items-center gap-1 md:flex" aria-label="Private navigation">
+              {desktopNav.map((item) => {
+                const Icon = item.icon;
+                const active = location === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`focus-house group relative flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${active ? 'text-white' : 'text-zinc-400 hover:bg-white/5 hover:text-white'}`}
+                    data-testid={`link-nav-${item.label.toLowerCase()}`}
+                  >
+                    <Icon className={`h-4 w-4 ${active ? 'text-[#60a5fa]' : 'text-zinc-500 group-hover:text-zinc-200'}`} />
+                    {item.label}
+                    <span className={`absolute inset-x-4 bottom-0.5 h-px bg-gradient-to-r from-[#3b82f6]/80 to-[#8b5cf6]/80 transition-opacity duration-200 ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} />
+                  </Link>
+                );
+              })}
+            </nav>
 
-          {/* Right cluster — authors shortcut, user chip, sign out */}
-          <div className="ml-auto flex items-center gap-2">
-            <Link href="/categories/authors" className="focus-house group hidden items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100 lg:flex" data-testid="link-header-authors">
-              <PiArrowLeftDuotone className="h-3.5 w-3.5 text-zinc-500 transition-transform group-hover:-translate-x-0.5" />
-              Author's Atrium
-            </Link>
-            <UserChip />
-            <button type="button" onClick={logout} className="focus-house group hidden items-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-100 sm:flex" data-testid="button-header-logout">
-              <PiSignOutDuotone className="h-3.5 w-3.5 text-zinc-500 transition-transform group-hover:-translate-x-0.5 group-hover:translate-y-0.5" />
-              Sign out
-            </button>
-            <button type="button" onClick={() => setMenuOpen((open) => !open)} className="focus-house rounded-lg border border-white/10 p-2 md:hidden" aria-label="Open menu" data-testid="button-mobile-profile-menu">
-              {menuOpen ? <PiXDuotone className="h-4 w-4" /> : <PiListDuotone className="h-4 w-4" />}
-            </button>
+            {/* Right cluster — authors shortcut, user chip, sign out */}
+            <div className="ml-auto flex items-center gap-2">
+              <Link href="/categories/authors" className="focus-house group hidden items-center gap-2 rounded-full px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-zinc-100 lg:flex" data-testid="link-header-authors">
+                <PiArrowLeftDuotone className="h-3.5 w-3.5 text-zinc-500 transition-transform group-hover:-translate-x-0.5" />
+                Author's Atrium
+              </Link>
+              <UserChip />
+              <button type="button" onClick={logout} className="focus-house group hidden items-center gap-2 rounded-full border border-white/10 px-3 py-2 text-xs font-medium text-zinc-400 transition-colors hover:border-white/20 hover:text-zinc-100 sm:flex" data-testid="button-header-logout">
+                <PiSignOutDuotone className="h-3.5 w-3.5 text-zinc-500 transition-transform group-hover:-translate-x-0.5 group-hover:translate-y-0.5" />
+                Sign out
+              </button>
+              <button type="button" onClick={() => setMenuOpen((open) => !open)} className="focus-house rounded-lg border border-white/10 p-2 md:hidden" aria-label="Open menu" data-testid="button-mobile-profile-menu">
+                {menuOpen ? <PiXDuotone className="h-4 w-4" /> : <PiListDuotone className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
+
+          {/* Mobile dropdown menu — same card treatment as the home page */}
+          {menuOpen && (
+            <div className="absolute inset-x-4 top-[78px] rounded-2xl border border-white/10 bg-[#0d0d0d]/95 p-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06),0_24px_60px_-20px_rgba(0,0,0,0.95),0_0_60px_-24px_rgba(59,130,246,0.5)] backdrop-blur-xl sm:inset-x-8 md:hidden lg:inset-x-10">
+              <span className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#3b82f6]/50 to-transparent" />
+              {mobileNav.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}>
+                    <Icon className="h-4 w-4 text-zinc-500" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+              <div className="my-1 h-px bg-white/5" />
+              <Link href="/categories/authors" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid="link-mobile-authors"><PiArrowLeftDuotone className="h-4 w-4 text-zinc-500" />Author's Atrium</Link>
+              <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-400 hover:bg-white/5" data-testid="button-mobile-logout"><PiSignOutDuotone className="h-4 w-4" />Sign out</button>
+            </div>
+          )}
         </div>
-
-        {/* Mobile dropdown menu */}
-        {menuOpen && (
-          <div className="absolute inset-x-4 top-[68px] rounded-2xl border border-white/10 bg-[#111111] p-2 shadow-2xl md:hidden">
-            {mobileNav.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-zinc-200 hover:bg-white/5" data-testid={`link-mobile-nav-${item.label.toLowerCase()}`}>
-                  <Icon className="h-4 w-4 text-zinc-500" />
-                  {item.label}
-                </Link>
-              );
-            })}
-            <div className="my-1 h-px bg-white/5" />
-            <Link href="/categories/authors" onClick={() => setMenuOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-zinc-200 hover:bg-white/5" data-testid="link-mobile-authors"><PiArrowLeftDuotone className="h-4 w-4 text-zinc-500" />Author's Atrium</Link>
-            <button type="button" onClick={logout} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium text-zinc-400 hover:bg-white/5" data-testid="button-mobile-logout"><PiSignOutDuotone className="h-4 w-4" />Sign out</button>
-          </div>
-        )}
       </header>
 
       {/* Mobile bottom tab bar */}
