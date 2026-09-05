@@ -4,11 +4,14 @@
 //
 //   · active pass            → the den opens normally, nothing is shown
 //   · first visit, no pass   → the 10-minute tour auto-starts; a slim top
-//                              countdown bar runs until it hits zero
+//                              countdown bar runs until it hits zero (timer
+//                              only — no ticket CTA while the tour is free)
 //   · tour running           → the app works normally during the countdown
-//   · tour expired           → "Your tour has ended" notice, then the visitor
-//                              is navigated straight back to the Tandem
-//                              category page to buy the pass
+//   · tour expired           → "Your tour has ended" notice pops up — the only
+//                              moment the ticket appears, since access is now
+//                              actually restricted — then the visitor is
+//                              navigated back to the Tandem category page to
+//                              buy the pass
 //   · tour already used      → no re-entry: navigate straight to the paywall
 //
 // The tour state lives on the server (tandem_tours, one row per user per
@@ -149,7 +152,10 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
     <>
       {children}
 
-      {/* The slim top countdown bar while the tour is running. */}
+      {/* The slim top countdown bar while the tour is running — a quiet
+          timer ONLY. No ticket/pass CTA here: the free tour is not a sales
+          moment. The buy pop-up appears only once the tour is exhausted and
+          access is actually restricted. */}
       {inTour && (
         <div
           role="status"
@@ -178,27 +184,8 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
           <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             Preview tour of the {TOUR_LABEL[category]} ·{' '}
             <b style={{ fontVariantNumeric: 'tabular-nums', color: '#f5c451' }}>{fmtClock(Math.ceil(remainingMs / 1000))}</b>{' '}
-            left — buy a pass to keep access
+            left
           </span>
-          <span style={{ flex: 1 }} />
-          <a
-            href={PAYWALL_PATH[category]}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '5px 14px',
-              borderRadius: 999,
-              background: '#3b82f6',
-              color: '#fff',
-              textDecoration: 'none',
-              fontWeight: 700,
-              whiteSpace: 'nowrap',
-            }}
-            data-testid="den-tour-buy"
-          >
-            <Ticket size={12} /> Get the pass
-          </a>
         </div>
       )}
 
