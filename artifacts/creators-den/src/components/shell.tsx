@@ -333,6 +333,22 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             </span>
           </Link>
 
+          {/* Channel analytics sits in the chrome row, right beside the name
+              that is written here (the channel or project name). It is
+              channel-scoped, so it only appears once a channel is selected. */}
+          {channelId && (
+            <Link
+              href={`/channels/${channelId}/analytics`}
+              className={`cd-topnav-analytics-chrome ${location === `/channels/${channelId}/analytics` || location.startsWith(`/channels/${channelId}/analytics/`) ? 'active' : ''}`}
+              aria-label="Channel analytics"
+              title="Channel analytics"
+              data-testid="nav-analytics"
+            >
+              <BarChart3 size={14} />
+              <span>Analytics</span>
+            </Link>
+          )}
+
           <ExploreSearch />
 
           <div className="cd-topnav-account">
@@ -379,48 +395,39 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 {channelOpen && <ChannelMenu channelId={channelId} />}
               </div>
             </div>
-            {/* A quiet gap between the channel dropdown and the home icon. */}
-            <span className="cd-topnav-chip-gap" aria-hidden />
-            {/* Home icon — on the near side of the project dropdown. */}
-            <div className="cd-topnav-chip">
-              <Link href={homeHref} className="cd-topnav-home-notch" aria-label={channelId ? 'Channel home' : 'Channels'} title={channelId ? 'Channel home' : 'All channels'} data-testid="nav-home-notch">
-                <Home size={15} />
-              </Link>
-            </div>
-            {/* Project dropdown — projects of the currently selected channel only. */}
-            <div className="cd-topnav-chip">
-              <div className="top-workspace-wrap" onPointerLeave={() => setProjectOpen(false)}>
-                <button
-                  type="button"
-                  className="top-workspace"
-                  onClick={() => {
-                    setProjectOpen((open) => !open);
-                    setChannelOpen(false);
-                  }}
-                  data-testid="top-project"
-                >
-                  <span>Project</span>
-                  <b className="truncate">{current?.name ?? (channelId ? 'No project' : 'No channel')}</b>
-                  <ChevronDown size={13} />
-                </button>
-                {projectOpen && <ProjectMenu channelId={channelId} projectId={projectId} />}
-              </div>
-            </div>
-            {/* The Analytics notch — only inside a channel (per the brief it
-                sits beside the workshop dropdown). */}
+            {/* Channel home + its project dropdown only make sense once a
+                channel is selected — on the MCNs grid (no channel yet) they
+                drop away and only the globe + Channel switcher remain. */}
             {channelId && (
-              <div className="cd-topnav-chip">
-                <Link
-                  href={`/channels/${channelId}/analytics`}
-                  className={`cd-topnav-analytics-notch ${location === `/channels/${channelId}/analytics` || location.startsWith(`/channels/${channelId}/analytics/`) ? 'active' : ''}`}
-                  aria-label="Channel analytics"
-                  title="Channel analytics"
-                  data-testid="nav-analytics"
-                >
-                  <BarChart3 size={14} />
-                  <span>Analytics</span>
-                </Link>
-              </div>
+              <>
+                {/* A quiet gap between the channel dropdown and the home icon. */}
+                <span className="cd-topnav-chip-gap" aria-hidden />
+                {/* Home icon — on the near side of the project dropdown. */}
+                <div className="cd-topnav-chip">
+                  <Link href={homeHref} className="cd-topnav-home-notch" aria-label="Channel home" title="Channel home" data-testid="nav-home-notch">
+                    <Home size={15} />
+                  </Link>
+                </div>
+                {/* Project dropdown — projects of the currently selected channel only. */}
+                <div className="cd-topnav-chip">
+                  <div className="top-workspace-wrap" onPointerLeave={() => setProjectOpen(false)}>
+                    <button
+                      type="button"
+                      className="top-workspace"
+                      onClick={() => {
+                        setProjectOpen((open) => !open);
+                        setChannelOpen(false);
+                      }}
+                      data-testid="top-project"
+                    >
+                      <span>Project</span>
+                      <b className="truncate">{current?.name ?? 'No project'}</b>
+                      <ChevronDown size={13} />
+                    </button>
+                    {projectOpen && <ProjectMenu channelId={channelId} projectId={projectId} />}
+                  </div>
+                </div>
+              </>
             )}
           </div>
 

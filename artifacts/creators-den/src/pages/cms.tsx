@@ -471,11 +471,15 @@ function ChannelCard({ channel }: { channel: ChannelSummary }) {
     <div className={`cms-channel-card ${isOwner ? 'is-owner' : 'is-editor'}`} data-testid={`card-channel-${channel.id}`}>
       <Link href={`/channels/${channel.id}`} className="cms-channel-hit" aria-label={`Open ${displayName}`} />
       <div className="cms-channel-banner" aria-hidden>
-        {channel.youtubeBannerUrl ? (
-          <img src={channel.youtubeBannerUrl} alt="" />
-        ) : (
-          <span className="cms-channel-banner-fallback" />
-        )}
+        {/* The media is clipped on its own wrapper so the straddling avatar
+            below is never cut off at the banner's bottom edge. */}
+        <span className="cms-channel-banner-media">
+          {channel.youtubeBannerUrl ? (
+            <img src={channel.youtubeBannerUrl} alt="" />
+          ) : (
+            <span className="cms-channel-banner-fallback" />
+          )}
+        </span>
         <span className="cms-channel-logo" aria-hidden>
           {channel.youtubeAvatarUrl ? <img src={channel.youtubeAvatarUrl} alt="" /> : display}
         </span>
