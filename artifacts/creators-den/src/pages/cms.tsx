@@ -37,57 +37,167 @@ import { NotificationsPanel } from '@/components/notifications-panel';
 // owner still has to attach to a channel.
 // ---------------------------------------------------------------------------
 
+// The Google "G" mark for the sign-in button (four brand colors, no icon lib).
+function GoogleG() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.53 5.53 0 0 1-2.4 3.58v2.98h3.89c2.26-2.09 3.53-5.17 3.53-8.8z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.89-2.98c-1.08.72-2.45 1.16-4.04 1.16-3.1 0-5.73-2.09-6.67-4.91H1.3v3.07C3.26 21.3 7.31 24 12 24z" />
+      <path fill="#FBBC05" d="M5.33 14.36a7.2 7.2 0 0 1 0-4.72V6.57H1.3a11.97 11.97 0 0 0 0 10.86l4.03-3.07z" />
+      <path fill="#EA4335" d="M12 4.73c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.94 1.19 15.23 0 12 0 7.31 0 3.26 2.7 1.3 6.57l4.03 3.07C6.27 6.82 8.9 4.73 12 4.73z" />
+    </svg>
+  );
+}
+
 function NewChannelModal({ onClose, onCreated }: { onClose: () => void; onCreated: (channel: ChannelSummary) => void }) {
   const create = useCreateChannel();
+  const start = useStartChannelOauth();
+  const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  // Google-first linking (no typed name): the consent URL runs against a
+  // provisional channel id and the workspace row is created server-side from
+  // the picked YouTube channel when the code comes back.
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
+  const [popupBlocked, setPopupBlocked] = useState(false);
+
+  const invalidateChannels = () => {
+    queryClient.invalidateQueries({ queryKey: getListChannelsQueryKey() });
+  };
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!name.trim()) return;
+    // Create only — link it now via the Google button, or later from the card.
     create.mutate(
       { data: { name: name.trim() } },
       {
-        onSuccess: (channel) => onCreated(channel),
+        onSuccess: () => {
+          invalidateChannels();
+          onClose();
+        },
         onError: () => setError('We could not create that channel just yet.'),
       },
     );
   };
 
+  // A typed name → the channel is created with it and the Google consent
+  // opens for that channel (onCreated hands off to the connect modal). A
+  // blank name → Google-first: consent against a provisional id, and the
+  // channel is created on return with the real YouTube name/logo/banner.
+  const signInWithGoogle = () => {
+    if (create.isPending || start.isPending) return;
+    setError('');
+    setPopupBlocked(false);
+    const typed = name.trim();
+    if (typed) {
+      create.mutate(
+        { data: { name: typed } },
+        {
+          onSuccess: (channel) => onCreated(channel),
+          onError: () => setError('We could not create that channel just yet.'),
+        },
+      );
+      return;
+    }
+    const provisionalId =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    start.mutate(
+      { channelId: provisionalId },
+      {
+        onSuccess: (result) => {
+          setPendingLink(result.url);
+          // window.open returns null when the browser blocked the pop-up — the
+          // "Open Google" link below still works as a fallback.
+          if (!window.open(result.url, '_blank', 'noopener,noreferrer')) setPopupBlocked(true);
+        },
+        onError: (err) => {
+          const e = err as { response?: { data?: { error?: string } } };
+          setError(e?.response?.data?.error || 'Could not reach Google — try again.');
+        },
+      },
+    );
+  };
+
+  const busy = create.isPending || start.isPending;
+
   return (
-    <div className="modal-backdrop" onClick={create.isPending ? undefined : onClose}>
+    <div className="modal-backdrop" onClick={busy ? undefined : onClose}>
       <div className="modal project-modal" onClick={(event) => event.stopPropagation()}>
         <span className="project-modal-orbit"><span /><i /><b>C</b></span>
-        <button type="button" className="modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
+        <button type="button" className="modal-close" onClick={onClose} disabled={busy} aria-label="Close"><X size={16} /></button>
         <div className="project-modal-heading">
           <span className="eyebrow">New channel</span>
           <h2>A workspace for <em>one channel.</em></h2>
-          <p>Name the channel, then link it to the YouTube channel it belongs to — its banner, logo, and name will come straight from YouTube, and its videos become trackable in Analytics.</p>
+          <p>Type a name to create it now — or sign in with Google and the channel is built from your real YouTube channel: its name, logo, and banner, ready for Analytics.</p>
         </div>
-        <form className="project-modal-fields" onSubmit={submit}>
-          <div className="field">
-            <span>Channel name</span>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="e.g. Ada Makes Games"
-              maxLength={80}
-              required
-              autoFocus
-              data-testid="input-channel-name"
-            />
+        {pendingLink ? (
+          <div className="project-modal-fields" data-testid="panel-google-pending">
+            <p className="setting-copy">
+              {popupBlocked
+                ? 'Your browser blocked the pop-up — click below to open the Google consent screen in a new tab.'
+                : 'Google opened in a new tab. Pick your YouTube channel there — this workspace is created with its name, logo, and banner the moment you finish.'}
+            </p>
+            <a href={pendingLink} target="_blank" rel="noreferrer" className="primary-btn modal-submit" style={{ textDecoration: 'none' }} data-testid="link-google-consent-open">
+              <GoogleG /> {popupBlocked ? 'Open Google' : 'Reopen Google'}
+            </a>
+            <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 10 }}>
+              <button
+                type="button"
+                className="secondary-btn"
+                onClick={() => {
+                  invalidateChannels();
+                  onClose();
+                }}
+                data-testid="button-google-linked"
+              >
+                <RefreshCw size={13} /> I've linked it
+              </button>
+              <button type="button" className="secondary-btn" onClick={onClose} data-testid="button-google-cancel">Not now</button>
+            </div>
           </div>
-          {error && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--destructive))' }} role="alert">{error}</p>}
-          <button
-            type="submit"
-            disabled={create.isPending || !name.trim()}
-            className="primary-btn modal-submit"
-            data-testid="button-create-channel"
-          >
-            {create.isPending ? 'Opening the channel…' : 'Create channel'}
-            <ArrowRight size={15} />
-          </button>
-        </form>
+        ) : (
+          <form className="project-modal-fields" onSubmit={submit}>
+            <div className="field">
+              <span>Channel name</span>
+              <div className="channel-name-row">
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="e.g. Ada Makes Games"
+                  maxLength={80}
+                  required
+                  autoFocus
+                  disabled={busy}
+                  data-testid="input-channel-name"
+                />
+                <button
+                  type="button"
+                  className="google-btn"
+                  onClick={signInWithGoogle}
+                  disabled={busy}
+                  data-testid="button-signin-google"
+                >
+                  <GoogleG />
+                  {start.isPending ? 'Contacting Google…' : 'Sign in with Google'}
+                </button>
+              </div>
+              <span className="channel-name-hint">Optional — leave it blank and the name comes from your YouTube channel.</span>
+            </div>
+            {error && <p className="text-sm font-semibold" style={{ color: 'hsl(var(--destructive))' }} role="alert" data-testid="new-channel-error">{error}</p>}
+            <button
+              type="submit"
+              disabled={create.isPending || !name.trim()}
+              className="primary-btn modal-submit"
+              data-testid="button-create-channel"
+            >
+              {create.isPending ? 'Opening the channel…' : 'Create channel'}
+              <ArrowRight size={15} />
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

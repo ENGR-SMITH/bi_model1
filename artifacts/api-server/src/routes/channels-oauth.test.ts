@@ -326,4 +326,88 @@ describe("channel YouTube OAuth", () => {
       .where(eq(state.tables.tandemChannelsTable.id, id));
     expect(channel.status).toBe("CREATED");
   });
+
+  it("Google-first: start + exchange for a provisional id creates the channel from the picked YouTube channel", async () => {
+    // The "+ New channel" flow with no typed name links against a provisional
+    // channel id; the workspace row is minted on exchange, named after the
+    // real YouTube channel.
+    const provisionalId = "b7e91c2a-0f00-4000-8000-000000000001";
+    const started = await request(API).post(`/api/channels/${provisionalId}/oauth/start`);
+    expect(started.status).toBe(200);
+    expect(started.body.channelId).toBe(provisionalId);
+    const stateParam = new URL(started.body.url).searchParams.get("state")!;
+
+    const exchanged = await request(API)
+      .post(`/api/channels/${provisionalId}/oauth/exchange`)
+      .send({ state: stateParam, code: "auth-code-from-google" });
+    expect(exchanged.status).toBe(200);
+    expect(exchanged.body.status).toBe("CONNECTED");
+    expect(exchanged.body.youtubeConnected).toBe(true);
+    expect(exchanged.body.myRole).toBe("OWNER");
+    // Named from the YouTube channel, and the card shows the branding.
+    expect(exchanged.body.name).toBe("Ada Makes Games");
+    expect(exchanged.body.youtubeChannelId).toBe("UC-stubbed-youtube-channel");
+    expect(exchanged.body.youtubeAvatarUrl).toBe("https://yt3.example/avatar-hi.jpg");
+
+    const [channel] = await state.db
+      .select()
+      .from(state.tables.tandemChannelsTable)
+      .where(eq(state.tables.tandemChannelsTable.id, provisionalId));
+    expect(channel).toBeTruthy();
+    expect(channel.ownerId).toBe("user-1");
+    expect(channel.status).toBe("CONNECTED");
+
+    const [member] = await state.db
+      .select()
+      .from(state.tables.tandemChannelMembersTable)
+      .where(eq(state.tables.tandemChannelMembersTable.channelId, provisionalId));
+    expect(member?.role).toBe("OWNER");
+
+    const [oauth] = await state.db
+      .select()
+      .from(state.tables.tandemChannelOauthTable)
+      .where(eq(state.tables.tandemChannelOauthTable.channelId, provisionalId));
+    expect(oauth?.status).toBe("ACTIVE");
+  });
+
+  it("Google-first exchange refuses a YouTube channel already linked elsewhere and leaves no row behind", async () => {
+    const { id } = await createChannel("Already linked");
+    await linkChannel(id);
+
+    const provisionalId = "b7e91c2a-0f00-4000-8000-000000000002";
+    const started = await request(API).post(`/api/channels/${provisionalId}/oauth/start`);
+    expect(started.status).toBe(200);
+    const stateParam = new URL(started.body.url).searchParams.get("state")!;
+
+    const exchanged = await request(API)
+      .post(`/api/channels/${provisionalId}/oauth/exchange`)
+      .send({ state: stateParam, code: "auth-code-from-google" });
+    expect(exchanged.status).toBe(400);
+    expect(exchanged.body.error).toContain("already linked");
+
+    const [channel] = await state.db
+      .select()
+      .from(state.tables.tandemChannelsTable)
+      .where(eq(state.tables.tandemChannelsTable.id, provisionalId));
+    expect(channel).toBeUndefined();
+  });
+
+  it("only the account that started a Google-first link can exchange it", async () => {
+    const provisionalId = "b7e91c2a-0f00-4000-8000-000000000003";
+    const started = await request(API).post(`/api/channels/${provisionalId}/oauth/start`);
+    const stateParam = new URL(started.body.url).searchParams.get("state")!;
+
+    state.userId = "user-2";
+    const exchanged = await request(API)
+      .post(`/api/channels/${provisionalId}/oauth/exchange`)
+      .send({ state: stateParam, code: "auth-code-from-google" });
+    expect(exchanged.status).toBe(400);
+    expect(exchanged.body.error).toContain("another account");
+
+    const [channel] = await state.db
+      .select()
+      .from(state.tables.tandemChannelsTable)
+      .where(eq(state.tables.tandemChannelsTable.id, provisionalId));
+    expect(channel).toBeUndefined();
+  });
 });
