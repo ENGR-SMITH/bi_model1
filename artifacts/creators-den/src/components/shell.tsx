@@ -615,7 +615,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
             <div className="cd-topnav-chip">
               <button type="button" className="cd-signout" onClick={logout} data-testid="button-creators-logout">
                 <LogOut size={14} />
-                <span>Sign out</span>
+                <span>EXIT</span>
               </button>
             </div>
           </div>

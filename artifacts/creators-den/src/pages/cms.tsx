@@ -605,18 +605,24 @@ function ArenaDoorwayRow() {
       className="arena-doorway"
       data-testid="card-arena-doorway"
     >
-      <span className="arena-doorway-icon" aria-hidden><Globe size={18} /></span>
+      {/* Channel-card theme: a banner with the globe as the channel logo, the
+          live count as the status chip, and the copy sitting tight against
+          the globe instead of floating mid-card. */}
+      <span className="arena-doorway-banner">
+        <span className="arena-doorway-logo" aria-hidden><Globe size={22} /></span>
+        <span className="arena-doorway-heading">
+          <span className="eyebrow"><Globe size={11} /> Collaboration / Audition Arena</span>
+          <b className="arena-doorway-title">Audition for open roles on creators' channels.</b>
+        </span>
+        <span className="arena-doorway-chip" data-testid="arena-doorway-count">
+          <i className="arena-doorway-live-dot" aria-hidden />
+          {openCount} open {openCount === 1 ? 'audition' : 'auditions'}
+        </span>
+      </span>
       <span className="arena-doorway-copy">
-        <span className="eyebrow"><Globe size={11} /> Collaboration / Audition Arena</span>
-        <b className="arena-doorway-title">Audition for open roles on creators' channels.</b>
         <span className="arena-doorway-sub">
           Video, audio, script, and thumbnail seats — pitch with your work, preview the project read-only while
           it's open, and get hired straight onto the team.
-        </span>
-      </span>
-      <span className="arena-doorway-cta">
-        <span className="den-tag accent" data-testid="arena-doorway-count">
-          {openCount} open {openCount === 1 ? 'audition' : 'auditions'}
         </span>
         <span className="arena-doorway-go">
           Browse the arena <ArrowRight size={14} />

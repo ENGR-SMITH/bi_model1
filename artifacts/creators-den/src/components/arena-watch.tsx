@@ -129,7 +129,7 @@ export function ArenaRoleWatchMenu({
         data-testid="button-arena-watch"
       >
         {anyWatch ? <BellRing size={14} /> : <Bell size={14} />}
-        {anyWatch ? 'Watching' : `Watch ${meta.label} auditions`}
+        <span className="arena-watch-label">{anyWatch ? 'Watching' : `Watch ${meta.label} auditions`}</span>
       </button>
       {open && (
         <div className="arena-watch-options" role="group" aria-label="Watch scope">
@@ -185,7 +185,7 @@ export function SharePostButton({ postId }: { postId: string }) {
   return (
     <button
       type="button"
-      className="secondary-btn"
+      className="secondary-btn arena-share-btn"
       onClick={() => void copy()}
       data-testid="button-arena-share"
     >

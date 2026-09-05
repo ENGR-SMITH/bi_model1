@@ -6010,7 +6010,7 @@ select optgroup {
 .arena-back:hover { color: hsl(var(--accent)); }
 .arena-post-titleline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .arena-post-titleline h1 { flex: 0 0 auto; }
-.arena-hero { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 22px; padding: 20px 22px; margin-bottom: 20px; }
+.arena-hero { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 22px; padding: 20px 22px; margin-bottom: 20px; }
 .arena-hero-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .arena-hero-blurb { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
 .arena-hero-pitch { margin: 0; font: 15px/1.65 var(--app-font-sans); color: hsl(var(--foreground)); white-space: pre-wrap; }
@@ -6054,7 +6054,7 @@ select optgroup {
 .arena-app-body { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .arena-app-topline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .arena-app-topline b { font: 600 13px var(--app-font-sans); }
-.arena-app-portfolio { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: hsl(var(--accent)); font: 11px var(--app-font-sans); text-decoration: none; }
+.arena-app-portfolio { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: hsl(var(--accent)); font: 700 11px var(--app-font-sans); letter-spacing: .01em; text-decoration: none; }
 .arena-app-portfolio:hover { text-decoration: underline; }
 .arena-app-message { margin: 0; font-size: 12.5px; line-height: 1.55; color: hsl(var(--muted-foreground)); white-space: pre-wrap; }
 .arena-doc-row { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -6097,34 +6097,90 @@ select optgroup {
   .arena-card-arrow { margin-left: auto; }
 }
 
-/* ---- CMS arena doorway row ---- */
+/* ---- CMS arena doorway: the channel-card theme (banner + logo + chip +
+   body), stretched to a full-width row so it leads the channel wall. ---- */
 .arena-doorway {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: 18px;
-  padding: 18px 20px;
-  border: 1px solid hsl(var(--accent) / .35);
-  border-radius: 14px;
-  background: linear-gradient(120deg, hsl(var(--accent) / .1), transparent 60%);
-  box-shadow: var(--shadow-xs);
+  flex-direction: column;
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, hsl(0 0% 13.5%), hsl(0 0% 10%));
+  box-shadow: var(--shadow-sm);
   text-decoration: none;
   color: inherit;
-  transition: border-color .16s ease, transform .16s ease;
+  transition: transform .24s cubic-bezier(.22, 1, .36, 1), box-shadow .24s ease, border-color .2s ease;
 }
-.arena-doorway:hover { border-color: hsl(var(--accent) / .7); transform: translateY(-1px); }
-.arena-doorway-copy { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.arena-doorway-title { font: 700 18px var(--app-font-serif); letter-spacing: -.02em; }
-.arena-doorway-sub { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.55; max-width: 56ch; }
-.arena-doorway-cta { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: 0 0 auto; }
-.arena-doorway-go { display: inline-flex; align-items: center; gap: 6px; color: hsl(var(--accent)); font: 600 12px var(--app-font-sans); }
+.arena-doorway:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .55);
+  border-color: hsl(var(--accent) / .4);
+}
+.arena-doorway-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: radial-gradient(90% 150% at 82% -25%, hsl(var(--accent) / .32), transparent 55%), linear-gradient(120deg, hsl(0 0% 17%), hsl(0 0% 9%));
+}
+.arena-doorway-logo {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 3px solid hsl(var(--accent) / .45);
+  background: linear-gradient(180deg, hsl(var(--accent) / .3), hsl(var(--accent) / .08));
+  color: hsl(var(--accent));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
+}
+/* The heading hugs the globe — a tight 14px gap, no dead space mid-card. */
+.arena-doorway-heading { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.arena-doorway-title { font: 700 17px var(--app-font-serif); letter-spacing: -.02em; color: hsl(var(--foreground)); }
+.arena-doorway-chip {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: hsl(0 0% 0% / .6);
+  backdrop-filter: blur(6px);
+  color: hsl(var(--muted-foreground));
+  font: 700 8.5px var(--app-font-mono);
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.arena-doorway-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: hsl(152 60% 55%);
+  box-shadow: 0 0 6px hsl(152 60% 55% / .9);
+  animation: arenaLivePulse 1.8s ease infinite;
+}
+.arena-doorway-copy { display: flex; flex-direction: column; gap: 4px; padding: 14px 20px 16px; }
+.arena-doorway-sub { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.55; max-width: 64ch; }
+.arena-doorway-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-top: 11px;
+  border-top: 1px solid hsl(var(--border));
+  color: hsl(var(--accent));
+  font: 700 11px var(--app-font-sans);
+}
 
 .arena-composer-roles { flex-wrap: wrap; }
 
 @media (max-width: 720px) {
-  .arena-doorway { flex-direction: column; align-items: flex-start; }
-  .arena-doorway-cta { flex-direction: row; align-items: center; width: 100%; justify-content: space-between; }
+  .arena-doorway-banner { flex-wrap: wrap; gap: 10px; }
+  .arena-doorway-chip { margin-left: 0; }
 }
 
 /* ---- Board \"Post an open role\" CTA ---- */
@@ -6158,15 +6214,40 @@ select optgroup {
 .role-tabs .arena-watch-bell:hover { color: hsl(var(--accent)); transform: translateY(-1px); }
 .role-tabs .arena-watch-bell.is-watching { color: hsl(var(--accent)); background: hsl(var(--accent) / .14); }
 
-/* ---- Post hero secondary actions: share + watch menu ---- */
+/* ---- Post hero secondary actions: Share (blue) + Watch side by side on
+   one row, with the Captain's Close/Remove row directly beneath. ---- */
 .arena-actions-secondary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 2px;
   padding-top: 10px;
   border-top: 1px dashed hsl(var(--border));
+}
+.arena-actions-secondary .secondary-btn {
+  min-width: 0;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 8px;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.arena-actions-secondary .arena-watch-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Share is the row's primary action — blue. */
+.arena-share-btn {
+  color: hsl(217 88% 62%) !important;
+  border-color: hsl(217 88% 58% / .55) !important;
+  background: hsl(217 88% 58% / .1);
+}
+.arena-share-btn:hover {
+  color: hsl(217 88% 72%) !important;
+  border-color: hsl(217 88% 62%) !important;
+  background: hsl(217 88% 58% / .18);
 }
 .arena-watch-menu { position: relative; }
 .arena-watch-menu-toggle.secondary-btn.is-watching {
@@ -6404,20 +6485,7 @@ select optgroup {
 }
 .cd-agent-link svg { flex: 0 0 auto; }
 
-/* ---- CMS Arena doorway: a microphone tile leads the card ---- */
-.arena-doorway-icon {
-  flex: 0 0 auto;
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, hsl(var(--accent) / .22), hsl(var(--accent) / .08));
-  border: 1px solid hsl(var(--accent) / .4);
-  color: hsl(var(--accent));
-  box-shadow: 0 6px 16px hsl(var(--accent) / .18), inset 0 1px 0 hsl(0 0% 100% / .08);
-}
-/* The doorway now leads the channel wall — no top margin, air below instead. */
+/* The doorway leads the channel wall — no top margin, air below instead. */
 .cms-split-main > .arena-doorway { margin-top: 0; margin-bottom: 18px; }
 
 /* ---- Vault "Collaboration / Audition Arena" card ---- */
@@ -6664,8 +6732,53 @@ select optgroup {
   box-shadow: 0 3px 10px hsl(0 0% 0% / .26);
 }
 .arena-app-topline b { font: 700 13.5px var(--app-font-sans); }
-.arena-app-actions { justify-content: center; }
+.arena-app-actions {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.arena-app-actions .secondary-btn { min-width: 0; }
+/* Accept + Reject glow: a slow colored halo pulses behind each decision. */
+@keyframes arenaGlowAccept {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(164 45% 52% / 0), var(--shadow-xs), var(--edge-hi); }
+  50% { box-shadow: 0 0 16px 3px hsl(164 45% 52% / .38), var(--shadow-xs), var(--edge-hi); }
+}
+@keyframes arenaGlowDecline {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--destructive) / 0), var(--shadow-xs), var(--edge-hi); }
+  50% { box-shadow: 0 0 16px 3px hsl(var(--destructive) / .38), var(--shadow-xs), var(--edge-hi); }
+}
+.arena-accept { animation: arenaGlowAccept 2.4s ease-in-out infinite; }
+.arena-decline { animation: arenaGlowDecline 2.4s ease-in-out infinite; }
+.arena-accept:hover,
+.arena-decline:hover { animation-play-state: paused; }
 .arena-withdraw.is-armed { border-color: hsl(0 72% 60%) !important; color: hsl(0 72% 64%) !important; }
+
+/* ---- Captain controls row under Share + Watch (hero side) ---- */
+.arena-captain-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px dashed hsl(var(--border));
+}
+.arena-captain-row:empty { display: none; }
+.arena-captain-row .secondary-btn {
+  min-width: 0;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 8px;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.arena-captain-confirm {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+.arena-captain-confirm .secondary-btn { flex: 1; }
+.arena-captain-error { grid-column: 1 / -1; margin: 0; font-size: 10.5px; }
 
 /* ---- Vault "Collaboration / Audition Arena" card: globe tile head ---- */
 .arena-vault-card {
@@ -6674,7 +6787,7 @@ select optgroup {
   border: 1px solid hsl(var(--accent) / .28);
   background: linear-gradient(140deg, hsl(var(--card)), hsl(var(--accent) / .05));
 }
-.arena-vault-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; }
+.arena-vault-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; }
 .arena-vault-icon {
   flex: 0 0 auto;
   display: inline-grid;
