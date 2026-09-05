@@ -1448,6 +1448,9 @@ select optgroup {
    border is the row's baseline — clear and quiet, like the side chips. */
 .cd-topnav-tabs {
   grid-column: 2;
+  /* Clear air between the workspace chips (project dropdown) and the relay
+     deck so the two never crowd each other. */
+  margin-left: var(--sp-5);
   display: flex; align-items: stretch; gap: var(--sp-2);
   min-width: 0; max-width: 100%;
   background: hsl(var(--card) / .35);
@@ -5278,9 +5281,13 @@ select optgroup {
 .cms-channel-card.is-editor:hover { border-color: hsl(164 33% 45% / .6); }
 .cms-channel-hit { position: absolute; inset: 0; z-index: 2; }
 .cms-channel-banner {
-  position: relative; height: 122px; overflow: hidden;
+  /* No overflow clip here — it would cut the straddling avatar in half at
+     the banner's bottom edge. The media (banner image) is clipped inside
+     its own wrapper below instead. */
+  position: relative; height: 122px;
   background: linear-gradient(120deg, hsl(0 0% 17%), hsl(0 0% 9%));
 }
+.cms-channel-banner-media { position: absolute; inset: 0; overflow: hidden; }
 .cms-channel-banner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.02); transition: transform .5s cubic-bezier(.22,1,.36,1); }
 .cms-channel-card:hover .cms-channel-banner img { transform: scale(1.06); }
 /* A quiet veil under the banner so the straddling avatar + chips read clean. */
@@ -5456,18 +5463,22 @@ select optgroup {
 .channel-card-menu-wrap .cd-card-delete { position: static; opacity: 0; }
 .cd-card:hover .channel-card-menu-wrap .cd-card-delete { opacity: 1; }
 
-/* ---- Analytics notch chip (beside the Workshop dropdown) ---- */
-.cd-topnav-analytics-notch {
+/* ---- Analytics pill (chrome row, beside the brand name) ----
+   A quiet bordered pill that lights up red when the analytics page is open
+   — YouTube-dark: solid accent only on the active state. */
+.cd-topnav-analytics-chrome {
   display: inline-flex; align-items: center; gap: 7px;
-  padding: 9px 11px; border-radius: 5px;
+  padding: 7px 13px; border-radius: 999px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / .35);
   color: hsl(var(--muted-foreground));
-  font: 600 10px var(--app-font-mono); letter-spacing: .1em; text-transform: uppercase;
-  text-decoration: none;
-  transition: color .15s, background .15s;
+  font: 700 11px var(--app-font-sans); letter-spacing: .01em;
+  text-decoration: none; white-space: nowrap;
+  transition: color .15s ease, border-color .15s ease, background .15s ease;
 }
-.cd-topnav-analytics-notch:hover { color: hsl(var(--accent)); background: hsl(var(--accent) / .08); }
-.cd-topnav-analytics-notch.active { color: hsl(var(--accent)); background: hsl(var(--accent) / .12); box-shadow: inset 0 -1px hsl(var(--accent)); }
-.cd-topnav-chip .cd-topnav-analytics-notch { align-self: center; }
+.cd-topnav-analytics-chrome svg { flex: 0 0 auto; opacity: .85; }
+.cd-topnav-analytics-chrome:hover { color: hsl(var(--foreground)); border-color: hsl(var(--border)); background: hsl(var(--foreground) / .05); }
+.cd-topnav-analytics-chrome.active { color: hsl(var(--accent)); border-color: hsl(var(--accent) / .5); background: hsl(var(--accent) / .12); }
 
 /* Nav bar brand copy: keep the channel name on one line next to the lockup. */
 .cd-brand .brand-copy .truncate { max-width: min(260px, 28vw); }
