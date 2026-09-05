@@ -1,7 +1,6 @@
 import { PiArrowRightDuotone, PiArrowUpRightDuotone, PiBookOpenDuotone, PiLockKeyDuotone, PiMagnifyingGlassDuotone, PiPenNibDuotone, PiTrayDuotone, PiUsersDuotone } from 'react-icons/pi';
 import { Link } from 'wouter';
 import { useUser } from '@clerk/react';
-import { SectionEyebrow } from '@/components/protected-shell';
 
 export default function AuthorsPage() {
   const { user } = useUser();
@@ -18,7 +17,6 @@ export default function AuthorsPage() {
 
         <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-stretch">
           <div className="flex flex-col justify-center">
-            <SectionEyebrow>Authors &amp; writers / the room</SectionEyebrow>
             <h1 className="mt-3 max-w-[9ch] text-5xl font-extrabold leading-[.9] tracking-[-0.07em] text-white sm:text-6xl">
               Your words have a room.
             </h1>
