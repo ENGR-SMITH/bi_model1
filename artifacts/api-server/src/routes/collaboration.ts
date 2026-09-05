@@ -164,6 +164,8 @@ async function notify(
     resourceId,
     read: false,
     createdAt: new Date().toISOString(),
+    // Tells clients this notice came from the Author Den feed.
+    source: "authors",
   });
 }
 

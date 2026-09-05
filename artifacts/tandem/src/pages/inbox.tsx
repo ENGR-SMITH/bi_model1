@@ -15,7 +15,15 @@ import {
 } from '@workspace/api-client-react';
 import type { VideoNotification } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/protected-shell';
-import { useInboxRealtime } from '@/lib/use-inbox-realtime';
+import {
+  denPageCtaLabel,
+  metaFor,
+  noticeDenPageHref,
+  TONE_TEXT,
+  WORLD_CHIP,
+  WORLD_LABEL,
+  type NoticeWorld,
+} from '@/lib/notice-meta';
 
 function roleLabel(project: any, role: string) {
   return project.creatorId === role ? project.creatorName : project.respondentName;
@@ -29,9 +37,9 @@ function roleLabel(project: any, role: string) {
 //                   approvals/rejections, annotations, grants, releases)
 // Each row stays brief — the type of notice plus where it came from — and
 // carries a link into that den's own notifications page for the full detail.
+// Live updates come from the app-wide NotificationCenter (one realtime
+// socket), so this page needs no polling of its own.
 // ---------------------------------------------------------------------------
-
-type NoticeWorld = 'authors' | 'creators';
 
 interface Notice {
   key: string;
@@ -45,50 +53,10 @@ interface Notice {
   createdAt: string;
 }
 
-const AUTHORS_META: Record<string, { label: string; tone: string }> = {
-  continuation_submitted: { label: 'Submitted for review', tone: 'gold' },
-  collaboration_message: { label: 'Message', tone: 'teal' },
-  continuation_declined: { label: 'Archived', tone: 'danger' },
-  respondent_accepted: { label: 'Accepted', tone: 'teal' },
-  respondent_selected: { label: 'Selected', tone: 'teal' },
-  contract_locked: { label: 'Contract locked', tone: 'accent' },
-  contract_action_required: { label: 'Action required', tone: 'gold' },
-  your_turn: { label: 'Your turn', tone: 'accent' },
-  block_approved: { label: 'Approved', tone: 'teal' },
-};
-
-const CREATORS_META: Record<string, { label: string; tone: string }> = {
-  video_invite: { label: 'Invite', tone: 'accent' },
-  video_submission: { label: 'Submitted for review', tone: 'gold' },
-  video_approved: { label: 'Approved', tone: 'teal' },
-  video_rejected: { label: 'Needs another pass', tone: 'danger' },
-  video_timeline_updated: { label: 'Timeline updated', tone: 'accent' },
-  video_comment: { label: 'Annotation', tone: 'teal' },
-  video_released: { label: 'Lock released', tone: 'teal' },
-  video_grant: { label: 'Download access', tone: 'accent' },
-  video_grant_revoked: { label: 'Access revoked', tone: 'danger' },
-};
-
-const TONE_TEXT: Record<string, string> = {
-  accent: 'bg-[#3b82f6]/10 text-[#93c5fd]',
-  teal: 'bg-[#34d399]/10 text-[#5eead4]',
-  gold: 'bg-[#fbbf24]/10 text-[#fcd34d]',
-  danger: 'bg-red-500/10 text-red-400',
-  muted: 'bg-white/5 text-zinc-400',
-};
-
-function metaFor(world: NoticeWorld, category: string) {
-  const meta = (world === 'creators' ? CREATORS_META : AUTHORS_META)[category];
-  return meta ?? { label: world === 'creators' ? 'Studio update' : 'Room update', tone: 'muted' };
-}
-
 export default function InboxPage() {
   const { user } = useUser();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  // A live Socket.IO connection keeps both feeds current — a new notification
-  // from either den refetches them the moment it is written (no polling).
-  useInboxRealtime();
   const inboxQ = useGetCollaborationInbox({ query: { queryKey: ['collaboration-inbox'] } });
   const videoQ = useListVideoNotifications({ query: { queryKey: getListVideoNotificationsQueryKey() } });
   const threadsQ = useListCollaborationThreads({ query: { queryKey: ['collaboration-inbox-threads'] } });
@@ -178,8 +146,7 @@ export default function InboxPage() {
       if (n.world === 'creators') markVideo.mutate({ notificationId: n.id });
       else mark.mutate({ notificationId: n.id });
     }
-    window.location.href =
-      n.world === 'creators' ? '/creators-den/notifications' : '/authors-den?notifications=1';
+    window.location.href = noticeDenPageHref(n.world);
   };
 
   return (
@@ -275,8 +242,8 @@ export default function InboxPage() {
                 <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.unread ? (n.world === 'creators' ? 'bg-red-500 glow-dot' : 'bg-[#3b82f6] glow-dot') : 'bg-white/10'}`} />
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 font-mono-ui text-[8.5px] uppercase tracking-[.14em] ${n.world === 'creators' ? 'bg-red-500/10 text-red-300' : 'bg-[#3b82f6]/10 text-[#93c5fd]'}`}>
-                      {n.world === 'creators' ? 'Creators Den' : 'Author Den'}
+                    <span className={`rounded-full px-2 py-0.5 font-mono-ui text-[8.5px] uppercase tracking-[.14em] ${WORLD_CHIP[n.world]}`}>
+                      {WORLD_LABEL[n.world]}
                     </span>
                     <span className={`rounded-full px-2 py-0.5 font-mono-ui text-[8.5px] uppercase tracking-[.14em] ${TONE_TEXT[n.tone] ?? TONE_TEXT.muted}`}>{n.label}</span>
                   </span>
@@ -284,7 +251,7 @@ export default function InboxPage() {
                   <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-500">
                     <span>{new Date(n.createdAt).toLocaleDateString()}</span>
                     <span className="inline-flex items-center gap-1 text-zinc-400">
-                      View in {n.world === 'creators' ? 'Creators Den inbox' : 'Author Den'} <PiArrowRightDuotone className="h-3 w-3" />
+                      View in {denPageCtaLabel(n.world)} <PiArrowRightDuotone className="h-3 w-3" />
                     </span>
                   </span>
                 </span>
