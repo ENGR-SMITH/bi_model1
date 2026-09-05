@@ -9,6 +9,7 @@ import {
   History,
   Loader2,
   LockKeyhole,
+  Megaphone,
   Mic2,
   Image,
   Palette,
@@ -18,7 +19,7 @@ import {
   UserPlus,
   X,
 } from 'lucide-react';
-import { Link, useParams } from 'wouter';
+import { Link, useLocation, useParams } from 'wouter';
 import { useUser } from '@clerk/react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -36,9 +37,13 @@ import {
   useListVideoGrants,
   useRemoveVideoProjectMember,
   useRevokeVideoGrant,
+  useListArenaPosts,
   useUpdateVideoProjectMemberRoles,
+  type ArenaPostSummary,
 } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
+import { PostArenaRoleModal } from '@/components/arena-post-composer';
+import { ARENA_ROLE_META, ArenaRoleTag } from '@/components/arena-apply-modal';
 import { useProjectRealtime } from '@/lib/realtime';
 import { isAudioKind, proxyUrlFor } from '@/components/asset-preview';
 import { MemberAvatar } from '@/components/member-avatar';
@@ -616,6 +621,88 @@ function DownloadAuditPanel({ projectId, myRoles }: { projectId: string; myRoles
   );
 }
 
+// Arena — the collaboration/audition doorway on the vault. The Captain can
+// open a role for THIS project (one OPEN post per role); existing open posts
+// link straight into their Captain view for Accept/Reject.
+function ArenaProjectPanel({ projectId, projectName }: { projectId: string; projectName: string }) {
+  const [, setLocation] = useLocation();
+  const open = useListArenaPosts({ projectId });
+  const [composerOpen, setComposerOpen] = useState(false);
+  const posts = (open.data ?? []) as ArenaPostSummary[];
+
+  return (
+    <div className="paper-card mt-6" data-testid="panel-arena-project">
+      <div className="inline-heading">
+        <span className="eyebrow"><Megaphone size={13} /> Collaboration / Audition Arena</span>
+        <span className="mono-label">{posts.length} open</span>
+      </div>
+      <p className="setting-copy mt-1">
+        Hire for this project from the public arena. Anyone signed in can audition with a pitch and documents,
+        previewing the project read-only (timeline + preview) while the role is open.
+      </p>
+
+      {posts.length > 0 && (
+        <div className="den-stack mt-3">
+          {posts.map((post) => (
+            <div className="list-row" key={post.id} data-testid={`arena-open-post-${post.id}`}>
+              <ArenaRoleTag role={post.role} />
+              <span className="flex-1 min-w-0">
+                <b className="truncate">{ARENA_ROLE_META[post.role].roleLabel}</b>
+                <small>
+                  {post.applicantCount} applicant{post.applicantCount === 1 ? '' : 's'} now · {timeAgo(post.createdAt)}
+                </small>
+              </span>
+              <Link href={`/arena/posts/${post.id}`} className="secondary-btn" data-testid={`arena-open-post-manage-${post.id}`}>
+                Manage auditions
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {posts.length < 4 && (
+        <button
+          type="button"
+          className="primary-btn mt-4"
+          onClick={() => setComposerOpen(true)}
+          data-testid="button-arena-post-role"
+        >
+          <Megaphone size={14} /> Post an open role
+        </button>
+      )}
+      {posts.length > 0 && posts.length < 4 && (
+        <p className="den-footnote mt-2">
+          One open audition per role — close or fill one before posting another of the same.
+        </p>
+      )}
+
+      {composerOpen && (
+        <PostArenaRoleModal
+          projectId={projectId}
+          projectName={projectName}
+          onClose={() => setComposerOpen(false)}
+          onCreated={(post) => {
+            setComposerOpen(false);
+            setLocation(`/arena/posts/${post.id}`);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function timeAgo(iso: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
 export default function ContentCreatorsProjectPage() {
   const { channelId, projectId } = useParams<{ channelId?: string; projectId: string }>();
   // The vault's billboard wears the linked channel's real YouTube banner
@@ -796,6 +883,10 @@ export default function ContentCreatorsProjectPage() {
         </div>
         <GrantsPanel projectId={p.id} myRoles={myRoles} members={p.members} />
       </div>
+
+      {/* The audition doorway — only the project owner (the channel Captain)
+          can post roles; open roles always surface above the vault rails. */}
+      {viewerId === p.ownerId && <ArenaProjectPanel projectId={p.id} projectName={p.name} />}
 
       <div className="cd-watch">
         <div className="cd-watch-main">

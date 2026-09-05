@@ -16,6 +16,7 @@ import {
   Image,
   LayoutGrid,
   LogOut,
+  Megaphone,
   Mic2,
   Package,
   Palette,
@@ -43,6 +44,7 @@ import {
 } from '@workspace/api-client-react';
 import { useChannelPresence, useProjectPresence, useRealtimeNotifications, useRealtimeSocket } from '@/lib/realtime';
 import { ProjectChat } from '@/components/project-chat';
+import { ArenaPreviewBanner } from '@/components/arena-preview-banner';
 import { denRouteInfo, projectUrl } from '@/lib/den-urls';
 import { matchesCreatorQuery, matchesProjectQuery } from '@/lib/explore-search';
 
@@ -343,6 +345,10 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   const [channelOpen, setChannelOpen] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
   const info = denRouteInfo(location);
+  // The Arena (board / post / my auditions) is a den-level surface with no
+  // channel or project context — the shell keeps the CMS-style header and
+  // marks the space with a violet "Arena" notch.
+  const isArena = location === '/arena' || location.startsWith('/arena/');
 
   const channelId = info.mode === 'channel' || info.mode === 'channel-project' ? info.channelId : undefined;
   const projectId = info.mode === 'channel-project' || info.mode === 'flat-project' ? info.projectId : undefined;
@@ -377,23 +383,34 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
     ? (reviewQueue.data ?? []).filter((item) => item.projectId === projectId).length
     : (reviewQueue.data ?? []).length;
 
-  // Read-only mode: a PUBLIC project opened by someone who is not a member.
+  // Read-only preview mode: a non-member on a PUBLIC project (viewerAccess
+  // 'public') or inside the Arena applicant window — a PRIVATE project with an
+  // OPEN role post (viewerAccess 'applicant'). Payloads that predate the field
+  // fall back to the member-role state (members always hold at least CAPTAIN).
   const detail = useGetVideoProject(projectId ?? '', {
     query: {
       queryKey: getGetVideoProjectQueryKey(projectId ?? ''),
       enabled: Boolean(projectId),
     },
   });
-  const readOnly = Boolean(projectId) && Boolean(detail.data) && (detail.data?.myRoles?.length ?? 0) === 0;
+  const projectDetail = detail.data;
+  const viewerAccess = projectDetail?.viewerAccess;
+  const readOnly = Boolean(projectId) && Boolean(projectDetail)
+    ? (viewerAccess === undefined ? (projectDetail?.myRoles?.length ?? 0) === 0 : viewerAccess !== 'member')
+    : false;
+  const isApplicantPreview = viewerAccess === 'applicant';
   const projectLabel = current?.name ?? detail.data?.name ?? channelLabel ?? 'Home';
   // The brand reads "Creators Den" only on the MCNs grid; inside a channel it
-  // shows the channel's name, and inside a project the project's name.
-  const brandTitle = !channelId && !projectId ? 'Creators Den' : projectLabel;
-  const brandSub = projectId
-    ? (channelLabel ? `in ${channelLabel}` : 'channel project')
-    : channelId
-      ? (channelData?.myRole === 'OWNER' ? 'Your channel' : 'You’re an editor')
-      : 'video version control';
+  // shows the channel's name, and inside a project the project's name. The
+  // Arena gets the CMS-style brand with its own sub-line.
+  const brandTitle = isArena ? 'Creators Den' : !channelId && !projectId ? 'Creators Den' : projectLabel;
+  const brandSub = isArena
+    ? 'collaboration · audition arena'
+    : projectId
+      ? (channelLabel ? `in ${channelLabel}` : 'channel project')
+      : channelId
+        ? (channelData?.myRole === 'OWNER' ? 'Your channel' : 'You’re an editor')
+        : 'video version control';
 
   const logout = () => signOut({ redirectUrl: '/' });
 
@@ -476,6 +493,16 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 <Globe size={15} />
               </Link>
             </div>
+            {/* Arena notch — marks the collaboration room while on /arena…,
+                and doubles as the way back to the board from a post page. */}
+            {isArena && (
+              <div className="cd-topnav-chip">
+                <Link href="/arena" className="cd-topnav-arena-notch" title="Audition Arena" data-testid="nav-arena-notch">
+                  <Megaphone size={15} />
+                  <span>Arena</span>
+                </Link>
+              </div>
+            )}
             {/* Channel dropdown — every channel, one click to its den. */}
             <div className="cd-topnav-chip">
               <div className="top-workspace-wrap" onPointerLeave={() => setChannelOpen(false)}>
@@ -548,8 +575,12 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                 {tab(`${base}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview', true)}
               </div>
               {readOnly ? (
-                <span className="den-tag muted cd-readonly-tag" title="You are viewing a PUBLIC project read-only — only its preview and timeline are open to you.">
-                  <Eye size={11} /> Read only
+                <span
+                  className="den-tag muted cd-readonly-tag"
+                  title={isApplicantPreview ? 'You are previewing this project to audition for an open role — only its timeline and preview are open to you.' : 'You are viewing a PUBLIC project read-only — only its preview and timeline are open to you.'}
+                  data-testid={isApplicantPreview ? 'tag-audition-preview' : 'tag-read-only'}
+                >
+                  <Eye size={11} /> {isApplicantPreview ? 'Audition preview' : 'Read only'}
                 </span>
               ) : (
                 <>
@@ -593,6 +624,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
 
       <main className="main-stage">
         {projectId && !readOnly && <PresenceStrip projectId={projectId} />}
+        {projectId && isApplicantPreview && <ArenaPreviewBanner projectId={projectId} />}
         {children}
       </main>
 

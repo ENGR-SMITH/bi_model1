@@ -11,6 +11,9 @@ import VaultPage from '@/pages/vault';
 import ActivityPage from '@/pages/activity';
 import ProfilePage from '@/pages/profile';
 import ExplorePage from '@/pages/explore';
+import ArenaBoardPage from '@/pages/arena';
+import ArenaPostPage from '@/pages/arena-post';
+import ArenaMinePage from '@/pages/arena-mine';
 import NotificationsPage from '@/pages/notifications';
 import ReviewPage from '@/pages/review';
 import PreviewPage from '@/pages/preview';
@@ -114,6 +117,9 @@ export default function App() {
           <Route path="/profile" component={ProfilePage} />
           <Route path="/profile/:userId" component={ProfilePage} />
           <Route path="/explore" component={ExplorePage} />
+          <Route path="/arena" component={ArenaBoardPage} />
+          <Route path="/arena/mine" component={ArenaMinePage} />
+          <Route path="/arena/posts/:postId" component={ArenaPostPage} />
           <Route path="/notifications" component={NotificationsPage} />
           <Route path="/projects/:projectId" component={LegacyProjectGate} />
           {FLAT_SUFFIXES.map(([suffix, Page]) => (

@@ -291,7 +291,9 @@ router.post("/video/projects", async (req, res): Promise<void> => {
 
 // GET /video/projects/:projectId — detail with members + assets. Members get
 // their full roles (`myRoles`); a non-member may open a PUBLIC project in
-// read-only mode (`myRoles: []`) so search results can be previewed.
+// read-only mode (`myRoles: []`) so search results can be previewed, or a
+// project carrying an OPEN Arena audition in the same read-only mode
+// (`viewerAccess: 'applicant'`). Writes never flow through this route.
 router.get("/video/projects/:projectId", async (req: Request, res): Promise<void> => {
   const userId = getAuth(req).userId;
   if (!userId) {
@@ -354,6 +356,9 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
   res.json(
     GetVideoProjectResponse.parse({
       ...project,
+      // null access already 403'd above, so the surviving kinds are exactly
+      // the three the client needs to render the right chrome.
+      viewerAccess: access.kind,
       myRoles: access.kind === "member" ? (access.member.roles ?? []) : [],
       members: members.map((row) => ({
         ...row,

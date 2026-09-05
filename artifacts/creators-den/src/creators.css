@@ -189,6 +189,44 @@ select optgroup {
 .den-presence-dot { width: 7px; height: 7px; border-radius: 50%; background: hsl(164 33% 45%); box-shadow: 0 0 0 3px hsl(164 33% 45% / .14); animation: pulseDot 2.2s ease-in-out infinite; }
 @keyframes pulseDot { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 
+/* Arena audition-preview strip: shown inside a PRIVATE project's read-only
+   applicant window (viewerAccess 'applicant') — same place the presence strip
+   sits, but accent-tinted with a link back to the open role post. */
+.arena-preview-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px clamp(20px, 3vw, 42px); border-bottom: 1px solid hsl(var(--accent) / .25); background: linear-gradient(90deg, hsl(var(--accent) / .13), hsl(var(--accent) / .04)); font-size: 11px; color: hsl(var(--foreground)); }
+.arena-preview-banner > svg { flex: 0 0 auto; color: hsl(var(--accent)); }
+.arena-preview-banner b { font-weight: 700; }
+.arena-preview-banner-link { margin-left: auto; color: hsl(var(--accent)); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.arena-preview-banner-link:hover { text-decoration: underline; }
+
+/* ---- Arena work reviews (profile card + composer) ---- */
+.review-stars { display: inline-flex; align-items: center; gap: 1px; }
+.review-stars svg.is-on { color: hsl(var(--sidebar-primary)); }
+.review-stars svg.is-off { color: hsl(var(--muted-foreground) / .4); }
+
+.work-review-row { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid hsl(var(--border) / .7); border-radius: 9px; background: hsl(var(--card)); }
+.work-review-topline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.work-review-reviewer { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
+.work-review-reviewer img { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+.work-review-reviewer svg { width: 22px; height: 22px; padding: 4px; border-radius: 50%; background: hsl(var(--accent) / .14); color: hsl(var(--accent)); }
+.work-review-reviewer a { font: 700 12px var(--app-font-sans); color: hsl(var(--foreground)); text-decoration: none; }
+.work-review-reviewer a:hover { color: hsl(var(--accent)); text-decoration: underline; }
+.work-review-context { color: hsl(var(--muted-foreground)); font-size: 10px; }
+.work-review-note { margin: 0; font: 13px/1.6 var(--app-font-sans); color: hsl(var(--foreground)); white-space: pre-wrap; }
+.work-review-row .den-tag { align-self: flex-start; }
+
+/* Composer star picker — large tap targets with hover preview. */
+.review-picker { display: inline-flex; align-items: center; gap: 4px; padding: 7px 9px; border: 1px solid hsl(var(--border)); border-radius: 999px; background: hsl(var(--background) / .35); }
+.review-picker button { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; padding: 0; transition: transform .12s, color .12s, background .12s; }
+.review-picker button:hover { transform: translateY(-2px); }
+.review-picker button.is-on { color: hsl(var(--sidebar-primary)); }
+.review-picker button.is-off { color: hsl(var(--muted-foreground) / .35); }
+.review-picker button.is-on:hover,
+.review-picker button.is-on:focus-visible { color: hsl(var(--sidebar-primary)); }
+.review-picker button:disabled { cursor: wait; opacity: .7; transform: none; }
+
+/* Review CTA on the filled post (Captain actions column + hire actions). */
+.arena-review-cta { white-space: nowrap; }
+
 /* ---- Misc ---- */
 .den-stat-row { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid hsl(var(--border)); background: hsl(var(--card)); }
 .den-stat { padding: 14px 16px; border-right: 1px solid hsl(var(--border)); }
@@ -5888,3 +5926,329 @@ select optgroup {
 @media (max-width: 1180px) {
   .role-notes-bar > .stage-submit-card { overflow: hidden; max-height: min(62vh, 540px); }
 }
+
+/* ==========================================================================
+   Creator Den — Collaboration / Audition Arena (board, post, apply modal)
+   ========================================================================== */
+
+/* ---- Board toolbar + filter/sort segmented chips ---- */
+.arena-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 18px; }
+
+/* ---- Board cards ---- */
+.arena-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--card) / .9);
+  box-shadow: var(--shadow-xs);
+  text-decoration: none;
+  color: inherit;
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.arena-card:hover { border-color: hsl(var(--primary) / .5); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.arena-card-main { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.arena-card-topline { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.arena-channel-avatar,
+.arena-app-avatar {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: hsl(var(--accent) / .14);
+  color: hsl(var(--accent));
+  font: 700 13px var(--app-font-sans);
+  text-transform: uppercase;
+}
+.arena-channel-avatar img,
+.arena-app-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.arena-card-channel { display: block; font: 700 11px var(--app-font-sans); letter-spacing: .02em; }
+.arena-card-project { display: block; color: hsl(var(--muted-foreground)); font-size: 12px; }
+.arena-card-roleline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.arena-card-seat { font: 12px var(--app-font-sans); color: hsl(var(--muted-foreground)); }
+.arena-card-pitch {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: hsl(var(--muted-foreground));
+  font-size: 13px;
+  line-height: 1.5;
+}
+.arena-card-foot { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.arena-card-poster { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: hsl(var(--muted-foreground)); min-width: 0; }
+.arena-card-poster img,
+.arena-fact-poster img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
+.arena-card-poster i,
+.arena-fact-poster i { font-style: normal; display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: hsl(var(--secondary)); font-size: 9px; }
+.arena-card-time { font: 9px var(--app-font-mono); color: hsl(var(--muted-foreground)); text-transform: uppercase; }
+.arena-card-arrow { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; color: hsl(var(--accent)); font: 600 11px var(--app-font-sans); }
+.arena-card-side { display: flex; flex-direction: column; justify-content: center; align-items: flex-end; gap: 7px; flex: 0 0 auto; }
+.arena-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: hsl(var(--secondary));
+  color: hsl(var(--muted-foreground));
+  font: 8.5px var(--app-font-mono);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.arena-count b { font-size: 11px; }
+.arena-count.applied { color: hsl(164 33% 39%); background: hsl(164 33% 45% / .14); }
+.arena-count.is-applied { color: hsl(var(--muted-foreground)); }
+
+/* ---- Post detail ---- */
+.arena-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px; color: hsl(var(--muted-foreground)); font: 11px var(--app-font-sans); text-decoration: none; }
+.arena-back:hover { color: hsl(var(--accent)); }
+.arena-post-titleline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.arena-post-titleline h1 { flex: 0 0 auto; }
+.arena-hero { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 22px; padding: 20px 22px; margin-bottom: 20px; }
+.arena-hero-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.arena-hero-blurb { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
+.arena-hero-pitch { margin: 0; font: 15px/1.65 var(--app-font-sans); color: hsl(var(--foreground)); white-space: pre-wrap; }
+.arena-hero-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 4px; }
+.arena-fact { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 8px; background: hsl(var(--muted) / .6); }
+.arena-fact-label { font: 8px var(--app-font-mono); text-transform: uppercase; letter-spacing: .08em; color: hsl(var(--muted-foreground)); }
+.arena-fact b { font: 600 12px var(--app-font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arena-fact-poster { display: inline-flex; align-items: center; gap: 6px; }
+.arena-filled-note,
+.arena-closed-note { display: flex; align-items: center; gap: 7px; margin: 2px 0 0; font: 11px var(--app-font-sans); color: hsl(var(--muted-foreground)); }
+.arena-filled-note svg { color: hsl(164 33% 39%); }
+.arena-closed-note svg { color: hsl(var(--muted-foreground)); }
+
+/* Captain-view fill state banner — the seat went to the ACCEPTED hire and
+   the remaining PENDING auditions were auto-declined by the accept. */
+.arena-fill-banner { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; padding: 10px 14px; border: 1px solid hsl(164 33% 45% / .4); border-radius: 10px; background: linear-gradient(90deg, hsl(164 33% 45% / .14), hsl(164 33% 45% / .04)); font: 12px/1.55 var(--app-font-sans); color: hsl(var(--foreground)); }
+.arena-fill-banner > svg { flex: 0 0 auto; color: hsl(164 33% 39%); }
+.arena-fill-hire { color: hsl(164 33% 45%); font-weight: 700; text-decoration: none; }
+.arena-fill-hire:hover { text-decoration: underline; }
+.arena-hero-side { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+.arena-count-big { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; border-radius: 10px; background: hsl(var(--secondary)); border: 1px dashed hsl(var(--border)); }
+.arena-count-big b { font: 700 22px var(--app-font-serif); letter-spacing: -.02em; }
+.arena-count-big span { font: 10.5px var(--app-font-sans); color: hsl(var(--muted-foreground)); line-height: 1.45; }
+.arena-actions { display: flex; flex-direction: column; gap: 8px; }
+.arena-actions .primary-btn,
+.arena-actions .secondary-btn { justify-content: center; }
+.arena-withdraw.is-armed { border-color: hsl(var(--foreground) / .35); color: hsl(var(--foreground)); }
+.arena-apply-hint { margin: 0; font-size: 10px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
+
+/* ---- Captain review panel ---- */
+.arena-captain-panel { margin-top: 8px; }
+.arena-section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 12px; }
+.arena-app-row {
+  display: flex;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 11px;
+  background: hsl(var(--card) / .9);
+}
+.arena-app-body { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.arena-app-topline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.arena-app-topline b { font: 600 13px var(--app-font-sans); }
+.arena-app-portfolio { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: hsl(var(--accent)); font: 11px var(--app-font-sans); text-decoration: none; }
+.arena-app-portfolio:hover { text-decoration: underline; }
+.arena-app-message { margin: 0; font-size: 12.5px; line-height: 1.55; color: hsl(var(--muted-foreground)); white-space: pre-wrap; }
+.arena-doc-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.arena-doc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 260px;
+  padding: 3px 9px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 7px;
+  background: hsl(var(--muted) / .5);
+  color: hsl(var(--muted-foreground));
+  font: 10.5px var(--app-font-sans);
+  text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.arena-doc-chip:hover { border-color: hsl(var(--accent) / .5); color: hsl(var(--accent)); }
+.arena-app-decided { margin: 0; font-size: 10px; color: hsl(var(--muted-foreground)); font-style: italic; }
+.arena-app-actions { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; align-items: stretch; }
+.arena-accept { color: hsl(164 33% 39%); }
+.arena-decline { color: hsl(var(--foreground)); }
+
+/* ---- Apply modal extras ---- */
+.arena-file-pick { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; cursor: pointer; }
+.arena-file-pick input[type='file'] { display: none; }
+.arena-file-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.arena-file-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; background: hsl(var(--muted) / .6); font-size: 11.5px; min-width: 0; }
+.arena-file-row svg { flex: 0 0 auto; color: hsl(var(--accent)); }
+.arena-file-row small { color: hsl(var(--muted-foreground)); font: 9px var(--app-font-mono); }
+.arena-file-row button { display: inline-grid; place-items: center; margin-left: auto; border: 0; background: transparent; color: hsl(var(--muted-foreground)); cursor: pointer; border-radius: 4px; padding: 2px; }
+.arena-file-row button:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / .08); }
+
+@media (max-width: 860px) {
+  .arena-hero { grid-template-columns: 1fr; }
+  .arena-card { flex-direction: column; gap: 10px; }
+  .arena-card-side { flex-direction: row; justify-content: flex-start; align-items: center; }
+  .arena-card-arrow { margin-left: auto; }
+}
+
+/* ---- CMS arena doorway row ---- */
+.arena-doorway {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 18px 20px;
+  border: 1px solid hsl(var(--accent) / .35);
+  border-radius: 14px;
+  background: linear-gradient(120deg, hsl(var(--accent) / .1), transparent 60%);
+  box-shadow: var(--shadow-xs);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .16s ease, transform .16s ease;
+}
+.arena-doorway:hover { border-color: hsl(var(--accent) / .7); transform: translateY(-1px); }
+.arena-doorway-copy { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.arena-doorway-title { font: 700 18px var(--app-font-serif); letter-spacing: -.02em; }
+.arena-doorway-sub { color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.55; max-width: 56ch; }
+.arena-doorway-cta { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex: 0 0 auto; }
+.arena-doorway-go { display: inline-flex; align-items: center; gap: 6px; color: hsl(var(--accent)); font: 600 12px var(--app-font-sans); }
+
+.arena-composer-roles { flex-wrap: wrap; }
+
+@media (max-width: 720px) {
+  .arena-doorway { flex-direction: column; align-items: flex-start; }
+  .arena-doorway-cta { flex-direction: row; align-items: center; width: 100%; justify-content: space-between; }
+}
+
+/* ---- Board \"Post an open role\" CTA ---- */
+.arena-toolbar-cta { margin-left: auto; }
+.arena-composer-roles { flex-wrap: wrap; }
+
+@media (max-width: 720px) {
+  .arena-toolbar-cta { margin-left: 0; width: 100%; justify-content: center; }
+}
+
+/* ---- My Auditions page ---- */
+.arena-mine-tabs { align-self: flex-start; margin-bottom: 16px; }
+.arena-mine-meta { font: 10px var(--app-font-sans); color: hsl(var(--muted-foreground)); }
+.arena-mine-meta span { color: hsl(var(--muted-foreground)); }
+.arena-mine-hire-link {
+  color: hsl(var(--muted-foreground));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.arena-mine-hire-link:hover { color: hsl(var(--foreground)); }
+
+/* ---- Arena role chips: watch bell inside each filter pill ---- */
+.arena-role-pill { display: inline-flex; align-items: stretch; }
+.arena-role-pill > button:first-child:not(:only-child) { border-radius: 999px 0 0 999px; }
+.role-tabs .arena-watch-bell {
+  padding: 6px 9px;
+  border-left: 1px solid hsl(var(--border));
+  border-radius: 0 999px 999px 0;
+  color: hsl(var(--muted-foreground));
+}
+.role-tabs .arena-watch-bell:hover { color: hsl(var(--accent)); transform: translateY(-1px); }
+.role-tabs .arena-watch-bell.is-watching { color: hsl(var(--accent)); background: hsl(var(--accent) / .14); }
+
+/* ---- Post hero secondary actions: share + watch menu ---- */
+.arena-actions-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px dashed hsl(var(--border));
+}
+.arena-watch-menu { position: relative; }
+.arena-watch-menu-toggle.secondary-btn.is-watching {
+  color: hsl(var(--accent));
+  border-color: hsl(var(--accent) / .5);
+}
+.arena-watch-options {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(272px, 74vw);
+  padding: 9px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 11px;
+  background: hsl(var(--card));
+  box-shadow: 0 12px 34px hsl(0 0% 0% / .18), var(--shadow-sm);
+}
+.arena-watch-options-caption {
+  margin: 0 4px 5px;
+  font: 10px/1.45 var(--app-font-sans);
+  color: hsl(var(--muted-foreground));
+}
+.arena-watch-options > button {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  color: hsl(var(--foreground));
+  font: var(--app-font-sans);
+}
+.arena-watch-options > button:hover { background: hsl(var(--muted) / .6); }
+.arena-watch-options > button:disabled { opacity: .55; cursor: default; }
+.arena-watch-options > button .arena-watch-check {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 5px;
+  color: #fff;
+  background: hsl(var(--card));
+}
+.arena-watch-options > button.checked .arena-watch-check {
+  border-color: hsl(var(--accent));
+  background: hsl(var(--accent));
+}
+.arena-watch-options > button b { display: block; font: 700 12px var(--app-font-sans); }
+.arena-watch-options > button small { display: block; margin-top: 1px; font: 10px var(--app-font-sans); color: hsl(var(--muted-foreground)); }
+
+/* ---- Arena notch in the topnav (while on /arena…) ---- */
+.cd-topnav-chip .cd-topnav-arena-notch {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 100%;
+  padding: 0 14px;
+  color: hsl(var(--accent));
+  font: 800 11px var(--app-font-sans);
+  letter-spacing: .02em;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: filter 140ms ease;
+}
+.cd-topnav-chip .cd-topnav-arena-notch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: hsl(var(--accent) / .13);
+  clip-path: polygon(0 0, calc(100% - var(--sp-3)) 0, 100% 100%, 0 100%);
+}
+.cd-topnav-chip .cd-topnav-arena-notch:hover { filter: brightness(1.12); }
+.cd-topnav-chip .cd-topnav-arena-notch svg { flex: 0 0 auto; }

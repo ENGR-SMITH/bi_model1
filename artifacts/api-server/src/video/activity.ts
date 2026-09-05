@@ -17,6 +17,12 @@ export const VIDEO_ACTIVITY_EVENT_TYPES = [
   "submission_approved",
   "submission_rejected",
   "asset_uploaded",
+  // Creator Den Arena (public audition system) — timeline events on the
+  // project so members see posts open/close and hires land.
+  "arena_post_opened",
+  "arena_post_closed",
+  "arena_post_filled",
+  "arena_application_rejected",
 ] as const;
 
 export type VideoActivityEventType = (typeof VIDEO_ACTIVITY_EVENT_TYPES)[number];

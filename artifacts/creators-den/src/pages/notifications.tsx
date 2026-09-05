@@ -4,11 +4,15 @@ import {
   Bell,
   CheckCheck,
   CheckCircle2,
+  Clock,
   GitPullRequest,
   History,
   Inbox,
   LockKeyhole,
+  Megaphone,
   MessageSquare,
+  Star,
+  UserMinus,
   UserPlus,
   XCircle,
 } from 'lucide-react';
@@ -39,6 +43,14 @@ const CATEGORY_META: Record<string, { icon: typeof Bell; tone: string; label: st
   video_released: { icon: LockKeyhole, tone: 'teal', label: 'Lock released' },
   video_grant: { icon: CheckCircle2, tone: 'accent', label: 'Download access' },
   video_grant_revoked: { icon: XCircle, tone: 'danger', label: 'Access revoked' },
+  // Arena (audition arena) categories — see §9.4 of the Arena plan.
+  video_arena_applied: { icon: Megaphone, tone: 'gold', label: 'New audition' },
+  video_arena_accepted: { icon: CheckCircle2, tone: 'teal', label: 'Hired' },
+  video_arena_rejected: { icon: XCircle, tone: 'danger', label: 'Declined' },
+  video_arena_closed: { icon: Clock, tone: 'muted', label: 'Audition closed' },
+  video_arena_withdrawn: { icon: UserMinus, tone: 'muted', label: 'Audition withdrawn' },
+  video_arena_watch: { icon: Bell, tone: 'accent', label: 'Role alert' },
+  video_arena_reviewed: { icon: Star, tone: 'teal', label: 'Work review' },
 };
 
 const FALLBACK_META = { icon: Bell, tone: 'muted', label: 'Update' } as const;

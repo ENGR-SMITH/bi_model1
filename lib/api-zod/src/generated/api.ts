@@ -2076,6 +2076,7 @@ export const CreateVideoProjectResponse = zod.object({
   "description": zod.string(),
   "status": zod.string(),
   "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
+  "viewerAccess": zod.enum(['member', 'public', 'applicant', 'none']).optional().describe('How the signed-in caller may view this project. member = full member access; public = non-member read-only preview of a PUBLIC project; applicant = non-member read-only Arena preview while an open role post exists on this project; none = no access. Optional (not in required) so create\/list payloads that reuse this schema and predate the field stay valid — when absent, fall back to the caller\'s role state.'),
   "myRoles": zod.array(zod.string()).describe('The viewer\'s roles in this project (e.g. [\"VIDEO\", \"THUMBNAIL\"]; always includes CAPTAIN for the owner)'),
   "members": zod.array(zod.object({
   "id": zod.string(),
@@ -2830,6 +2831,7 @@ export const GetVideoProjectResponse = zod.object({
   "description": zod.string(),
   "status": zod.string(),
   "visibility": zod.enum(['PUBLIC', 'PRIVATE']).describe('Whether the project appears on the owner\'s public profile'),
+  "viewerAccess": zod.enum(['member', 'public', 'applicant', 'none']).optional().describe('How the signed-in caller may view this project. member = full member access; public = non-member read-only preview of a PUBLIC project; applicant = non-member read-only Arena preview while an open role post exists on this project; none = no access. Optional (not in required) so create\/list payloads that reuse this schema and predate the field stay valid — when absent, fall back to the caller\'s role state.'),
   "myRoles": zod.array(zod.string()).describe('The viewer\'s roles in this project (e.g. [\"VIDEO\", \"THUMBNAIL\"]; always includes CAPTAIN for the owner)'),
   "members": zod.array(zod.object({
   "id": zod.string(),
@@ -4329,5 +4331,555 @@ export const MarkVideoNotificationReadResponse = zod.object({
   "readAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
+
+
+/**
+ * OPEN posts across the platform with the poster/channel/project summaries, the live applicant count, and the caller's own application state. ?mine=1 returns the caller's own posts (Captain) with application counts for the management view.
+ * @summary List open role posts across the Arena
+ */
+export const ListArenaPostsQueryParams = zod.object({
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).optional(),
+  "channelId": zod.coerce.string().optional(),
+  "projectId": zod.coerce.string().optional(),
+  "sort": zod.enum(['newest', 'most_applied']).optional(),
+  "followed": zod.coerce.boolean().optional().describe('Order posts from Captains the caller follows first'),
+  "mine": zod.coerce.boolean().optional().describe('Return only the caller\'s own posts')
+})
+
+export const ListArenaPostsResponseItem = zod.object({
+  "id": zod.string(),
+  "channelId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "pitch": zod.string(),
+  "status": zod.enum(['OPEN', 'FILLED', 'CLOSED']),
+  "postedBy": zod.string(),
+  "posterName": zod.string(),
+  "posterImageUrl": zod.string().nullable(),
+  "channelName": zod.string(),
+  "channelAvatarUrl": zod.string().nullable(),
+  "projectName": zod.string(),
+  "projectStatus": zod.string(),
+  "applicantCount": zod.number().int().describe('Live number of PENDING auditions on this post (the current applicants)'),
+  "myApplication": zod.enum(['none', 'pending', 'accepted', 'rejected']).describe('The caller\'s own application state on this post'),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('An open role post as shown on the Arena board \/ lists')
+export const ListArenaPostsResponse = zod.array(ListArenaPostsResponseItem)
+
+
+/**
+ * The caller must own the project and its channel; only one OPEN post per (project, role).
+ * @summary Publish an open role on a channel project (Captain only)
+ */
+export const createArenaPostBodyPitchMin = 10;
+export const createArenaPostBodyPitchMax = 2000;
+
+
+
+export const CreateArenaPostBody = zod.object({
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "pitch": zod.string().min(createArenaPostBodyPitchMin).max(createArenaPostBodyPitchMax)
+}).describe('Publish an open role on one of the Captain\'s channel projects')
+
+export const CreateArenaPostResponse = zod.object({
+  "id": zod.string(),
+  "channelId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "pitch": zod.string(),
+  "status": zod.enum(['OPEN', 'FILLED', 'CLOSED']),
+  "postedBy": zod.string(),
+  "posterName": zod.string(),
+  "posterImageUrl": zod.string().nullable(),
+  "channelName": zod.string(),
+  "channelAvatarUrl": zod.string().nullable(),
+  "projectName": zod.string(),
+  "projectStatus": zod.string(),
+  "applicantCount": zod.number().int().describe('Live number of PENDING auditions on this post (the current applicants)'),
+  "myApplication": zod.enum(['none', 'pending', 'accepted', 'rejected']).describe('The caller\'s own application state on this post'),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('An open role post as shown on the Arena board \/ lists').and(zod.object({
+  "totalApplications": zod.number().int().describe('All applications ever received on this post (Captain only; 0 otherwise)'),
+  "filledBy": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "imageUrl": zod.string().nullable()
+}).describe('Public profile of the creator who filled a role — present on the post once it is FILLED').nullable().describe('The accepted hire\'s public profile once the post is FILLED; null while it is OPEN or CLOSED')
+}).describe('Post detail (Captain view adds the total application history)'))
+
+
+/**
+ * @summary Read a role post
+ */
+
+
+
+export const GetArenaPostParams = zod.object({
+  "postId": zod.coerce.string().min(1)
+})
+
+export const GetArenaPostResponse = zod.object({
+  "id": zod.string(),
+  "channelId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "pitch": zod.string(),
+  "status": zod.enum(['OPEN', 'FILLED', 'CLOSED']),
+  "postedBy": zod.string(),
+  "posterName": zod.string(),
+  "posterImageUrl": zod.string().nullable(),
+  "channelName": zod.string(),
+  "channelAvatarUrl": zod.string().nullable(),
+  "projectName": zod.string(),
+  "projectStatus": zod.string(),
+  "applicantCount": zod.number().int().describe('Live number of PENDING auditions on this post (the current applicants)'),
+  "myApplication": zod.enum(['none', 'pending', 'accepted', 'rejected']).describe('The caller\'s own application state on this post'),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('An open role post as shown on the Arena board \/ lists').and(zod.object({
+  "totalApplications": zod.number().int().describe('All applications ever received on this post (Captain only; 0 otherwise)'),
+  "filledBy": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "imageUrl": zod.string().nullable()
+}).describe('Public profile of the creator who filled a role — present on the post once it is FILLED').nullable().describe('The accepted hire\'s public profile once the post is FILLED; null while it is OPEN or CLOSED')
+}).describe('Post detail (Captain view adds the total application history)'))
+
+
+/**
+ * @summary Close/reopen a role post or edit its pitch (Captain only)
+ */
+
+
+
+export const UpdateArenaPostParams = zod.object({
+  "postId": zod.coerce.string().min(1)
+})
+
+export const updateArenaPostBodyPitchMin = 10;
+export const updateArenaPostBodyPitchMax = 2000;
+
+
+
+export const UpdateArenaPostBody = zod.object({
+  "status": zod.enum(['OPEN', 'CLOSED']).optional(),
+  "pitch": zod.string().min(updateArenaPostBodyPitchMin).max(updateArenaPostBodyPitchMax).optional()
+}).describe('Close\/reopen a post or edit its pitch while OPEN (Captain only)')
+
+export const UpdateArenaPostResponse = zod.object({
+  "id": zod.string(),
+  "channelId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "pitch": zod.string(),
+  "status": zod.enum(['OPEN', 'FILLED', 'CLOSED']),
+  "postedBy": zod.string(),
+  "posterName": zod.string(),
+  "posterImageUrl": zod.string().nullable(),
+  "channelName": zod.string(),
+  "channelAvatarUrl": zod.string().nullable(),
+  "projectName": zod.string(),
+  "projectStatus": zod.string(),
+  "applicantCount": zod.number().int().describe('Live number of PENDING auditions on this post (the current applicants)'),
+  "myApplication": zod.enum(['none', 'pending', 'accepted', 'rejected']).describe('The caller\'s own application state on this post'),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('An open role post as shown on the Arena board \/ lists').and(zod.object({
+  "totalApplications": zod.number().int().describe('All applications ever received on this post (Captain only; 0 otherwise)'),
+  "filledBy": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "imageUrl": zod.string().nullable()
+}).describe('Public profile of the creator who filled a role — present on the post once it is FILLED').nullable().describe('The accepted hire\'s public profile once the post is FILLED; null while it is OPEN or CLOSED')
+}).describe('Post detail (Captain view adds the total application history)'))
+
+
+/**
+ * Multipart. One PENDING audition per user per post; the per-week apply cap and per-Captain blocks are enforced server-side.
+ * @summary Audition for an open role (message + up to 3 documents)
+ */
+
+
+
+export const CreateArenaApplicationParams = zod.object({
+  "postId": zod.coerce.string().min(1)
+})
+
+export const createArenaApplicationBodyMessageMin = 20;
+export const createArenaApplicationBodyMessageMax = 2000;
+
+export const createArenaApplicationBodyFilesMax = 3;
+
+
+
+export const CreateArenaApplicationBody = zod.object({
+  "message": zod.string().min(createArenaApplicationBodyMessageMin).max(createArenaApplicationBodyMessageMax),
+  "files": zod.array(zod.instanceof(File)).max(createArenaApplicationBodyFilesMax).optional()
+}).describe('Multipart audition — a message plus up to 3 supporting documents')
+
+export const CreateArenaApplicationResponse = zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "applicantId": zod.string(),
+  "applicantName": zod.string().nullable(),
+  "applicantImageUrl": zod.string().nullable(),
+  "message": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN']),
+  "decidedBy": zod.string().nullable(),
+  "decidedAt": zod.coerce.date().nullable(),
+  "files": zod.array(zod.object({
+  "id": zod.string(),
+  "fileName": zod.string(),
+  "mimeType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List the auditions on a post (Captain only)
+ */
+
+
+
+export const ListArenaPostApplicationsParams = zod.object({
+  "postId": zod.coerce.string().min(1)
+})
+
+export const ListArenaPostApplicationsResponseItem = zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "applicantId": zod.string(),
+  "applicantName": zod.string().nullable(),
+  "applicantImageUrl": zod.string().nullable(),
+  "message": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN']),
+  "decidedBy": zod.string().nullable(),
+  "decidedAt": zod.coerce.date().nullable(),
+  "files": zod.array(zod.object({
+  "id": zod.string(),
+  "fileName": zod.string(),
+  "mimeType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListArenaPostApplicationsResponse = zod.array(ListArenaPostApplicationsResponseItem)
+
+
+/**
+ * @summary List the caller's own auditions (My Auditions)
+ */
+export const ListMyArenaApplicationsResponseItem = zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "applicantId": zod.string(),
+  "applicantName": zod.string().nullable(),
+  "applicantImageUrl": zod.string().nullable(),
+  "message": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN']),
+  "decidedBy": zod.string().nullable(),
+  "decidedAt": zod.coerce.date().nullable(),
+  "files": zod.array(zod.object({
+  "id": zod.string(),
+  "fileName": zod.string(),
+  "mimeType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListMyArenaApplicationsResponse = zod.array(ListMyArenaApplicationsResponseItem)
+
+
+/**
+ * @summary Read one audition (the applicant themself or the Captain)
+ */
+
+
+
+export const GetArenaApplicationParams = zod.object({
+  "applicationId": zod.coerce.string().min(1)
+})
+
+export const GetArenaApplicationResponse = zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "applicantId": zod.string(),
+  "applicantName": zod.string().nullable(),
+  "applicantImageUrl": zod.string().nullable(),
+  "message": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN']),
+  "decidedBy": zod.string().nullable(),
+  "decidedAt": zod.coerce.date().nullable(),
+  "files": zod.array(zod.object({
+  "id": zod.string(),
+  "fileName": zod.string(),
+  "mimeType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Transactionally marks the application ACCEPTED, fills the post, adds the applicant as a member holding the role, and auto-declines the remaining PENDING auditions.
+ * @summary Accept an audition (Captain only)
+ */
+
+
+
+export const AcceptArenaApplicationParams = zod.object({
+  "applicationId": zod.coerce.string().min(1)
+})
+
+export const AcceptArenaApplicationResponse = zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "applicantId": zod.string(),
+  "applicantName": zod.string().nullable(),
+  "applicantImageUrl": zod.string().nullable(),
+  "message": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN']),
+  "decidedBy": zod.string().nullable(),
+  "decidedAt": zod.coerce.date().nullable(),
+  "files": zod.array(zod.object({
+  "id": zod.string(),
+  "fileName": zod.string(),
+  "mimeType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Reject an audition (Captain only)
+ */
+
+
+
+export const RejectArenaApplicationParams = zod.object({
+  "applicationId": zod.coerce.string().min(1)
+})
+
+export const RejectArenaApplicationResponse = zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "applicantId": zod.string(),
+  "applicantName": zod.string().nullable(),
+  "applicantImageUrl": zod.string().nullable(),
+  "message": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN']),
+  "decidedBy": zod.string().nullable(),
+  "decidedAt": zod.coerce.date().nullable(),
+  "files": zod.array(zod.object({
+  "id": zod.string(),
+  "fileName": zod.string(),
+  "mimeType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Withdraw a PENDING audition (applicant only)
+ */
+
+
+
+export const WithdrawArenaApplicationParams = zod.object({
+  "applicationId": zod.coerce.string().min(1)
+})
+
+export const WithdrawArenaApplicationResponse = zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "applicantId": zod.string(),
+  "applicantName": zod.string().nullable(),
+  "applicantImageUrl": zod.string().nullable(),
+  "message": zod.string(),
+  "status": zod.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'WITHDRAWN']),
+  "decidedBy": zod.string().nullable(),
+  "decidedAt": zod.coerce.date().nullable(),
+  "files": zod.array(zod.object({
+  "id": zod.string(),
+  "fileName": zod.string(),
+  "mimeType": zod.string(),
+  "sizeBytes": zod.number().int(),
+  "createdAt": zod.coerce.date()
+})),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * Only the two participants of an ACCEPTED application, once each per hire. The Captain may review the hired applicant and the applicant may review the Captain.
+ * @summary Leave a mutual work review after a hire
+ */
+
+
+
+export const CreateArenaApplicationReviewParams = zod.object({
+  "applicationId": zod.coerce.string().min(1)
+})
+
+export const createArenaApplicationReviewBodyRatingMax = 5;
+
+export const createArenaApplicationReviewBodyNoteMax = 500;
+
+
+
+export const CreateArenaApplicationReviewBody = zod.object({
+  "rating": zod.number().int().min(1).max(createArenaApplicationReviewBodyRatingMax),
+  "note": zod.string().max(createArenaApplicationReviewBodyNoteMax)
+}).describe('A mutual work review between the Captain and the hired applicant')
+
+export const CreateArenaApplicationReviewResponse = zod.object({
+  "id": zod.string(),
+  "applicationId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "reviewerId": zod.string(),
+  "reviewerName": zod.string().nullable(),
+  "reviewerImageUrl": zod.string().nullable(),
+  "revieweeId": zod.string(),
+  "rating": zod.number().int(),
+  "note": zod.string(),
+  "projectName": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}).describe('A mutual work review between the Captain and the hired applicant')
+
+
+/**
+ * Per-Captain anti-spam block. Does not change any existing application status; the blocked user gets 403 when applying to this Captain's posts.
+ * @summary Block an applicant from all of this Captain's posts
+ */
+
+
+
+export const BlockArenaApplicantParams = zod.object({
+  "applicationId": zod.coerce.string().min(1)
+})
+
+export const BlockArenaApplicantResponse = zod.void()
+
+
+/**
+ * Returns the document bytes. Applicant or Captain only.
+ * @summary Stream a stored audition document
+ */
+
+
+
+
+export const GetArenaApplicationFileParams = zod.object({
+  "applicationId": zod.coerce.string().min(1),
+  "fileId": zod.coerce.string().min(1)
+})
+
+export const GetArenaApplicationFileResponse = zod.unknown()
+
+
+/**
+ * Received reviews (rating + note + role + project context) are public profile data — the reputation surface of the Arena. Any signed-in creator can read the reviews a reviewee has received.
+ * @summary Read the public work reviews a profile has received
+ */
+
+
+
+export const ListArenaReviewsQueryParams = zod.object({
+  "userId": zod.coerce.string().min(1).describe('The reviewee whose received reviews to list')
+})
+
+export const ListArenaReviewsResponseItem = zod.object({
+  "id": zod.string(),
+  "applicationId": zod.string(),
+  "projectId": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "reviewerId": zod.string(),
+  "reviewerName": zod.string().nullable(),
+  "reviewerImageUrl": zod.string().nullable(),
+  "revieweeId": zod.string(),
+  "rating": zod.number().int(),
+  "note": zod.string(),
+  "projectName": zod.string().nullable(),
+  "createdAt": zod.coerce.date()
+}).describe('A mutual work review between the Captain and the hired applicant')
+export const ListArenaReviewsResponse = zod.array(ListArenaReviewsResponseItem)
+
+
+/**
+ * @summary List the caller's role watches
+ */
+export const ListArenaWatchesResponseItem = zod.object({
+  "id": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "channelId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListArenaWatchesResponse = zod.array(ListArenaWatchesResponseItem)
+
+
+/**
+ * @summary Watch a role (optionally on one channel)
+ */
+export const CreateArenaWatchBody = zod.object({
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "channelId": zod.string().optional()
+}).describe('Watch a role — across the whole Arena, or scoped to one channel')
+
+export const CreateArenaWatchResponse = zod.object({
+  "id": zod.string(),
+  "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']).describe('The four content roles an arena post can recruit for'),
+  "channelId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Stop watching (own watch only)
+ */
+
+
+
+export const DeleteArenaWatchParams = zod.object({
+  "watchId": zod.coerce.string().min(1)
+})
+
+export const DeleteArenaWatchResponse = zod.void()
 
 

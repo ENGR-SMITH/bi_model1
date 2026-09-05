@@ -1,4 +1,4 @@
-import { PiArrowUpRightDuotone, PiDownloadSimpleDuotone, PiFilmSlateDuotone, PiMicrophoneStageDuotone, PiPaletteDuotone, PiScissorsDuotone } from 'react-icons/pi';
+import { PiArrowUpRightDuotone, PiDownloadSimpleDuotone, PiFilmSlateDuotone, PiMegaphoneDuotone, PiMicrophoneStageDuotone, PiPaletteDuotone, PiScissorsDuotone } from 'react-icons/pi';
 import { Link } from 'wouter';
 import { useUser } from '@clerk/react';
 
@@ -89,6 +89,36 @@ export default function ContentCreatorsPage() {
             })}
           </div>
         </div>
+      </div>
+
+      {/* The collaboration doorway — creators can audition for open roles on
+          channels straight from the category page. */}
+      <div className="mt-8">
+        <div className="flex items-center gap-4">
+          <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#a78bfa]">Beyond your den</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+
+        <a
+          href="/creators-den/arena"
+          className="focus-house soft-lift mt-4 flex flex-col justify-between gap-6 overflow-hidden rounded-[1.5rem] border border-[#a78bfa]/40 bg-gradient-to-br from-[#a78bfa]/15 to-transparent p-7 sm:flex-row sm:items-center"
+          data-testid="card-arena-category"
+        >
+          <div className="flex items-start gap-4">
+            <span className="icon-chip h-12 w-12 shrink-0 text-[#c4b5fd]"><PiMegaphoneDuotone className="h-6 w-6" /></span>
+            <div>
+              <h2 className="max-w-[16ch] text-3xl font-extrabold leading-[.95] tracking-[-0.05em] text-white sm:text-4xl">Audition Arena</h2>
+              <p className="mt-2 max-w-[34rem] text-sm leading-relaxed text-zinc-300">
+                Captains across Creators Den post open seats — video, audio, script, and thumbnails. Apply with your
+                pitch and your work, and preview the project read-only before you commit.
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-3 rounded-full border border-[#a78bfa]/50 bg-[#111111]/20 px-5 py-2.5 text-sm font-bold text-zinc-100 transition-colors hover:bg-[#a78bfa]/20">
+            Browse open auditions
+            <PiArrowUpRightDuotone className="h-4 w-4" />
+          </span>
+        </a>
       </div>
     </div>
   );

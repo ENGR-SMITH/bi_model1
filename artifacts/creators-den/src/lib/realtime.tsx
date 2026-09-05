@@ -30,6 +30,8 @@ import {
   getGetVideoProjectQueryKey,
   getGetVideoReferenceQueryKey,
   getGetVideoTimelineQueryKey,
+  getListArenaPostsQueryKey,
+  getListMyArenaApplicationsQueryKey,
   getListVideoActivityQueryKey,
   getListVideoChatMessagesQueryKey,
   getListVideoCommentsQueryKey,
@@ -269,7 +271,13 @@ export function useProjectPresence(projectId?: string): PresenceEntry[] {
   return roster;
 }
 
-/** Invalidates the notifications query when a new one streams in. */
+/**
+ * Invalidates the notifications query when a new one streams in. Arena events
+ * (apply / accept / reject / withdraw / watch / review) arrive as per-user
+ * notifications, so the board's live applicant counts and the caller's own
+ * My Auditions state are also refreshed on the same event stream; refetch-on-
+ * focus covers anyone browsing without an event of their own.
+ */
 export function useRealtimeNotifications(): void {
   const socket = useRealtimeSocket();
   const queryClient = useQueryClient();
@@ -278,6 +286,8 @@ export function useRealtimeNotifications(): void {
     if (!socket) return;
     const onNotification = () => {
       void queryClient.invalidateQueries({ queryKey: getListVideoNotificationsQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getListArenaPostsQueryKey() });
+      void queryClient.invalidateQueries({ queryKey: getListMyArenaApplicationsQueryKey() });
     };
     socket.on('notification.new', onNotification);
     return () => {

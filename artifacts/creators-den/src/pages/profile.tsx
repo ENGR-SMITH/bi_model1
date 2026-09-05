@@ -21,6 +21,7 @@ import type { VideoContributionDay, VideoProject } from '@workspace/api-client-r
 import { SectionEyebrow } from '@/components/shell';
 import { FollowButton } from '@/pages/explore';
 import { CvCard, StorageBar } from '@/components/account-panel';
+import { WorkReviewsCard } from '@/components/work-reviews-card';
 
 // ---------------------------------------------------------------------------
 // Profile — the creator's public track history. It lists every project the
@@ -321,6 +322,10 @@ export default function ProfilePage() {
             )}
           </div>
         )}
+      </div>
+
+      <div className="mt-8">
+        <WorkReviewsCard userId={profileUserId} />
       </div>
 
       <div className="cd-rail mt-8">

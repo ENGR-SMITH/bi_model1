@@ -157,9 +157,18 @@ export function LegacyProjectGate() {
     return <AttachNotice projectId={project.id} />;
   }
 
-  // A PUBLIC project viewed by someone who is not on the channel stays on the
-  // flat path as the read-only preview experience (profile/explore flows).
-  if (project.visibility === 'PUBLIC') {
+  // A non-member viewing surface stays on the flat path as the read-only
+  // preview experience (PREVIEW + TIMELINE only): PUBLIC projects opened from
+  // profile/explore flows, and the Arena applicant window — a PRIVATE project
+  // carrying an OPEN role post grants the same read-only access while the post
+  // is OPEN. The server reports both as viewerAccess 'public' | 'applicant';
+  // older payloads without the field fall back to the PUBLIC visibility check.
+  const readOnlyAccess =
+    project.viewerAccess === 'public' ||
+    project.viewerAccess === 'applicant' ||
+    (project.viewerAccess === undefined && project.visibility === 'PUBLIC');
+
+  if (readOnlyAccess) {
     const Page = FLAT_READONLY_PAGES.find(([key]) => key === rest)?.[1] ?? VaultPage;
     return <Page key={`flat-${project.id}-${rest}`} />;
   }
