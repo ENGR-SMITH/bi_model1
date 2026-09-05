@@ -2,36 +2,42 @@ import { useState, type ReactNode } from 'react';
 import { useClerk, useUser } from '@clerk/react';
 import {
   Activity,
+  BarChart3,
   Bell,
   Check,
   ChevronDown,
   Clapperboard,
   Eye,
-  FileText,
   Film,
   GitPullRequest,
   Home,
   Image,
+  LayoutGrid,
   LogOut,
   Mic2,
   Package,
   Palette,
-  Scissors,
   Search,
+  Scissors,
   Video,
 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import {
+  getGetChannelQueryKey,
   getGetVideoProjectQueryKey,
   getListVideoNotificationsQueryKey,
   getListVideoReviewQueueQueryKey,
+  useGetChannel,
   useGetVideoProject,
+  useListChannels,
   useListVideoNotifications,
   useListVideoProjects,
   useListVideoReviewQueue,
+  type ChannelSummary,
 } from '@workspace/api-client-react';
-import { useProjectPresence, useRealtimeNotifications, useRealtimeSocket } from '@/lib/realtime';
+import { useChannelPresence, useProjectPresence, useRealtimeNotifications, useRealtimeSocket } from '@/lib/realtime';
 import { ProjectChat } from '@/components/project-chat';
+import { denRouteInfo, projectUrl } from '@/lib/den-urls';
 
 export function SectionEyebrow({ children }: { children: ReactNode }) {
   return <span className="eyebrow">{children}</span>;
@@ -110,42 +116,69 @@ function PresenceStrip({ projectId }: { projectId: string }) {
   );
 }
 
-function WorkspaceMenu({ onClose }: { onClose: () => void }) {
+function ChannelRow({ channel, selected, onOpen }: { channel: ChannelSummary; selected: boolean; onOpen: () => void }) {
+  const name = channel.youtubeTitle || channel.name;
+  return (
+    <button
+      type="button"
+      className={selected ? 'selected' : ''}
+      onClick={onOpen}
+      data-testid={`workspace-channel-${channel.id}`}
+    >
+      <span className="menu-project-mark">
+        {channel.youtubeAvatarUrl ? <img src={channel.youtubeAvatarUrl} alt="" /> : name.slice(0, 1).toUpperCase()}
+      </span>
+      <span>
+        <b>{name}</b>
+        <small>{channel.myRole === 'OWNER' ? 'Your channel' : 'You’re an editor'} · {channel.projectCount} project{channel.projectCount === 1 ? '' : 's'}</small>
+      </span>
+      {selected && <Check size={14} />}
+    </button>
+  );
+}
+
+// The workspace dropdown: every channel on the CMS grid, then the current
+// context's projects underneath — the den's "switch spaces" surface.
+function WorkspaceMenu({ channelId, projectId }: { channelId?: string; projectId?: string }) {
   const [, setLocation] = useLocation();
-  const projects = useListVideoProjects();
-  const [location] = useLocation();
-  const match = location.match(/^\/projects\/([^/]+)/);
-  const currentId = match?.[1];
+  const channels = useListChannels();
+  // Inside a channel the project list matches that channel home (owner sees
+  // everything, editors their memberships); elsewhere it is the global list.
+  const projects = useListVideoProjects(channelId ? { channelId } : undefined);
+  const list = projects.data ?? [];
 
   return (
     <div className="workspace-menu" data-testid="workspace-menu">
       <button
         type="button"
         className="menu-home"
-        onClick={() => {
-          setLocation('/');
-          onClose();
-        }}
-        data-testid="workspace-home"
+        onClick={() => setLocation('/')}
+        data-testid="workspace-cms"
       >
-        <Home size={15} />
+        <LayoutGrid size={15} />
         <span>
-          <b>Home</b>
-          <small>Back to the room</small>
+          <b>All channels</b>
+          <small>Back to the CMS grid</small>
         </span>
       </button>
-      <span className="menu-caption">Your projects</span>
-      {(projects.data ?? []).map((project) => {
-        const selected = project.id === currentId;
+      <span className="menu-caption">Channels</span>
+      {(channels.data ?? []).map((channel) => (
+        <ChannelRow
+          key={channel.id}
+          channel={channel}
+          selected={channel.id === channelId}
+          onOpen={() => setLocation(`/channels/${channel.id}`)}
+        />
+      ))}
+      <span className="menu-caption">Projects in this space</span>
+      {list.map((project) => {
+        const selected = project.id === projectId;
         return (
           <button
             key={project.id}
             type="button"
             className={selected ? 'selected' : ''}
-            onClick={() => {
-              setLocation(`/projects/${project.id}`);
-              onClose();
-            }}
+            onClick={() => setLocation(projectUrl(project.channelId, project.id))}
             data-testid={`workspace-project-${project.id}`}
           >
             <span className="menu-project-mark">{project.name.slice(0, 1).toUpperCase()}</span>
@@ -157,26 +190,28 @@ function WorkspaceMenu({ onClose }: { onClose: () => void }) {
           </button>
         );
       })}
+      {list.length === 0 && (
+        <span className="menu-empty-caption">No projects here yet.</span>
+      )}
       <button
         type="button"
         className="menu-new"
         onClick={() => {
-          setLocation('/');
-          onClose();
+          // New project opens from the channel home (owner) or the CMS.
+          setLocation(channelId ? `/channels/${channelId}` : '/');
         }}
       >
         <Clapperboard size={15} />
         <span>
           <b>New project</b>
-          <small>Start a new locked project</small>
+          <small>{channelId ? 'Open one in this channel' : 'Open a channel first'}</small>
         </span>
       </button>
     </div>
   );
 }
 
-// A long, always-visible search field in the centre of the top bar — the
-// telescope icon lives inside it; submitting jumps to /explore?q=…
+// A long, always-visible search field in the centre of the top bar.
 function ExploreSearch() {
   const [, setLocation] = useLocation();
   const [query, setQuery] = useState('');
@@ -211,10 +246,23 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const [location] = useLocation();
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const projects = useListVideoProjects();
+  const info = denRouteInfo(location);
 
-  const projectMatch = location.match(/^\/projects\/([^/]+)/);
-  const projectId = projectMatch?.[1];
+  const channelId = info.mode === 'channel' || info.mode === 'channel-project' ? info.channelId : undefined;
+  const projectId = info.mode === 'channel-project' || info.mode === 'flat-project' ? info.projectId : undefined;
+
+  // The den chrome for the current space: which project list + channel chrome
+  // to show depends on where we are (channel home, project inside a channel,
+  // or a flat legacy/public project page).
+  const projects = useListVideoProjects(channelId ? { channelId } : undefined);
+  const channel = useGetChannel(channelId ?? '', {
+    query: {
+      queryKey: getGetChannelQueryKey(channelId ?? ''),
+      enabled: Boolean(channelId),
+    },
+  });
+  const channelData = channel.data;
+  const channelLabel = channelData?.youtubeTitle || channelData?.name;
   const current = projects.data?.find((p) => p.id === projectId);
 
   // Live notifications: the bell badge counts unread; the socket keeps it fresh.
@@ -222,8 +270,6 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   const notifications = useListVideoNotifications();
   const unreadCount = (notifications.data ?? []).filter((n) => !n.readAt).length;
 
-  // The Review desk is Captain-only: the queue scans owned projects, so the
-  // chip only appears (and only fetches) when the user owns at least one.
   const isCaptain = (projects.data ?? []).some((p) => p.ownerId === user?.id);
   const reviewQueue = useListVideoReviewQueue({
     query: {
@@ -231,15 +277,11 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
       enabled: isCaptain,
     },
   });
-  // Inside a project the badge counts that project's pending reviews; without
-  // one it counts every owned project's pending reviews.
   const pendingReviews = projectId
     ? (reviewQueue.data ?? []).filter((item) => item.projectId === projectId).length
     : (reviewQueue.data ?? []).length;
 
-  // Read-only mode: a PUBLIC project opened by someone who is not a member
-  // (e.g. from a search result). The detail query carries the viewer's roles
-  // — an empty `myRoles` means the viewer only gets PREVIEW + TIMELINE.
+  // Read-only mode: a PUBLIC project opened by someone who is not a member.
   const detail = useGetVideoProject(projectId ?? '', {
     query: {
       queryKey: getGetVideoProjectQueryKey(projectId ?? ''),
@@ -247,12 +289,16 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
     },
   });
   const readOnly = Boolean(projectId) && Boolean(detail.data) && (detail.data?.myRoles?.length ?? 0) === 0;
-  const projectLabel = current?.name ?? detail.data?.name ?? 'Home';
+  const projectLabel = current?.name ?? detail.data?.name ?? channelLabel ?? 'Home';
+  const spaceLabel = current?.name ?? channelLabel;
 
   const logout = () => signOut({ redirectUrl: '/' });
 
-  // A primary section tab. The active tab (not a breadcrumb) conveys location.
-  // `matchPrefix` keeps the tab lit on its sub-pages (e.g. Preview → /preview/video).
+  // Base for project links: channel-scoped when inside a channel, flat for
+  // legacy/public pages so the workspace stays coherent either way.
+  const base = channelId ? `/channels/${channelId}/projects/${projectId}` : `/projects/${projectId}`;
+  const homeHref = channelId ? `/channels/${channelId}` : '/';
+
   const tab = (href: string, label: string, icon: ReactNode, testId: string, matchPrefix = false) => {
     const active = matchPrefix ? location === href || location.startsWith(`${href}/`) : location === href;
     return (
@@ -270,13 +316,15 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <header className="cd-topnav" data-testid="den-topnav">
-        {/* Tier 1 — chrome: brand · search · account (the account tile is the profile). */}
+        {/* Tier 1 — chrome: brand · search · account. */}
         <div className="cd-topnav-chrome">
-          <Link href="/" className="cd-brand" data-testid="nav-home">
+          <Link href={homeHref} className="cd-brand" data-testid="nav-home">
             <span className="brand-mark">C</span>
             <span className="brand-copy">
               <span className="block brand-name">Creators Den</span>
-              <span className="block brand-sub">video version control</span>
+              <span className="block brand-sub truncate" title={channelLabel ?? 'video version control'}>
+                {channelLabel ?? 'video version control'}
+              </span>
             </span>
           </Link>
 
@@ -284,9 +332,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
 
           <div className="cd-topnav-account">
             <span className="cd-topnav-bell-wrap">
-              {/* Inside a project the inbox stays in the project (the rail is
-                  kept); with no project open it is the global inbox. */}
-              <Link href={projectId ? `/projects/${projectId}/notifications` : '/notifications'} className="cd-topnav-bell" aria-label="Notifications" title="Notifications" data-testid="nav-notifications">
+              <Link href={projectId ? `${base}/notifications` : '/notifications'} className="cd-topnav-bell" aria-label="Notifications" title="Notifications" data-testid="nav-notifications">
                 <Bell size={16} />
                 {unreadCount > 0 && (
                   <span className="cd-topnav-bell-badge" data-testid="nav-notifications-badge">
@@ -300,13 +346,11 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        {/* Tier 2 — three cut-out chips on one row: workspace · relay deck · sign out. */}
+        {/* Tier 2 — the notch chips + section tabs. */}
         <div className="cd-topnav-secondary">
           <div className="cd-topnav-workspace-col">
-            {/* The home notch — a quiet chip with just the home icon, sitting
-                beside the WORKSPACE dropdown. */}
             <div className="cd-topnav-chip">
-              <Link href="/" className="cd-topnav-home-notch" aria-label="Home" title="Home" data-testid="nav-home-notch">
+              <Link href={homeHref} className="cd-topnav-home-notch" aria-label={channelId ? 'Channel home' : 'Channels'} title={channelId ? 'Channel home' : 'All channels'} data-testid="nav-home-notch">
                 <Home size={15} />
               </Link>
             </div>
@@ -319,28 +363,36 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                   data-testid="top-workspace"
                 >
                   <span>Workspace</span>
-                  <b className="truncate">{projectLabel}</b>
+                  <b className="truncate">{spaceLabel ?? 'Channels'}</b>
                   <ChevronDown size={13} />
                 </button>
-                {workspaceOpen && <WorkspaceMenu onClose={() => setWorkspaceOpen(false)} />}
+                {workspaceOpen && <WorkspaceMenu channelId={channelId} projectId={projectId} />}
               </div>
             </div>
+            {/* The Analytics notch — only inside a channel (per the brief it
+                sits beside the workshop dropdown). */}
+            {channelId && (
+              <div className="cd-topnav-chip">
+                <Link
+                  href={`/channels/${channelId}/analytics`}
+                  className={`cd-topnav-analytics-notch ${location === `/channels/${channelId}/analytics` || location.startsWith(`/channels/${channelId}/analytics/`) ? 'active' : ''}`}
+                  aria-label="Channel analytics"
+                  title="Channel analytics"
+                  data-testid="nav-analytics"
+                >
+                  <BarChart3 size={14} />
+                  <span>Analytics</span>
+                </Link>
+              </div>
+            )}
           </div>
 
-          {/* The Review tab only lives inside a project (the project rail
-              below) — it is never shown on the home page or other global
-              screens. */}
           {projectId && (
             <nav className="cd-topnav-tabs" aria-label="Project sections">
               <div className="cd-tab-group">
-                {/* A public (non-member) viewer only gets PREVIEW + TIMELINE. */}
-                {!readOnly && tab(`/projects/${projectId}`, 'Vault', <Film size={15} />, 'nav-project')}
-                {/* One Review tab for everyone, project-scoped so the rail
-                    stays: Captains land on this project's review desk (with
-                    the pending-count badge), the crew land on this project's
-                    review board + the timeline tree. */}
+                {!readOnly && tab(`${base}`, 'Vault', <Film size={15} />, 'nav-project')}
                 {!readOnly && (
-                  <Link href={`/projects/${projectId}/review`} className={`cd-tab ${location === `/projects/${projectId}/review` || location.startsWith(`/projects/${projectId}/review/`) ? 'active' : ''}`} data-testid="nav-review">
+                  <Link href={`${base}/review`} className={`cd-tab ${location === `${base}/review` || location.startsWith(`${base}/review/`) ? 'active' : ''}`} data-testid="nav-review">
                     <GitPullRequest size={15} />
                     <span>Review</span>
                     {isCaptain && pendingReviews > 0 && (
@@ -348,8 +400,8 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
                     )}
                   </Link>
                 )}
-                {tab(`/projects/${projectId}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
-                {tab(`/projects/${projectId}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview', true)}
+                {tab(`${base}/activity`, 'Timeline', <Activity size={15} />, 'nav-activity')}
+                {tab(`${base}/preview`, 'Preview', <Clapperboard size={15} />, 'nav-preview', true)}
               </div>
               {readOnly ? (
                 <span className="den-tag muted cd-readonly-tag" title="You are viewing a PUBLIC project read-only — only its preview and timeline are open to you.">
@@ -358,16 +410,13 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
               ) : (
                 <>
                   <span className="cd-tab-divider" aria-hidden />
-                  {/* The four studios sit on the relay rail (numbered, lit on hover /
-                      active) — the removed Selects / Cut / Sound / Finish stages now
-                      live here as Video / Audio / Script / Thumbnail. */}
                   <div className="cd-tab-group cd-tab-stages">
                     {[
-                      { href: `/projects/${projectId}/role/video`, number: '01', label: 'Video', icon: <Video size={15} />, testId: 'nav-role-video' },
-                      { href: `/projects/${projectId}/role/audio`, number: '02', label: 'Audio', icon: <Mic2 size={15} />, testId: 'nav-role-audio' },
-                      { href: `/projects/${projectId}/role/script`, number: '03', label: 'Script', icon: <FileText size={15} />, testId: 'nav-role-script' },
-                      { href: `/projects/${projectId}/role/thumbnail`, number: '04', label: 'Thumbnail', icon: <Image size={15} />, testId: 'nav-role-thumbnail' },
-                      { href: `/projects/${projectId}/preview/finish`, number: '05', label: 'Finish', icon: <Package size={15} />, testId: 'nav-role-finish' },
+                      { href: `${base}/role/video`, number: '01', label: 'Video', icon: <Video size={15} />, testId: 'nav-role-video' },
+                      { href: `${base}/role/audio`, number: '02', label: 'Audio', icon: <Mic2 size={15} />, testId: 'nav-role-audio' },
+                      { href: `${base}/role/script`, number: '03', label: 'Script', icon: <Package size={15} />, testId: 'nav-role-script' },
+                      { href: `${base}/role/thumbnail`, number: '04', label: 'Thumbnail', icon: <Image size={15} />, testId: 'nav-role-thumbnail' },
+                      { href: `${base}/preview/finish`, number: '05', label: 'Finish', icon: <Palette size={15} />, testId: 'nav-role-finish' },
                     ].map((item) => (
                       <Link
                         key={item.label}
@@ -399,15 +448,10 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="main-stage">
-        {/* Presence + the crew room are team surfaces — hidden in read-only. */}
         {projectId && !readOnly && <PresenceStrip projectId={projectId} />}
-        {/* Each page component supplies its own `.page` container; the shell
-            must not add a second one or the content gets doubled padding. */}
         {children}
       </main>
 
-      {/* The crew room floats over every project page, like the Author Den's
-          draggable chat — project-wide instead of a private 1:1 thread. */}
       {projectId && !readOnly && <ProjectChat projectId={projectId} />}
     </div>
   );

@@ -1,7 +1,7 @@
 import { getAuth } from "@clerk/express";
 import { logger } from "../lib/logger";
 import { emitToProject } from "../realtime";
-import { notify } from "./video-platform";
+import { notify, projectDeepLink } from "./video-platform";
 import {
   db,
   tandemVideoAssetFilesTable,
@@ -728,6 +728,11 @@ router.put(
       });
 
       // Notify the rest of the crew that the stage moved (M4).
+      const [saveProject] = await db
+        .select({ channelId: tandemVideoProjectsTable.channelId })
+        .from(tandemVideoProjectsTable)
+        .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+        .limit(1);
       const crew = await db
         .select()
         .from(tandemVideoMembersTable)
@@ -741,7 +746,7 @@ router.put(
           `${params.data.leg} v${versionNumber} was saved${
             version.message ? ` — “${version.message.slice(0, 120)}”` : ""
           }.`,
-          `/creators-den/projects/${params.data.projectId}`,
+          projectDeepLink(saveProject?.channelId ?? null, params.data.projectId),
           version.id,
         ).catch(() => {});
       }
@@ -1181,7 +1186,7 @@ router.post(
         "video_submission",
         `Stage ${body.data.leg} submitted for review`,
         `The ${body.data.leg} stage was submitted${body.data.note ? ` — “${body.data.note.slice(0, 120)}”` : ""}.`,
-        `/creators-den/projects/${params.data.projectId}`,
+        projectDeepLink(owner.channelId, params.data.projectId),
         submission.id,
       ).catch(() => {});
     }
@@ -1412,13 +1417,14 @@ async function decideSubmission(
       .select()
       .from(tandemVideoMembersTable)
       .where(eq(tandemVideoMembersTable.projectId, submission.projectId));
+    const projectChannelId = project.channelId;
     for (const member of members) {
       await notify(
         member.userId,
         "video_released",
         "The Lock is released",
         "The Captain approved the final master — downloads are open.",
-        `/creators-den/projects/${submission.projectId}`,
+        projectDeepLink(projectChannelId, submission.projectId),
         submission.id,
       ).catch(() => {});
     }
@@ -1438,7 +1444,7 @@ async function decideSubmission(
         : decisionNote
           ? `Sent back for revision — ${decisionNote}`
           : "The Captain sent your pull request back — revise and resubmit.",
-      `/creators-den/projects/${submission.projectId}`,
+      projectDeepLink(project.channelId, submission.projectId),
       submission.id,
     ).catch(() => {});
   }
@@ -1550,6 +1556,11 @@ router.post(
     emitToProject(params.data.projectId, "comment.new", comment);
 
     // Notify the rest of the crew that a note was pinned under the preview (M4).
+    const [commentProject] = await db
+      .select({ channelId: tandemVideoProjectsTable.channelId })
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
     const crew = await db
       .select()
       .from(tandemVideoMembersTable)
@@ -1563,7 +1574,7 @@ router.post(
         `${comment.kind === "PIN" ? "A pin" : "A note"} was added${
           comment.leg ? ` to the ${comment.leg} preview` : " to the project"
         }.`,
-        `/creators-den/projects/${params.data.projectId}/preview`,
+        projectDeepLink(commentProject?.channelId ?? null, params.data.projectId, "/preview"),
         comment.id,
       ).catch(() => {});
     }
@@ -2713,7 +2724,7 @@ router.post(
             "video_submission",
             `Stage ${params.data.leg} submitted for review`,
             `The ${params.data.leg} stage was submitted from an external edit${version.message ? ` — “${version.message.slice(0, 120)}”` : ""}.`,
-            `/creators-den/projects/${params.data.projectId}`,
+            projectDeepLink(owner.channelId, params.data.projectId),
             submission.id,
           ).catch(() => {});
         }

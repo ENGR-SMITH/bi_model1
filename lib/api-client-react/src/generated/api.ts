@@ -31,6 +31,12 @@ import type {
   AdminPromoUpdate,
   AdminSession,
   AuthorProjectDocument,
+  ChannelInput,
+  ChannelOauthExchangeInput,
+  ChannelOauthStartResponse,
+  ChannelPerson,
+  ChannelSummary,
+  ChannelUpdate,
   CollaborationAnnotation,
   CollaborationAnnotationInput,
   CollaborationMessage,
@@ -54,10 +60,12 @@ import type {
   InboxThread,
   ListCollaborationSeedsParams,
   ListVideoActivityParams,
+  ListVideoProjectsParams,
   OracleChatInput,
   OracleResult,
   OutlineAssistInput,
   OutlineAssistResult,
+  ProjectChannelInput,
   ProjectDocument,
   ProviderStatus,
   ProviderUpdate,
@@ -6048,20 +6056,28 @@ export const usePurchaseTicket = <TError = ErrorType<ErrorResponse>,
       return useMutation(getPurchaseTicketMutationOptions(options));
     }
 
-export const getListVideoProjectsUrl = () => {
+export const getListVideoProjectsUrl = (params?: ListVideoProjectsParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/video/projects`
+  return stringifiedParams.length > 0 ? `/api/video/projects?${stringifiedParams}` : `/api/video/projects`
 }
 
 /**
+ * Returns the projects the user owns or is a member of. When a channelId is given, the list is scoped to that channel (editors only see the projects they are members of there). Set unlinked=1 to list only the caller's channel-less legacy projects.
  * @summary List the authenticated user's content-creation projects
  */
-export const listVideoProjects = async ( options?: Parameters<typeof customFetch>[1]): Promise<VideoProject[]> => {
+export const listVideoProjects = async (params?: ListVideoProjectsParams, options?: Parameters<typeof customFetch>[1]): Promise<VideoProject[]> => {
 
-  return customFetch<VideoProject[]>(getListVideoProjectsUrl(),
+  return customFetch<VideoProject[]>(getListVideoProjectsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -6074,23 +6090,23 @@ export const listVideoProjects = async ( options?: Parameters<typeof customFetch
 
 
 
-export const getListVideoProjectsQueryKey = () => {
+export const getListVideoProjectsQueryKey = (params?: ListVideoProjectsParams,) => {
     return [
-    `/api/video/projects`
+    `/api/video/projects`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListVideoProjectsQueryOptions = <TData = Awaited<ReturnType<typeof listVideoProjects>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListVideoProjectsQueryOptions = <TData = Awaited<ReturnType<typeof listVideoProjects>>, TError = ErrorType<ErrorResponse>>(params?: ListVideoProjectsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListVideoProjectsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getListVideoProjectsQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoProjects>>> = ({ signal }) => listVideoProjects({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listVideoProjects>>> = ({ signal }) => listVideoProjects(params, { signal, ...requestOptions });
 
 
 
@@ -6108,11 +6124,11 @@ export type ListVideoProjectsQueryError = ErrorType<ErrorResponse>
  */
 
 export function useListVideoProjects<TData = Awaited<ReturnType<typeof listVideoProjects>>, TError = ErrorType<ErrorResponse>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListVideoProjectsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listVideoProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListVideoProjectsQueryOptions(options)
+  const queryOptions = getListVideoProjectsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -6134,7 +6150,7 @@ export const getCreateVideoProjectUrl = () => {
 }
 
 /**
- * @summary Create a locked video project (Captain)
+ * @summary Create a locked video project in a channel (Captain)
  */
 export const createVideoProject = async (videoProjectInput: VideoProjectInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoProjectDetail> => {
 
@@ -6183,7 +6199,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateVideoProjectMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Create a locked video project (Captain)
+ * @summary Create a locked video project in a channel (Captain)
  */
 export const useCreateVideoProject = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVideoProject>>, TError,{data: BodyType<VideoProjectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -6194,6 +6210,823 @@ export const useCreateVideoProject = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCreateVideoProjectMutationOptions(options));
+    }
+
+export const getListChannelsUrl = () => {
+
+
+
+
+  return `/api/channels`
+}
+
+/**
+ * Channels the caller owns (OWNER) or is an editor on (EDITOR), each with their role, YouTube link state, and project/editor counts. Used by the CMS landing page.
+ * @summary List the channels on the caller's CMS grid
+ */
+export const listChannels = async ( options?: Parameters<typeof customFetch>[1]): Promise<ChannelSummary[]> => {
+
+  return customFetch<ChannelSummary[]>(getListChannelsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChannelsQueryKey = () => {
+    return [
+    `/api/channels`
+    ] as const;
+    }
+
+
+export const getListChannelsQueryOptions = <TData = Awaited<ReturnType<typeof listChannels>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChannels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChannelsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChannels>>> = ({ signal }) => listChannels({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChannels>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChannelsQueryResult = NonNullable<Awaited<ReturnType<typeof listChannels>>>
+export type ListChannelsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the channels on the caller's CMS grid
+ */
+
+export function useListChannels<TData = Awaited<ReturnType<typeof listChannels>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChannels>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChannelsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateChannelUrl = () => {
+
+
+
+
+  return `/api/channels`
+}
+
+/**
+ * Creates the channel and its OWNER membership row. YouTube OAuth linking (Phase 2 connect flow) later upgrades it to CONNECTED with real branding.
+ * @summary Create a new Creator Den channel (CREATED, unlinked)
+ */
+export const createChannel = async (channelInput: ChannelInput, options?: Parameters<typeof customFetch>[1]): Promise<ChannelSummary> => {
+
+  return customFetch<ChannelSummary>(getCreateChannelUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(channelInput)
+  }
+);}
+
+
+
+
+
+export const getCreateChannelMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChannel>>, TError,{data: BodyType<ChannelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createChannel>>, TError,{data: BodyType<ChannelInput>}, TContext> => {
+
+const mutationKey = ['createChannel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createChannel>>, {data: BodyType<ChannelInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createChannel(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateChannelMutationResult = NonNullable<Awaited<ReturnType<typeof createChannel>>>
+    export type CreateChannelMutationBody = BodyType<ChannelInput>
+    export type CreateChannelMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Create a new Creator Den channel (CREATED, unlinked)
+ */
+export const useCreateChannel = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChannel>>, TError,{data: BodyType<ChannelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createChannel>>,
+        TError,
+        {data: BodyType<ChannelInput>},
+        TContext
+      > => {
+      return useMutation(getCreateChannelMutationOptions(options));
+    }
+
+export const getGetChannelUrl = (channelId: string,) => {
+
+
+
+
+  return `/api/channels/${channelId}`
+}
+
+/**
+ * @summary Read a channel the caller is on (owner or editor)
+ */
+export const getChannel = async (channelId: string, options?: Parameters<typeof customFetch>[1]): Promise<ChannelSummary> => {
+
+  return customFetch<ChannelSummary>(getGetChannelUrl(channelId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetChannelQueryKey = (channelId: string,) => {
+    return [
+    `/api/channels/${channelId}`
+    ] as const;
+    }
+
+
+export const getGetChannelQueryOptions = <TData = Awaited<ReturnType<typeof getChannel>>, TError = ErrorType<ErrorResponse>>(channelId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetChannelQueryKey(channelId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getChannel>>> = ({ signal }) => getChannel(channelId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: channelId !== null && channelId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getChannel>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetChannelQueryResult = NonNullable<Awaited<ReturnType<typeof getChannel>>>
+export type GetChannelQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read a channel the caller is on (owner or editor)
+ */
+
+export function useGetChannel<TData = Awaited<ReturnType<typeof getChannel>>, TError = ErrorType<ErrorResponse>>(
+ channelId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getChannel>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetChannelQueryOptions(channelId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateChannelUrl = (channelId: string,) => {
+
+
+
+
+  return `/api/channels/${channelId}`
+}
+
+/**
+ * @summary Rename a channel (owner only)
+ */
+export const updateChannel = async (channelId: string,
+    channelUpdate: ChannelUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ChannelSummary> => {
+
+  return customFetch<ChannelSummary>(getUpdateChannelUrl(channelId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(channelUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateChannelMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChannel>>, TError,{channelId: string;data: BodyType<ChannelUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateChannel>>, TError,{channelId: string;data: BodyType<ChannelUpdate>}, TContext> => {
+
+const mutationKey = ['updateChannel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateChannel>>, {channelId: string;data: BodyType<ChannelUpdate>}> = (props) => {
+          const {channelId,data} = props ?? {};
+
+          return  updateChannel(channelId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateChannelMutationResult = NonNullable<Awaited<ReturnType<typeof updateChannel>>>
+    export type UpdateChannelMutationBody = BodyType<ChannelUpdate>
+    export type UpdateChannelMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Rename a channel (owner only)
+ */
+export const useUpdateChannel = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateChannel>>, TError,{channelId: string;data: BodyType<ChannelUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateChannel>>,
+        TError,
+        {channelId: string;data: BodyType<ChannelUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateChannelMutationOptions(options));
+    }
+
+export const getDeleteChannelUrl = (channelId: string,) => {
+
+
+
+
+  return `/api/channels/${channelId}`
+}
+
+/**
+ * Fails with 409 while the channel still has projects; the channel must be emptied first. Deleting also removes channel membership rows.
+ * @summary Delete an empty channel (owner only)
+ */
+export const deleteChannel = async (channelId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteChannelUrl(channelId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteChannelMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChannel>>, TError,{channelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteChannel>>, TError,{channelId: string}, TContext> => {
+
+const mutationKey = ['deleteChannel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteChannel>>, {channelId: string}> = (props) => {
+          const {channelId} = props ?? {};
+
+          return  deleteChannel(channelId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteChannelMutationResult = NonNullable<Awaited<ReturnType<typeof deleteChannel>>>
+
+    export type DeleteChannelMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Delete an empty channel (owner only)
+ */
+export const useDeleteChannel = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteChannel>>, TError,{channelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteChannel>>,
+        TError,
+        {channelId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteChannelMutationOptions(options));
+    }
+
+export const getStartChannelOauthUrl = (channelId: string,) => {
+
+
+
+
+  return `/api/channels/${channelId}/oauth/start`
+}
+
+/**
+ * Validates the caller owns the channel, generates a PKCE consent URL with a signed state token, and returns the Google authorization URL to open in a new tab. Fails when YouTube OAuth credentials are not configured on the server.
+ * @summary Start linking a channel to its YouTube channel via Google OAuth (owner only)
+ */
+export const startChannelOauth = async (channelId: string, options?: Parameters<typeof customFetch>[1]): Promise<ChannelOauthStartResponse> => {
+
+  return customFetch<ChannelOauthStartResponse>(getStartChannelOauthUrl(channelId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getStartChannelOauthMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startChannelOauth>>, TError,{channelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startChannelOauth>>, TError,{channelId: string}, TContext> => {
+
+const mutationKey = ['startChannelOauth'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startChannelOauth>>, {channelId: string}> = (props) => {
+          const {channelId} = props ?? {};
+
+          return  startChannelOauth(channelId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartChannelOauthMutationResult = NonNullable<Awaited<ReturnType<typeof startChannelOauth>>>
+
+    export type StartChannelOauthMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Start linking a channel to its YouTube channel via Google OAuth (owner only)
+ */
+export const useStartChannelOauth = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startChannelOauth>>, TError,{channelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startChannelOauth>>,
+        TError,
+        {channelId: string},
+        TContext
+      > => {
+      return useMutation(getStartChannelOauthMutationOptions(options));
+    }
+
+export const getExchangeChannelOauthUrl = (channelId: string,) => {
+
+
+
+
+  return `/api/channels/${channelId}/oauth/exchange`
+}
+
+/**
+ * Verifies the signed state, swaps the code for tokens at Google, fetches the connected YouTube channel (mine=true), refuses a YouTube channel already bound elsewhere, stores the tokens encrypted, and upgrades the channel to CONNECTED with real branding.
+ * @summary Exchange the Google consent code and bind the YouTube channel
+ */
+export const exchangeChannelOauth = async (channelId: string,
+    channelOauthExchangeInput: ChannelOauthExchangeInput, options?: Parameters<typeof customFetch>[1]): Promise<ChannelSummary> => {
+
+  return customFetch<ChannelSummary>(getExchangeChannelOauthUrl(channelId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(channelOauthExchangeInput)
+  }
+);}
+
+
+
+
+
+export const getExchangeChannelOauthMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exchangeChannelOauth>>, TError,{channelId: string;data: BodyType<ChannelOauthExchangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof exchangeChannelOauth>>, TError,{channelId: string;data: BodyType<ChannelOauthExchangeInput>}, TContext> => {
+
+const mutationKey = ['exchangeChannelOauth'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof exchangeChannelOauth>>, {channelId: string;data: BodyType<ChannelOauthExchangeInput>}> = (props) => {
+          const {channelId,data} = props ?? {};
+
+          return  exchangeChannelOauth(channelId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ExchangeChannelOauthMutationResult = NonNullable<Awaited<ReturnType<typeof exchangeChannelOauth>>>
+    export type ExchangeChannelOauthMutationBody = BodyType<ChannelOauthExchangeInput>
+    export type ExchangeChannelOauthMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Exchange the Google consent code and bind the YouTube channel
+ */
+export const useExchangeChannelOauth = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof exchangeChannelOauth>>, TError,{channelId: string;data: BodyType<ChannelOauthExchangeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof exchangeChannelOauth>>,
+        TError,
+        {channelId: string;data: BodyType<ChannelOauthExchangeInput>},
+        TContext
+      > => {
+      return useMutation(getExchangeChannelOauthMutationOptions(options));
+    }
+
+export const getDisconnectChannelOauthUrl = (channelId: string,) => {
+
+
+
+
+  return `/api/channels/${channelId}/oauth/disconnect`
+}
+
+/**
+ * Revokes the Google token (best-effort), clears the encrypted token vault, and returns the channel to CREATED. Projects, roster, and editors stay; the card shows the connect action again.
+ * @summary Disconnect the YouTube link (owner only)
+ */
+export const disconnectChannelOauth = async (channelId: string, options?: Parameters<typeof customFetch>[1]): Promise<ChannelSummary> => {
+
+  return customFetch<ChannelSummary>(getDisconnectChannelOauthUrl(channelId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getDisconnectChannelOauthMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectChannelOauth>>, TError,{channelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof disconnectChannelOauth>>, TError,{channelId: string}, TContext> => {
+
+const mutationKey = ['disconnectChannelOauth'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof disconnectChannelOauth>>, {channelId: string}> = (props) => {
+          const {channelId} = props ?? {};
+
+          return  disconnectChannelOauth(channelId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DisconnectChannelOauthMutationResult = NonNullable<Awaited<ReturnType<typeof disconnectChannelOauth>>>
+
+    export type DisconnectChannelOauthMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Disconnect the YouTube link (owner only)
+ */
+export const useDisconnectChannelOauth = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof disconnectChannelOauth>>, TError,{channelId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof disconnectChannelOauth>>,
+        TError,
+        {channelId: string},
+        TContext
+      > => {
+      return useMutation(getDisconnectChannelOauthMutationOptions(options));
+    }
+
+export const getListChannelPeopleUrl = (channelId: string,) => {
+
+
+
+
+  return `/api/channels/${channelId}/people`
+}
+
+/**
+ * GitHub-contributors-style roster for the channel home: every user on the channel plus the project roles they hold across the channel's projects.
+ * @summary List the channel roster (owner + editors) with resolved identities
+ */
+export const listChannelPeople = async (channelId: string, options?: Parameters<typeof customFetch>[1]): Promise<ChannelPerson[]> => {
+
+  return customFetch<ChannelPerson[]>(getListChannelPeopleUrl(channelId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChannelPeopleQueryKey = (channelId: string,) => {
+    return [
+    `/api/channels/${channelId}/people`
+    ] as const;
+    }
+
+
+export const getListChannelPeopleQueryOptions = <TData = Awaited<ReturnType<typeof listChannelPeople>>, TError = ErrorType<ErrorResponse>>(channelId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChannelPeople>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChannelPeopleQueryKey(channelId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChannelPeople>>> = ({ signal }) => listChannelPeople(channelId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: channelId !== null && channelId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChannelPeople>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChannelPeopleQueryResult = NonNullable<Awaited<ReturnType<typeof listChannelPeople>>>
+export type ListChannelPeopleQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the channel roster (owner + editors) with resolved identities
+ */
+
+export function useListChannelPeople<TData = Awaited<ReturnType<typeof listChannelPeople>>, TError = ErrorType<ErrorResponse>>(
+ channelId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChannelPeople>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChannelPeopleQueryOptions(channelId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListChannelProjectsUrl = (channelId: string,) => {
+
+
+
+
+  return `/api/channels/${channelId}/projects`
+}
+
+/**
+ * The owner sees every project in the channel; an editor sees only the projects they are an ACTIVE member of. Same project-row shape as the global project list.
+ * @summary List the projects shown on a channel home
+ */
+export const listChannelProjects = async (channelId: string, options?: Parameters<typeof customFetch>[1]): Promise<VideoProject[]> => {
+
+  return customFetch<VideoProject[]>(getListChannelProjectsUrl(channelId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChannelProjectsQueryKey = (channelId: string,) => {
+    return [
+    `/api/channels/${channelId}/projects`
+    ] as const;
+    }
+
+
+export const getListChannelProjectsQueryOptions = <TData = Awaited<ReturnType<typeof listChannelProjects>>, TError = ErrorType<ErrorResponse>>(channelId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChannelProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChannelProjectsQueryKey(channelId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChannelProjects>>> = ({ signal }) => listChannelProjects(channelId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: channelId !== null && channelId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChannelProjects>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChannelProjectsQueryResult = NonNullable<Awaited<ReturnType<typeof listChannelProjects>>>
+export type ListChannelProjectsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the projects shown on a channel home
+ */
+
+export function useListChannelProjects<TData = Awaited<ReturnType<typeof listChannelProjects>>, TError = ErrorType<ErrorResponse>>(
+ channelId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChannelProjects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChannelProjectsQueryOptions(channelId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAttachVideoProjectChannelUrl = (projectId: string,) => {
+
+
+
+
+  return `/api/video/projects/${projectId}/channel`
+}
+
+/**
+ * Legacy projects created before the multi-channel restructure have no channel. The Captain attaches them to a channel they own so the project appears on that channel home (and the CMS grid) again.
+ * @summary Attach a legacy unlinked project to one of the Captain's channels
+ */
+export const attachVideoProjectChannel = async (projectId: string,
+    projectChannelInput: ProjectChannelInput, options?: Parameters<typeof customFetch>[1]): Promise<VideoProject> => {
+
+  return customFetch<VideoProject>(getAttachVideoProjectChannelUrl(projectId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(projectChannelInput)
+  }
+);}
+
+
+
+
+
+export const getAttachVideoProjectChannelMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachVideoProjectChannel>>, TError,{projectId: string;data: BodyType<ProjectChannelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof attachVideoProjectChannel>>, TError,{projectId: string;data: BodyType<ProjectChannelInput>}, TContext> => {
+
+const mutationKey = ['attachVideoProjectChannel'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof attachVideoProjectChannel>>, {projectId: string;data: BodyType<ProjectChannelInput>}> = (props) => {
+          const {projectId,data} = props ?? {};
+
+          return  attachVideoProjectChannel(projectId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AttachVideoProjectChannelMutationResult = NonNullable<Awaited<ReturnType<typeof attachVideoProjectChannel>>>
+    export type AttachVideoProjectChannelMutationBody = BodyType<ProjectChannelInput>
+    export type AttachVideoProjectChannelMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Attach a legacy unlinked project to one of the Captain's channels
+ */
+export const useAttachVideoProjectChannel = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof attachVideoProjectChannel>>, TError,{projectId: string;data: BodyType<ProjectChannelInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof attachVideoProjectChannel>>,
+        TError,
+        {projectId: string;data: BodyType<ProjectChannelInput>},
+        TContext
+      > => {
+      return useMutation(getAttachVideoProjectChannelMutationOptions(options));
     }
 
 export const getListPublicVideoProjectsUrl = (userId: string,) => {

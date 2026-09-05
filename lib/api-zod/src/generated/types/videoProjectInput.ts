@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 
+/**
+ * Projects are created inside a workspace channel when channelId is given (the creator must own that channel); omitting it creates a legacy unlinked project for pre-channel tooling/tests
+ */
 export interface VideoProjectInput {
   /**
      * @minLength 1
@@ -14,4 +17,9 @@ export interface VideoProjectInput {
   name: string;
   /** @maxLength 2000 */
   description?: string;
+  /**
+     * The workspace channel this project belongs to; the creator must own it (omit only for legacy/unlinked projects)
+     * @minLength 1
+     */
+  channelId?: string;
 }

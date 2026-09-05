@@ -5,6 +5,7 @@ import {
   db,
   tandemVideoProjectsTable,
   tandemVideoMembersTable,
+  tandemChannelsTable,
   tandemVideoAssetsTable,
   tandemVideoAssetFilesTable,
   tandemVideoTranscriptsTable,
@@ -38,17 +39,23 @@ import {
   ListVideoAssetsParams,
   ListVideoAssetsResponse,
   ListVideoProjectsResponse,
+  ListVideoProjectsQueryParams,
+  AttachVideoProjectChannelBody,
+  AttachVideoProjectChannelParams,
+  AttachVideoProjectChannelResponse,
   UpdateVideoProjectVisibilityBody,
   UpdateVideoProjectVisibilityParams,
   UpdateVideoProjectVisibilityResponse,
   UploadVideoAssetParams,
   UploadVideoAssetResponse,
 } from "@workspace/api-zod";
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
 import { randomUUID } from "node:crypto";
 import type { TandemVideoMember } from "@workspace/db";
-import { notify } from "./video-platform";
+import { notify, projectDeepLink } from "./video-platform";
+import { channelMembership, ensureChannelEditor, syncChannelEditors } from "../channels/channel-members";
+import { visibleChannelProjectRows } from "./channels";
 import { upload } from "../video/upload";
 import { createAssetFromUpload } from "../video/content-address";
 import { ensureUploadFits } from "../video/quota";
@@ -112,11 +119,59 @@ async function requireMember(
   return member ?? null;
 }
 
-// GET /video/projects — the user's projects (owned or member).
+// GET /video/projects — the user's projects (owned or member). With a
+// channelId the list is scoped to a channel (owner sees all, editors only
+// their own memberships); with unlinked=1 it returns the caller's legacy
+// channel-less projects so the CMS can offer the attach flow.
 router.get("/video/projects", async (req, res): Promise<void> => {
   const userId = getAuth(req).userId;
   if (!userId) {
     res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  const query = ListVideoProjectsQueryParams.safeParse(req.query);
+  const channelId = query.success && query.data.channelId ? query.data.channelId : null;
+  const unlinkedOnly = query.success && query.data.unlinked === "1";
+
+  // Legacy unlinked projects (the CMS "attach to a channel" section): only
+  // the caller's own channel-less projects.
+  if (unlinkedOnly) {
+    const owned = await db
+      .select()
+      .from(tandemVideoProjectsTable)
+      .where(
+        and(
+          eq(tandemVideoProjectsTable.ownerId, userId),
+          isNull(tandemVideoProjectsTable.channelId),
+        ),
+      );
+    res.json(
+      ListVideoProjectsResponse.parse(
+        owned.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()),
+      ),
+    );
+    return;
+  }
+
+  // Channel-scoped listing (the channel home + workspace menu).
+  if (channelId) {
+    const [channel] = await db
+      .select({ id: tandemChannelsTable.id })
+      .from(tandemChannelsTable)
+      .where(eq(tandemChannelsTable.id, channelId))
+      .limit(1);
+    if (!channel) {
+      res.status(404).json({ error: "Channel not found" });
+      return;
+    }
+    const membership = await channelMembership(channelId, userId);
+    if (!membership) {
+      res.status(403).json({ error: "You are not on this channel" });
+      return;
+    }
+    const projects = await visibleChannelProjectRows(channelId, userId, membership.role);
+    res.json(ListVideoProjectsResponse.parse(projects));
     return;
   }
 
@@ -168,6 +223,26 @@ router.post("/video/projects", async (req, res): Promise<void> => {
     return;
   }
 
+  // Projects normally live inside a channel the creator owns (multi-channel
+  // restructure). A missing channelId creates a legacy unlinked project — the
+  // CMS always sends a channel, but older tooling/tests may not.
+  const channelId = parsed.data.channelId ?? null;
+  if (channelId) {
+    const [channel] = await db
+      .select()
+      .from(tandemChannelsTable)
+      .where(eq(tandemChannelsTable.id, channelId))
+      .limit(1);
+    if (!channel) {
+      res.status(404).json({ error: "Channel not found" });
+      return;
+    }
+    if (channel.ownerId !== userId) {
+      res.status(403).json({ error: "Only the channel owner can create projects in it" });
+      return;
+    }
+  }
+
   const projectId = randomUUID();
   const memberId = randomUUID();
 
@@ -176,6 +251,7 @@ router.post("/video/projects", async (req, res): Promise<void> => {
       .insert(tandemVideoProjectsTable)
       .values({
         id: projectId,
+        channelId,
         ownerId: userId,
         name: parsed.data.name,
         description: parsed.data.description ?? "",
@@ -469,7 +545,80 @@ router.delete(
       wholeProject: true,
     });
 
+    // Editors who only had memberships on this project lose their channel card.
+    if (project.channelId) await syncChannelEditors(project.channelId);
+
     res.status(204).end();
+  },
+);
+
+// PATCH /video/projects/:projectId/channel — attach a legacy (unlinked)
+// project to one of the Captain's own channels so it shows up on that
+// channel home + CMS card again.
+router.patch(
+  "/video/projects/:projectId/channel",
+  async (req: Request, res): Promise<void> => {
+    const userId = getAuth(req).userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    const params = AttachVideoProjectChannelParams.safeParse(req.params);
+    const body = AttachVideoProjectChannelBody.safeParse(req.body);
+    if (!params.success || !body.success) {
+      res.status(400).json({ error: "Invalid attach request" });
+      return;
+    }
+
+    const [project] = await db
+      .select()
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
+    if (!project) {
+      res.status(404).json({ error: "Project not found" });
+      return;
+    }
+    if (project.ownerId !== userId) {
+      res.status(403).json({ error: "Only the Captain can attach the project to a channel" });
+      return;
+    }
+    if (project.channelId) {
+      res.status(400).json({ error: "This project already lives in a channel" });
+      return;
+    }
+
+    const [channel] = await db
+      .select()
+      .from(tandemChannelsTable)
+      .where(eq(tandemChannelsTable.id, body.data.channelId))
+      .limit(1);
+    if (!channel) {
+      res.status(404).json({ error: "Channel not found" });
+      return;
+    }
+    if (channel.ownerId !== userId) {
+      res.status(403).json({ error: "You can only attach projects to channels you own" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(tandemVideoProjectsTable)
+      .set({ channelId: channel.id, updatedAt: new Date() })
+      .where(eq(tandemVideoProjectsTable.id, project.id))
+      .returning();
+
+    // Existing members on a now-attached legacy project become channel editors.
+    const projectMembers = await db
+      .select({ userId: tandemVideoMembersTable.userId })
+      .from(tandemVideoMembersTable)
+      .where(eq(tandemVideoMembersTable.projectId, project.id));
+    for (const m of projectMembers) {
+      await ensureChannelEditor(channel.id, m.userId);
+    }
+
+    res.json(AttachVideoProjectChannelResponse.parse(updated));
   },
 );
 
@@ -612,12 +761,15 @@ router.post(
         .where(eq(tandemVideoMembersTable.id, existing.id))
         .returning();
       const updatedProfiles = await resolveUserProfiles([clerkUserId]);
+      // Channel membership follows project membership: the invitee appears on
+      // the channel (owner's contributor strip + their own CMS mirror card).
+      if (project.channelId) await ensureChannelEditor(project.channelId, clerkUserId);
       await notify(
         clerkUserId,
         "video_invite",
         "You were added to a project",
         `The Captain added you to “${project.name}” as ${body.data.role.replaceAll("_", " ").toLowerCase()}.`,
-        `/creators-den/projects/${project.id}`,
+        projectDeepLink(project.channelId, project.id),
         project.id,
       ).catch(() => {});
       res.status(200).json(
@@ -642,12 +794,15 @@ router.post(
         })
         .returning();
       const invitedProfiles = await resolveUserProfiles([clerkUserId]);
+      // Channel membership follows project membership: the invitee appears on
+      // the channel (owner's contributor strip + their own CMS mirror card).
+      if (project.channelId) await ensureChannelEditor(project.channelId, clerkUserId);
       await notify(
         clerkUserId,
         "video_invite",
         "You were added to a project",
         `The Captain added you to “${project.name}” as ${body.data.role.replaceAll("_", " ").toLowerCase()}.`,
-        `/creators-den/projects/${project.id}`,
+        projectDeepLink(project.channelId, project.id),
         project.id,
       ).catch(() => {});
       res.status(201).json(
@@ -800,6 +955,10 @@ router.delete(
         .delete(tandemVideoMembersTable)
         .where(eq(tandemVideoMembersTable.id, member.id));
     });
+
+    // If that was the member's last project membership in the channel, their
+    // channel card (EDITOR row) disappears too.
+    if (project.channelId) await syncChannelEditors(project.channelId);
 
     res.status(204).end();
   },
@@ -1026,7 +1185,7 @@ router.post(
           "video_submission",
           "New upload for review",
           `${fileName} was uploaded for your review.`,
-          `/creators-den/projects/${params.data.projectId}`,
+          projectDeepLink(owner.channelId, params.data.projectId),
           submission.id,
         ).catch(() => {});
       }

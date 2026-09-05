@@ -1081,6 +1081,11 @@ export const VideoProjectVisibility = {
 
 export interface VideoProject {
   id: string;
+  /**
+     * The workspace channel this project lives in (null for legacy unlinked projects)
+     * @nullable
+     */
+  channelId: string | null;
   ownerId: string;
   name: string;
   description: string;
@@ -1091,6 +1096,9 @@ export interface VideoProject {
   updatedAt: string;
 }
 
+/**
+ * Projects are created inside a workspace channel when channelId is given (the creator must own that channel); omitting it creates a legacy unlinked project for pre-channel tooling/tests
+ */
 export interface VideoProjectInput {
   /**
      * @minLength 1
@@ -1099,6 +1107,11 @@ export interface VideoProjectInput {
   name: string;
   /** @maxLength 2000 */
   description?: string;
+  /**
+     * The workspace channel this project belongs to; the creator must own it (omit only for legacy/unlinked projects)
+     * @minLength 1
+     */
+  channelId?: string;
 }
 
 export type VideoProjectVisibilityInputVisibility = typeof VideoProjectVisibilityInputVisibility[keyof typeof VideoProjectVisibilityInputVisibility];
@@ -1111,6 +1124,154 @@ export const VideoProjectVisibilityInputVisibility = {
 
 export interface VideoProjectVisibilityInput {
   visibility: VideoProjectVisibilityInputVisibility;
+}
+
+/**
+ * The channel to attach a legacy unlinked project to
+ */
+export interface ProjectChannelInput {
+  /** @minLength 1 */
+  channelId: string;
+}
+
+/**
+ * CREATED = workspace ready but not yet YouTube-linked; CONNECTED = linked with real branding/analytics
+ */
+export type ChannelStatus = typeof ChannelStatus[keyof typeof ChannelStatus];
+
+
+export const ChannelStatus = {
+  CREATED: 'CREATED',
+  CONNECTED: 'CONNECTED',
+} as const;
+
+/**
+ * A Creator Den workspace channel (owned by one user; optionally linked to their real YouTube channel)
+ */
+export interface Channel {
+  id: string;
+  ownerId: string;
+  /** CREATED = workspace ready but not yet YouTube-linked; CONNECTED = linked with real branding/analytics */
+  status: ChannelStatus;
+  name: string;
+  /** @nullable */
+  youtubeChannelId: string | null;
+  /** @nullable */
+  youtubeTitle: string | null;
+  /** @nullable */
+  youtubeDescription: string | null;
+  /** @nullable */
+  youtubeAvatarUrl: string | null;
+  /** @nullable */
+  youtubeBannerUrl: string | null;
+  /** @nullable */
+  youtubeCountry: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ChannelSummaryStatus = typeof ChannelSummaryStatus[keyof typeof ChannelSummaryStatus];
+
+
+export const ChannelSummaryStatus = {
+  CREATED: 'CREATED',
+  CONNECTED: 'CONNECTED',
+} as const;
+
+export type ChannelSummaryMyRole = typeof ChannelSummaryMyRole[keyof typeof ChannelSummaryMyRole];
+
+
+export const ChannelSummaryMyRole = {
+  OWNER: 'OWNER',
+  EDITOR: 'EDITOR',
+} as const;
+
+/**
+ * A channel as shown on the CMS grid / den chrome, with the viewer's role and counts
+ */
+export interface ChannelSummary {
+  id: string;
+  ownerId: string;
+  status: ChannelSummaryStatus;
+  name: string;
+  /** @nullable */
+  youtubeChannelId: string | null;
+  /** @nullable */
+  youtubeTitle: string | null;
+  /** @nullable */
+  youtubeDescription: string | null;
+  /** @nullable */
+  youtubeAvatarUrl: string | null;
+  /** @nullable */
+  youtubeBannerUrl: string | null;
+  /** @nullable */
+  youtubeCountry: string | null;
+  createdAt: string;
+  updatedAt: string;
+  myRole: ChannelSummaryMyRole;
+  youtubeConnected: boolean;
+  projectCount: number;
+  editorCount: number;
+}
+
+export interface ChannelInput {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name: string;
+}
+
+export interface ChannelUpdate {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name: string;
+}
+
+/**
+ * The Google consent URL to open for the channel owner's YouTube link
+ */
+export interface ChannelOauthStartResponse {
+  /** Full Google OAuth authorization URL (PKCE) to open in a new tab */
+  url: string;
+  /** The workspace channel being linked (rides along so the callback page can exchange without parsing the state token) */
+  channelId: string;
+}
+
+/**
+ * The Google callback parameters, exchanged server-side for tokens
+ */
+export interface ChannelOauthExchangeInput {
+  /** The signed state token from the consent URL */
+  state: string;
+  /** The one-time authorization code from Google's redirect */
+  code: string;
+}
+
+export type ChannelPersonRole = typeof ChannelPersonRole[keyof typeof ChannelPersonRole];
+
+
+export const ChannelPersonRole = {
+  OWNER: 'OWNER',
+  EDITOR: 'EDITOR',
+} as const;
+
+/**
+ * One roster entry on a channel home — a GitHub-contributors-style avatar with the roles they hold on the channel's projects
+ */
+export interface ChannelPerson {
+  userId: string;
+  /** @nullable */
+  name: string | null;
+  /** @nullable */
+  imageUrl: string | null;
+  role: ChannelPersonRole;
+  /** Roles the person holds across the channel's projects (CAPTAIN for the owner on their projects) */
+  projectRoles: string[];
+  /** Number of the channel's projects this person is on */
+  projectCount: number;
 }
 
 /**
@@ -1245,6 +1406,11 @@ export interface VideoAsset {
 
 export interface VideoProjectDetail {
   id: string;
+  /**
+     * The workspace channel this project lives in (null for legacy unlinked projects)
+     * @nullable
+     */
+  channelId: string | null;
   ownerId: string;
   name: string;
   description: string;
@@ -1950,6 +2116,17 @@ unit?: UnitQueryParameter;
 language?: LanguageQueryParameter;
 protocol?: ProtocolQueryParameter;
 availability?: AvailabilityQueryParameter;
+};
+
+export type ListVideoProjectsParams = {
+/**
+ * When set, only return projects inside this channel (caller must be a channel member)
+ */
+channelId?: string;
+/**
+ * When 1, return only the caller's projects that are not attached to any channel yet
+ */
+unlinked?: string;
 };
 
 export type ListVideoActivityParams = {

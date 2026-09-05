@@ -10,6 +10,56 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+export const tandemChannelsTable = sqliteTable("tandem_channels", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull(),
+  status: text("status").notNull().default("CREATED"),
+  name: text("name").notNull(),
+  youtubeChannelId: text("youtube_channel_id"),
+  youtubeTitle: text("youtube_title"),
+  youtubeDescription: text("youtube_description"),
+  youtubeAvatarUrl: text("youtube_avatar_url"),
+  youtubeBannerUrl: text("youtube_banner_url"),
+  youtubeCountry: text("youtube_country"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const tandemChannelMembersTable = sqliteTable(
+  "tandem_channel_members",
+  {
+    id: text("id").primaryKey(),
+    channelId: text("channel_id").notNull(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    channelUserUnique: unique("tandem_channel_member_channel_user").on(table.channelId, table.userId),
+  }),
+);
+
+export const tandemChannelOauthTable = sqliteTable(
+  "tandem_channel_oauth",
+  {
+    id: text("id").primaryKey(),
+    channelId: text("channel_id").notNull(),
+    youtubeChannelId: text("youtube_channel_id").notNull(),
+    accessTokenCipher: text("access_token_cipher").notNull(),
+    refreshTokenCipher: text("refresh_token_cipher").notNull(),
+    scope: text("scope").notNull().default(""),
+    status: text("status").notNull().default("ACTIVE"),
+    expiresAt: integer("expires_at", { mode: "timestamp" }),
+    linkedByUserId: text("linked_by_user_id").notNull(),
+    lastRefreshedAt: integer("last_refreshed_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    channelUnique: unique("tandem_channel_oauth_channel_unique").on(table.channelId),
+  }),
+);
+
 export const tandemVideoStorageSnapshotsTable = sqliteTable(
   "tandem_video_storage_snapshots",
   {
@@ -234,6 +284,7 @@ export const collaborationGenealogyTable = sqliteTable("collaboration_genealogy"
 
 export const tandemVideoProjectsTable = sqliteTable("tandem_video_projects", {
   id: text("id").primaryKey(),
+  channelId: text("channel_id"),
   ownerId: text("owner_id").notNull(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
@@ -698,8 +749,32 @@ export async function buildInMemoryDb() {
       event_type TEXT NOT NULL, status TEXT NOT NULL, response_status INTEGER,
       created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_projects (
+    CREATE TABLE tandem_channels (
       id TEXT PRIMARY KEY NOT NULL, owner_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'CREATED', name TEXT NOT NULL,
+      youtube_channel_id TEXT, youtube_title TEXT, youtube_description TEXT,
+      youtube_avatar_url TEXT, youtube_banner_url TEXT, youtube_country TEXT,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_channel_members (
+      id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
+      user_id TEXT NOT NULL, role TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE (channel_id, user_id)
+    );
+    CREATE TABLE tandem_channel_oauth (
+      id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
+      youtube_channel_id TEXT NOT NULL,
+      access_token_cipher TEXT NOT NULL, refresh_token_cipher TEXT NOT NULL,
+      scope TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'ACTIVE',
+      expires_at INTEGER, linked_by_user_id TEXT NOT NULL,
+      last_refreshed_at INTEGER,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      UNIQUE (channel_id)
+    );
+    CREATE TABLE tandem_video_projects (
+      id TEXT PRIMARY KEY NOT NULL, channel_id TEXT,
+      owner_id TEXT NOT NULL,
       name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'VAULT',
       visibility TEXT NOT NULL DEFAULT 'PRIVATE',
@@ -910,6 +985,9 @@ export async function buildInMemoryDb() {
     oracleProvidersTable,
     oracleHealthEventsTable,
     tandemVideoProjectsTable,
+    tandemChannelsTable,
+    tandemChannelMembersTable,
+    tandemChannelOauthTable,
     tandemVideoFollowsTable,
     tandemVideoMembersTable,
     tandemVideoAssetsTable,

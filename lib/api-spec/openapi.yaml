@@ -24,6 +24,8 @@ tags:
     description: Public profile lookups for collaborators
   - name: content-creators
     description: Pre-recorded video production projects (the 4-leg relay)
+  - name: channels
+    description: Creator Den multi-channel workspaces (agency/MCN channel grid, channel roster, channel-scoped projects)
 paths:
   /healthz:
     get:
@@ -1771,6 +1773,18 @@ paths:
       operationId: listVideoProjects
       tags: [content-creators]
       summary: List the authenticated user's content-creation projects
+      description: Returns the projects the user owns or is a member of. When a channelId is given, the list is scoped to that channel (editors only see the projects they are members of there). Set unlinked=1 to list only the caller's channel-less legacy projects.
+      parameters:
+        - name: channelId
+          in: query
+          required: false
+          description: When set, only return projects inside this channel (caller must be a channel member)
+          schema: { type: string }
+        - name: unlinked
+          in: query
+          required: false
+          description: When 1, return only the caller's projects that are not attached to any channel yet
+          schema: { type: string }
       responses:
         "200":
           description: Projects the user owns or is a member of
@@ -1784,10 +1798,15 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not a member of the requested channel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
     post:
       operationId: createVideoProject
       tags: [content-creators]
-      summary: Create a locked video project (Captain)
+      summary: Create a locked video project in a channel (Captain)
       requestBody:
         required: true
         content:
@@ -1806,6 +1825,344 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         "401":
           description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Caller does not own the channel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /channels:
+    get:
+      operationId: listChannels
+      tags: [channels]
+      summary: List the channels on the caller's CMS grid
+      description: Channels the caller owns (OWNER) or is an editor on (EDITOR), each with their role, YouTube link state, and project/editor counts. Used by the CMS landing page.
+      responses:
+        "200":
+          description: The caller's channels (owned + editor mirror cards)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ChannelSummary" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createChannel
+      tags: [channels]
+      summary: Create a new Creator Den channel (CREATED, unlinked)
+      description: Creates the channel and its OWNER membership row. YouTube OAuth linking (Phase 2 connect flow) later upgrades it to CONNECTED with real branding.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChannelInput" }
+      responses:
+        "201":
+          description: Created channel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelSummary" }
+        "400":
+          description: Invalid channel name
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /channels/{channelId}:
+    get:
+      operationId: getChannel
+      tags: [channels]
+      summary: Read a channel the caller is on (owner or editor)
+      parameters:
+        - { $ref: "#/components/parameters/ChannelId" }
+      responses:
+        "200":
+          description: Channel detail with the caller's role
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelSummary" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not a member of this channel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    patch:
+      operationId: updateChannel
+      tags: [channels]
+      summary: Rename a channel (owner only)
+      parameters:
+        - { $ref: "#/components/parameters/ChannelId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChannelUpdate" }
+      responses:
+        "200":
+          description: Updated channel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelSummary" }
+        "400":
+          description: Invalid update
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not the channel owner
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    delete:
+      operationId: deleteChannel
+      tags: [channels]
+      summary: Delete an empty channel (owner only)
+      description: Fails with 409 while the channel still has projects; the channel must be emptied first. Deleting also removes channel membership rows.
+      parameters:
+        - { $ref: "#/components/parameters/ChannelId" }
+      responses:
+        "204":
+          description: Channel deleted
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not the channel owner
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Channel still has projects
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /channels/{channelId}/oauth/start:
+    post:
+      operationId: startChannelOauth
+      tags: [channels]
+      summary: Start linking a channel to its YouTube channel via Google OAuth (owner only)
+      description: Validates the caller owns the channel, generates a PKCE consent URL with a signed state token, and returns the Google authorization URL to open in a new tab. Fails when YouTube OAuth credentials are not configured on the server.
+      parameters:
+        - { $ref: "#/components/parameters/ChannelId" }
+      responses:
+        "200":
+          description: Google consent URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelOauthStartResponse" }
+        "400":
+          description: Not the owner, already connected, or OAuth not configured
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /channels/{channelId}/oauth/exchange:
+    post:
+      operationId: exchangeChannelOauth
+      tags: [channels]
+      summary: Exchange the Google consent code and bind the YouTube channel
+      description: Verifies the signed state, swaps the code for tokens at Google, fetches the connected YouTube channel (mine=true), refuses a YouTube channel already bound elsewhere, stores the tokens encrypted, and upgrades the channel to CONNECTED with real branding.
+      parameters:
+        - { $ref: "#/components/parameters/ChannelId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChannelOauthExchangeInput" }
+      responses:
+        "200":
+          description: The channel, now CONNECTED with YouTube branding
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelSummary" }
+        "400":
+          description: Expired/invalid state, Google rejection, or channel already bound elsewhere
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /channels/{channelId}/oauth/disconnect:
+    post:
+      operationId: disconnectChannelOauth
+      tags: [channels]
+      summary: Disconnect the YouTube link (owner only)
+      description: Revokes the Google token (best-effort), clears the encrypted token vault, and returns the channel to CREATED. Projects, roster, and editors stay; the card shows the connect action again.
+      parameters:
+        - { $ref: "#/components/parameters/ChannelId" }
+      responses:
+        "200":
+          description: The channel, back to CREATED without branding
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelSummary" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not the channel owner
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /channels/{channelId}/people:
+    get:
+      operationId: listChannelPeople
+      tags: [channels]
+      summary: List the channel roster (owner + editors) with resolved identities
+      description: "GitHub-contributors-style roster for the channel home: every user on the channel plus the project roles they hold across the channel's projects."
+      parameters:
+        - { $ref: "#/components/parameters/ChannelId" }
+      responses:
+        "200":
+          description: Channel roster
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ChannelPerson" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not a member of this channel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /channels/{channelId}/projects:
+    get:
+      operationId: listChannelProjects
+      tags: [channels]
+      summary: List the projects shown on a channel home
+      description: The owner sees every project in the channel; an editor sees only the projects they are an ACTIVE member of. Same project-row shape as the global project list.
+      parameters:
+        - { $ref: "#/components/parameters/ChannelId" }
+      responses:
+        "200":
+          description: Channel projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/VideoProject" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not a member of this channel
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Channel not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/projects/{projectId}/channel:
+    patch:
+      operationId: attachVideoProjectChannel
+      tags: [content-creators]
+      summary: Attach a legacy unlinked project to one of the Captain's channels
+      description: Legacy projects created before the multi-channel restructure have no channel. The Captain attaches them to a channel they own so the project appears on that channel home (and the CMS grid) again.
+      parameters:
+        - { $ref: "#/components/parameters/VideoProjectId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectChannelInput" }
+      responses:
+        "200":
+          description: Updated project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VideoProject" }
+        "400":
+          description: Project already has a channel or target channel is invalid
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not the project Captain or not the channel owner
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Project or channel not found
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -3438,6 +3795,12 @@ components:
       in: path
       required: true
       schema: { type: string, minLength: 1 }
+    ChannelId:
+      name: channelId
+      in: path
+      required: true
+      description: Creator Den workspace channel id
+      schema: { type: string, minLength: 1 }
     VideoUserId:
       name: userId
       in: path
@@ -4452,6 +4815,7 @@ components:
       type: object
       properties:
         id: { type: string }
+        channelId: { type: ["string", "null"], description: The workspace channel this project lives in (null for legacy unlinked projects) }
         ownerId: { type: string }
         name: { type: string }
         description: { type: string }
@@ -4462,12 +4826,14 @@ components:
           description: Whether the project appears on the owner's public profile
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, ownerId, name, description, status, visibility, createdAt, updatedAt]
+      required: [id, channelId, ownerId, name, description, status, visibility, createdAt, updatedAt]
     VideoProjectInput:
       type: object
+      description: Projects are created inside a workspace channel when channelId is given (the creator must own that channel); omitting it creates a legacy unlinked project for pre-channel tooling/tests
       properties:
         name: { type: string, minLength: 1, maxLength: 120 }
         description: { type: string, maxLength: 2000 }
+        channelId: { type: string, minLength: 1, description: The workspace channel this project belongs to; the creator must own it (omit only for legacy/unlinked projects) }
       required: [name]
     VideoProjectVisibilityInput:
       type: object
@@ -4476,6 +4842,88 @@ components:
           type: string
           enum: [PUBLIC, PRIVATE]
       required: [visibility]
+    ProjectChannelInput:
+      type: object
+      description: The channel to attach a legacy unlinked project to
+      properties:
+        channelId: { type: string, minLength: 1 }
+      required: [channelId]
+    Channel:
+      type: object
+      description: A Creator Den workspace channel (owned by one user; optionally linked to their real YouTube channel)
+      properties:
+        id: { type: string }
+        ownerId: { type: string }
+        status:
+          type: string
+          enum: [CREATED, CONNECTED]
+          description: CREATED = workspace ready but not yet YouTube-linked; CONNECTED = linked with real branding/analytics
+        name: { type: string }
+        youtubeChannelId: { type: ["string", "null"] }
+        youtubeTitle: { type: ["string", "null"] }
+        youtubeDescription: { type: ["string", "null"] }
+        youtubeAvatarUrl: { type: ["string", "null"] }
+        youtubeBannerUrl: { type: ["string", "null"] }
+        youtubeCountry: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, ownerId, status, name, youtubeChannelId, youtubeTitle, youtubeDescription, youtubeAvatarUrl, youtubeBannerUrl, youtubeCountry, createdAt, updatedAt]
+    ChannelSummary:
+      type: object
+      description: A channel as shown on the CMS grid / den chrome, with the viewer's role and counts
+      properties:
+        id: { type: string }
+        ownerId: { type: string }
+        status: { type: string, enum: [CREATED, CONNECTED] }
+        name: { type: string }
+        youtubeChannelId: { type: ["string", "null"] }
+        youtubeTitle: { type: ["string", "null"] }
+        youtubeDescription: { type: ["string", "null"] }
+        youtubeAvatarUrl: { type: ["string", "null"] }
+        youtubeBannerUrl: { type: ["string", "null"] }
+        youtubeCountry: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        myRole: { type: string, enum: [OWNER, EDITOR] }
+        youtubeConnected: { type: boolean }
+        projectCount: { type: integer }
+        editorCount: { type: integer }
+      required: [id, ownerId, status, name, youtubeChannelId, youtubeTitle, youtubeDescription, youtubeAvatarUrl, youtubeBannerUrl, youtubeCountry, createdAt, updatedAt, myRole, youtubeConnected, projectCount, editorCount]
+    ChannelInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+      required: [name]
+    ChannelUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+      required: [name]
+    ChannelOauthStartResponse:
+      type: object
+      description: The Google consent URL to open for the channel owner's YouTube link
+      properties:
+        url: { type: string, description: Full Google OAuth authorization URL (PKCE) to open in a new tab }
+        channelId: { type: string, description: The workspace channel being linked (rides along so the callback page can exchange without parsing the state token) }
+      required: [url, channelId]
+    ChannelOauthExchangeInput:
+      type: object
+      description: The Google callback parameters, exchanged server-side for tokens
+      properties:
+        state: { type: string, description: The signed state token from the consent URL }
+        code: { type: string, description: The one-time authorization code from Google's redirect }
+      required: [state, code]
+    ChannelPerson:
+      type: object
+      description: One roster entry on a channel home — a GitHub-contributors-style avatar with the roles they hold on the channel's projects
+      properties:
+        userId: { type: string }
+        name: { type: ["string", "null"] }
+        imageUrl: { type: ["string", "null"] }
+        role: { type: string, enum: [OWNER, EDITOR] }
+        projectRoles: { type: array, items: { type: string }, description: Roles the person holds across the channel's projects (CAPTAIN for the owner on their projects) }
+        projectCount: { type: integer, description: Number of the channel's projects this person is on }
+      required: [userId, name, imageUrl, role, projectRoles, projectCount]
     VideoCreatorSummary:
       type: object
       description: A discoverable Creator Den user (has public track history), with social counts for the viewer
@@ -4539,6 +4987,7 @@ components:
       type: object
       properties:
         id: { type: string }
+        channelId: { type: ["string", "null"], description: The workspace channel this project lives in (null for legacy unlinked projects) }
         ownerId: { type: string }
         name: { type: string }
         description: { type: string }
@@ -4559,7 +5008,7 @@ components:
           items: { $ref: "#/components/schemas/VideoAsset" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, ownerId, name, description, status, visibility, myRoles, members, assets, createdAt, updatedAt]
+      required: [id, channelId, ownerId, name, description, status, visibility, myRoles, members, assets, createdAt, updatedAt]
     VideoMember:
       type: object
       properties:

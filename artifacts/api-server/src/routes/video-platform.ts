@@ -40,6 +40,17 @@ const router: IRouter = Router();
 // and the Tandem notifications center (mirrors the parent's inbox pattern).
 // ---------------------------------------------------------------------------
 
+/**
+ * The /creators-den deep link for a project notification. Projects inside a
+ * channel link straight to the channel-scoped page (no redirect hop); legacy
+ * unlinked projects keep the flat path, which the frontend gate resolves.
+ */
+export function projectDeepLink(channelId: string | null, projectId: string, rest = ""): string {
+  return channelId
+    ? `/creators-den/channels/${channelId}/projects/${projectId}${rest}`
+    : `/creators-den/projects/${projectId}${rest}`;
+}
+
 const LEG_ROLES: Record<string, string> = {
   SELECTS: "VIDEO",
   CUT: "VIDEO",
@@ -271,12 +282,17 @@ router.post(
       .returning();
     emitToProject(params.data.projectId, "grant.created", grant);
 
+    const [grantProject] = await db
+      .select({ channelId: tandemVideoProjectsTable.channelId })
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
     await notify(
       body.data.memberId,
       "video_grant",
       "Download access granted",
       `The Captain granted you temporary download access${body.data.reason ? ` — ${body.data.reason}` : ""}.`,
-      `/creators-den/projects/${params.data.projectId}`,
+      projectDeepLink(grantProject?.channelId ?? null, params.data.projectId),
       grant.id,
     );
 
@@ -331,12 +347,17 @@ router.post(
       .returning();
     emitToProject(params.data.projectId, "grant.revoked", revoked);
 
+    const [revokeProject] = await db
+      .select({ channelId: tandemVideoProjectsTable.channelId })
+      .from(tandemVideoProjectsTable)
+      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .limit(1);
     await notify(
       grant.memberId,
       "video_grant_revoked",
       "Download access revoked",
       "The Captain revoked your temporary download access.",
-      `/creators-den/projects/${params.data.projectId}`,
+      projectDeepLink(revokeProject?.channelId ?? null, params.data.projectId),
       grant.id,
     );
 
