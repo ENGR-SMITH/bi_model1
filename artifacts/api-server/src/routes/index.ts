@@ -16,6 +16,7 @@ import accountRouter from "./account";
 import ticketsRouter from "./tickets";
 import subscriptionsRouter from "./subscriptions";
 import videoStorageRouter from "./video-storage";
+import arenaRouter from "./arena";
 
 const router: IRouter = Router();
 
@@ -34,6 +35,7 @@ router.use(accountRouter);
 router.use(ticketsRouter);
 router.use(subscriptionsRouter);
 router.use(videoStorageRouter);
+router.use(arenaRouter);
 router.use(adminRouter);
 router.use(oracleRouter);
 

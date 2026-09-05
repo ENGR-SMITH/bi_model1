@@ -30,6 +30,16 @@ import type {
   AdminPromoInput,
   AdminPromoUpdate,
   AdminSession,
+  ArenaApplication,
+  ArenaApplicationInput,
+  ArenaPostDetail,
+  ArenaPostInput,
+  ArenaPostSummary,
+  ArenaPostUpdate,
+  ArenaReview,
+  ArenaReviewInput,
+  ArenaWatch,
+  ArenaWatchInput,
   AuthorProjectDocument,
   ChannelAnalyticsOverview,
   ChannelAnalyticsReport,
@@ -66,6 +76,8 @@ import type {
   GetChannelAnalyticsVideoReportParams,
   HealthStatus,
   InboxThread,
+  ListArenaPostsParams,
+  ListArenaReviewsParams,
   ListChannelAnalyticsVideosParams,
   ListCollaborationSeedsParams,
   ListVideoActivityParams,
@@ -12419,5 +12431,1366 @@ export const useMarkVideoNotificationRead = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getMarkVideoNotificationReadMutationOptions(options));
+    }
+
+export const getListArenaPostsUrl = (params?: ListArenaPostsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/video/arena/posts?${stringifiedParams}` : `/api/video/arena/posts`
+}
+
+/**
+ * OPEN posts across the platform with the poster/channel/project summaries, the live applicant count, and the caller's own application state. ?mine=1 returns the caller's own posts (Captain) with application counts for the management view.
+ * @summary List open role posts across the Arena
+ */
+export const listArenaPosts = async (params?: ListArenaPostsParams, options?: Parameters<typeof customFetch>[1]): Promise<ArenaPostSummary[]> => {
+
+  return customFetch<ArenaPostSummary[]>(getListArenaPostsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListArenaPostsQueryKey = (params?: ListArenaPostsParams,) => {
+    return [
+    `/api/video/arena/posts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListArenaPostsQueryOptions = <TData = Awaited<ReturnType<typeof listArenaPosts>>, TError = ErrorType<ErrorResponse>>(params?: ListArenaPostsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArenaPosts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListArenaPostsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listArenaPosts>>> = ({ signal }) => listArenaPosts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listArenaPosts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListArenaPostsQueryResult = NonNullable<Awaited<ReturnType<typeof listArenaPosts>>>
+export type ListArenaPostsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List open role posts across the Arena
+ */
+
+export function useListArenaPosts<TData = Awaited<ReturnType<typeof listArenaPosts>>, TError = ErrorType<ErrorResponse>>(
+ params?: ListArenaPostsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArenaPosts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListArenaPostsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateArenaPostUrl = () => {
+
+
+
+
+  return `/api/video/arena/posts`
+}
+
+/**
+ * The caller must own the project and its channel; only one OPEN post per (project, role).
+ * @summary Publish an open role on a channel project (Captain only)
+ */
+export const createArenaPost = async (arenaPostInput: ArenaPostInput, options?: Parameters<typeof customFetch>[1]): Promise<ArenaPostDetail> => {
+
+  return customFetch<ArenaPostDetail>(getCreateArenaPostUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(arenaPostInput)
+  }
+);}
+
+
+
+
+
+export const getCreateArenaPostMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createArenaPost>>, TError,{data: BodyType<ArenaPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createArenaPost>>, TError,{data: BodyType<ArenaPostInput>}, TContext> => {
+
+const mutationKey = ['createArenaPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createArenaPost>>, {data: BodyType<ArenaPostInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createArenaPost(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateArenaPostMutationResult = NonNullable<Awaited<ReturnType<typeof createArenaPost>>>
+    export type CreateArenaPostMutationBody = BodyType<ArenaPostInput>
+    export type CreateArenaPostMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Publish an open role on a channel project (Captain only)
+ */
+export const useCreateArenaPost = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createArenaPost>>, TError,{data: BodyType<ArenaPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createArenaPost>>,
+        TError,
+        {data: BodyType<ArenaPostInput>},
+        TContext
+      > => {
+      return useMutation(getCreateArenaPostMutationOptions(options));
+    }
+
+export const getGetArenaPostUrl = (postId: string,) => {
+
+
+
+
+  return `/api/video/arena/posts/${postId}`
+}
+
+/**
+ * @summary Read a role post
+ */
+export const getArenaPost = async (postId: string, options?: Parameters<typeof customFetch>[1]): Promise<ArenaPostDetail> => {
+
+  return customFetch<ArenaPostDetail>(getGetArenaPostUrl(postId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetArenaPostQueryKey = (postId: string,) => {
+    return [
+    `/api/video/arena/posts/${postId}`
+    ] as const;
+    }
+
+
+export const getGetArenaPostQueryOptions = <TData = Awaited<ReturnType<typeof getArenaPost>>, TError = ErrorType<ErrorResponse>>(postId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArenaPost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetArenaPostQueryKey(postId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getArenaPost>>> = ({ signal }) => getArenaPost(postId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: postId !== null && postId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getArenaPost>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetArenaPostQueryResult = NonNullable<Awaited<ReturnType<typeof getArenaPost>>>
+export type GetArenaPostQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read a role post
+ */
+
+export function useGetArenaPost<TData = Awaited<ReturnType<typeof getArenaPost>>, TError = ErrorType<ErrorResponse>>(
+ postId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArenaPost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetArenaPostQueryOptions(postId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateArenaPostUrl = (postId: string,) => {
+
+
+
+
+  return `/api/video/arena/posts/${postId}`
+}
+
+/**
+ * @summary Close/reopen a role post or edit its pitch (Captain only)
+ */
+export const updateArenaPost = async (postId: string,
+    arenaPostUpdate: ArenaPostUpdate, options?: Parameters<typeof customFetch>[1]): Promise<ArenaPostDetail> => {
+
+  return customFetch<ArenaPostDetail>(getUpdateArenaPostUrl(postId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(arenaPostUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateArenaPostMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateArenaPost>>, TError,{postId: string;data: BodyType<ArenaPostUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateArenaPost>>, TError,{postId: string;data: BodyType<ArenaPostUpdate>}, TContext> => {
+
+const mutationKey = ['updateArenaPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateArenaPost>>, {postId: string;data: BodyType<ArenaPostUpdate>}> = (props) => {
+          const {postId,data} = props ?? {};
+
+          return  updateArenaPost(postId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateArenaPostMutationResult = NonNullable<Awaited<ReturnType<typeof updateArenaPost>>>
+    export type UpdateArenaPostMutationBody = BodyType<ArenaPostUpdate>
+    export type UpdateArenaPostMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Close/reopen a role post or edit its pitch (Captain only)
+ */
+export const useUpdateArenaPost = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateArenaPost>>, TError,{postId: string;data: BodyType<ArenaPostUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateArenaPost>>,
+        TError,
+        {postId: string;data: BodyType<ArenaPostUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateArenaPostMutationOptions(options));
+    }
+
+export const getCreateArenaApplicationUrl = (postId: string,) => {
+
+
+
+
+  return `/api/video/arena/posts/${postId}/applications`
+}
+
+/**
+ * Multipart. One PENDING audition per user per post; the per-week apply cap and per-Captain blocks are enforced server-side.
+ * @summary Audition for an open role (message + up to 3 documents)
+ */
+export const createArenaApplication = async (postId: string,
+    arenaApplicationInput: ArenaApplicationInput, options?: Parameters<typeof customFetch>[1]): Promise<ArenaApplication> => {
+    const formData = new FormData();
+formData.append(`message`, arenaApplicationInput.message);
+if(arenaApplicationInput.files !== undefined) {
+ arenaApplicationInput.files.forEach(value => formData.append(`files`, value));
+ }
+
+  return customFetch<ArenaApplication>(getCreateArenaApplicationUrl(postId),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+
+
+
+export const getCreateArenaApplicationMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createArenaApplication>>, TError,{postId: string;data: BodyType<ArenaApplicationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createArenaApplication>>, TError,{postId: string;data: BodyType<ArenaApplicationInput>}, TContext> => {
+
+const mutationKey = ['createArenaApplication'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createArenaApplication>>, {postId: string;data: BodyType<ArenaApplicationInput>}> = (props) => {
+          const {postId,data} = props ?? {};
+
+          return  createArenaApplication(postId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateArenaApplicationMutationResult = NonNullable<Awaited<ReturnType<typeof createArenaApplication>>>
+    export type CreateArenaApplicationMutationBody = BodyType<ArenaApplicationInput>
+    export type CreateArenaApplicationMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Audition for an open role (message + up to 3 documents)
+ */
+export const useCreateArenaApplication = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createArenaApplication>>, TError,{postId: string;data: BodyType<ArenaApplicationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createArenaApplication>>,
+        TError,
+        {postId: string;data: BodyType<ArenaApplicationInput>},
+        TContext
+      > => {
+      return useMutation(getCreateArenaApplicationMutationOptions(options));
+    }
+
+export const getListArenaPostApplicationsUrl = (postId: string,) => {
+
+
+
+
+  return `/api/video/arena/posts/${postId}/applications`
+}
+
+/**
+ * @summary List the auditions on a post (Captain only)
+ */
+export const listArenaPostApplications = async (postId: string, options?: Parameters<typeof customFetch>[1]): Promise<ArenaApplication[]> => {
+
+  return customFetch<ArenaApplication[]>(getListArenaPostApplicationsUrl(postId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListArenaPostApplicationsQueryKey = (postId: string,) => {
+    return [
+    `/api/video/arena/posts/${postId}/applications`
+    ] as const;
+    }
+
+
+export const getListArenaPostApplicationsQueryOptions = <TData = Awaited<ReturnType<typeof listArenaPostApplications>>, TError = ErrorType<ErrorResponse>>(postId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArenaPostApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListArenaPostApplicationsQueryKey(postId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listArenaPostApplications>>> = ({ signal }) => listArenaPostApplications(postId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: postId !== null && postId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listArenaPostApplications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListArenaPostApplicationsQueryResult = NonNullable<Awaited<ReturnType<typeof listArenaPostApplications>>>
+export type ListArenaPostApplicationsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the auditions on a post (Captain only)
+ */
+
+export function useListArenaPostApplications<TData = Awaited<ReturnType<typeof listArenaPostApplications>>, TError = ErrorType<ErrorResponse>>(
+ postId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArenaPostApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListArenaPostApplicationsQueryOptions(postId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListMyArenaApplicationsUrl = () => {
+
+
+
+
+  return `/api/video/arena/applications/mine`
+}
+
+/**
+ * @summary List the caller's own auditions (My Auditions)
+ */
+export const listMyArenaApplications = async ( options?: Parameters<typeof customFetch>[1]): Promise<ArenaApplication[]> => {
+
+  return customFetch<ArenaApplication[]>(getListMyArenaApplicationsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyArenaApplicationsQueryKey = () => {
+    return [
+    `/api/video/arena/applications/mine`
+    ] as const;
+    }
+
+
+export const getListMyArenaApplicationsQueryOptions = <TData = Awaited<ReturnType<typeof listMyArenaApplications>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyArenaApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyArenaApplicationsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyArenaApplications>>> = ({ signal }) => listMyArenaApplications({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyArenaApplications>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyArenaApplicationsQueryResult = NonNullable<Awaited<ReturnType<typeof listMyArenaApplications>>>
+export type ListMyArenaApplicationsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the caller's own auditions (My Auditions)
+ */
+
+export function useListMyArenaApplications<TData = Awaited<ReturnType<typeof listMyArenaApplications>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyArenaApplications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyArenaApplicationsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetArenaApplicationUrl = (applicationId: string,) => {
+
+
+
+
+  return `/api/video/arena/applications/${applicationId}`
+}
+
+/**
+ * @summary Read one audition (the applicant themself or the Captain)
+ */
+export const getArenaApplication = async (applicationId: string, options?: Parameters<typeof customFetch>[1]): Promise<ArenaApplication> => {
+
+  return customFetch<ArenaApplication>(getGetArenaApplicationUrl(applicationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetArenaApplicationQueryKey = (applicationId: string,) => {
+    return [
+    `/api/video/arena/applications/${applicationId}`
+    ] as const;
+    }
+
+
+export const getGetArenaApplicationQueryOptions = <TData = Awaited<ReturnType<typeof getArenaApplication>>, TError = ErrorType<ErrorResponse>>(applicationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArenaApplication>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetArenaApplicationQueryKey(applicationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getArenaApplication>>> = ({ signal }) => getArenaApplication(applicationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: applicationId !== null && applicationId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getArenaApplication>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetArenaApplicationQueryResult = NonNullable<Awaited<ReturnType<typeof getArenaApplication>>>
+export type GetArenaApplicationQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read one audition (the applicant themself or the Captain)
+ */
+
+export function useGetArenaApplication<TData = Awaited<ReturnType<typeof getArenaApplication>>, TError = ErrorType<ErrorResponse>>(
+ applicationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArenaApplication>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetArenaApplicationQueryOptions(applicationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getAcceptArenaApplicationUrl = (applicationId: string,) => {
+
+
+
+
+  return `/api/video/arena/applications/${applicationId}`
+}
+
+/**
+ * Transactionally marks the application ACCEPTED, fills the post, adds the applicant as a member holding the role, and auto-declines the remaining PENDING auditions.
+ * @summary Accept an audition (Captain only)
+ */
+export const acceptArenaApplication = async (applicationId: string, options?: Parameters<typeof customFetch>[1]): Promise<ArenaApplication> => {
+
+  return customFetch<ArenaApplication>(getAcceptArenaApplicationUrl(applicationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getAcceptArenaApplicationMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptArenaApplication>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof acceptArenaApplication>>, TError,{applicationId: string}, TContext> => {
+
+const mutationKey = ['acceptArenaApplication'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptArenaApplication>>, {applicationId: string}> = (props) => {
+          const {applicationId} = props ?? {};
+
+          return  acceptArenaApplication(applicationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AcceptArenaApplicationMutationResult = NonNullable<Awaited<ReturnType<typeof acceptArenaApplication>>>
+
+    export type AcceptArenaApplicationMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Accept an audition (Captain only)
+ */
+export const useAcceptArenaApplication = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptArenaApplication>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof acceptArenaApplication>>,
+        TError,
+        {applicationId: string},
+        TContext
+      > => {
+      return useMutation(getAcceptArenaApplicationMutationOptions(options));
+    }
+
+export const getRejectArenaApplicationUrl = (applicationId: string,) => {
+
+
+
+
+  return `/api/video/arena/applications/${applicationId}/reject`
+}
+
+/**
+ * @summary Reject an audition (Captain only)
+ */
+export const rejectArenaApplication = async (applicationId: string, options?: Parameters<typeof customFetch>[1]): Promise<ArenaApplication> => {
+
+  return customFetch<ArenaApplication>(getRejectArenaApplicationUrl(applicationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getRejectArenaApplicationMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectArenaApplication>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof rejectArenaApplication>>, TError,{applicationId: string}, TContext> => {
+
+const mutationKey = ['rejectArenaApplication'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejectArenaApplication>>, {applicationId: string}> = (props) => {
+          const {applicationId} = props ?? {};
+
+          return  rejectArenaApplication(applicationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RejectArenaApplicationMutationResult = NonNullable<Awaited<ReturnType<typeof rejectArenaApplication>>>
+
+    export type RejectArenaApplicationMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Reject an audition (Captain only)
+ */
+export const useRejectArenaApplication = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectArenaApplication>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof rejectArenaApplication>>,
+        TError,
+        {applicationId: string},
+        TContext
+      > => {
+      return useMutation(getRejectArenaApplicationMutationOptions(options));
+    }
+
+export const getWithdrawArenaApplicationUrl = (applicationId: string,) => {
+
+
+
+
+  return `/api/video/arena/applications/${applicationId}/withdraw`
+}
+
+/**
+ * @summary Withdraw a PENDING audition (applicant only)
+ */
+export const withdrawArenaApplication = async (applicationId: string, options?: Parameters<typeof customFetch>[1]): Promise<ArenaApplication> => {
+
+  return customFetch<ArenaApplication>(getWithdrawArenaApplicationUrl(applicationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getWithdrawArenaApplicationMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawArenaApplication>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof withdrawArenaApplication>>, TError,{applicationId: string}, TContext> => {
+
+const mutationKey = ['withdrawArenaApplication'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof withdrawArenaApplication>>, {applicationId: string}> = (props) => {
+          const {applicationId} = props ?? {};
+
+          return  withdrawArenaApplication(applicationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type WithdrawArenaApplicationMutationResult = NonNullable<Awaited<ReturnType<typeof withdrawArenaApplication>>>
+
+    export type WithdrawArenaApplicationMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Withdraw a PENDING audition (applicant only)
+ */
+export const useWithdrawArenaApplication = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawArenaApplication>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof withdrawArenaApplication>>,
+        TError,
+        {applicationId: string},
+        TContext
+      > => {
+      return useMutation(getWithdrawArenaApplicationMutationOptions(options));
+    }
+
+export const getCreateArenaApplicationReviewUrl = (applicationId: string,) => {
+
+
+
+
+  return `/api/video/arena/applications/${applicationId}/review`
+}
+
+/**
+ * Only the two participants of an ACCEPTED application, once each per hire. The Captain may review the hired applicant and the applicant may review the Captain.
+ * @summary Leave a mutual work review after a hire
+ */
+export const createArenaApplicationReview = async (applicationId: string,
+    arenaReviewInput: ArenaReviewInput, options?: Parameters<typeof customFetch>[1]): Promise<ArenaReview> => {
+
+  return customFetch<ArenaReview>(getCreateArenaApplicationReviewUrl(applicationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(arenaReviewInput)
+  }
+);}
+
+
+
+
+
+export const getCreateArenaApplicationReviewMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createArenaApplicationReview>>, TError,{applicationId: string;data: BodyType<ArenaReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createArenaApplicationReview>>, TError,{applicationId: string;data: BodyType<ArenaReviewInput>}, TContext> => {
+
+const mutationKey = ['createArenaApplicationReview'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createArenaApplicationReview>>, {applicationId: string;data: BodyType<ArenaReviewInput>}> = (props) => {
+          const {applicationId,data} = props ?? {};
+
+          return  createArenaApplicationReview(applicationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateArenaApplicationReviewMutationResult = NonNullable<Awaited<ReturnType<typeof createArenaApplicationReview>>>
+    export type CreateArenaApplicationReviewMutationBody = BodyType<ArenaReviewInput>
+    export type CreateArenaApplicationReviewMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Leave a mutual work review after a hire
+ */
+export const useCreateArenaApplicationReview = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createArenaApplicationReview>>, TError,{applicationId: string;data: BodyType<ArenaReviewInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createArenaApplicationReview>>,
+        TError,
+        {applicationId: string;data: BodyType<ArenaReviewInput>},
+        TContext
+      > => {
+      return useMutation(getCreateArenaApplicationReviewMutationOptions(options));
+    }
+
+export const getBlockArenaApplicantUrl = (applicationId: string,) => {
+
+
+
+
+  return `/api/video/arena/applications/${applicationId}/block`
+}
+
+/**
+ * Per-Captain anti-spam block. Does not change any existing application status; the blocked user gets 403 when applying to this Captain's posts.
+ * @summary Block an applicant from all of this Captain's posts
+ */
+export const blockArenaApplicant = async (applicationId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getBlockArenaApplicantUrl(applicationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getBlockArenaApplicantMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof blockArenaApplicant>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof blockArenaApplicant>>, TError,{applicationId: string}, TContext> => {
+
+const mutationKey = ['blockArenaApplicant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof blockArenaApplicant>>, {applicationId: string}> = (props) => {
+          const {applicationId} = props ?? {};
+
+          return  blockArenaApplicant(applicationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BlockArenaApplicantMutationResult = NonNullable<Awaited<ReturnType<typeof blockArenaApplicant>>>
+
+    export type BlockArenaApplicantMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Block an applicant from all of this Captain's posts
+ */
+export const useBlockArenaApplicant = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof blockArenaApplicant>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof blockArenaApplicant>>,
+        TError,
+        {applicationId: string},
+        TContext
+      > => {
+      return useMutation(getBlockArenaApplicantMutationOptions(options));
+    }
+
+export const getGetArenaApplicationFileUrl = (applicationId: string,
+    fileId: string,) => {
+
+
+
+
+  return `/api/video/arena/applications/${applicationId}/files/${fileId}`
+}
+
+/**
+ * Returns the document bytes. Applicant or Captain only.
+ * @summary Stream a stored audition document
+ */
+export const getArenaApplicationFile = async (applicationId: string,
+    fileId: string, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetArenaApplicationFileUrl(applicationId,fileId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetArenaApplicationFileQueryKey = (applicationId: string,
+    fileId: string,) => {
+    return [
+    `/api/video/arena/applications/${applicationId}/files/${fileId}`
+    ] as const;
+    }
+
+
+export const getGetArenaApplicationFileQueryOptions = <TData = Awaited<ReturnType<typeof getArenaApplicationFile>>, TError = ErrorType<ErrorResponse>>(applicationId: string,
+    fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArenaApplicationFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetArenaApplicationFileQueryKey(applicationId,fileId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getArenaApplicationFile>>> = ({ signal }) => getArenaApplicationFile(applicationId,fileId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: applicationId !== null && applicationId !== undefined && fileId !== null && fileId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getArenaApplicationFile>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetArenaApplicationFileQueryResult = NonNullable<Awaited<ReturnType<typeof getArenaApplicationFile>>>
+export type GetArenaApplicationFileQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Stream a stored audition document
+ */
+
+export function useGetArenaApplicationFile<TData = Awaited<ReturnType<typeof getArenaApplicationFile>>, TError = ErrorType<ErrorResponse>>(
+ applicationId: string,
+    fileId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getArenaApplicationFile>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetArenaApplicationFileQueryOptions(applicationId,fileId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListArenaReviewsUrl = (params: ListArenaReviewsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/video/arena/reviews?${stringifiedParams}` : `/api/video/arena/reviews`
+}
+
+/**
+ * Received reviews (rating + note + role + project context) are public profile data — the reputation surface of the Arena. Any signed-in creator can read the reviews a reviewee has received.
+ * @summary Read the public work reviews a profile has received
+ */
+export const listArenaReviews = async (params: ListArenaReviewsParams, options?: Parameters<typeof customFetch>[1]): Promise<ArenaReview[]> => {
+
+  return customFetch<ArenaReview[]>(getListArenaReviewsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListArenaReviewsQueryKey = (params?: ListArenaReviewsParams,) => {
+    return [
+    `/api/video/arena/reviews`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListArenaReviewsQueryOptions = <TData = Awaited<ReturnType<typeof listArenaReviews>>, TError = ErrorType<ErrorResponse>>(params: ListArenaReviewsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArenaReviews>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListArenaReviewsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listArenaReviews>>> = ({ signal }) => listArenaReviews(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listArenaReviews>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListArenaReviewsQueryResult = NonNullable<Awaited<ReturnType<typeof listArenaReviews>>>
+export type ListArenaReviewsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read the public work reviews a profile has received
+ */
+
+export function useListArenaReviews<TData = Awaited<ReturnType<typeof listArenaReviews>>, TError = ErrorType<ErrorResponse>>(
+ params: ListArenaReviewsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArenaReviews>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListArenaReviewsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getListArenaWatchesUrl = () => {
+
+
+
+
+  return `/api/video/arena/watches`
+}
+
+/**
+ * @summary List the caller's role watches
+ */
+export const listArenaWatches = async ( options?: Parameters<typeof customFetch>[1]): Promise<ArenaWatch[]> => {
+
+  return customFetch<ArenaWatch[]>(getListArenaWatchesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListArenaWatchesQueryKey = () => {
+    return [
+    `/api/video/arena/watches`
+    ] as const;
+    }
+
+
+export const getListArenaWatchesQueryOptions = <TData = Awaited<ReturnType<typeof listArenaWatches>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArenaWatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListArenaWatchesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listArenaWatches>>> = ({ signal }) => listArenaWatches({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listArenaWatches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListArenaWatchesQueryResult = NonNullable<Awaited<ReturnType<typeof listArenaWatches>>>
+export type ListArenaWatchesQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the caller's role watches
+ */
+
+export function useListArenaWatches<TData = Awaited<ReturnType<typeof listArenaWatches>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listArenaWatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListArenaWatchesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateArenaWatchUrl = () => {
+
+
+
+
+  return `/api/video/arena/watches`
+}
+
+/**
+ * @summary Watch a role (optionally on one channel)
+ */
+export const createArenaWatch = async (arenaWatchInput: ArenaWatchInput, options?: Parameters<typeof customFetch>[1]): Promise<ArenaWatch> => {
+
+  return customFetch<ArenaWatch>(getCreateArenaWatchUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(arenaWatchInput)
+  }
+);}
+
+
+
+
+
+export const getCreateArenaWatchMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createArenaWatch>>, TError,{data: BodyType<ArenaWatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createArenaWatch>>, TError,{data: BodyType<ArenaWatchInput>}, TContext> => {
+
+const mutationKey = ['createArenaWatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createArenaWatch>>, {data: BodyType<ArenaWatchInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createArenaWatch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateArenaWatchMutationResult = NonNullable<Awaited<ReturnType<typeof createArenaWatch>>>
+    export type CreateArenaWatchMutationBody = BodyType<ArenaWatchInput>
+    export type CreateArenaWatchMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Watch a role (optionally on one channel)
+ */
+export const useCreateArenaWatch = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createArenaWatch>>, TError,{data: BodyType<ArenaWatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createArenaWatch>>,
+        TError,
+        {data: BodyType<ArenaWatchInput>},
+        TContext
+      > => {
+      return useMutation(getCreateArenaWatchMutationOptions(options));
+    }
+
+export const getDeleteArenaWatchUrl = (watchId: string,) => {
+
+
+
+
+  return `/api/video/arena/watches/${watchId}`
+}
+
+/**
+ * @summary Stop watching (own watch only)
+ */
+export const deleteArenaWatch = async (watchId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteArenaWatchUrl(watchId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteArenaWatchMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArenaWatch>>, TError,{watchId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteArenaWatch>>, TError,{watchId: string}, TContext> => {
+
+const mutationKey = ['deleteArenaWatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteArenaWatch>>, {watchId: string}> = (props) => {
+          const {watchId} = props ?? {};
+
+          return  deleteArenaWatch(watchId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteArenaWatchMutationResult = NonNullable<Awaited<ReturnType<typeof deleteArenaWatch>>>
+
+    export type DeleteArenaWatchMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Stop watching (own watch only)
+ */
+export const useDeleteArenaWatch = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArenaWatch>>, TError,{watchId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteArenaWatch>>,
+        TError,
+        {watchId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteArenaWatchMutationOptions(options));
     }
 

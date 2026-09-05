@@ -47,8 +47,11 @@ router.post(
     const mimeType = typeof req.body?.mimeType === "string" ? req.body.mimeType : "video/mp4";
     const fileSize = Number(req.body?.fileSize);
 
+    // Presigning a proxy upload and recording the pending row is a WRITE:
+    // member-only. PUBLIC viewers and Arena applicants (kind 'public' /
+    // 'applicant') may read previews, never mint uploads.
     const access = await resolveProjectAccess(projectId, userId);
-    if (!access) {
+    if (access?.kind !== "member") {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -113,8 +116,10 @@ router.post(
     const projectId = String(req.params.projectId ?? "");
     const assetId = String(req.params.assetId ?? "");
 
+    // Flipping the pending proxy row to uploaded is a WRITE: member-only,
+    // like the upload-URL endpoint above (Arena applicants never write).
     const access = await resolveProjectAccess(projectId, userId);
-    if (!access) {
+    if (access?.kind !== "member") {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }

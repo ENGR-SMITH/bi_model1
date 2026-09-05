@@ -37,6 +37,14 @@ export const CREATORS_META: Record<string, NoticeKindMeta> = {
   video_released: { label: 'Lock released', tone: 'teal' },
   video_grant: { label: 'Download access', tone: 'accent' },
   video_grant_revoked: { label: 'Access revoked', tone: 'danger' },
+  // Arena (audition arena) categories — §9.4 of the Arena plan.
+  video_arena_applied: { label: 'New audition', tone: 'gold' },
+  video_arena_accepted: { label: 'Audition accepted', tone: 'teal' },
+  video_arena_rejected: { label: 'Audition declined', tone: 'danger' },
+  video_arena_closed: { label: 'Audition closed', tone: 'muted' },
+  video_arena_withdrawn: { label: 'Audition withdrawn', tone: 'muted' },
+  video_arena_watch: { label: 'Role alert', tone: 'accent' },
+  video_arena_reviewed: { label: 'New work review', tone: 'teal' },
 };
 
 /** Tailwind chip classes per tone. */

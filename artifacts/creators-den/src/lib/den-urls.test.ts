@@ -32,6 +32,12 @@ describe("denRouteInfo", () => {
     expect(denRouteInfo("/notifications")).toEqual({ mode: "other" });
     expect(denRouteInfo("/explore")).toEqual({ mode: "other" });
   });
+
+  it("classifies the Arena surfaces as other (no channel/project chrome)", () => {
+    expect(denRouteInfo("/arena")).toEqual({ mode: "other" });
+    expect(denRouteInfo("/arena/mine")).toEqual({ mode: "other" });
+    expect(denRouteInfo("/arena/posts/p_1")).toEqual({ mode: "other" });
+  });
 });
 
 describe("projectUrl", () => {

@@ -22,9 +22,11 @@ import {
   useCreateChannel,
   useDeleteChannel,
   useDisconnectChannelOauth,
+  useListArenaPosts,
   useListChannels,
   useListVideoProjects,
   useStartChannelOauth,
+  type ArenaPostSummary,
   type ChannelSummary,
 } from '@workspace/api-client-react';
 import { SectionEyebrow } from '@/components/shell';
@@ -590,6 +592,38 @@ function UnlinkedProjects() {
   );
 }
 
+// The doorway row under the channel wall: the public collaboration/audition
+// arena, with the live count of open roles across every channel.
+function ArenaDoorwayRow() {
+  const arena = useListArenaPosts();
+  const openCount = ((arena.data ?? []) as ArenaPostSummary[]).length;
+
+  return (
+    <Link
+      href="/arena"
+      className="arena-doorway"
+      data-testid="card-arena-doorway"
+    >
+      <span className="arena-doorway-copy">
+        <span className="eyebrow">Collaboration / Audition Arena</span>
+        <b className="arena-doorway-title">Audition for open roles on creators' channels.</b>
+        <span className="arena-doorway-sub">
+          Video, audio, script, and thumbnail seats — pitch with your work, preview the project read-only while
+          it's open, and get hired straight onto the team.
+        </span>
+      </span>
+      <span className="arena-doorway-cta">
+        <span className="den-tag accent" data-testid="arena-doorway-count">
+          {openCount} open {openCount === 1 ? 'audition' : 'auditions'}
+        </span>
+        <span className="arena-doorway-go">
+          Browse the arena <ArrowRight size={14} />
+        </span>
+      </span>
+    </Link>
+  );
+}
+
 export default function CmsPage() {
   const queryClient = useQueryClient();
   const channels = useListChannels();
@@ -656,6 +690,10 @@ export default function CmsPage() {
           )}
 
           <UnlinkedProjects />
+
+          {/* The collaboration / audition arena — the doorway to the public
+              role board, always one row under the channel wall. */}
+          <ArenaDoorwayRow />
         </div>
 
         <aside className="cms-split-side">

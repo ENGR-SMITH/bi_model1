@@ -7,6 +7,7 @@
  */
 import type { VideoAsset } from './videoAsset';
 import type { VideoMember } from './videoMember';
+import type { VideoProjectDetailViewerAccess } from './videoProjectDetailViewerAccess';
 import type { VideoProjectDetailVisibility } from './videoProjectDetailVisibility';
 
 export interface VideoProjectDetail {
@@ -22,6 +23,8 @@ export interface VideoProjectDetail {
   status: string;
   /** Whether the project appears on the owner's public profile */
   visibility: VideoProjectDetailVisibility;
+  /** How the signed-in caller may view this project. member = full member access; public = non-member read-only preview of a PUBLIC project; applicant = non-member read-only Arena preview while an open role post exists on this project; none = no access. Optional (not in required) so create/list payloads that reuse this schema and predate the field stay valid — when absent, fall back to the caller's role state. */
+  viewerAccess?: VideoProjectDetailViewerAccess;
   /** The viewer's roles in this project (e.g. ["VIDEO", "THUMBNAIL"]; always includes CAPTAIN for the owner) */
   myRoles: string[];
   members: VideoMember[];

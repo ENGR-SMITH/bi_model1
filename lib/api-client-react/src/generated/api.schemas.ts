@@ -1611,6 +1611,19 @@ export const VideoProjectDetailVisibility = {
   PRIVATE: 'PRIVATE',
 } as const;
 
+/**
+ * How the signed-in caller may view this project. member = full member access; public = non-member read-only preview of a PUBLIC project; applicant = non-member read-only Arena preview while an open role post exists on this project; none = no access. Optional (not in required) so create/list payloads that reuse this schema and predate the field stay valid — when absent, fall back to the caller's role state.
+ */
+export type VideoProjectDetailViewerAccess = typeof VideoProjectDetailViewerAccess[keyof typeof VideoProjectDetailViewerAccess];
+
+
+export const VideoProjectDetailViewerAccess = {
+  member: 'member',
+  public: 'public',
+  applicant: 'applicant',
+  none: 'none',
+} as const;
+
 export interface VideoMember {
   id: string;
   projectId: string;
@@ -1661,6 +1674,8 @@ export interface VideoProjectDetail {
   status: string;
   /** Whether the project appears on the owner's public profile */
   visibility: VideoProjectDetailVisibility;
+  /** How the signed-in caller may view this project. member = full member access; public = non-member read-only preview of a PUBLIC project; applicant = non-member read-only Arena preview while an open role post exists on this project; none = no access. Optional (not in required) so create/list payloads that reuse this schema and predate the field stay valid — when absent, fall back to the caller's role state. */
+  viewerAccess?: VideoProjectDetailViewerAccess;
   /** The viewer's roles in this project (e.g. ["VIDEO", "THUMBNAIL"]; always includes CAPTAIN for the owner) */
   myRoles: string[];
   members: VideoMember[];
@@ -2333,6 +2348,224 @@ export interface VideoNotification {
   createdAt: string;
 }
 
+/**
+ * The four content roles an arena post can recruit for
+ */
+export type ArenaRole = typeof ArenaRole[keyof typeof ArenaRole];
+
+
+export const ArenaRole = {
+  VIDEO: 'VIDEO',
+  AUDIO: 'AUDIO',
+  SCRIPT: 'SCRIPT',
+  THUMBNAIL: 'THUMBNAIL',
+} as const;
+
+export type ArenaPostStatus = typeof ArenaPostStatus[keyof typeof ArenaPostStatus];
+
+
+export const ArenaPostStatus = {
+  OPEN: 'OPEN',
+  FILLED: 'FILLED',
+  CLOSED: 'CLOSED',
+} as const;
+
+export type ArenaApplicationStatus = typeof ArenaApplicationStatus[keyof typeof ArenaApplicationStatus];
+
+
+export const ArenaApplicationStatus = {
+  PENDING: 'PENDING',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
+  WITHDRAWN: 'WITHDRAWN',
+} as const;
+
+/**
+ * The caller's own application state on this post
+ */
+export type ArenaPostSummaryMyApplication = typeof ArenaPostSummaryMyApplication[keyof typeof ArenaPostSummaryMyApplication];
+
+
+export const ArenaPostSummaryMyApplication = {
+  none: 'none',
+  pending: 'pending',
+  accepted: 'accepted',
+  rejected: 'rejected',
+} as const;
+
+/**
+ * An open role post as shown on the Arena board / lists
+ */
+export interface ArenaPostSummary {
+  id: string;
+  channelId: string;
+  projectId: string;
+  role: ArenaRole;
+  pitch: string;
+  status: ArenaPostStatus;
+  postedBy: string;
+  posterName: string;
+  /** @nullable */
+  posterImageUrl: string | null;
+  channelName: string;
+  /** @nullable */
+  channelAvatarUrl: string | null;
+  projectName: string;
+  projectStatus: string;
+  /** Live number of PENDING auditions on this post (the current applicants) */
+  applicantCount: number;
+  /** The caller's own application state on this post */
+  myApplication: ArenaPostSummaryMyApplication;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Public profile of the creator who filled a role — present on the post once it is FILLED
+ */
+export interface ArenaHireProfile {
+  id: string;
+  name: string;
+  /** @nullable */
+  imageUrl: string | null;
+}
+
+export type ArenaPostDetail = ArenaPostSummary & ({
+  /** All applications ever received on this post (Captain only; 0 otherwise) */
+  totalApplications: number;
+  /**
+     * The accepted hire's public profile once the post is FILLED; null while it is OPEN or CLOSED
+     * @nullable
+     */
+  filledBy: ArenaHireProfile | null;
+});
+
+/**
+ * Publish an open role on one of the Captain's channel projects
+ */
+export interface ArenaPostInput {
+  projectId: string;
+  role: ArenaRole;
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  pitch: string;
+}
+
+export type ArenaPostUpdateStatus = typeof ArenaPostUpdateStatus[keyof typeof ArenaPostUpdateStatus];
+
+
+export const ArenaPostUpdateStatus = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+} as const;
+
+/**
+ * Close/reopen a post or edit its pitch while OPEN (Captain only)
+ */
+export interface ArenaPostUpdate {
+  status?: ArenaPostUpdateStatus;
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  pitch?: string;
+}
+
+export interface ArenaApplicationFile {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface ArenaApplication {
+  id: string;
+  postId: string;
+  projectId: string;
+  role: ArenaRole;
+  applicantId: string;
+  /** @nullable */
+  applicantName: string | null;
+  /** @nullable */
+  applicantImageUrl: string | null;
+  message: string;
+  status: ArenaApplicationStatus;
+  /** @nullable */
+  decidedBy: string | null;
+  /** @nullable */
+  decidedAt: string | null;
+  files: ArenaApplicationFile[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Multipart audition — a message plus up to 3 supporting documents
+ */
+export interface ArenaApplicationInput {
+  /**
+     * @minLength 20
+     * @maxLength 2000
+     */
+  message: string;
+  /** @maxItems 3 */
+  files?: Blob[];
+}
+
+/**
+ * A mutual work review between the Captain and the hired applicant
+ */
+export interface ArenaReviewInput {
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+  /** @maxLength 500 */
+  note: string;
+}
+
+/**
+ * A mutual work review between the Captain and the hired applicant
+ */
+export interface ArenaReview {
+  id: string;
+  applicationId: string;
+  projectId: string;
+  role: ArenaRole;
+  reviewerId: string;
+  /** @nullable */
+  reviewerName: string | null;
+  /** @nullable */
+  reviewerImageUrl: string | null;
+  revieweeId: string;
+  rating: number;
+  note: string;
+  /** @nullable */
+  projectName: string | null;
+  createdAt: string;
+}
+
+/**
+ * Watch a role — across the whole Arena, or scoped to one channel
+ */
+export interface ArenaWatchInput {
+  role: ArenaRole;
+  channelId?: string;
+}
+
+export interface ArenaWatch {
+  id: string;
+  role: ArenaRole;
+  /** @nullable */
+  channelId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type GenreQueryParameter = string;
 
 export type UnitQueryParameter = string;
@@ -2480,5 +2713,36 @@ export type ListVideoActivityParams = {
  * Optional leg (stage) filter — returns only that leg's events
  */
 leg?: VideoActivityLegQueryParameter;
+};
+
+export type ListArenaPostsParams = {
+role?: ArenaRole;
+channelId?: string;
+projectId?: string;
+sort?: ListArenaPostsSort;
+/**
+ * Order posts from Captains the caller follows first
+ */
+followed?: boolean;
+/**
+ * Return only the caller's own posts
+ */
+mine?: boolean;
+};
+
+export type ListArenaPostsSort = typeof ListArenaPostsSort[keyof typeof ListArenaPostsSort];
+
+
+export const ListArenaPostsSort = {
+  newest: 'newest',
+  most_applied: 'most_applied',
+} as const;
+
+export type ListArenaReviewsParams = {
+/**
+ * The reviewee whose received reviews to list
+ * @minLength 1
+ */
+userId: string;
 };
 

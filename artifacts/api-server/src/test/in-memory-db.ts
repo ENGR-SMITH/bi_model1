@@ -152,6 +152,111 @@ export const tandemChannelAlertsTable = sqliteTable(
   }),
 );
 
+// ---- Creator Den Arena (public collaboration/audition) — mirrors
+// lib/db/src/schema/arena.ts. jsonb → TEXT; timestamps → INTEGER mode
+// "timestamp"; pg bigint → INTEGER. Partial unique indexes are supported by
+// SQLite (CREATE UNIQUE INDEX … WHERE), same as the seed_applications mirror.
+
+export const tandemArenaPostsTable = sqliteTable(
+  "tandem_arena_posts",
+  {
+    id: text("id").primaryKey(),
+    channelId: text("channel_id").notNull(),
+    projectId: text("project_id").notNull(),
+    role: text("role").notNull(),
+    pitch: text("pitch").notNull(),
+    status: text("status").notNull().default("OPEN"),
+    postedBy: text("posted_by").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    // One OPEN post per (project, role) — mirrors the pg partial unique index.
+    openProjectRoleUnique: uniqueIndex("tandem_arena_post_open_project_role_unique")
+      .on(table.projectId, table.role)
+      .where(sql`${table.status} = 'OPEN'`),
+  }),
+);
+
+export const tandemArenaApplicationsTable = sqliteTable(
+  "tandem_arena_applications",
+  {
+    id: text("id").primaryKey(),
+    postId: text("post_id").notNull(),
+    projectId: text("project_id").notNull(),
+    role: text("role").notNull(),
+    applicantId: text("applicant_id").notNull(),
+    message: text("message").notNull(),
+    status: text("status").notNull().default("PENDING"),
+    decidedBy: text("decided_by"),
+    decidedAt: integer("decided_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    // One PENDING audition per (post, applicant) — mirrors the pg partial index.
+    pendingPostApplicantUnique: uniqueIndex("tandem_arena_application_pending_post_applicant_unique")
+      .on(table.postId, table.applicantId)
+      .where(sql`${table.status} = 'PENDING'`),
+  }),
+);
+
+export const tandemArenaApplicationFilesTable = sqliteTable("tandem_arena_application_files", {
+  id: text("id").primaryKey(),
+  applicationId: text("application_id").notNull(),
+  fileName: text("file_name").notNull(),
+  mimeType: text("mime_type").notNull().default("application/octet-stream"),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  storageKey: text("storage_key").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const tandemArenaWatchesTable = sqliteTable("tandem_arena_watches", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  role: text("role").notNull(),
+  channelId: text("channel_id"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+export const tandemArenaReviewsTable = sqliteTable(
+  "tandem_arena_reviews",
+  {
+    id: text("id").primaryKey(),
+    applicationId: text("application_id").notNull(),
+    projectId: text("project_id").notNull(),
+    role: text("role").notNull(),
+    reviewerId: text("reviewer_id").notNull(),
+    revieweeId: text("reviewee_id").notNull(),
+    rating: integer("rating").notNull(),
+    note: text("note").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    applicationReviewerUnique: unique("tandem_arena_review_application_reviewer_unique").on(
+      table.applicationId,
+      table.reviewerId,
+    ),
+  }),
+);
+
+export const tandemArenaBlocksTable = sqliteTable(
+  "tandem_arena_blocks",
+  {
+    id: text("id").primaryKey(),
+    captainId: text("captain_id").notNull(),
+    applicantId: text("applicant_id").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    captainApplicantUnique: unique("tandem_arena_block_captain_applicant_unique").on(
+      table.captainId,
+      table.applicantId,
+    ),
+  }),
+);
+
 export const tandemVideoStorageSnapshotsTable = sqliteTable(
   "tandem_video_storage_snapshots",
   {
@@ -1075,6 +1180,52 @@ export async function buildInMemoryDb() {
       audio_url TEXT, audio_name TEXT, audio_duration_ms INTEGER,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE tandem_arena_posts (
+      id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
+      project_id TEXT NOT NULL, role TEXT NOT NULL,
+      pitch TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN',
+      posted_by TEXT NOT NULL,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX tandem_arena_post_open_project_role_unique
+      ON tandem_arena_posts (project_id, role)
+      WHERE status = 'OPEN';
+    CREATE TABLE tandem_arena_applications (
+      id TEXT PRIMARY KEY NOT NULL, post_id TEXT NOT NULL,
+      project_id TEXT NOT NULL, role TEXT NOT NULL,
+      applicant_id TEXT NOT NULL, message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      decided_by TEXT, decided_at INTEGER,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE UNIQUE INDEX tandem_arena_application_pending_post_applicant_unique
+      ON tandem_arena_applications (post_id, applicant_id)
+      WHERE status = 'PENDING';
+    CREATE TABLE tandem_arena_application_files (
+      id TEXT PRIMARY KEY NOT NULL, application_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+      size_bytes INTEGER NOT NULL DEFAULT 0, storage_key TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_arena_watches (
+      id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
+      role TEXT NOT NULL, channel_id TEXT,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_arena_reviews (
+      id TEXT PRIMARY KEY NOT NULL, application_id TEXT NOT NULL,
+      project_id TEXT NOT NULL, role TEXT NOT NULL,
+      reviewer_id TEXT NOT NULL, reviewee_id TEXT NOT NULL,
+      rating INTEGER NOT NULL, note TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE (application_id, reviewer_id)
+    );
+    CREATE TABLE tandem_arena_blocks (
+      id TEXT PRIMARY KEY NOT NULL, captain_id TEXT NOT NULL,
+      applicant_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+      UNIQUE (captain_id, applicant_id)
+    );
   `);
   const db = drizzle(database);
 
@@ -1149,6 +1300,12 @@ export async function buildInMemoryDb() {
     tandemPromoCodesTable,
     tandemSubscriptionsTable,
     tandemVideoStorageSnapshotsTable,
+    tandemArenaPostsTable,
+    tandemArenaApplicationsTable,
+    tandemArenaApplicationFilesTable,
+    tandemArenaWatchesTable,
+    tandemArenaReviewsTable,
+    tandemArenaBlocksTable,
   };
   return { db, tables, exports: { db, ...tables } };
 }

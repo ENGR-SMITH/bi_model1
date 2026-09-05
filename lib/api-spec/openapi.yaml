@@ -26,6 +26,8 @@ tags:
     description: Pre-recorded video production projects (the 4-leg relay)
   - name: channels
     description: Creator Den multi-channel workspaces (agency/MCN channel grid, channel roster, channel-scoped projects)
+  - name: arena
+    description: Creator Den Collaboration / Audition Arena — public role posts, applications, role watch alerts, work reviews, and Captain blocks
 paths:
   /healthz:
     get:
@@ -3933,6 +3935,558 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/posts:
+    get:
+      operationId: listArenaPosts
+      tags: [arena]
+      summary: List open role posts across the Arena
+      description: OPEN posts across the platform with the poster/channel/project summaries, the live applicant count, and the caller's own application state. ?mine=1 returns the caller's own posts (Captain) with application counts for the management view.
+      parameters:
+        - name: role
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/ArenaRole" }
+        - name: channelId
+          in: query
+          required: false
+          schema: { type: string }
+        - name: projectId
+          in: query
+          required: false
+          schema: { type: string }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [newest, most_applied] }
+        - name: followed
+          in: query
+          required: false
+          description: Order posts from Captains the caller follows first
+          schema: { type: boolean }
+        - name: mine
+          in: query
+          required: false
+          description: Return only the caller's own posts
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Role posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ArenaPostSummary" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createArenaPost
+      tags: [arena]
+      summary: Publish an open role on a channel project (Captain only)
+      description: The caller must own the project and its channel; only one OPEN post per (project, role).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArenaPostInput" }
+      responses:
+        "201":
+          description: Published role post
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaPostDetail" }
+        "400":
+          description: Invalid post
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not the project Captain / channel owner
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: An OPEN post for that role already exists on the project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/posts/{postId}:
+    get:
+      operationId: getArenaPost
+      tags: [arena]
+      summary: Read a role post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Role post detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaPostDetail" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Post not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    patch:
+      operationId: updateArenaPost
+      tags: [arena]
+      summary: Close/reopen a role post or edit its pitch (Captain only)
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArenaPostUpdate" }
+      responses:
+        "200":
+          description: Updated role post
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaPostDetail" }
+        "400":
+          description: Invalid update
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not the Captain
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Post not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/posts/{postId}/applications:
+    post:
+      operationId: createArenaApplication
+      tags: [arena]
+      summary: Audition for an open role (message + up to 3 documents)
+      description: Multipart. One PENDING audition per user per post; the per-week apply cap and per-Captain blocks are enforced server-side.
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/ArenaApplicationInput" }
+      responses:
+        "201":
+          description: Audition submitted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaApplication" }
+        "400":
+          description: Invalid application
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Own post, already a member, or blocked by this Captain
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Post not found or not OPEN
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Already auditioning for this post
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "429":
+          description: Per-week application cap reached
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    get:
+      operationId: listArenaPostApplications
+      tags: [arena]
+      summary: List the auditions on a post (Captain only)
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Auditions (any status, newest first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ArenaApplication" }
+        "403":
+          description: Not the Captain
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Post not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/applications/mine:
+    get:
+      operationId: listMyArenaApplications
+      tags: [arena]
+      summary: List the caller's own auditions (My Auditions)
+      responses:
+        "200":
+          description: The caller's applications across every post
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ArenaApplication" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/applications/{applicationId}:
+    get:
+      operationId: getArenaApplication
+      tags: [arena]
+      summary: Read one audition (the applicant themself or the Captain)
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Audition detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaApplication" }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Application not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: acceptArenaApplication
+      tags: [arena]
+      summary: Accept an audition (Captain only)
+      description: Transactionally marks the application ACCEPTED, fills the post, adds the applicant as a member holding the role, and auto-declines the remaining PENDING auditions.
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Accepted audition
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaApplication" }
+        "403":
+          description: Not the Captain
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Application not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Application is not PENDING or the post already filled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/applications/{applicationId}/reject:
+    post:
+      operationId: rejectArenaApplication
+      tags: [arena]
+      summary: Reject an audition (Captain only)
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Rejected audition
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaApplication" }
+        "403":
+          description: Not the Captain
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Application not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Application is not PENDING
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/applications/{applicationId}/withdraw:
+    post:
+      operationId: withdrawArenaApplication
+      tags: [arena]
+      summary: Withdraw a PENDING audition (applicant only)
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Withdrawn audition
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaApplication" }
+        "403":
+          description: Not the applicant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Application not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Application is not PENDING
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/applications/{applicationId}/review:
+    post:
+      operationId: createArenaApplicationReview
+      tags: [arena]
+      summary: Leave a mutual work review after a hire
+      description: Only the two participants of an ACCEPTED application, once each per hire. The Captain may review the hired applicant and the applicant may review the Captain.
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArenaReviewInput" }
+      responses:
+        "201":
+          description: Created review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaReview" }
+        "400":
+          description: Invalid review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not a participant of an ACCEPTED hire
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Application not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Already reviewed this hire
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/applications/{applicationId}/block:
+    post:
+      operationId: blockArenaApplicant
+      tags: [arena]
+      summary: Block an applicant from all of this Captain's posts
+      description: Per-Captain anti-spam block. Does not change any existing application status; the blocked user gets 403 when applying to this Captain's posts.
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "204":
+          description: Blocked
+        "403":
+          description: Not the Captain
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Application not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/applications/{applicationId}/files/{fileId}:
+    get:
+      operationId: getArenaApplicationFile
+      tags: [arena]
+      summary: Stream a stored audition document
+      description: Returns the document bytes. Applicant or Captain only.
+      parameters:
+        - name: applicationId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: The document bytes
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "403":
+          description: Not allowed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: File not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/reviews:
+    get:
+      operationId: listArenaReviews
+      tags: [arena]
+      summary: Read the public work reviews a profile has received
+      description: Received reviews (rating + note + role + project context) are public profile data — the reputation surface of the Arena. Any signed-in creator can read the reviews a reviewee has received.
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          description: The reviewee whose received reviews to list
+          schema: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: Received reviews, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ArenaReview" }
+        "400":
+          description: Missing reviewee id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/watches:
+    get:
+      operationId: listArenaWatches
+      tags: [arena]
+      summary: List the caller's role watches
+      responses:
+        "200":
+          description: The caller's watches
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ArenaWatch" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createArenaWatch
+      tags: [arena]
+      summary: Watch a role (optionally on one channel)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ArenaWatchInput" }
+      responses:
+        "201":
+          description: Created watch
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ArenaWatch" }
+        "400":
+          description: Invalid watch
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Already watching that role (and channel)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /video/arena/watches/{watchId}:
+    delete:
+      operationId: deleteArenaWatch
+      tags: [arena]
+      summary: Stop watching (own watch only)
+      parameters:
+        - name: watchId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Not the watcher
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Watch not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 components:
   parameters:
     SeedId:
@@ -5348,6 +5902,15 @@ components:
           type: string
           enum: [PUBLIC, PRIVATE]
           description: Whether the project appears on the owner's public profile
+        viewerAccess:
+          type: string
+          enum: [member, public, applicant, none]
+          description: >-
+            How the signed-in caller may view this project. member = full member access;
+            public = non-member read-only preview of a PUBLIC project; applicant = non-member
+            read-only Arena preview while an open role post exists on this project; none = no
+            access. Optional (not in required) so create/list payloads that reuse this schema
+            and predate the field stay valid — when absent, fall back to the caller's role state.
         myRoles:
           type: array
           items: { type: string }
@@ -5873,3 +6436,172 @@ components:
         readAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
       required: [id, recipientId, category, title, body, deepLink, resourceId, readAt, createdAt]
+    ArenaRole:
+      type: string
+      enum: [VIDEO, AUDIO, SCRIPT, THUMBNAIL]
+      description: The four content roles an arena post can recruit for
+    ArenaPostStatus:
+      type: string
+      enum: [OPEN, FILLED, CLOSED]
+    ArenaApplicationStatus:
+      type: string
+      enum: [PENDING, ACCEPTED, REJECTED, WITHDRAWN]
+    ArenaPostSummary:
+      type: object
+      description: An open role post as shown on the Arena board / lists
+      properties:
+        id: { type: string }
+        channelId: { type: string }
+        projectId: { type: string }
+        role: { $ref: "#/components/schemas/ArenaRole" }
+        pitch: { type: string }
+        status: { $ref: "#/components/schemas/ArenaPostStatus" }
+        postedBy: { type: string }
+        posterName: { type: string }
+        posterImageUrl: { type: ["string", "null"] }
+        channelName: { type: string }
+        channelAvatarUrl: { type: ["string", "null"] }
+        projectName: { type: string }
+        projectStatus: { type: string }
+        applicantCount: { type: integer, description: Live number of PENDING auditions on this post (the current applicants) }
+        myApplication:
+          type: string
+          enum: [none, pending, accepted, rejected]
+          description: The caller's own application state on this post
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, channelId, projectId, role, pitch, status, postedBy, posterName, posterImageUrl, channelName, channelAvatarUrl, projectName, projectStatus, applicantCount, myApplication, createdAt, updatedAt]
+    ArenaHireProfile:
+      type: object
+      description: Public profile of the creator who filled a role — present on the post once it is FILLED
+      properties:
+        id: { type: string }
+        name: { type: string }
+        imageUrl: { type: ["string", "null"] }
+      required: [id, name, imageUrl]
+    ArenaPostDetail:
+      allOf:
+        - $ref: "#/components/schemas/ArenaPostSummary"
+        - type: object
+          description: Post detail (Captain view adds the total application history)
+          properties:
+            totalApplications:
+              type: integer
+              description: All applications ever received on this post (Captain only; 0 otherwise)
+            filledBy:
+              type: ["object", "null"]
+              description: The accepted hire's public profile once the post is FILLED; null while it is OPEN or CLOSED
+              allOf:
+                - $ref: "#/components/schemas/ArenaHireProfile"
+          required: [totalApplications, filledBy]
+    ArenaPostInput:
+      type: object
+      description: Publish an open role on one of the Captain's channel projects
+      properties:
+        projectId: { type: string }
+        role: { $ref: "#/components/schemas/ArenaRole" }
+        pitch:
+          type: string
+          minLength: 10
+          maxLength: 2000
+      required: [projectId, role, pitch]
+    ArenaPostUpdate:
+      type: object
+      description: Close/reopen a post or edit its pitch while OPEN (Captain only)
+      properties:
+        status:
+          type: string
+          enum: [OPEN, CLOSED]
+        pitch:
+          type: string
+          minLength: 10
+          maxLength: 2000
+    ArenaApplicationFile:
+      type: object
+      properties:
+        id: { type: string }
+        fileName: { type: string }
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        createdAt: { type: string, format: date-time }
+      required: [id, fileName, mimeType, sizeBytes, createdAt]
+    ArenaApplication:
+      type: object
+      properties:
+        id: { type: string }
+        postId: { type: string }
+        projectId: { type: string }
+        role: { $ref: "#/components/schemas/ArenaRole" }
+        applicantId: { type: string }
+        applicantName: { type: ["string", "null"] }
+        applicantImageUrl: { type: ["string", "null"] }
+        message: { type: string }
+        status: { $ref: "#/components/schemas/ArenaApplicationStatus" }
+        decidedBy: { type: ["string", "null"] }
+        decidedAt: { type: ["string", "null"], format: date-time }
+        files:
+          type: array
+          items: { $ref: "#/components/schemas/ArenaApplicationFile" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, postId, projectId, role, applicantId, applicantName, applicantImageUrl, message, status, decidedBy, decidedAt, files, createdAt, updatedAt]
+    ArenaApplicationInput:
+      type: object
+      description: Multipart audition — a message plus up to 3 supporting documents
+      properties:
+        message:
+          type: string
+          minLength: 20
+          maxLength: 2000
+        files:
+          type: array
+          maxItems: 3
+          items:
+            type: string
+            format: binary
+      required: [message]
+    ArenaReviewInput:
+      type: object
+      description: A mutual work review between the Captain and the hired applicant
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        note:
+          type: string
+          maxLength: 500
+      required: [rating, note]
+    ArenaReview:
+      type: object
+      description: A mutual work review between the Captain and the hired applicant
+      properties:
+        id: { type: string }
+        applicationId: { type: string }
+        projectId: { type: string }
+        role: { $ref: "#/components/schemas/ArenaRole" }
+        reviewerId: { type: string }
+        reviewerName: { type: ["string", "null"] }
+        reviewerImageUrl: { type: ["string", "null"] }
+        revieweeId: { type: string }
+        rating: { type: integer }
+        note: { type: string }
+        projectName: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, applicationId, projectId, role, reviewerId, reviewerName, reviewerImageUrl, revieweeId, rating, note, projectName, createdAt]
+    ArenaWatchInput:
+      type: object
+      description: Watch a role — across the whole Arena, or scoped to one channel
+      properties:
+        role: { $ref: "#/components/schemas/ArenaRole" }
+        channelId: { type: string }
+      required: [role]
+    ArenaWatch:
+      type: object
+      properties:
+        id: { type: string }
+        role: { $ref: "#/components/schemas/ArenaRole" }
+        channelId: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, role, channelId, createdAt, updatedAt]
