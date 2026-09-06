@@ -397,25 +397,20 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           </p>
         </div>
 
-        {/* Coupon detach footer — barcode + expiry, so the pass reads like a
-            printed coupon you tear off along the dashed line. */}
-        <div className="flex items-center gap-4 border-t border-white/10 bg-white/[.02] px-7 py-4">
-          <div className="flex items-center gap-3">
-            <span className="h-8 w-5 -rotate-90 rounded-md border border-[#60a5fa]/60" />
-            <span className="font-mono-ui text-[8px] uppercase tracking-[0.18em] text-[#60a5fa]/80">Tear</span>
+        {/* Pass specs — what the ticket covers, replacing the old coupon stub. */}
+        <div className="relative grid grid-cols-3 gap-3 border-t border-white/10 bg-white/[.02] px-7 py-4">
+          <div>
+            <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Pass length</p>
+            <p className="mt-1 text-sm font-bold text-white">{weeks} weeks</p>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Tandem access pass · {weeks} weeks</p>
-            <div className="mt-2 flex h-8 items-end gap-[2px]">
-              {Array.from({ length: 26 }).map((_, i) => (
-                <span key={i} className="rounded-[1px] bg-zinc-600" style={{ width: '2px', height: `${34 + ((i * 47) % 46)}%` }} />
-              ))}
-            </div>
+          <div className="border-l border-white/10 pl-3">
+            <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Unlocks</p>
+            <p className="mt-1 text-sm font-bold leading-tight text-white">{name}</p>
           </div>
-          <div className="text-right">
-            <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Valid until</p>
-            <p className="mt-1 font-mono-ui text-sm font-medium text-white">
-              {new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+          <div className="border-l border-white/10 pl-3">
+            <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Payment</p>
+            <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-white">
+              <PiLockKeyDuotone className="h-3 w-3 shrink-0 text-[#34d399]" /> Paystack
             </p>
           </div>
         </div>
