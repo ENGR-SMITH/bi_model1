@@ -240,10 +240,22 @@ function PostCard({ post }: { post: ArenaPostSummary }) {
       <span className="arena-card-pitch">{post.pitch}</span>
 
       <span className="arena-card-foot">
-        <span className="arena-card-poster">
-          {post.posterImageUrl ? <img src={post.posterImageUrl} alt="" /> : <i>{post.posterName.slice(0, 1)}</i>}
-          {post.posterName}
+        {/* Overlapping avatar stack: the poster first, then every distinct
+            creator who has applied — capped with a +N overflow chip. */}
+        <span className="arena-card-avatars" aria-hidden>
+          <span className="arena-card-avatar-ring">
+            {post.posterImageUrl ? <img src={post.posterImageUrl} alt="" /> : <i>{post.posterName.slice(0, 1)}</i>}
+          </span>
+          {post.applicants.slice(0, 3).map((applicant) => (
+            <span key={applicant.id} className="arena-card-avatar-ring">
+              {applicant.imageUrl ? <img src={applicant.imageUrl} alt="" /> : <i>{(applicant.name ?? 'C').slice(0, 1)}</i>}
+            </span>
+          ))}
+          {post.applicants.length > 3 && (
+            <span className="arena-card-avatar-more">+{post.applicants.length - 3}</span>
+          )}
         </span>
+        <span className="arena-card-poster">{post.posterName}</span>
         <span className="arena-card-time">{timeAgo(post.createdAt)}</span>
         <span className="arena-card-arrow">
           Open audition <ArrowRight size={13} />

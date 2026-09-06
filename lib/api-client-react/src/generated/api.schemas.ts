@@ -2414,6 +2414,8 @@ export interface ArenaPostSummary {
   projectStatus: string;
   /** Live number of PENDING auditions on this post (the current applicants) */
   applicantCount: number;
+  /** Distinct creators who applied to this post, most recent application first (capped) — the avatar stack on the board cards */
+  applicants: ArenaHireProfile[];
   /** The caller's own application state on this post */
   myApplication: ArenaPostSummaryMyApplication;
   createdAt: string;
