@@ -144,8 +144,8 @@
 .page-header h1 { margin: 9px 0 7px; font: 700 clamp(30px, 4vw, 43px) var(--app-font-serif); letter-spacing: -.045em; }
 .page-header p { color: hsl(var(--muted-foreground)); margin: 0; font-size: 13px; max-width: 560px; line-height: 1.6; }
 .primary-btn, .secondary-btn, .text-btn, .link-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 6px; transition: transform .18s, background .18s, border-color .18s; }
-.primary-btn { border: 1px solid hsl(var(--primary)); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding: 10px 15px; font-size: 12px; font-weight: 700; white-space: nowrap; }
-.secondary-btn { border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); padding: 10px 14px; font-size: 12px; font-weight: 600; }
+.primary-btn { border: 1px solid hsl(var(--primary)); background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); padding: 10px 15px; font-size: 12px; font-weight: 700; white-space: nowrap; text-decoration: none; }
+.secondary-btn { border: 1px solid hsl(var(--border)); background: hsl(var(--card)); color: hsl(var(--foreground)); padding: 10px 14px; font-size: 12px; font-weight: 600; text-decoration: none; }
 .text-btn, .link-btn { border: 0; background: transparent; color: hsl(var(--accent)); padding: 5px 0; font-size: 12px; font-weight: 600; }
 .link-btn { text-decoration: underline; text-underline-offset: 3px; }
 .primary-btn:hover, .secondary-btn:hover { transform: translateY(-1px); }

@@ -6046,6 +6046,7 @@ select optgroup {
 .arena-app-row {
   display: flex;
   gap: 12px;
+  align-items: flex-start;
   padding: 13px 15px;
   border: 1px solid hsl(var(--border));
   border-radius: 11px;
@@ -6259,9 +6260,9 @@ select optgroup {
 .role-tabs .arena-watch-bell.is-watching { color: hsl(var(--accent)); background: hsl(var(--accent) / .14); }
 
 /* ---- Post hero action grid: the live count (with the Captain's total
-   received tag beneath) | Preview project, then Share (blue) | Watch
-   notification, then the Captain's Close | Remove — one 3-row × 2-column
-   grid where every cell shares the same width. ---- */
+   received tag beneath) | Watch notification, then Share (blue) | Preview
+   project, then the Captain's Close | Remove — one 3-row × 2-column grid
+   where every cell shares the same width. ---- */
 .arena-hero-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
