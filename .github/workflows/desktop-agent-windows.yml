@@ -35,6 +35,20 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Same stamping as build-desktop-agent.yml: electron-updater ignores
+      # builds whose version isn't newer, and the artifact filename embeds the
+      # version, so every run must produce a higher one.
+      - name: Stamp build version from run number
+        run: |
+          node -e "
+            const fs = require('fs');
+            const file = 'artifacts/desktop-agent/package.json';
+            const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+            pkg.version = '0.0.' + (100 + Number(process.env.GITHUB_RUN_NUMBER || 0));
+            fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');
+            console.log('stamped build version →', pkg.version);
+          "
+
       - name: Download FFmpeg for bundling
         run: pnpm --filter @workspace/scripts exec tsx src/download-ffmpeg.ts
 
@@ -45,4 +59,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tandem-desktop-agent-windows
-          path: artifacts/desktop-agent/dist-bundle/Tandem Desktop Agent Setup 0.0.1.exe
+          path: artifacts/desktop-agent/dist-bundle/*.exe

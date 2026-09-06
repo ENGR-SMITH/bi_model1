@@ -1,4 +1,7 @@
 import express, { type Express } from "express";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
@@ -51,6 +54,25 @@ if (process.env.CLERK_SECRET_KEY) {
 // while still populating req.body for every other route.
 app.use(express.json({ verify: (req, _res, buf) => { (req as { rawBody?: Buffer }).rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
+
+// Desktop-agent release feed (latest.yml + installer + blockmap). Only
+// mounted when the agent has been built on this machine (electron-builder
+// writes to ../desktop-agent/dist-bundle), so a locally installed agent can
+// update from this API server — e.g. through a devtunnel to port 3000 while
+// testing. Skipped entirely when the folder isn't there (CI / prod hosts).
+const agentDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../desktop-agent/dist-bundle");
+if (fs.existsSync(agentDist)) {
+  app.use(
+    "/desktop-agent",
+    express.static(agentDist, {
+      index: false,
+      dotfiles: "ignore",
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith(".yml")) res.setHeader("Content-Type", "text/yaml; charset=utf-8");
+      },
+    }),
+  );
+}
 
 app.use("/api", router);
 

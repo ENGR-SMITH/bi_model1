@@ -39,6 +39,24 @@ jobs:
       - name: Install workspace deps (with agent)
         run: pnpm install
 
+      # electron-updater only offers a release whose version is strictly higher
+      # than the installed app's, and package.json has been pinned at 0.0.1
+      # since the agent's first build — so every rebuild was "the same version"
+      # and was never offered as an update. Stamp a monotonic version from the
+      # GitHub run number (offset above the shipped 0.0.1) right before
+      # packaging so each run yields a version the installed app will accept.
+      - name: Stamp build version from run number
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const file = 'artifacts/desktop-agent/package.json';
+            const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+            pkg.version = '0.0.' + (100 + Number(process.env.GITHUB_RUN_NUMBER || 0));
+            fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');
+            console.log('stamped build version →', pkg.version);
+          "
+
       - name: Download FFmpeg for bundling
         run: pnpm --filter @workspace/scripts exec tsx src/download-ffmpeg.ts
 
