@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useLocation } from 'wouter';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useSearch } from 'wouter';
 import { useUser } from '@clerk/react';
 import { ArrowRight, CheckCircle2, Clapperboard, Megaphone, Users } from 'lucide-react';
 import {
@@ -30,12 +30,32 @@ const ROLE_FILTERS: Array<{ key: 'ALL' | ArenaRole }> = [
   { key: 'THUMBNAIL' },
 ];
 
+const ARENA_ROLE_KEYS = new Set<string>(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL']);
+
 export default function ArenaBoardPage() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { user } = useUser();
-  const [roleFilter, setRoleFilter] = useState<'ALL' | ArenaRole>('ALL');
+  // Deep-linkable role filter: /arena?role=VIDEO (the Tandem category cards)
+  // opens the board pre-filtered, and picking a chip keeps the URL in sync.
+  const urlRole = new URLSearchParams(search).get('role');
+  const [roleFilter, setRoleFilter] = useState<'ALL' | ArenaRole>(
+    urlRole && ARENA_ROLE_KEYS.has(urlRole) ? (urlRole as ArenaRole) : 'ALL',
+  );
   const [sort, setSort] = useState<ListArenaPostsSort>('newest');
   const [composerOpen, setComposerOpen] = useState(false);
+
+  // The URL is the source of truth — browser back/forward across filters
+  // stays in sync, not just deep links into the board.
+  useEffect(() => {
+    const role = new URLSearchParams(search).get('role');
+    setRoleFilter(role && ARENA_ROLE_KEYS.has(role) ? (role as ArenaRole) : 'ALL');
+  }, [search]);
+
+  const setRole = (key: 'ALL' | ArenaRole) => {
+    setRoleFilter(key);
+    setLocation(key === 'ALL' ? '/arena' : `/arena?role=${key}`);
+  };
 
   // Polled so the live applicant counts and new posts stream in.
   const listParams = { role: roleFilter === 'ALL' ? undefined : roleFilter, sort };
@@ -95,7 +115,7 @@ export default function ArenaBoardPage() {
               <button
                 type="button"
                 className={roleFilter === key ? 'active' : ''}
-                onClick={() => setRoleFilter(key)}
+                onClick={() => setRole(key)}
                 data-testid={`arena-role-${key.toLowerCase()}`}
               >
                 {key === 'ALL' ? 'All roles' : ARENA_ROLE_META[key].label}
@@ -143,7 +163,7 @@ export default function ArenaBoardPage() {
           <p>Captains post the roles they need here — check back soon, or watch a role to get pinged when one opens.</p>
         </div>
       ) : (
-        <div className="den-stack" data-testid="arena-board">
+        <div className="arena-board" data-testid="arena-board">
           {rows.map((post) => (
             <PostCard key={post.id} post={post} />
           ))}

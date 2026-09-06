@@ -2,11 +2,14 @@ import { PiArrowUpRightDuotone, PiDownloadSimpleDuotone, PiFilmSlateDuotone, PiM
 import { Link } from 'wouter';
 import { useUser } from '@clerk/react';
 
+// Each relay leg opens the Audition Arena already filtered to the matching
+// content role — Story Architect → Script, Visual Editor → Video, Sound
+// Designer → Audio, and Motion & Color → Thumbnail (the final cover polish).
 const LEGS = [
-  { number: '01', role: 'Story Architect', studio: 'Selects & structure', icon: PiFilmSlateDuotone },
-  { number: '02', role: 'Visual Editor', studio: 'Precision cutting', icon: PiScissorsDuotone },
-  { number: '03', role: 'Sound Designer', studio: 'Restore & score', icon: PiMicrophoneStageDuotone },
-  { number: '04', role: 'Motion & Color', studio: 'Finish & polish', icon: PiPaletteDuotone },
+  { number: '01', role: 'Story Architect', studio: 'Selects & structure', icon: PiFilmSlateDuotone, arenaRole: 'SCRIPT' },
+  { number: '02', role: 'Visual Editor', studio: 'Precision cutting', icon: PiScissorsDuotone, arenaRole: 'VIDEO' },
+  { number: '03', role: 'Sound Designer', studio: 'Restore & score', icon: PiMicrophoneStageDuotone, arenaRole: 'AUDIO' },
+  { number: '04', role: 'Motion & Color', studio: 'Finish & polish', icon: PiPaletteDuotone, arenaRole: 'THUMBNAIL' },
 ];
 
 export default function ContentCreatorsPage() {
@@ -76,7 +79,12 @@ export default function ContentCreatorsPage() {
             {LEGS.map((leg) => {
               const Icon = leg.icon;
               return (
-                <div key={leg.number} className="soft-lift group overflow-hidden rounded-[1.25rem] card-surface p-5" data-testid={`card-door-leg-${leg.number}`}>
+                <a
+                  key={leg.number}
+                  href={`/creators-den/arena?role=${leg.arenaRole}`}
+                  className="soft-lift group overflow-hidden rounded-[1.25rem] card-surface p-5 transition-colors hover:border-[#3b82f6]/50"
+                  data-testid={`card-door-leg-${leg.number}`}
+                >
                   <span className="card-spot" />
                   <div className="flex items-center justify-between">
                     <span className="icon-chip h-11 w-11 text-[#3b82f6]"><Icon className="h-5 w-5" /></span>
@@ -84,7 +92,7 @@ export default function ContentCreatorsPage() {
                   </div>
                   <p className="mt-5 font-mono-ui text-[9px] uppercase tracking-[0.16em] text-[#3b82f6]">{leg.studio}</p>
                   <p className="mt-1.5 font-display text-lg italic leading-none">{leg.role}</p>
-                </div>
+                </a>
               );
             })}
           </div>
