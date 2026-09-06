@@ -332,7 +332,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           {/* Price — its own row under the title. */}
           <div className="mt-6 flex items-baseline gap-1.5">
             <span className="font-display text-[2.5rem] font-extrabold leading-none tracking-[-0.05em] text-[#34d399] drop-shadow-[0_0_18px_rgba(52,211,153,.35)]">${(priceUsd / 100).toFixed(2)}</span>
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#34d399]/70">/ {weeks} weeks</span>
+            <span className="font-mono-ui text-[13px] uppercase tracking-[0.16em] text-white">/ {weeks} weeks</span>
           </div>
 
           <p className="mt-4 text-[13px] leading-relaxed text-zinc-400">
@@ -346,7 +346,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
         {/* Perforation */}
         <div className="relative flex items-center px-2">
           <span className="absolute -left-2 h-4 w-4 rounded-full bg-[#131316]/90" />
-          <div className="h-0 flex-1 border-t-2 border-dashed border-white/10" />
+          <div className="h-0 flex-1 border-t-2 border-dashed border-white/25" />
           <span className="absolute -right-2 h-4 w-4 rounded-full bg-[#131316]/90" />
         </div>
 
@@ -392,14 +392,10 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
               <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay ${(priceUsd / 100).toFixed(2)} · {weeks} weeks</>
             )}
           </button>
-          <p className="mt-4 flex items-center justify-center gap-2 text-center text-[10px] leading-relaxed text-zinc-600">
-            <PiLockKeyDuotone className="h-3 w-3 shrink-0 text-[#34d399]" />
-            Secure checkout by Paystack — no card details ever pass through this site.
-          </p>
         </div>
 
         {/* Pass specs — what the ticket covers, replacing the old coupon stub. */}
-        <div className="relative grid grid-cols-3 gap-3 border-t border-white/10 bg-white/[.02] px-7 py-4">
+        <div className="relative grid grid-cols-3 gap-3 border-t-2 border-dashed border-white/25 bg-white/[.02] px-7 py-4">
           <div>
             <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Pass length</p>
             <p className="mt-1 text-sm font-bold text-white">{weeks} weeks</p>
