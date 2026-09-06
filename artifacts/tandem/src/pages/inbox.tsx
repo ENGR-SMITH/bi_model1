@@ -1,15 +1,10 @@
-import { PiArrowRightDuotone, PiChatCircleDuotone, PiFileTextDuotone, PiHourglassDuotone, PiPenDuotone, PiTrayDuotone, PiUsersDuotone } from 'react-icons/pi';
-import { Link, useLocation } from 'wouter';
-import { useUser } from '@clerk/react';
+import { PiArrowRightDuotone, PiClockDuotone, PiPenNibDuotone, PiTrayDuotone, PiUsersDuotone, PiVideoCameraDuotone } from 'react-icons/pi';
+import { Link } from 'wouter';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getGetCollaborationInboxQueryKey,
   getListVideoNotificationsQueryKey,
-  getListContinuationsQueryKey,
   useGetCollaborationInbox,
-  useListCollaborationProjects,
-  useListCollaborationThreads,
-  useListContinuations,
   useListVideoNotifications,
   useMarkCollaborationNotificationRead,
   useMarkVideoNotificationRead,
@@ -26,18 +21,17 @@ import {
   type NoticeWorld,
 } from '@/lib/notice-meta';
 
-function roleLabel(project: any, role: string) {
-  return project.creatorId === role ? project.creatorName : project.respondentName;
-}
-
 // ---------------------------------------------------------------------------
-// Notices — the inbox pulls BOTH den feeds into one list:
+// Notices — the inbox pulls BOTH den feeds into one brief list:
 //   * Author Den  → the collaboration notifications (seeds, submissions,
 //                   contracts, your-turn passes, private messages)
 //   * Creators Den → the video notifications (invites, uploads for review,
 //                   approvals/rejections, annotations, grants, releases)
 // Each row stays brief — the type of notice plus where it came from — and
 // carries a link into that den's own notifications page for the full detail.
+// Urgent work (contract/turn/review) and the conversation list moved to the
+// Author Den notifications page (?notifications=1); when one of those events
+// fires, its notification lands here as a brief row.
 // Live updates come from the app-wide NotificationCenter (one realtime
 // socket), so this page needs no polling of its own.
 // ---------------------------------------------------------------------------
@@ -55,14 +49,9 @@ interface Notice {
 }
 
 export default function InboxPage() {
-  const { user } = useUser();
-  const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const inboxQ = useGetCollaborationInbox({ query: { queryKey: ['collaboration-inbox'] } });
   const videoQ = useListVideoNotifications({ query: { queryKey: getListVideoNotificationsQueryKey() } });
-  const threadsQ = useListCollaborationThreads({ query: { queryKey: ['collaboration-inbox-threads'] } });
-  const projectsQ = useListCollaborationProjects();
-  const continuationsQ = useListContinuations({ query: { queryKey: getListContinuationsQueryKey() } });
   const mark = useMarkCollaborationNotificationRead({
     mutation: {
       onSuccess: () => {
@@ -82,9 +71,6 @@ export default function InboxPage() {
 
   const authorNotes: any[] = inboxQ.data || [];
   const videoNotes: VideoNotification[] = videoQ.data || [];
-  const threads: any[] = threadsQ.data || [];
-  const projects: any[] = projectsQ.data || [];
-  const continuations: any[] = continuationsQ.data || [];
 
   const notices: Notice[] = [
     ...authorNotes.map((n: any): Notice => {
@@ -118,35 +104,8 @@ export default function InboxPage() {
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const unreadNotes = notices.filter((n) => n.unread);
-  const unreadThreads = threads.filter((t: any) => t.unread);
-  const unreadCount = unreadNotes.length + unreadThreads.length;
+  const unreadCount = unreadNotes.length;
   const unreadByWorld = (world: NoticeWorld) => notices.filter((n) => n.world === world && n.unread).length;
-  const pendingReviews = continuations.filter((c: any) => c.status === 'UNDER_REVIEW');
-
-  const urgent: Array<{ kind: string; label: string; body: string; href: string; icon: React.ReactNode }> = [];
-  projects.forEach((p: any) => {
-    const myRole = p.creatorId === user?.id ? 'CREATOR' : 'RESPONDENT';
-    const myApproved = p.creatorId === user?.id ? p.creatorApproved : p.respondentApproved;
-    if (p.status === 'CONTRACT_PENDING' && !myApproved) {
-      urgent.push({ kind: 'contract', label: 'Contract action required', body: `Approve the contract for “${p.title}” so the room can open.`, href: `/authors-den/?project=${p.id}`, icon: <PiFileTextDuotone className="h-4 w-4" /> });
-    } else if (p.status === 'ACTIVE' && p.currentTurn === myRole) {
-      urgent.push({ kind: 'turn', label: 'Your turn', body: `The next pass in “${p.title}” is yours to write.`, href: `/authors-den/?project=${p.id}`, icon: <PiPenDuotone className="h-4 w-4" /> });
-    } else if (p.status === 'ACTIVE') {
-      urgent.push({ kind: 'waiting', label: 'Waiting on partner', body: `${roleLabel(p, p.currentTurn)} is carrying “${p.title}”.`, href: `/authors-den/?project=${p.id}`, icon: <PiHourglassDuotone className="h-4 w-4" /> });
-    }
-  });
-  if (pendingReviews.length) {
-    urgent.push({ kind: 'review', label: 'Review pending', body: `${pendingReviews.length} continuation${pendingReviews.length === 1 ? '' : 's'} waiting on your eye.`, href: '/authors/collaborations/continuations', icon: <PiTrayDuotone className="h-4 w-4" /> });
-  }
-  if (unreadNotes.length) {
-    urgent.push({ kind: 'inbox', label: `${unreadNotes.length} unread note${unreadNotes.length === 1 ? '' : 's'}`, body: 'Notices from your Author Den rooms and Creators Den workspaces.', href: '/inbox', icon: <PiTrayDuotone className="h-4 w-4" /> });
-  }
-  const cardClass = (kind: string) =>
-    kind === 'turn' || kind === 'contract'
-      ? 'bg-[#fbbf24]/20 text-[#fbbf24]'
-      : kind === 'review'
-      ? 'bg-red-500/20 text-red-400'
-      : 'bg-[#34d399]/20 text-[#34d399]';
 
   // Open a notice: mark it read in whichever den wrote it, then jump to that
   // den's notifications page where the full notification info lives.
@@ -170,114 +129,65 @@ export default function InboxPage() {
         <p className="max-w-sm border-l border-white/10 pl-5 text-sm leading-[1.8] text-zinc-400">
           {unreadCount > 0
             ? `${unreadCount} unread ${unreadCount === 1 ? 'item' : 'items'} need your attention across your rooms and workspaces.`
-            : 'Everything here is read and resting. Urgent work, private threads, and notices from both dens gather below.'}
+            : 'Everything here is read and resting. Notices from both dens gather below — each one opens its full page inside the den it came from.'}
         </p>
       </div>
 
-      {urgent.length > 0 && (
-        <section className="reveal reveal-1 mt-10">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#3b82f6]">Urgent work</h2>
-            <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">{urgent.length} item{urgent.length === 1 ? '' : 's'} need you</span>
-          </div>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {urgent.slice(0, 6).map((item) => (
-              <Link key={`${item.kind}-${item.href}`} href={item.href} className={`soft-lift focus-house group overflow-hidden rounded-3xl border p-7 ${cardClass(item.kind)}`}>
-                <span className="card-spot" />
-                <span className="icon-chip h-12 w-12">{item.icon}</span>
-                <h3 className="mt-7 text-lg font-bold tracking-[-.03em] text-zinc-100">{item.label}</h3>
-                <p className="mt-2 text-xs leading-relaxed opacity-80">{item.body}</p>
-                <span className="mt-6 inline-flex items-center gap-2 text-xs font-semibold text-zinc-300">Open <PiArrowRightDuotone className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" /></span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <div className="reveal reveal-1 mt-10 grid gap-8 lg:grid-cols-[1.1fr_.9fr]">
-        <section aria-labelledby="threads-heading">
-          <div className="flex items-center justify-between gap-4">
-            <h2 id="threads-heading" className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#3b82f6]">
-              <PiChatCircleDuotone className="h-4 w-4" /> Conversations
-            </h2>
-            <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">{threads.length} thread{threads.length === 1 ? '' : 's'}</span>
-          </div>
-          <div className="mt-5 space-y-3">
-            {threadsQ.isLoading ? (
-              <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-28 animate-pulse rounded-2xl bg-white/5" />)}</div>
-            ) : threads.length ? threads.map((t) => (
-              <button key={t.id} data-testid={`inbox-thread-${t.id}`} onClick={() => t.projectId ? window.location.href = `/authors-den/?project=${t.projectId}&chat=1` : setLocation(`/authors/collaborations/thread/${t.id}`)}
-                className={`focus-house soft-lift flex w-full items-start gap-4 rounded-2xl border p-5 text-left ${t.unread ? 'border-[#3b82f6]/40 bg-[#3b82f6]/5' : 'card-surface'}`}>
-                <span className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] font-mono-ui text-[11px] font-medium uppercase text-white">{(t.partnerName || 'W').slice(0, 1)}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="block truncate text-sm font-semibold text-zinc-100">{t.sourceProjectTitle}</span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      <span className="text-[10px] font-semibold text-zinc-500">{t.messageCount} msg{t.messageCount === 1 ? '' : 's'}</span>
-                      {t.unread && <span className="rounded-full bg-[#3b82f6] px-2 py-0.5 font-mono-ui text-[9px] uppercase tracking-[.12em] text-white">New</span>}
-                    </span>
+      <section aria-labelledby="notes-heading" className="reveal reveal-1 mt-10">
+        <div className="flex items-center justify-between gap-4">
+          <h2 id="notes-heading" className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#34d399]">
+            <PiTrayDuotone className="h-4 w-4" /> Notices
+          </h2>
+          <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">
+            {unreadByWorld('authors') > 0 && <span className="mr-2 text-[#93c5fd]">{unreadByWorld('authors')} author</span>}
+            {unreadByWorld('creators') > 0 && <span className="mr-2 text-red-400">{unreadByWorld('creators')} creator</span>}
+            {notices.length} total
+          </span>
+        </div>
+        <div className="mt-5 space-y-3">
+          {inboxQ.isLoading || videoQ.isLoading ? (
+            <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-white/5" />)}</div>
+          ) : notices.length ? notices.map((n) => (
+            <div key={n.key} data-testid={`inbox-note-${n.key}`} onClick={() => openNotice(n)}
+              className={`focus-house group soft-lift relative flex w-full cursor-pointer items-start gap-4 overflow-hidden rounded-2xl border p-4 pl-5 text-left transition-colors ${n.unread ? (n.world === 'creators' ? 'border-red-500/50 bg-red-500/[0.06] hover:bg-red-500/[0.09]' : 'border-[#3b82f6]/50 bg-[#3b82f6]/[0.06] hover:bg-[#3b82f6]/[0.09]') : 'card-surface hover:border-white/15'}`}>
+              <span className="card-spot" />
+              {n.unread && (
+                <span className={`pointer-events-none absolute inset-y-2.5 left-0 w-[3px] rounded-full ${n.world === 'creators' ? 'bg-red-500 shadow-[0_0_12px_1px_rgba(239,68,68,0.55)]' : 'bg-[#3b82f6] shadow-[0_0_12px_1px_rgba(59,130,246,0.55)]'}`} />
+              )}
+              <span className={`icon-chip h-10 w-10 shrink-0 ${n.world === 'creators' ? 'text-red-400' : 'text-[#93c5fd]'}`}>
+                {n.world === 'creators' ? <PiVideoCameraDuotone className="h-4 w-4" /> : <PiPenNibDuotone className="h-4 w-4" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-1 font-mono-ui text-[8.5px] uppercase tracking-[.14em] ${WORLD_CHIP[n.world]}`}>
+                    {WORLD_LABEL[n.world]}
                   </span>
-                  <span className="mt-0.5 block text-xs text-zinc-500">with {t.partnerName}</span>
-                  <span className={`mt-2 block truncate text-sm leading-relaxed ${t.unread ? 'font-medium text-zinc-100' : 'text-zinc-400'}`}>{t.lastMessage ? `“${t.lastMessage}”` : 'No messages yet — start the conversation.'}</span>
-                  {t.lastMessageAt && <span className="mt-2 block font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-600">{new Date(t.lastMessageAt).toLocaleString()}</span>}
+                  <span className={`rounded-full px-2.5 py-1 font-mono-ui text-[8.5px] uppercase tracking-[.14em] ${TONE_TEXT[n.tone] ?? TONE_TEXT.muted}`}>{n.label}</span>
+                  {n.unread && <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-[#fbbf24] shadow-[0_0_10px_2px_rgba(251,191,36,0.45)]" />}
                 </span>
-              </button>
-            )) : (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6">
-                <p className="text-2xl font-semibold text-zinc-100">No conversations yet.</p>
-                <p className="mt-2 text-sm leading-relaxed text-zinc-500">Private threads open when a seed is answered — the creator and respondent can talk without leaving the room.</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        <section aria-labelledby="notes-heading">
-          <div className="flex items-center justify-between gap-4">
-            <h2 id="notes-heading" className="flex items-center gap-2 font-mono-ui text-[10px] uppercase tracking-[.2em] text-[#34d399]">
-              <PiTrayDuotone className="h-4 w-4" /> Notices
-            </h2>
-            <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">
-              {unreadByWorld('authors') > 0 && <span className="mr-2 text-[#93c5fd]">{unreadByWorld('authors')} author</span>}
-              {unreadByWorld('creators') > 0 && <span className="mr-2 text-red-400">{unreadByWorld('creators')} creator</span>}
-              {notices.length} total
-            </span>
-          </div>
-          <div className="mt-5 space-y-3">
-            {inboxQ.isLoading || videoQ.isLoading ? (
-              <div className="space-y-3">{[0, 1].map((i) => <div key={i} className="h-24 animate-pulse rounded-2xl bg-white/5" />)}</div>
-            ) : notices.length ? notices.map((n) => (
-              <div key={n.key} data-testid={`inbox-note-${n.key}`} onClick={() => openNotice(n)}
-                className={`focus-house flex w-full cursor-pointer items-start gap-3 rounded-2xl border p-4 text-left transition ${n.unread ? (n.world === 'creators' ? 'border-red-500/40 bg-red-500/5' : 'border-[#3b82f6]/40 bg-[#3b82f6]/5') : 'card-surface'}`}>
-                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.unread ? (n.world === 'creators' ? 'bg-red-500 glow-dot' : 'bg-[#3b82f6] glow-dot') : 'bg-white/10'}`} />
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 font-mono-ui text-[8.5px] uppercase tracking-[.14em] ${WORLD_CHIP[n.world]}`}>
-                      {WORLD_LABEL[n.world]}
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 font-mono-ui text-[8.5px] uppercase tracking-[.14em] ${TONE_TEXT[n.tone] ?? TONE_TEXT.muted}`}>{n.label}</span>
+                <span className={`mt-2 block text-sm leading-snug ${n.unread ? 'font-semibold text-white' : 'font-medium text-zinc-200'}`}>{n.title}</span>
+                <span className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <PiClockDuotone className="h-3 w-3 text-zinc-600" /> {new Date(n.createdAt).toLocaleDateString()}
                   </span>
-                  <span className="mt-1.5 block text-sm font-semibold leading-snug text-zinc-100">{n.title}</span>
-                  <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono-ui text-[9px] uppercase tracking-[.12em] text-zinc-500">
-                    <span>{new Date(n.createdAt).toLocaleDateString()}</span>
-                    <span className="inline-flex items-center gap-1 text-zinc-400">
-                      View in {denPageCtaLabel(n.world)} <PiArrowRightDuotone className="h-3 w-3" />
-                    </span>
+                  <span className={`inline-flex items-center gap-1 transition-colors ${n.unread ? 'text-[#93c5fd]' : 'text-zinc-400 group-hover:text-white'}`}>
+                    View in {denPageCtaLabel(n.world)} <PiArrowRightDuotone className="arrow-nudge-right h-3 w-3" />
                   </span>
                 </span>
-              </div>
-            )) : (
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6">
-                <p className="text-2xl font-semibold text-zinc-100">Both dens are quiet.</p>
-                <p className="mt-2 text-sm leading-relaxed text-zinc-500">Notices from Author Den (submissions, contracts, your-turn passes) and Creators Den (uploads for review, approvals, invites) will appear here when they need you — opening one takes you to its full page in that den.</p>
-              </div>
-            )}
-          </div>
-        </section>
-      </div>
+              </span>
+            </div>
+          )) : (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-6">
+              <p className="text-2xl font-semibold text-zinc-100">Both dens are quiet.</p>
+              <p className="mt-2 text-sm leading-relaxed text-zinc-500">Notices from Author Den (submissions, contracts, your-turn passes) and Creators Den (uploads for review, approvals, invites) will appear here when they need you — opening one takes you to its full page in that den.</p>
+            </div>
+          )}
+        </div>
+      </section>
 
       <div className="reveal reveal-2 mt-12 flex flex-wrap items-center gap-3 border-t border-white/5 pt-7 text-sm text-zinc-500">
         <PiUsersDuotone className="h-4 w-4 text-[#34d399]" />
-        <span>Everything here is private to you — notices are brief here; each one opens its full page inside the den it came from.</span>
+        <span>Everything here is private to you — notices are brief here; urgent work and conversations live on the Author Den notifications page, and each row opens it.</span>
         <Link href="/categories/authors" className="focus-house ml-auto inline-flex items-center gap-2 rounded-full bg-[#3b82f6] px-4 py-2 text-xs font-semibold text-white">
           Authors room <PiArrowRightDuotone className="h-3.5 w-3.5" />
         </Link>
