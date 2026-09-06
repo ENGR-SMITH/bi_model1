@@ -1,36 +1,24 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PiArrowUpRightDuotone, PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiCreditCardDuotone, PiLockKeyDuotone, PiTicketDuotone, PiXDuotone } from 'react-icons/pi';
+import { PiArrowUpRightDuotone, PiCheckCircleDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiLockKeyDuotone, PiTicketDuotone, PiXDuotone } from 'react-icons/pi';
 import {
+  confirmPaystackCheckout,
   getGetTicketStatusQueryKey,
   getTicketCategoryAccessQueryKey,
+  useCreatePaystackCheckout,
   useGetTicketStatus,
-  usePurchaseTicket,
   useTicketCategoryAccess,
-  useValidateTicketPromo,
 } from '@workspace/api-client-react';
-import type { TicketPromoValidateResponse, TicketPurchaseResponse } from '@workspace/api-client-react';
 
 // ---------------------------------------------------------------------------
 // Ticket gate — the TANDEM category paywall. Each available category
 // (Author-Writer, Content-Creators) requires an active pass ($1.88 / 3 weeks)
 // before the room opens. Without a pass the page renders dimmed behind a
-// coupon-style popup where the user pays by card (or applies a promo code).
+// coupon-style popup. Payment runs through Paystack's hosted checkout (USD):
+// the popup opens a Paystack page, and when the customer returns the gate
+// confirms the charge (?reference=…) before the room unlocks. No card
+// details are ever collected here.
 // ---------------------------------------------------------------------------
-
-function formatCardNumber(value: string): string {
-  return value
-    .replace(/\D/g, '')
-    .slice(0, 16)
-    .replace(/(\d{4})(?=\d)/g, '$1 ')
-    .trim();
-}
-
-function formatExpiry(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-}
 
 export function TicketGate({
   slug,
@@ -46,6 +34,47 @@ export function TicketGate({
     query: { queryKey: getTicketCategoryAccessQueryKey(slug) },
   });
   const active = status.data?.tickets.some((ticket) => ticket.category === slug) ?? false;
+
+  // Paystack return: the checkout redirects back with ?reference=… — confirm
+  // the charge server-side, unlock the room, and show the stamped pass.
+  const [confirming, setConfirming] = useState(false);
+  const [returnStamp, setReturnStamp] = useState<{ expiresAt: string; total: number; cardLast4: string | null; promoCode: string | null } | null>(null);
+
+  useEffect(() => {
+    const reference = new URLSearchParams(window.location.search).get('reference');
+    if (!reference) return;
+    let disposed = false;
+    setConfirming(true);
+    void (async () => {
+      try {
+        const res = await confirmPaystackCheckout({ reference });
+        if (disposed) return;
+        window.history.replaceState(window.history.state, '', window.location.pathname);
+        if (res.granted) {
+          const refreshed = await status.refetch();
+          if (disposed) return;
+          const ticket = refreshed.data?.tickets.find((item) => item.category === slug);
+          setReturnStamp({
+            expiresAt:
+              ticket?.expiresAt ??
+              new Date(Date.now() + (refreshed.data?.weeks ?? 3) * 7 * 24 * 60 * 60 * 1000).toISOString(),
+            total: res.receipt?.total ?? 0,
+            cardLast4: res.receipt?.cardLast4 ?? null,
+            promoCode: res.receipt?.promoCode ?? null,
+          });
+        }
+      } catch {
+        // Confirmation failed — the gate simply stays as the status query says.
+      } finally {
+        if (!disposed) setConfirming(false);
+      }
+    })();
+    return () => {
+      disposed = true;
+    };
+    // Runs once per page load — the reference arrives on the initial URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (status.isLoading || access.isLoading) return <>{children}</>;
 
@@ -65,7 +94,104 @@ export function TicketGate({
         <FreePreviewStrip slug={slug} name={name} previewing={access.data?.tourActive === true} />
       )}
       {!active && !canPreview && <PassCoupon slug={slug} name={name} onPurchased={() => void status.refetch()} />}
+
+      {confirming && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-confirming">
+          <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-[#111111] p-8 text-center text-white shadow-2xl">
+            <PiCircleNotchDuotone className="mx-auto h-8 w-8 animate-spin text-[#3b82f6]" />
+            <p className="mt-4 text-sm font-semibold text-zinc-100">Confirming your payment…</p>
+            <p className="mt-1 text-xs text-zinc-500">This can take a few seconds.</p>
+          </div>
+        </div>
+      )}
+      {returnStamp && (
+        <PassStamp
+          name={name}
+          weeks={status.data?.weeks ?? 3}
+          expiresAt={returnStamp.expiresAt}
+          total={returnStamp.total}
+          cardLast4={returnStamp.cardLast4}
+          promoCode={returnStamp.promoCode}
+          discount={Math.max(0, (status.data?.priceUsd ?? 188) - returnStamp.total)}
+          onDone={() => setReturnStamp(null)}
+        />
+      )}
     </>
+  );
+}
+
+// The stamped pass receipt — shown right after a purchase (including a FREE
+// promo granted server-side) or when the customer returns from the Paystack
+// checkout.
+function PassStamp({
+  name,
+  weeks,
+  expiresAt,
+  total,
+  cardLast4,
+  promoCode,
+  discount,
+  onDone,
+}: {
+  name: string;
+  weeks: number;
+  expiresAt: string;
+  total: number;
+  cardLast4: string | null;
+  promoCode: string | null;
+  discount: number;
+  onDone: () => void;
+}) {
+  const expires = new Date(expiresAt).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-success">
+      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-7 text-white shadow-2xl">
+        <div className="flex items-center justify-between">
+          <span className="icon-chip h-14 w-14 text-[#34d399]">
+            <PiConfettiDuotone className="h-7 w-7" />
+          </span>
+          <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">PASS PURCHASED</span>
+        </div>
+        <h2 className="mt-5 font-display text-3xl font-extrabold tracking-[-0.05em]">
+          You're in, {name.split(' ')[0]}.
+        </h2>
+        <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+          Your {name} pass is active until <b className="text-white">{expires}</b>
+          {promoCode ? (
+            <span className="mt-2 flex items-center gap-2 text-[#34d399]">
+              <PiCheckCircleDuotone className="h-4 w-4" /> Promo {promoCode} applied —{' '}
+              {discount > 0 ? `you saved $${(discount / 100).toFixed(2)}` : 'the pass was free'}.
+            </span>
+          ) : null}
+        </p>
+        <div className="mt-5 rounded-2xl border-2 border-dashed border-white/10 bg-[#111111] p-4">
+          <div className="flex items-center justify-between font-mono-ui text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+            <span>{cardLast4 ? <>Card •••• {cardLast4}</> : <>Free pass</>}</span>
+            <span>Total ${(total / 100).toFixed(2)}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onDone}
+          className="focus-house mt-6 w-full rounded-xl bg-[#3b82f6] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2563eb]"
+          data-testid="button-enter-room"
+        >
+          Enter the room <PiTicketDuotone className="ml-1 inline h-4 w-4 text-white/80" />
+        </button>
+        <button
+          type="button"
+          className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white"
+          onClick={onDone}
+          aria-label="Close"
+        >
+          <PiXDuotone className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -117,139 +243,69 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
   const priceUsd = status.data?.priceUsd ?? 188;
   const weeks = status.data?.weeks ?? 3;
 
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvc, setCvc] = useState('');
   const [promoInput, setPromoInput] = useState('');
-  const [promo, setPromo] = useState<TicketPromoValidateResponse | null>(null);
-  const [promoError, setPromoError] = useState('');
-  const [purchaseError, setPurchaseError] = useState('');
-  const [purchased, setPurchased] = useState<TicketPurchaseResponse | null>(null);
+  const [stamp, setStamp] = useState<{ expiresAt: string; total: number; cardLast4: string | null; promoCode: string | null } | null>(null);
+  const [error, setError] = useState('');
+  const [opening, setOpening] = useState(false);
 
-  const validatePromo = useValidateTicketPromo({
+  const checkout = useCreatePaystackCheckout({
     mutation: {
-      onSuccess: (result) => {
-        if (result.valid) {
-          setPromo(result);
-          setPromoError('');
-        } else {
-          setPromo(null);
-          setPromoError('That promo code is not valid');
+      onSuccess: (res) => {
+        if (res.granted) {
+          // A FREE promo (full discount) is granted server-side — no redirect.
+          setStamp({
+            expiresAt: new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000).toISOString(),
+            total: 0,
+            cardLast4: null,
+            promoCode: promoInput.trim() || null,
+          });
+          void queryClient.invalidateQueries({ queryKey: getGetTicketStatusQueryKey() });
+          return;
         }
+        setError('');
+        setOpening(true);
+        // Let the spinner paint before leaving for Paystack.
+        window.setTimeout(() => {
+          window.location.assign(res.checkoutUrl);
+        }, 350);
       },
-      onError: () => {
-        setPromo(null);
-        setPromoError('That promo code could not be checked right now');
-      },
-    },
-  });
-
-  const purchase = usePurchaseTicket({
-    mutation: {
-      onSuccess: (result) => {
-        setPurchased(result);
-        void queryClient.invalidateQueries({ queryKey: getGetTicketStatusQueryKey() });
-      },
-      onError: (error) => {
-        const apiError = error as { response?: { data?: { error?: string } }; message?: string } | null;
-        setPurchaseError(apiError?.response?.data?.error || apiError?.message || 'The payment could not be completed. Check your card and try again.');
+      onError: (e: unknown) => {
+        const err = e as { response?: { data?: { error?: string } }; message?: string } | null;
+        setError(err?.response?.data?.error || err?.message || 'The payment could not be started. Please try again.');
       },
     },
   });
 
-  const discountedPriceUsd = promo?.discountedPriceUsd ?? priceUsd;
-  const totalLabel = useMemo(() => `$${(discountedPriceUsd / 100).toFixed(2)}`, [discountedPriceUsd]);
+  const callbackUrl = `${window.location.origin}${window.location.pathname}`;
+  const busy = checkout.isPending || opening;
 
   const pay = () => {
-    setPurchaseError('');
-    const digits = cardNumber.replace(/\D/g, '');
-    const [month, year] = expiry.split('/');
-    if (digits.length < 12) {
-      setPurchaseError('Enter the full card number');
-      return;
-    }
-    if (!month || !year || month.length !== 2 || year.length !== 2) {
-      setPurchaseError('Enter the card expiry as MM/YY');
-      return;
-    }
-    if (!cvc) {
-      setPurchaseError('Enter the security code');
-      return;
-    }
-    purchase.mutate({
+    setError('');
+    checkout.mutate({
       data: {
-        category: slug,
-        card: {
-          number: digits,
-          expiryMonth: Number(month),
-          expiryYear: Number(year),
-          cvc,
-        },
-        promoCode: promo?.valid ? promo.code : undefined,
+        kind: 'pass',
+        planId: slug,
+        promoCode: promoInput.trim() || undefined,
+        callbackUrl,
       },
     });
   };
 
-  const applyPromo = () => {
-    setPromoError('');
-    if (!promoInput.trim()) {
-      setPromoError('Enter a promo code first');
-      return;
-    }
-    validatePromo.mutate({ data: { code: promoInput } });
-  };
-
-  // Success state — the stamped pass with its expiry, and the way into the room.
-  if (purchased) {
-    const expires = new Date(purchased.ticket.expiresAt).toLocaleDateString(undefined, {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
+  if (stamp) {
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-success">
-        <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-7 text-white shadow-2xl">
-          <div className="flex items-center justify-between">
-            <span className="icon-chip h-14 w-14 text-[#34d399]">
-              <PiConfettiDuotone className="h-7 w-7" />
-            </span>
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">PASS PURCHASED</span>
-          </div>
-          <h2 className="mt-5 font-display text-3xl font-extrabold tracking-[-0.05em]">
-            You're in, {name.split(' ')[0]}.
-          </h2>
-          <p className="mt-3 text-sm leading-relaxed text-zinc-400">
-            Your {name} pass is active until <b className="text-white">{expires}</b>
-            {purchased.receipt.promoCode ? (
-              <span className="mt-2 flex items-center gap-2 text-[#34d399]">
-                <PiCheckCircleDuotone className="h-4 w-4" /> Promo {purchased.receipt.promoCode} applied — {purchased.receipt.discount > 0 ? `you saved $${(purchased.receipt.discount / 100).toFixed(2)}` : 'the pass was free'}.
-              </span>
-            ) : null}
-          </p>
-          <div className="mt-5 rounded-2xl border-2 border-dashed border-white/10 bg-[#111111] p-4">
-            <div className="flex items-center justify-between font-mono-ui text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-              <span>Card •••• {purchased.receipt.cardLast4}</span>
-              <span>Total ${(purchased.receipt.total / 100).toFixed(2)}</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onPurchased}
-            className="focus-house mt-6 w-full rounded-xl bg-[#3b82f6] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2563eb]"
-            data-testid="button-enter-room"
-          >
-            Enter the room <PiTicketDuotone className="ml-1 inline h-4 w-4 text-white/80" />
-          </button>
-          <button
-            type="button"
-            className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white"
-            onClick={() => { setPurchased(null); onPurchased(); }}
-            aria-label="Close"
-          >
-            <PiXDuotone className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+      <PassStamp
+        name={name}
+        weeks={weeks}
+        expiresAt={stamp.expiresAt}
+        total={stamp.total}
+        cardLast4={stamp.cardLast4}
+        promoCode={stamp.promoCode}
+        discount={Math.max(0, priceUsd - stamp.total)}
+        onDone={() => {
+          setStamp(null);
+          onPurchased();
+        }}
+      />
     );
   }
 
@@ -268,7 +324,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
                 <h2 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.04em]">{name}</h2>
               </div>
             </div>
-            <span className="font-display text-2xl font-extrabold tracking-[-0.04em]">{totalLabel}</span>
+            <span className="font-display text-2xl font-extrabold tracking-[-0.04em]">${(priceUsd / 100).toFixed(2)}</span>
           </div>
           <p className="mt-4 text-sm leading-relaxed text-zinc-400">
             A ticket unlocks the whole {name.toLowerCase()} category — <b>{weeks} weeks</b> of access. Renew anytime; a renewal extends the pass.
@@ -285,109 +341,49 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <span className="absolute -right-2 h-4 w-4 rounded-full bg-[#111111]/60" />
         </div>
 
-        {/* Payment body */}
+        {/* Payment body — Paystack hosted checkout (USD), no card fields. */}
         <div className="rounded-b-[1.35rem] p-6 pt-5">
-          <label className="block">
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Card number</span>
-            <div className="relative mt-2">
-              <PiCreditCardDuotone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
-              <input
-                value={cardNumber}
-                onChange={(event) => setCardNumber(formatCardNumber(event.target.value))}
-                placeholder="4242 4242 4242 4242"
-                inputMode="numeric"
-                autoComplete="cc-number"
-                className="focus-house w-full rounded-xl border border-white/10 bg-[#111111] py-3 pl-11 pr-4 text-sm text-white placeholder:text-zinc-600"
-                data-testid="input-card-number"
-              />
-            </div>
-          </label>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Expiry</span>
-              <input
-                value={expiry}
-                onChange={(event) => setExpiry(formatExpiry(event.target.value))}
-                placeholder="MM/YY"
-                inputMode="numeric"
-                autoComplete="cc-exp"
-                className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600"
-                data-testid="input-card-expiry"
-              />
-            </label>
-            <label className="block">
-              <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">CVC</span>
-              <input
-                value={cvc}
-                onChange={(event) => setCvc(event.target.value.replace(/\D/g, '').slice(0, 4))}
-                placeholder="123"
-                inputMode="numeric"
-                autoComplete="cc-csc"
-                className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600"
-                data-testid="input-card-cvc"
-              />
-            </label>
+          <div className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[.03] p-3">
+            <PiLockKeyDuotone className="mt-0.5 h-4 w-4 shrink-0 text-[#34d399]" />
+            <p className="text-xs leading-relaxed text-zinc-400">
+              You'll be taken to <b className="text-zinc-200">Paystack's secure checkout</b> (USD) to pay. You'll land back here when it's done.
+            </p>
           </div>
 
-          {/* Promo code */}
           <div className="mt-4">
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Promo code</span>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={promoInput}
-                onChange={(event) => {
-                  setPromoInput(event.target.value.toUpperCase());
-                  setPromo(null);
-                  setPromoError('');
-                }}
-                placeholder="PROMOCODE"
-                className="focus-house min-w-0 flex-1 rounded-xl border border-white/10 bg-[#111111] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600"
-                data-testid="input-promo"
-              />
-              <button
-                type="button"
-                onClick={applyPromo}
-                disabled={validatePromo.isPending}
-                className="focus-house rounded-xl border border-white/10 bg-[#111111] px-4 text-sm font-semibold text-white transition-colors hover:border-[#3b82f6]/50 hover:bg-[#3b82f6]/10 disabled:cursor-wait disabled:opacity-60"
-                data-testid="button-apply-promo"
-              >
-                {validatePromo.isPending ? <PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> : 'Apply'}
-              </button>
-            </div>
-            {promo?.valid && (
-              <p className="mt-2 flex items-center gap-2 text-xs font-semibold text-[#34d399]" data-testid="promo-applied">
-                <PiCheckDuotone className="h-3.5 w-3.5" /> {promo.code} — {promo.label}. Pass is now {totalLabel}.
-              </p>
-            )}
-            {promoError && (
-              <p className="mt-2 text-xs font-semibold text-red-400" role="alert" data-testid="promo-error">
-                {promoError}
-              </p>
-            )}
+            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Promo code (optional)</span>
+            <input
+              value={promoInput}
+              onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
+              placeholder="PROMOCODE"
+              disabled={busy}
+              className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600 disabled:opacity-50"
+              data-testid="input-promo"
+            />
           </div>
 
-          {purchaseError && (
+          {error && (
             <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-400" role="alert" data-testid="purchase-error">
-              {purchaseError}
+              {error}
             </p>
           )}
 
           <button
             type="button"
             onClick={pay}
-            disabled={purchase.isPending}
+            disabled={checkout.isPending || opening}
             className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b82f6] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2563eb] disabled:cursor-wait disabled:opacity-60"
             data-testid="button-pay"
           >
-            {purchase.isPending ? (
-              <><PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> Processing…</>
+            {busy ? (
+              <><PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> {opening ? 'Opening secure checkout…' : 'Starting checkout…'}</>
             ) : (
-              <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay {totalLabel} · {weeks} weeks</>
+              <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay ${(priceUsd / 100).toFixed(2)} · {weeks} weeks</>
             )}
           </button>
           <p className="mt-3 flex items-center gap-2 text-center text-[10px] leading-relaxed text-zinc-600">
             <PiLockKeyDuotone className="h-3 w-3 shrink-0" />
-            Cards are validated securely; only the last four digits are stored. Test card: 4242 4242 4242 4242.
+            Secure checkout by Paystack — no card details ever pass through this site.
           </p>
         </div>
 
