@@ -330,12 +330,12 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
               </div>
             </div>
             <div className="shrink-0 text-right">
-              <p className="font-display text-[1.9rem] font-extrabold leading-none tracking-[-0.05em] text-white">${(priceUsd / 100).toFixed(2)}</p>
-              <p className="mt-1 font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">/ {weeks} weeks</p>
+              <p className="font-display text-[2rem] font-extrabold leading-none tracking-[-0.05em] text-[#34d399] drop-shadow-[0_0_18px_rgba(52,211,153,.35)]">${(priceUsd / 100).toFixed(2)}</p>
+              <p className="mt-1 font-mono-ui text-[9px] uppercase tracking-[0.16em] text-[#34d399]/70">/ {weeks} weeks</p>
             </div>
           </div>
-          <p className="mt-5 text-sm leading-relaxed text-zinc-400">
-            A ticket unlocks the whole {name.toLowerCase()} category — <b className="text-zinc-200">{weeks} weeks</b> of access. Renew anytime; a renewal extends the pass.
+          <p className="mt-4 text-[13px] leading-relaxed text-zinc-400">
+            Unlocks the whole room for <b className="text-white">{weeks} weeks</b>. Renewing extends your pass.
           </p>
           {/* The free tour is offered on the room page while the visitor is
               still eligible — by the time this popup renders, the one-time
