@@ -121,6 +121,21 @@ function ensureAuthenticated(): ApiClient {
   return requireAuth();
 }
 
+// The agent reuses the Clerk session token captured at sign-in, and it is
+// short-lived (~1 minute by design). When any API call answers 401 the token
+// is stale: drop the session and tell the renderer so it can start a fresh
+// sign-in instead of surfacing a cryptic failure (the same handling the
+// upload jobs do inline). Returns true when the session was dropped.
+function notifySessionExpiredIfStale(err: unknown): boolean {
+  const message = (err as Error)?.message ?? "";
+  if (/failed \(401\)|Authentication required/i.test(message)) {
+    sessionCache = null;
+    sendAuthEvent({ type: "session-expired", error: "Your sign-in expired. Sign in again to upload." });
+    return true;
+  }
+  return false;
+}
+
 function sendJobProgress(progress: JobProgress): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("agent:job-progress", progress);
@@ -266,19 +281,34 @@ ipcMain.handle("agent:whoami", () => {
 
 ipcMain.handle("agent:list-projects", async (_e, channelId?: string) => {
   const api = ensureAuthenticated();
-  return api.listProjects(typeof channelId === "string" && channelId.length > 0 ? channelId : undefined);
+  try {
+    return await api.listProjects(typeof channelId === "string" && channelId.length > 0 ? channelId : undefined);
+  } catch (err) {
+    if (notifySessionExpiredIfStale(err)) throw new Error("Your sign-in expired — signing you back in.");
+    throw err;
+  }
 });
 
 // The channels the signed-in user is on (owned + editor mirrors) — feeds the
 // Channel dropdown; the Project list is then scoped to the chosen channel.
 ipcMain.handle("agent:list-channels", async () => {
   const api = ensureAuthenticated();
-  return api.listChannels();
+  try {
+    return await api.listChannels();
+  } catch (err) {
+    if (notifySessionExpiredIfStale(err)) throw new Error("Your sign-in expired — signing you back in.");
+    throw err;
+  }
 });
 
 ipcMain.handle("agent:list-assets", async (_e, projectId: string) => {
   const api = ensureAuthenticated();
-  return api.listAssets(String(projectId));
+  try {
+    return await api.listAssets(String(projectId));
+  } catch (err) {
+    if (notifySessionExpiredIfStale(err)) throw new Error("Your sign-in expired — signing you back in.");
+    throw err;
+  }
 });
 
 // Extensions the agent can put into the vault (fallback when the renderer
@@ -306,10 +336,18 @@ ipcMain.handle("agent:pick-file", async (_e, extensions?: string[]) => {
 // kinds those roles own (the API enforces the same rule on every upload).
 ipcMain.handle("agent:project-roles", async (_e, projectId: string) => {
   const api = ensureAuthenticated();
-  const detail = await api.getProject(String(projectId));
-  // channelId lets the renderer switch its Channel dropdown to the project's
-  // own channel when a Creator Den launch names a project directly.
-  return { myRoles: detail.myRoles ?? [], channelId: detail.channelId ?? null };
+  try {
+    const detail = await api.getProject(String(projectId));
+    // channelId lets the renderer switch its Channel dropdown to the project's
+    // own channel when a Creator Den launch names a project directly.
+    return { myRoles: detail.myRoles ?? [], channelId: detail.channelId ?? null };
+  } catch (err) {
+    // A stale token (401) dead-ends the role gate unless we drop the session
+    // and let the renderer re-sign-in; a 403/404 means the project itself is
+    // not accessible and re-picking it would never help.
+    if (notifySessionExpiredIfStale(err)) throw new Error("Your sign-in expired — signing you back in.");
+    throw err;
+  }
 });
 
 // Metadata for a file the user picked or dropped: the renderer shows name +

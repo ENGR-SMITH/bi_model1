@@ -25,8 +25,31 @@ type ProjectRolesState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "ready"; roles: string[] }
-  | { status: "error" };
+  | { status: "error"; error?: string };
 let projectRoles: ProjectRolesState = { status: "idle" };
+
+/** Turn the API failure behind the role gate into a copy that says what the
+ * user can actually do. The old generic message told people to re-pick the
+ * project, which can never fix a 403 (not a member) or 404 (gone) — and the
+ * 401 case now auto-triggers a fresh sign-in instead. */
+function rolesErrorCopy(error?: string): string {
+  const msg = error ?? "";
+  if (/\(401\)|Authentication required|sign.?in expired/i.test(msg)) {
+    return "Your sign-in expired — signing you back in. Uploads resume once it completes.";
+  }
+  if (/\(403\)/.test(msg)) {
+    return "You're not a member of this project — pick one you're a member of to upload.";
+  }
+  if (/\(404\)/.test(msg)) {
+    return "That project no longer exists — pick another one.";
+  }
+  if (/fetch failed|ECONNREFUSED|ENOTFOUND|getaddrinfo|Failed to fetch/i.test(msg)) {
+    return "Can't reach the Tandem server — check that it's running, then re-pick the project.";
+  }
+  return msg.length > 0
+    ? `${msg} — re-pick the project to retry.`
+    : "Couldn't verify your roles — uploads are paused. Re-pick the project to retry.";
+}
 
 const ROLE_LABELS: Record<string, string> = {
   CAPTAIN: "Captain",
@@ -132,7 +155,7 @@ function uploadPermission(): UploadPermission {
   if (projectRoles.status !== "ready") {
     const blockCopy =
       projectRoles.status === "error"
-        ? "Couldn't verify your roles on this project — uploads are paused. Re-pick the project to retry."
+        ? rolesErrorCopy(projectRoles.error)
         : projectRoles.status === "loading"
           ? "Checking your roles on this project…"
           : "Pick a project first — the file types you can upload depend on the roles it gives you.";
@@ -449,7 +472,7 @@ function renderRoles(): void {
   }
   if (projectRoles.status === "error") {
     note.className = "roles-note is-blocked";
-    note.textContent = "Couldn't verify your roles — uploads are paused. Re-pick the project to retry.";
+    note.textContent = rolesErrorCopy(projectRoles.error);
     updateUploadEnabled();
     return;
   }
@@ -479,7 +502,7 @@ async function loadRolesFor(projectId: string): Promise<void> {
     const res = await window.tandemAgent.projectRoles(projectId);
     projectRoles = { status: "ready", roles: Array.isArray(res?.myRoles) ? res.myRoles : [] };
   } catch (err) {
-    projectRoles = { status: "error" };
+    projectRoles = { status: "error", error: (err as Error)?.message ?? "" };
   }
   // A file chosen for the previous project may not fit this one's roles.
   if (chosenFile && !isFileAllowed(chosenFile.path)) {
