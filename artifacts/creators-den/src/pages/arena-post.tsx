@@ -172,9 +172,9 @@ export default function ArenaPostPage() {
 
         <div className="arena-hero-side">
           {/* Unified 3-row × 2-column action grid: the live count (with the
-              Captain's total-received tag) next to Preview, then Share | Watch
-              notification, then the Captain's Close | Remove row — every cell
-              is the same width. */}
+              Captain's total-received tag) next to Watch notification, then
+              Share | Preview project, then the Captain's Close | Remove row —
+              every cell is the same width. */}
           <div className="arena-hero-grid">
             <div className="arena-hero-count">
               <div className="arena-count-big" data-testid="arena-post-count">
@@ -198,16 +198,16 @@ export default function ArenaPostPage() {
                 </span>
               )}
             </div>
-            <Link href={`/projects/${post.projectId}`} className="secondary-btn" data-testid="arena-preview-project">
-              <Eye size={14} /> Preview project
-            </Link>
-            <SharePostButton postId={post.id} />
             <ArenaRoleWatchMenu
               role={post.role}
               channelId={post.channelId}
               channelName={post.channelName}
               dataTestId="arena-watch-menu"
             />
+            <SharePostButton postId={post.id} />
+            <Link href={`/projects/${post.projectId}`} className="secondary-btn" data-testid="arena-preview-project">
+              <Eye size={14} /> Preview project
+            </Link>
             {isCaptain && <CaptainHeroControls post={post} onChanged={refreshPost} />}
           </div>
 
