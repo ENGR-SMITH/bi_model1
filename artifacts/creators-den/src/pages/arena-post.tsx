@@ -171,56 +171,36 @@ export default function ArenaPostPage() {
         </div>
 
         <div className="arena-hero-side">
-          <div className="arena-count-big" data-testid="arena-post-count">
-            {post.applicantCount === 0 ? (
-              <>
-                <b>Be the first</b>
-                <span>to audition for this role</span>
-              </>
-            ) : (
-              <>
-                <b>{post.applicantCount}</b>
-                <span>
-                  {post.applicantCount === 1 ? 'creator has already' : 'creators have already'} applied{isApplicant ? ' — you’re one of them' : ''}
+          {/* Unified 3-row × 2-column action grid: the live count (with the
+              Captain's total-received tag) next to Preview, then Share | Watch
+              notification, then the Captain's Close | Remove row — every cell
+              is the same width. */}
+          <div className="arena-hero-grid">
+            <div className="arena-hero-count">
+              <div className="arena-count-big" data-testid="arena-post-count">
+                {post.applicantCount === 0 ? (
+                  <>
+                    <b>Be the first</b>
+                    <span>to audition for this role</span>
+                  </>
+                ) : (
+                  <>
+                    <b>{post.applicantCount}</b>
+                    <span>
+                      {post.applicantCount === 1 ? 'creator has already' : 'creators have already'} applied{isApplicant ? ' — you’re one of them' : ''}
+                    </span>
+                  </>
+                )}
+              </div>
+              {isCaptain && (
+                <span className="den-tag muted" data-testid="arena-total-applications">
+                  {post.totalApplications} total application{post.totalApplications === 1 ? '' : 's'} received
                 </span>
-              </>
-            )}
-          </div>
-          {isCaptain && (
-            <span className="den-tag muted" data-testid="arena-total-applications">
-              {post.totalApplications} total application{post.totalApplications === 1 ? '' : 's'} received
-            </span>
-          )}
-
-          <div className="arena-actions">
+              )}
+            </div>
             <Link href={`/projects/${post.projectId}`} className="secondary-btn" data-testid="arena-preview-project">
               <Eye size={14} /> Preview project
             </Link>
-            {canApply && (
-              <button type="button" className="primary-btn" onClick={() => setApplyOpen(true)} data-testid="button-arena-open-apply">
-                Apply for this role
-              </button>
-            )}
-            {mine === 'pending' && post.status === 'OPEN' && (
-              <WithdrawButton postId={post.id} onDone={refreshPost} />
-            )}
-            {mine === 'pending' && post.status !== 'OPEN' && (
-              <span className="den-tag muted">Your audition is on this post</span>
-            )}
-            {mine === 'accepted' && (
-              <span className="den-tag teal" data-testid="arena-hired-chip">You were hired for this role</span>
-            )}
-            {canReviewHire && (
-              <HireReviewCta
-                postId={post.id}
-                captainId={post.postedBy}
-                captainName={post.posterName}
-                roleLabel={meta.roleLabel}
-                projectName={post.projectName}
-              />
-            )}
-          </div>
-          <div className="arena-actions-secondary">
             <SharePostButton postId={post.id} />
             <ArenaRoleWatchMenu
               role={post.role}
@@ -228,8 +208,37 @@ export default function ArenaPostPage() {
               channelName={post.channelName}
               dataTestId="arena-watch-menu"
             />
+            {isCaptain && <CaptainHeroControls post={post} onChanged={refreshPost} />}
           </div>
-          {isCaptain && <CaptainHeroControls post={post} onChanged={refreshPost} />}
+
+          {/* Applicant-only actions sit below the grid — the Captain has none. */}
+          {!isCaptain && (canApply || mine === 'pending' || mine === 'accepted') && (
+            <div className="arena-actions">
+              {canApply && (
+                <button type="button" className="primary-btn" onClick={() => setApplyOpen(true)} data-testid="button-arena-open-apply">
+                  Apply for this role
+                </button>
+              )}
+              {mine === 'pending' && post.status === 'OPEN' && (
+                <WithdrawButton postId={post.id} onDone={refreshPost} />
+              )}
+              {mine === 'pending' && post.status !== 'OPEN' && (
+                <span className="den-tag muted">Your audition is on this post</span>
+              )}
+              {mine === 'accepted' && (
+                <span className="den-tag teal" data-testid="arena-hired-chip">You were hired for this role</span>
+              )}
+              {canReviewHire && (
+                <HireReviewCta
+                  postId={post.id}
+                  captainId={post.postedBy}
+                  captainName={post.posterName}
+                  roleLabel={meta.roleLabel}
+                  projectName={post.projectName}
+                />
+              )}
+            </div>
+          )}
           {canApply && (
             <p className="arena-apply-hint">
               {mine === 'rejected'
@@ -337,9 +346,9 @@ function HireReviewCta({
   );
 }
 
-// Captain controls inside the hero's button column — Close/Reopen (yellow)
-// and Remove post (red, two-step confirm) sit on their own row directly
-// below the Share + Watch row.
+// Captain controls — Close/Reopen (yellow) and Remove post (red, two-step
+// confirm). Rendered as a fragment so each button lands in its own cell of
+// the hero's 2-column action grid, next to the Share + Watch row above.
 function CaptainHeroControls({ post, onChanged }: { post: ArenaPostDetail; onChanged: () => void }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -348,7 +357,7 @@ function CaptainHeroControls({ post, onChanged }: { post: ArenaPostDetail; onCha
   const [confirmRemove, setConfirmRemove] = useState(false);
 
   return (
-    <div className="arena-captain-row">
+    <>
       {post.status === 'OPEN' ? (
         <button
           type="button"
@@ -411,7 +420,7 @@ function CaptainHeroControls({ post, onChanged }: { post: ArenaPostDetail; onCha
           {(removePost.error as { response?: { data?: { error?: string } } } | null)?.response?.data?.error || 'The post could not be removed.'}
         </p>
       )}
-    </div>
+    </>
   );
 }
 
