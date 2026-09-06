@@ -149,8 +149,10 @@ function PassStamp({
   });
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-success">
-      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-7 text-white shadow-2xl">
-        <div className="flex items-center justify-between">
+      <div className="relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#131316]/90 p-7 text-white shadow-[0_30px_80px_-20px_rgba(0,0,0,.7)] backdrop-blur-xl">
+        <span className="card-spot" />
+        <span className="card-shine" />
+        <div className="relative flex items-center justify-between">
           <span className="icon-chip h-14 w-14 text-[#34d399]">
             <PiConfettiDuotone className="h-7 w-7" />
           </span>
@@ -177,10 +179,10 @@ function PassStamp({
         <button
           type="button"
           onClick={onDone}
-          className="focus-house mt-6 w-full rounded-xl bg-[#3b82f6] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2563eb]"
+          className="focus-house relative mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] py-3.5 text-sm font-bold text-white shadow-[0_12px_28px_-12px_rgba(59,130,246,.8)] transition-all hover:brightness-110 hover:shadow-[0_16px_36px_-12px_rgba(139,92,246,.9)]"
           data-testid="button-enter-room"
         >
-          Enter the room <PiTicketDuotone className="ml-1 inline h-4 w-4 text-white/80" />
+          Enter the room <PiTicketDuotone className="inline h-4 w-4 text-white/80" />
         </button>
         <button
           type="button"
@@ -311,23 +313,29 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-gate">
-      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] text-white shadow-2xl">
+      <div className="soft-lift group relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#131316]/90 text-white shadow-[0_30px_80px_-20px_rgba(0,0,0,.7)] backdrop-blur-xl">
+        <span className="card-spot" />
+        <span className="card-shine" />
+
         {/* Coupon stub header */}
-        <div className="rounded-t-[1.35rem] p-6 pb-5">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <span className="icon-chip h-11 w-11 text-[#3b82f6]">
+        <div className="relative p-7 pb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3.5">
+              <span className="icon-chip h-12 w-12 shrink-0 text-[#60a5fa] shadow-[0_0_24px_-6px_rgba(59,130,246,.55)]">
                 <PiTicketDuotone className="h-5 w-5" />
               </span>
-              <div>
-                <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">Tandem access pass</p>
-                <h2 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.04em]">{name}</h2>
+              <div className="min-w-0">
+                <p className="font-mono-ui text-[10px] uppercase tracking-[0.22em] text-[#60a5fa]">Tandem access pass</p>
+                <h2 className="mt-1 truncate font-display text-2xl font-extrabold tracking-[-0.04em] text-white">{name}</h2>
               </div>
             </div>
-            <span className="font-display text-2xl font-extrabold tracking-[-0.04em]">${(priceUsd / 100).toFixed(2)}</span>
+            <div className="shrink-0 text-right">
+              <p className="font-display text-[1.9rem] font-extrabold leading-none tracking-[-0.05em] text-white">${(priceUsd / 100).toFixed(2)}</p>
+              <p className="mt-1 font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">/ {weeks} weeks</p>
+            </div>
           </div>
-          <p className="mt-4 text-sm leading-relaxed text-zinc-400">
-            A ticket unlocks the whole {name.toLowerCase()} category — <b>{weeks} weeks</b> of access. Renew anytime; a renewal extends the pass.
+          <p className="mt-5 text-sm leading-relaxed text-zinc-400">
+            A ticket unlocks the whole {name.toLowerCase()} category — <b className="text-zinc-200">{weeks} weeks</b> of access. Renew anytime; a renewal extends the pass.
           </p>
           {/* The free tour is offered on the room page while the visitor is
               still eligible — by the time this popup renders, the one-time
@@ -336,28 +344,30 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
 
         {/* Perforation */}
         <div className="relative flex items-center px-2">
-          <span className="absolute -left-2 h-4 w-4 rounded-full bg-[#111111]/60" />
+          <span className="absolute -left-2 h-4 w-4 rounded-full bg-[#131316]/90" />
           <div className="h-0 flex-1 border-t-2 border-dashed border-white/10" />
-          <span className="absolute -right-2 h-4 w-4 rounded-full bg-[#111111]/60" />
+          <span className="absolute -right-2 h-4 w-4 rounded-full bg-[#131316]/90" />
         </div>
 
         {/* Payment body — Paystack hosted checkout (USD), no card fields. */}
-        <div className="rounded-b-[1.35rem] p-6 pt-5">
-          <div className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[.03] p-3">
-            <PiLockKeyDuotone className="mt-0.5 h-4 w-4 shrink-0 text-[#34d399]" />
-            <p className="text-xs leading-relaxed text-zinc-400">
-              You'll be taken to <b className="text-zinc-200">Paystack's secure checkout</b> (USD) to pay. You'll land back here when it's done.
+        <div className="relative p-7 pt-6">
+          <div className="flex items-start gap-3 rounded-2xl border border-[#34d399]/15 bg-gradient-to-br from-[#34d399]/10 to-transparent p-3.5">
+            <span className="icon-chip h-8 w-8 shrink-0 text-[#34d399]">
+              <PiLockKeyDuotone className="h-3.5 w-3.5" />
+            </span>
+            <p className="text-xs leading-relaxed text-zinc-300">
+              You'll be taken to <b className="text-white">Paystack's secure checkout</b> (USD) to pay. You'll land back here when it's done.
             </p>
           </div>
 
-          <div className="mt-4">
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Promo code (optional)</span>
+          <div className="mt-5">
+            <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">Promo code (optional)</span>
             <input
               value={promoInput}
               onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
               placeholder="PROMOCODE"
               disabled={busy}
-              className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600 disabled:opacity-50"
+              className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600 transition-colors focus:border-[#3b82f6]/50 disabled:opacity-50"
               data-testid="input-promo"
             />
           </div>
@@ -372,7 +382,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             type="button"
             onClick={pay}
             disabled={checkout.isPending || opening}
-            className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b82f6] py-3.5 text-sm font-semibold text-white transition-colors hover:bg-[#2563eb] disabled:cursor-wait disabled:opacity-60"
+            className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] py-3.5 text-sm font-bold text-white shadow-[0_12px_28px_-12px_rgba(59,130,246,.8)] transition-all hover:brightness-110 hover:shadow-[0_16px_36px_-12px_rgba(139,92,246,.9)] disabled:cursor-wait disabled:opacity-60"
             data-testid="button-pay"
           >
             {busy ? (
@@ -381,17 +391,18 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
               <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay ${(priceUsd / 100).toFixed(2)} · {weeks} weeks</>
             )}
           </button>
-          <p className="mt-3 flex items-center gap-2 text-center text-[10px] leading-relaxed text-zinc-600">
-            <PiLockKeyDuotone className="h-3 w-3 shrink-0" />
+          <p className="mt-4 flex items-center justify-center gap-2 text-center text-[10px] leading-relaxed text-zinc-600">
+            <PiLockKeyDuotone className="h-3 w-3 shrink-0 text-[#34d399]" />
             Secure checkout by Paystack — no card details ever pass through this site.
           </p>
         </div>
 
         {/* Coupon detach footer — barcode + expiry, so the pass reads like a
-            printed coupon you tear off along the dashed line. */}          <div className="flex items-center gap-4 border-t border-white/10 px-6 py-4">
+            printed coupon you tear off along the dashed line. */}
+        <div className="flex items-center gap-4 border-t border-white/10 bg-white/[.02] px-7 py-4">
           <div className="flex items-center gap-3">
-            <span className="h-8 w-5 -rotate-90 rounded-md border border-[#3b82f6]" />
-            <span className="font-mono-ui text-[8px] uppercase tracking-[0.18em] text-[#3b82f6]">Tear</span>
+            <span className="h-8 w-5 -rotate-90 rounded-md border border-[#60a5fa]/60" />
+            <span className="font-mono-ui text-[8px] uppercase tracking-[0.18em] text-[#60a5fa]/80">Tear</span>
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Tandem access pass · {weeks} weeks</p>
