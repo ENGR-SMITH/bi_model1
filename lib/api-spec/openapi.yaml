@@ -6495,13 +6495,17 @@ components:
         projectName: { type: string }
         projectStatus: { type: string }
         applicantCount: { type: integer, description: Live number of PENDING auditions on this post (the current applicants) }
+        applicants:
+          type: array
+          description: Distinct creators who applied to this post, most recent application first (capped) — the avatar stack on the board cards
+          items: { $ref: "#/components/schemas/ArenaHireProfile" }
         myApplication:
           type: string
           enum: [none, pending, accepted, rejected]
           description: The caller's own application state on this post
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, channelId, projectId, role, pitch, status, postedBy, posterName, posterImageUrl, channelName, channelAvatarUrl, projectName, projectStatus, applicantCount, myApplication, createdAt, updatedAt]
+      required: [id, channelId, projectId, role, pitch, status, postedBy, posterName, posterImageUrl, channelName, channelAvatarUrl, projectName, projectStatus, applicantCount, applicants, myApplication, createdAt, updatedAt]
     ArenaHireProfile:
       type: object
       description: Public profile of the creator who filled a role — present on the post once it is FILLED

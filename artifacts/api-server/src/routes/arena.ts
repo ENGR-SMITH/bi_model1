@@ -109,6 +109,7 @@ type PostSummary = {
   projectName: string;
   projectStatus: string;
   applicantCount: number;
+  applicants: Array<{ id: string; name: string; imageUrl: string | null }>;
   myApplication: "none" | "pending" | "accepted" | "rejected";
   filledBy: { id: string; name: string; imageUrl: string | null } | null;
   createdAt: Date;
@@ -187,8 +188,21 @@ async function hydratePosts(
     }
   }
 
+  // Distinct creators who applied to each post (any status), most recent
+  // application first — capped so the board's avatar stack stays legible.
+  const MAX_AVATAR_APPLICANTS = 6;
+  const applicantsByPost = new Map<string, string[]>();
+  for (const row of [...applicationRows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())) {
+    const list = applicantsByPost.get(row.postId) ?? [];
+    if (!list.includes(row.applicantId) && list.length < MAX_AVATAR_APPLICANTS) {
+      list.push(row.applicantId);
+      applicantsByPost.set(row.postId, list);
+    }
+  }
+
   // Profiles for the poster(s) plus anyone who filled a role in this batch.
   const hireProfiles = await resolveUserProfiles([...new Set(hireByPost.values())]);
+  const applicantProfiles = await resolveUserProfiles([...new Set([...applicantsByPost.values()].flat())]);
 
   const items: PostSummary[] = posts.map((post) => {
     const channel = channelById.get(post.channelId);
@@ -217,6 +231,10 @@ async function hydratePosts(
       projectName: project?.name ?? "Unknown project",
       projectStatus: project?.status ?? "",
       applicantCount: pendingByPost.get(post.id) ?? 0,
+      applicants: (applicantsByPost.get(post.id) ?? []).map((id) => {
+        const profile = applicantProfiles[id];
+        return { id, name: profile?.name ?? "Tandem creator", imageUrl: profile?.imageUrl ?? null };
+      }),
       myApplication,
       filledBy:
         hiredApplicantId && hiredProfile

@@ -4361,6 +4361,11 @@ export const ListArenaPostsResponseItem = zod.object({
   "projectName": zod.string(),
   "projectStatus": zod.string(),
   "applicantCount": zod.number().int().describe('Live number of PENDING auditions on this post (the current applicants)'),
+  "applicants": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "imageUrl": zod.string().nullable()
+}).describe('Public profile of the creator who filled a role — present on the post once it is FILLED')).describe('Distinct creators who applied to this post, most recent application first (capped) — the avatar stack on the board cards'),
   "myApplication": zod.enum(['none', 'pending', 'accepted', 'rejected']).describe('The caller\'s own application state on this post'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -4398,6 +4403,11 @@ export const CreateArenaPostResponse = zod.object({
   "projectName": zod.string(),
   "projectStatus": zod.string(),
   "applicantCount": zod.number().int().describe('Live number of PENDING auditions on this post (the current applicants)'),
+  "applicants": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "imageUrl": zod.string().nullable()
+}).describe('Public profile of the creator who filled a role — present on the post once it is FILLED')).describe('Distinct creators who applied to this post, most recent application first (capped) — the avatar stack on the board cards'),
   "myApplication": zod.enum(['none', 'pending', 'accepted', 'rejected']).describe('The caller\'s own application state on this post'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -4436,6 +4446,11 @@ export const GetArenaPostResponse = zod.object({
   "projectName": zod.string(),
   "projectStatus": zod.string(),
   "applicantCount": zod.number().int().describe('Live number of PENDING auditions on this post (the current applicants)'),
+  "applicants": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "imageUrl": zod.string().nullable()
+}).describe('Public profile of the creator who filled a role — present on the post once it is FILLED')).describe('Distinct creators who applied to this post, most recent application first (capped) — the avatar stack on the board cards'),
   "myApplication": zod.enum(['none', 'pending', 'accepted', 'rejected']).describe('The caller\'s own application state on this post'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -4484,6 +4499,11 @@ export const UpdateArenaPostResponse = zod.object({
   "projectName": zod.string(),
   "projectStatus": zod.string(),
   "applicantCount": zod.number().int().describe('Live number of PENDING auditions on this post (the current applicants)'),
+  "applicants": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "imageUrl": zod.string().nullable()
+}).describe('Public profile of the creator who filled a role — present on the post once it is FILLED')).describe('Distinct creators who applied to this post, most recent application first (capped) — the avatar stack on the board cards'),
   "myApplication": zod.enum(['none', 'pending', 'accepted', 'rejected']).describe('The caller\'s own application state on this post'),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
