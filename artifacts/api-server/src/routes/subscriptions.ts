@@ -1,24 +1,15 @@
-import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
-import { and, eq, gt, sql } from "drizzle-orm";
+import { accountUsage } from "../video/quota";
 import {
-  db,
-  tandemAccountQuotasTable,
-  tandemPromoCodesTable,
-  tandemSubscriptionsTable,
-  tandemTicketsTable,
-} from "@workspace/db";
-import { getOrCreateQuota, accountUsage } from "../video/quota";
-import {
-  storagePlanBytes,
-  projectPlanCount,
-  isPassCategory,
+  applySubscriptionPurchase,
   listUserSubscriptions,
+  resolveSubscriptionProduct,
   subscriptionPlans,
-  recordSubscription,
+  unknownProductMessage,
+  type SubscriptionKind,
 } from "../video/subscriptions";
-import { luhnValid, expiryValid, resolvePromo, PASS_PRICE_USD, PASS_WEEKS, type TicketCategory } from "./tickets";
+import { luhnValid, expiryValid, resolvePromo } from "./tickets";
 
 const router: IRouter = Router();
 
@@ -43,11 +34,6 @@ function parseCard(card: unknown): CardInput | null {
   if (typeof c.expiryMonth !== "number" || typeof c.expiryYear !== "number") return null;
   if (typeof c.cvc !== "string") return null;
   return { number: c.number, expiryMonth: c.expiryMonth, expiryYear: c.expiryYear, cvc: c.cvc };
-}
-
-// Buried beneath the entitlement logic below — a small helper for the plan price.
-function planPrice(kind: "pass" | "storage" | "projects", planId: string): number {
-  return subscriptionPlans().find((plan) => plan.kind === kind && plan.planId === planId)?.priceUsd ?? 0;
 }
 
 // GET /subscriptions/plans — the full catalog (passes, storage, projects) plus
@@ -87,9 +73,12 @@ router.get("/subscriptions", async (req: Request, res: Response): Promise<void> 
 });
 
 // POST /subscriptions/purchase — subscribe to any product (category pass,
-// storage plan, or project plan) with a credit card. On success grants the
-// entitlement (a ticket, extra storage, or extra projects) and records the
-// subscription so the history page reflects it immediately.
+// storage plan, or project plan). This is the card-checkout path used while
+// no payment provider is connected: the card is validated in-house (Luhn +
+// expiry + cvc), only the last-4 is kept, and the entitlement is granted
+// immediately. When Paystack is wired to the buy buttons this endpoint is
+// superseded by the /paystack/checkout → webhook/verify flow, which grants
+// through the same applySubscriptionPurchase helper.
 router.post("/subscriptions/purchase", async (req: Request, res: Response): Promise<void> => {
   const userId = getAuth(req).userId;
   if (!userId) {
@@ -98,12 +87,12 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
   }
 
   const body = (req.body ?? {}) as Record<string, unknown>;
-  const kind = body.kind;
+  const rawKind = body.kind;
   const planId = typeof body.planId === "string" ? body.planId : "";
   const card = parseCard(body.card);
   const promoCode = typeof body.promoCode === "string" ? body.promoCode : undefined;
 
-  if (kind !== "pass" && kind !== "storage" && kind !== "projects") {
+  if (rawKind !== "pass" && rawKind !== "storage" && rawKind !== "projects") {
     res.status(400).json({ error: "A subscription kind (pass, storage, or projects) is required" });
     return;
   }
@@ -111,36 +100,15 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
     res.status(400).json({ error: "A plan id is required" });
     return;
   }
+  const kind = rawKind as SubscriptionKind;
 
-  // Resolve the product + price.
-  let priceUsd = 0;
-  let planLabel = "";
-  let intervalLabel = "";
-  if (kind === "pass") {
-    if (!isPassCategory(planId)) {
-      res.status(400).json({ error: `Unknown category: ${planId}` });
-      return;
-    }
-    priceUsd = PASS_PRICE_USD;
-    planLabel = planId === "authors" ? "Author & Writer pass" : "Content Creators pass";
-    intervalLabel = `${PASS_WEEKS} weeks`;
-  } else if (kind === "storage") {
-    if (storagePlanBytes(planId) <= 0) {
-      res.status(400).json({ error: `Unknown storage plan: ${planId}` });
-      return;
-    }
-    priceUsd = planPrice("storage", planId);
-    planLabel = `${formatStorageBytes(storagePlanBytes(planId))} more space`;
-    intervalLabel = "recurring";
-  } else {
-    if (projectPlanCount(planId) <= 0) {
-      res.status(400).json({ error: `Unknown projects plan: ${planId}` });
-      return;
-    }
-    priceUsd = planPrice("projects", planId);
-    planLabel = `+${projectPlanCount(planId)} projects`;
-    intervalLabel = "one-time";
+  // Resolve the product + price (shared with the Paystack checkout).
+  const product = resolveSubscriptionProduct(kind, planId);
+  if (!product) {
+    res.status(400).json({ error: unknownProductMessage(kind, planId) });
+    return;
   }
+  const { priceUsd, planLabel, intervalLabel } = product;
 
   // Card validation before anything is stored.
   if (!card || !luhnValid(card.number)) {
@@ -162,76 +130,25 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
     return;
   }
   const total = Math.max(0, priceUsd - (promo?.discount ?? 0));
-  const now = new Date();
   const cardLast4 = card!.number.replace(/\s+/g, "").slice(-4);
 
-  // Apply the entitlement + its billing period.
-  let periodStart = now;
-  let periodEnd: Date;
-
-  if (kind === "pass") {
-    const category = planId as TicketCategory;
-    const [existing] = await db
-      .select()
-      .from(tandemTicketsTable)
-      .where(
-        and(
-          eq(tandemTicketsTable.userId, userId),
-          eq(tandemTicketsTable.category, category),
-          gt(tandemTicketsTable.expiresAt, now),
-        ),
-      )
-      .orderBy(tandemTicketsTable.expiresAt)
-      .limit(1);
-    const base = existing && existing.expiresAt.getTime() > Date.now() ? existing.expiresAt : now;
-    periodStart = base;
-    periodEnd = new Date(base.getTime() + PASS_WEEKS * 7 * 24 * 60 * 60 * 1000);
-    await db.insert(tandemTicketsTable).values({
-      id: randomUUID(),
-      userId,
-      category,
-      priceUsd: total,
-      promoCode: promo?.code ?? null,
-      cardLast4,
-      expiresAt: periodEnd,
-    });
-  } else {
-    const quota = await getOrCreateQuota(userId);
-    periodEnd = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
-    await db
-      .update(tandemAccountQuotasTable)
-      .set(
-        kind === "storage"
-          ? { storageLimitBytes: quota.storageLimitBytes + storagePlanBytes(planId) }
-          : { projectLimit: quota.projectLimit + projectPlanCount(planId) },
-      )
-      .where(eq(tandemAccountQuotasTable.userId, userId));
-  }
-
-  if (promo) {
-    await db
-      .update(tandemPromoCodesTable)
-      .set({ uses: sql`${tandemPromoCodesTable.uses} + 1` })
-      .where(eq(tandemPromoCodesTable.code, promo.code));
-  }
-
-  await recordSubscription({
+  // Grant the entitlement + record the subscription (single shared grant path).
+  const applied = await applySubscriptionPurchase({
     userId,
     kind,
     planId,
     planLabel,
     priceUsd: total,
     intervalLabel,
-    periodStart,
-    periodEnd,
-    source: "checkout",
     promoCode: promo?.code ?? null,
     cardLast4,
+    source: "checkout",
   });
 
   const subscriptions = await listUserSubscriptions(userId);
+  const subscription = subscriptions.find((sub) => sub.id === applied.subscriptionId) ?? subscriptions[0];
   res.status(201).json({
-    subscription: subscriptions[0],
+    subscription,
     receipt: {
       subtotal: priceUsd,
       discount: promo?.discount ?? 0,
@@ -241,10 +158,5 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
     },
   });
 });
-
-function formatStorageBytes(bytes: number): string {
-  if (bytes >= 1024 ** 4) return `${(bytes / 1024 ** 4).toFixed(0)} TB`;
-  return `${(bytes / 1024 ** 3).toFixed(0)} GB`;
-}
 
 export default router;

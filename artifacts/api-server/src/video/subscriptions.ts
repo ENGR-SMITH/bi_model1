@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { desc, eq } from "drizzle-orm";
-import { db, tandemSubscriptionsTable } from "@workspace/db";
-import { STORAGE_PLANS, PROJECT_PLANS } from "./quota";
+import { and, desc, eq, gt, sql } from "drizzle-orm";
+import {
+  db,
+  tandemAccountQuotasTable,
+  tandemPromoCodesTable,
+  tandemSubscriptionsTable,
+  tandemTicketsTable,
+} from "@workspace/db";
+import { STORAGE_PLANS, PROJECT_PLANS, getOrCreateQuota } from "./quota";
 import { PASS_PRICE_USD, PASS_WEEKS, TICKET_CATEGORIES, type TicketCategory } from "../routes/tickets";
 
 // ---------------------------------------------------------------------------
@@ -61,6 +67,46 @@ export function storagePlanBytes(planId: string): number {
   return STORAGE_PLANS.find((plan) => plan.id === planId)?.bytes ?? 0;
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 ** 4) return `${(bytes / 1024 ** 4).toFixed(0)} TB`;
+  return `${(bytes / 1024 ** 3).toFixed(0)} GB`;
+}
+
+/**
+ * Resolve a purchasable product (kind + planId) to its catalog fields, or
+ * null when the kind/plan combination is unknown. Shared by the card checkout
+ * and the Paystack checkout so a plan always prices the same everywhere.
+ */
+export function resolveSubscriptionProduct(
+  kind: SubscriptionKind,
+  planId: string,
+): { priceUsd: number; planLabel: string; intervalLabel: string } | null {
+  if (kind === "pass") {
+    if (!isPassCategory(planId)) return null;
+    return {
+      priceUsd: PASS_PRICE_USD,
+      planLabel: planId === "authors" ? "Author & Writer pass" : "Content Creators pass",
+      intervalLabel: `${PASS_WEEKS} weeks`,
+    };
+  }
+  if (kind === "storage") {
+    const plan = STORAGE_PLANS.find((item) => item.id === planId);
+    if (!plan) return null;
+    return {
+      priceUsd: plan.priceUsd,
+      planLabel: `${formatBytes(plan.bytes)} more space`,
+      intervalLabel: "recurring",
+    };
+  }
+  const plan = PROJECT_PLANS.find((item) => item.id === planId);
+  if (!plan) return null;
+  return {
+    priceUsd: plan.priceUsd,
+    planLabel: `+${plan.count} projects`,
+    intervalLabel: "one-time",
+  };
+}
+
 /** Projects added for a project plan id, or 0. */
 export function projectPlanCount(planId: string): number {
   return PROJECT_PLANS.find((plan) => plan.id === planId)?.count ?? 0;
@@ -106,6 +152,113 @@ export async function recordSubscription(input: RecordSubscriptionInput): Promis
     cardLast4: input.cardLast4 ?? null,
   });
   return id;
+}
+
+/** Human-readable 400 message for an unknown kind/plan pair. */
+export function unknownProductMessage(kind: SubscriptionKind, planId: string): string {
+  return kind === "pass"
+    ? `Unknown category: ${planId}`
+    : kind === "storage"
+      ? `Unknown storage plan: ${planId}`
+      : `Unknown projects plan: ${planId}`;
+}
+
+export interface ApplySubscriptionPurchaseInput {
+  userId: string;
+  kind: SubscriptionKind;
+  planId: string;
+  planLabel: string;
+  /** Total actually charged/paid, in USD cents (after any promo discount). */
+  priceUsd: number;
+  intervalLabel: string;
+  promoCode?: string | null;
+  cardLast4?: string | null;
+  source?: "checkout" | "clerk";
+}
+
+export interface AppliedSubscription {
+  subscriptionId: string;
+  periodStart: Date;
+  periodEnd: Date;
+}
+
+/**
+ * Apply a paid subscription: grants the entitlement (a category ticket that
+ * stacks onto the current pass, or extra storage/projects on the account
+ * quota), records the subscription, and bumps the promo code's use count.
+ * This is the single grant point used by every checkout path (the card
+ * checkout, the Paystack webhook, and the Paystack verify-on-return), so a
+ * paid plan always lands the same way.
+ */
+export async function applySubscriptionPurchase(
+  input: ApplySubscriptionPurchaseInput,
+): Promise<AppliedSubscription> {
+  const now = new Date();
+  let periodStart: Date = now;
+  let periodEnd: Date;
+
+  if (input.kind === "pass") {
+    const category = input.planId as TicketCategory;
+    // Renewing while the pass is still live extends it; otherwise 3 weeks from now.
+    const [existing] = await db
+      .select()
+      .from(tandemTicketsTable)
+      .where(
+        and(
+          eq(tandemTicketsTable.userId, input.userId),
+          eq(tandemTicketsTable.category, category),
+          gt(tandemTicketsTable.expiresAt, now),
+        ),
+      )
+      .orderBy(tandemTicketsTable.expiresAt)
+      .limit(1);
+    const base = existing && existing.expiresAt.getTime() > Date.now() ? existing.expiresAt : now;
+    periodStart = base;
+    periodEnd = new Date(base.getTime() + PASS_WEEKS * 7 * 24 * 60 * 60 * 1000);
+    await db.insert(tandemTicketsTable).values({
+      id: randomUUID(),
+      userId: input.userId,
+      category,
+      priceUsd: input.priceUsd,
+      promoCode: input.promoCode ?? null,
+      cardLast4: input.cardLast4 ?? "",
+      expiresAt: periodEnd,
+    });
+  } else {
+    const quota = await getOrCreateQuota(input.userId);
+    periodEnd = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    await db
+      .update(tandemAccountQuotasTable)
+      .set(
+        input.kind === "storage"
+          ? { storageLimitBytes: quota.storageLimitBytes + storagePlanBytes(input.planId) }
+          : { projectLimit: quota.projectLimit + projectPlanCount(input.planId) },
+      )
+      .where(eq(tandemAccountQuotasTable.userId, input.userId));
+  }
+
+  if (input.promoCode) {
+    await db
+      .update(tandemPromoCodesTable)
+      .set({ uses: sql`${tandemPromoCodesTable.uses} + 1` })
+      .where(eq(tandemPromoCodesTable.code, input.promoCode));
+  }
+
+  const subscriptionId = await recordSubscription({
+    userId: input.userId,
+    kind: input.kind,
+    planId: input.planId,
+    planLabel: input.planLabel,
+    priceUsd: input.priceUsd,
+    intervalLabel: input.intervalLabel,
+    periodStart,
+    periodEnd,
+    source: input.source ?? "checkout",
+    promoCode: input.promoCode ?? null,
+    cardLast4: input.cardLast4 ?? null,
+  });
+
+  return { subscriptionId, periodStart, periodEnd };
 }
 
 export interface UserSubscriptionView {

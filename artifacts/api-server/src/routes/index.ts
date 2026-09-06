@@ -15,6 +15,7 @@ import videoSocialRouter from "./video-social";
 import accountRouter from "./account";
 import ticketsRouter from "./tickets";
 import subscriptionsRouter from "./subscriptions";
+import paystackRouter from "./paystack";
 import videoStorageRouter from "./video-storage";
 import arenaRouter from "./arena";
 
@@ -34,6 +35,7 @@ router.use(videoSocialRouter);
 router.use(accountRouter);
 router.use(ticketsRouter);
 router.use(subscriptionsRouter);
+router.use(paystackRouter);
 router.use(videoStorageRouter);
 router.use(arenaRouter);
 router.use(adminRouter);

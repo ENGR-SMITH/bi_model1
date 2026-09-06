@@ -12,6 +12,7 @@ import { exportProject, type ExportFormat } from "./export";
 import { useUser } from "@clerk/react";
 import { Toaster } from "@/components/ui/toaster";
 import { BuyProjectsModal, ProfilePage } from "@/components/profile-page";
+import { PaystackReturnGate } from "@/components/paystack-return";
 import { ExplorePage } from "@/components/explore";
 import { NotificationsPage } from "@/components/notifications";
 import { continuityAudit, oracleChat, outlineAssist, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
@@ -836,6 +837,8 @@ function App() {
     {noteProject && <NoteModal project={noteProject} onClose={() => setNoteProject(null)} onSubmit={(note) => submitClone(noteProject, note)} submitting={saveDraft.isPending || submitApp.isPending || createApplication.isPending} />}
     {toast && <div className="toast" role="status"><Check size={16} />{toast}</div>}
     <Toaster />
+    {/* Confirms a Paystack payment when the customer returns from checkout. */}
+    <PaystackReturnGate />
   </div>;
 }
 

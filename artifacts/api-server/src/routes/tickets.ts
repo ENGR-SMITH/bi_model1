@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
-import { and, eq, gt, sql } from "drizzle-orm";
-import { db, tandemPromoCodesTable, tandemSubscriptionsTable, tandemTicketsTable, tandemToursTable } from "@workspace/db";
+import { and, eq, gt } from "drizzle-orm";
+import { db, tandemPromoCodesTable, tandemTicketsTable, tandemToursTable } from "@workspace/db";
+import { applySubscriptionPurchase } from "../video/subscriptions";
 import {
   GetTicketStatusResponse,
   PurchaseTicketBody,
@@ -328,77 +329,36 @@ router.post("/tickets/purchase", async (req: Request, res: Response): Promise<vo
   }
 
   const total = Math.max(0, PASS_PRICE_USD - (promo?.discount ?? 0));
+  const cardLast4 = card.number.replace(/\s+/g, "").slice(-4);
 
-  // Extend from the current pass (if still active) so renewing stacks; a fresh
-  // pass runs 3 weeks from today.
-  const [existing] = await db
-    .select()
-    .from(tandemTicketsTable)
-    .where(
-      and(
-        eq(tandemTicketsTable.userId, userId),
-        eq(tandemTicketsTable.category, category),
-        gt(tandemTicketsTable.expiresAt, new Date()),
-      ),
-    )
-    .orderBy(tandemTicketsTable.expiresAt)
-    .limit(1);
-  const base = existing && existing.expiresAt.getTime() > Date.now() ? existing.expiresAt : new Date();
-  const expiresAt = new Date(base.getTime() + PASS_WEEKS * 7 * 24 * 60 * 60 * 1000);
-
-  const [ticket] = await db
-    .insert(tandemTicketsTable)
-    .values({
-      id: randomUUID(),
-      userId,
-      category,
-      priceUsd: total,
-      promoCode: promo?.code ?? null,
-      cardLast4: card.number.replace(/\s+/g, "").slice(-4),
-      expiresAt,
-    })
-    .returning();
-
-  if (promo) {
-    await db
-      .update(tandemPromoCodesTable)
-      .set({ uses: sql`${tandemPromoCodesTable.uses} + 1` })
-      .where(eq(tandemPromoCodesTable.code, promo.code));
-  }
-
-  // Record the purchase as a subscription so the TANDEM Subscriptions page
-  // has a full history of every pass (type, price, status, expiry).
-  const baseStart = existing && existing.expiresAt.getTime() > Date.now() ? existing.expiresAt : new Date();
-  await db.insert(tandemSubscriptionsTable).values({
-    id: randomUUID(),
+  // Grant the pass + record the subscription via the single shared grant path
+  // (renewing stacks onto the live pass; promo uses bump here, once).
+  const applied = await applySubscriptionPurchase({
     userId,
     kind: "pass",
     planId: category,
     planLabel: category === "authors" ? "Author & Writer pass" : "Content Creators pass",
     priceUsd: total,
-    status: "ACTIVE",
     intervalLabel: `${PASS_WEEKS} weeks`,
-    periodStart: baseStart,
-    periodEnd: expiresAt,
-    source: "checkout",
     promoCode: promo?.code ?? null,
-    cardLast4: card.number.replace(/\s+/g, "").slice(-4),
+    cardLast4,
+    source: "checkout",
   });
 
   res.status(201).json(
     PurchaseTicketResponse.parse({
       ticket: {
-        category: ticket.category,
-        expiresAt: ticket.expiresAt.toISOString(),
-        priceUsd: ticket.priceUsd,
-        promoCode: ticket.promoCode,
-        cardLast4: ticket.cardLast4,
+        category,
+        expiresAt: applied.periodEnd.toISOString(),
+        priceUsd: total,
+        promoCode: promo?.code ?? null,
+        cardLast4,
       },
       receipt: {
         subtotal: PASS_PRICE_USD,
         discount: promo?.discount ?? 0,
         total,
-        cardLast4: ticket.cardLast4,
+        cardLast4,
         promoCode: promo?.code ?? null,
       },
     }),

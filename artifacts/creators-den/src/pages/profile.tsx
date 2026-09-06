@@ -21,6 +21,7 @@ import type { VideoContributionDay, VideoProject } from '@workspace/api-client-r
 import { SectionEyebrow } from '@/components/shell';
 import { FollowButton } from '@/pages/explore';
 import { CvCard, StorageBar } from '@/components/account-panel';
+import { PaystackReturnGate } from '@/components/paystack-return';
 import { WorkReviewsCard } from '@/components/work-reviews-card';
 
 // ---------------------------------------------------------------------------
@@ -365,6 +366,9 @@ export default function ProfilePage() {
         <LockKeyhole size={13} />
         Only PUBLIC projects appear on a profile — private vaults never leave the room.
       </p>
+
+      {/* Confirms a Paystack payment when the customer returns from checkout. */}
+      <PaystackReturnGate />
     </div>
   );
 }
