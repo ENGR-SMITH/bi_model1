@@ -6054,8 +6054,27 @@ select optgroup {
 .arena-app-body { display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .arena-app-topline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .arena-app-topline b { font: 600 13px var(--app-font-sans); }
-.arena-app-portfolio { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: hsl(var(--accent)); font: 700 11px var(--app-font-sans); letter-spacing: .01em; text-decoration: none; }
-.arena-app-portfolio:hover { text-decoration: underline; }
+/* View portfolio — a quiet gray button with blue text. */
+.arena-app-portfolio {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 7px 13px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--muted) / .55);
+  color: hsl(217 88% 62%);
+  font: 700 11px var(--app-font-sans);
+  letter-spacing: .01em;
+  text-decoration: none;
+}
+.arena-app-portfolio:hover {
+  color: hsl(217 88% 72%);
+  border-color: hsl(217 88% 62% / .6);
+  background: hsl(var(--muted));
+  text-decoration: none;
+}
 .arena-app-message { margin: 0; font-size: 12.5px; line-height: 1.55; color: hsl(var(--muted-foreground)); white-space: pre-wrap; }
 .arena-doc-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .arena-doc-chip {
@@ -6239,18 +6258,16 @@ select optgroup {
 .role-tabs .arena-watch-bell:hover { color: hsl(var(--accent)); transform: translateY(-1px); }
 .role-tabs .arena-watch-bell.is-watching { color: hsl(var(--accent)); background: hsl(var(--accent) / .14); }
 
-/* ---- Post hero secondary actions: Share (blue) | Watch notification on
-   one two-column row, the same width as the Captain row beneath — all four
-   buttons share the same cell size. ---- */
-.arena-actions-secondary {
+/* ---- Post hero action grid: the live count (with the Captain's total
+   received tag beneath) | Preview project, then Share (blue) | Watch
+   notification, then the Captain's Close | Remove — one 3-row × 2-column
+   grid where every cell shares the same width. ---- */
+.arena-hero-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 2px;
-  padding-top: 10px;
-  border-top: 1px dashed hsl(var(--border));
 }
-.arena-actions-secondary .secondary-btn {
+.arena-hero-grid .secondary-btn {
   min-width: 0;
   justify-content: center;
   gap: 6px;
@@ -6258,12 +6275,19 @@ select optgroup {
   font-size: 10.5px;
   white-space: nowrap;
 }
-.arena-actions-secondary .arena-watch-label {
+.arena-hero-grid .arena-watch-label {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.arena-hero-count {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.arena-hero-count .den-tag { align-self: flex-start; }
 /* Share is the row's primary action — blue. */
 .arena-share-btn {
   color: hsl(217 88% 62%) !important;
@@ -6829,32 +6853,15 @@ select optgroup {
 .arena-decline:hover { animation-play-state: paused; }
 .arena-withdraw.is-armed { border-color: hsl(0 72% 60%) !important; color: hsl(0 72% 64%) !important; }
 
-/* ---- Captain controls row under Share + Watch (hero side): Close auditions
-   | Remove post on one two-column row, same cell width as the row above. ---- */
-.arena-captain-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 2px;
-  padding-top: 10px;
-  border-top: 1px dashed hsl(var(--border));
-}
-.arena-captain-row:empty { display: none; }
-.arena-captain-row .secondary-btn {
-  min-width: 0;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 6px;
-  font-size: 10.5px;
-  white-space: nowrap;
-}
+/* ---- Captain controls inside the hero action grid: Close (yellow) | Remove
+   (red) fill the third row; the two-step confirm + Keep span the whole row. ---- */
 .arena-captain-confirm {
   grid-column: 1 / -1;
   display: flex;
   gap: 8px;
 }
 .arena-captain-confirm .secondary-btn { flex: 1; }
-.arena-captain-error { margin: 0; font-size: 10.5px; }
+.arena-captain-error { grid-column: 1 / -1; margin: 0; font-size: 10.5px; }
 
 /* ---- Apply modal: role-tinted like the composer (seat-colored accents) ---- */
 .arena-apply-modal[data-role='VIDEO'] { --arena-role: hsl(var(--accent)); }
