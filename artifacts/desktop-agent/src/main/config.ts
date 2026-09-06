@@ -25,6 +25,9 @@ export interface AgentConfig {
   /**
    * Base URL of the auto-update feed (where latest.yml / latest-mac.yml live),
    * no trailing slash. Overrides the publish URL baked in at build time.
+   * When unset it defaults to <apiBaseUrl>/desktop-agent, so an installed
+   * agent can update from the same server it already talks to without any
+   * per-machine config.
    */
   updateUrl: string;
   /**
@@ -69,13 +72,17 @@ function loadFileConfig(): Partial<AgentConfig> {
 
 export function loadConfig(): AgentConfig {
   const file = loadFileConfig();
+  const apiBaseUrl = (process.env.TANDEM_API_URL || file.apiBaseUrl || DEFAULTS.apiBaseUrl).replace(/\/+$/, "");
   return {
-    apiBaseUrl: process.env.TANDEM_API_URL || file.apiBaseUrl || DEFAULTS.apiBaseUrl,
+    apiBaseUrl,
     webAppUrl: process.env.TANDEM_WEB_URL || file.webAppUrl || DEFAULTS.webAppUrl,
     clerkPublishableKey: process.env.TANDEM_CLERK_PUBLISHABLE_KEY || file.clerkPublishableKey || DEFAULTS.clerkPublishableKey,
     ffmpegPath: process.env.TANDEM_FFMPEG_PATH || file.ffmpegPath || DEFAULTS.ffmpegPath,
     workDir: process.env.TANDEM_AGENT_WORK_DIR || file.workDir || DEFAULTS.workDir,
-    updateUrl: process.env.TANDEM_UPDATE_URL || file.updateUrl || DEFAULTS.updateUrl,
+    // No per-machine config needed: updates come from the same host as the
+    // API (which serves the agent release feed at /desktop-agent). An explicit
+    // TANDEM_UPDATE_URL or config-file entry still wins.
+    updateUrl: process.env.TANDEM_UPDATE_URL || file.updateUrl || `${apiBaseUrl}/desktop-agent`,
     controlPort: Number(process.env.TANDEM_AGENT_CONTROL_PORT || file.controlPort || DEFAULTS.controlPort),
   };
 }
