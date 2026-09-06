@@ -91,12 +91,12 @@ describe("account quota", () => {
     expect(res.body.storageBytes.remainingBytes).toBe(DEFAULT_STORAGE_LIMIT_BYTES);
     expect(res.body.projects.total).toBe(DEFAULT_PROJECT_LIMIT);
     expect(res.body.projects.used).toBe(0);
-    expect(res.body.plans.storage.some((plan: any) => plan.id === "g500" && plan.priceUsd === 40)).toBe(true);
-    expect(res.body.plans.storage.some((plan: any) => plan.id === "g200" && plan.priceUsd === 20)).toBe(true);
-    expect(res.body.plans.storage.some((plan: any) => plan.id === "tb1" && plan.priceUsd === 60)).toBe(true);
-    expect(res.body.plans.projects.some((plan: any) => plan.id === "p10" && plan.priceUsd === 5)).toBe(true);
-    expect(res.body.plans.projects.some((plan: any) => plan.id === "p50" && plan.priceUsd === 20)).toBe(true);
-    expect(res.body.plans.projects.some((plan: any) => plan.id === "p200" && plan.priceUsd === 50)).toBe(true);
+    expect(res.body.plans.storage.some((plan: any) => plan.id === "g500" && plan.priceUsd === 4000)).toBe(true);
+    expect(res.body.plans.storage.some((plan: any) => plan.id === "g200" && plan.priceUsd === 2000)).toBe(true);
+    expect(res.body.plans.storage.some((plan: any) => plan.id === "tb1" && plan.priceUsd === 6000)).toBe(true);
+    expect(res.body.plans.projects.some((plan: any) => plan.id === "p10" && plan.priceUsd === 500)).toBe(true);
+    expect(res.body.plans.projects.some((plan: any) => plan.id === "p50" && plan.priceUsd === 2000)).toBe(true);
+    expect(res.body.plans.projects.some((plan: any) => plan.id === "p200" && plan.priceUsd === 5000)).toBe(true);
   });
 
   it("counts vault asset bytes of owned projects as used storage", async () => {
@@ -129,7 +129,7 @@ describe("account quota", () => {
       .send({ kind: "storage", planId: "g500" });
     expect(storage.status).toBe(200);
     expect(storage.body.storageBytes.totalBytes).toBe(DEFAULT_STORAGE_LIMIT_BYTES + 500 * 1024 ** 3);
-    expect(storage.body.purchased).toMatchObject({ kind: "storage", planId: "g500", priceUsd: 40 });
+    expect(storage.body.purchased).toMatchObject({ kind: "storage", planId: "g500", priceUsd: 4000 });
 
     const projects = await request(API)
       .post("/api/account/quota/purchase")

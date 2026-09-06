@@ -146,8 +146,8 @@ describe("storage plan values", () => {
     const g200 = STORAGE_PLANS.find((p) => p.id === "g200")!;
     const g500 = STORAGE_PLANS.find((p) => p.id === "g500")!;
     const tb1 = STORAGE_PLANS.find((p) => p.id === "tb1")!;
-    expect(g200.priceUsd).toBe(20);
-    expect(g500.priceUsd).toBe(40);
-    expect(tb1.priceUsd).toBe(60);
+    expect(g200.priceUsd).toBe(2000);
+    expect(g500.priceUsd).toBe(4000);
+    expect(tb1.priceUsd).toBe(6000);
   });
 });

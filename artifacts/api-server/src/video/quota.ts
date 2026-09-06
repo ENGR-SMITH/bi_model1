@@ -33,18 +33,21 @@ export interface ProjectPlan {
   count: number;
 }
 
-// Buy-more storage plans ($40/500GB, $20/200GB, $60/1TB as specified).
+// Buy-more storage plans — $20/200GB, $40/500GB, $60/1TB as specified, in USD
+// cents (2000/4000/6000) so they share the pass's priceUsd unit and map
+// directly onto Paystack's smallest-unit amounts.
 export const STORAGE_PLANS: StoragePlan[] = [
-  { id: "g200", label: "200 GB", priceUsd: 20, bytes: 200 * 1024 ** 3 },
-  { id: "g500", label: "500 GB", priceUsd: 40, bytes: 500 * 1024 ** 3 },
-  { id: "tb1", label: "1 TB", priceUsd: 60, bytes: 1024 ** 4 },
+  { id: "g200", label: "200 GB", priceUsd: 2000, bytes: 200 * 1024 ** 3 },
+  { id: "g500", label: "500 GB", priceUsd: 4000, bytes: 500 * 1024 ** 3 },
+  { id: "tb1", label: "1 TB", priceUsd: 6000, bytes: 1024 ** 4 },
 ];
 
-// Buy-more project plans ($5/10, $20/50, $50/200 as specified).
+// Buy-more project plans — $5/10, $20/50, $50/200 as specified, in USD cents
+// (500/2000/5000) — same unit as every other plan price.
 export const PROJECT_PLANS: ProjectPlan[] = [
-  { id: "p10", label: "10 more projects", priceUsd: 5, count: 10 },
-  { id: "p50", label: "50 more projects", priceUsd: 20, count: 50 },
-  { id: "p200", label: "200 more projects", priceUsd: 50, count: 200 },
+  { id: "p10", label: "10 more projects", priceUsd: 500, count: 10 },
+  { id: "p50", label: "50 more projects", priceUsd: 2000, count: 50 },
+  { id: "p200", label: "200 more projects", priceUsd: 5000, count: 200 },
 ];
 
 export function formatBytes(bytes: number): string {
