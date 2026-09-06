@@ -27,9 +27,10 @@ step-by-step how to obtain it. Everything ends up in your `.env` file (copy
 | 10 | Redis (Upstash/Redis Cloud/local) | `REDIS_URL` | BullMQ video job queue | No (optional) |
 | 11 | Stripe | Account | Real card payments via Clerk Billing | For real payments |
 | 12 | GitHub | Secrets + vars | CI build of the desktop agent | For CI |
+| 13 | Paystack | Secret key (+ USD account) | Direct USD card payments for subscriptions | For real payments |
 
 App-defined secrets (not from a platform — you create them):
-`ADMIN_ACCESS_CODE`, `SESSION_SECRET` — see section 13.
+`ADMIN_ACCESS_CODE`, `SESSION_SECRET` — see section 14.
 
 ---
 
@@ -324,7 +325,51 @@ Actions → Variables → New repository variable):
 
 ---
 
-## 13. App-defined secrets (you create these — no platform)
+## 13. Paystack — real payments (USD), direct gateway
+
+**Platform:** https://dashboard.paystack.com → **Settings → API Keys & Webhooks**
+
+Real card charging for subscriptions runs through **Paystack directly** (hosted
+checkout: the server calls `transaction.initialize`, the customer pays on
+Paystack's page, and a webhook/verify grants the entitlement). Only one
+credential is needed — there is **no separate webhook secret**; Paystack signs
+webhook bodies with HMAC-SHA512 **using your secret key**
+(`x-paystack-signature` header).
+
+**Step-by-step:**
+
+1. Create/activate your Paystack business (KYC). **Live** keys only appear after
+   activation — until then use **Test Mode** keys.
+2. Dashboard → Settings → **API Keys & Webhooks** → under *API Configuration –
+   Test Mode* (and later *Live Mode*), click the eye icon (asks for your
+   account password) and copy the **Secret Key** (`sk_test_…` / `sk_live_…`).
+3. **(USD only):** the account must accept international payments
+   (Settings → **Preferences** → *Accept international payments*) and have a
+   **Zenith Bank USD domiciliary account** added (Settings → **Accounts** →
+   *Add USD account* — confirmed within ~24h). Without these, USD charges fail.
+4. **Webhook URL** (set separately for Test and Live): point it at
+   `https://<api-host>/api/paystack/webhook`. Paystack posts `charge.success`
+   here so entitlements are granted even if the customer never returns.
+5. (Optional) a global **Callback URL** on the same settings page — the app
+   overrides it per purchase with the page the user came from.
+
+**Where it goes:**
+
+```env
+# root .env (server only)
+PAYSTACK_SECRET_KEY=sk_test_...
+# Optional — only for a Paystack Inline JS popup instead of hosted checkout.
+# Frontend-safe; copied into each Vite app's .env as VITE_PAYSTACK_PUBLIC_KEY if used.
+PAYSTACK_PUBLIC_KEY=pk_test_...
+```
+
+> **Test mode:** toggle Test Mode on the dashboard and pay with Paystack's test
+> card `4084 0840 8408 4081` — no real money moves until you switch to live
+> keys. Fees on live USD charges: 3.9% flat.
+
+---
+
+## 14. App-defined secrets (you create these — no platform)
 
 These aren't from any external service; you invent them.
 
@@ -340,7 +385,7 @@ SESSION_SECRET=<generate: openssl rand -hex 32>
 
 ---
 
-## 14. Desktop agent configuration
+## 15. Desktop agent configuration
 
 The desktop agent (`artifacts/desktop-agent`) reads its own config from
 `tandem-agent.json` next to the app, `~/.tandem-agent/config.json`, or env vars:

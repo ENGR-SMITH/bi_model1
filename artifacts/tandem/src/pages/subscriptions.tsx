@@ -1,14 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PiArrowLeftDuotone, PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiCreditCardDuotone, PiFolderOpenDuotone, PiHardDrivesDuotone, PiLockKeyDuotone, PiSparkleDuotone, PiTicketDuotone, PiXDuotone } from 'react-icons/pi';
+import { PiArrowLeftDuotone, PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiCreditCardDuotone, PiFolderOpenDuotone, PiHardDrivesDuotone, PiLockKeyDuotone, PiSparkleDuotone, PiTicketDuotone, PiWarningCircleDuotone, PiXDuotone } from 'react-icons/pi';
 import type { IconType } from 'react-icons';
 import { Link } from 'wouter';
 import { SectionEyebrow } from '@/components/protected-shell';
 import {
+  confirmPaystackCheckout,
   getSubscriptionPlansQueryKey,
-  usePurchaseSubscription,
+  useCreatePaystackCheckout,
   useSubscriptionPlans,
-  type SubscriptionCard,
   type SubscriptionPlan,
   type SubscriptionRecord,
 } from '@workspace/api-client-react';
@@ -19,6 +19,10 @@ import {
 // Shows the account's full subscription history (type, plan, status, expiry)
 // and lets the user subscribe to any available plan here — the same products
 // are also payable inline on the Creator Den and Author Den themselves.
+//
+// Payments run through Paystack's hosted checkout (USD). Buying a plan opens
+// a Paystack page; when the customer returns, the page confirms the charge
+// with the server (POST /paystack/confirm) and shows the receipt.
 // ---------------------------------------------------------------------------
 
 function formatBytes(bytes: number): string {
@@ -30,6 +34,11 @@ function formatBytes(bytes: number): string {
 
 function price(usd: number): string {
   return `$${(usd / 100).toFixed(2)}`;
+}
+
+function apiErrorMessage(e: unknown): string {
+  const err = e as { response?: { data?: { error?: string } }; message?: string } | null;
+  return err?.response?.data?.error || err?.message || 'Something went wrong. Please try again.';
 }
 
 const KIND_META: Record<string, { icon: IconType; label: string }> = {
@@ -50,11 +59,128 @@ function formatDate(iso: string): string {
   }
 }
 
+// A full-page status panel shown while a payment is being confirmed on return,
+// or right after a promo-waived (free) grant.
+type ResultOverlay =
+  | { kind: 'busy'; message: string }
+  | { kind: 'success'; total?: number; cardLast4?: string | null; promoCode?: string | null }
+  | { kind: 'error'; message: string };
+
+function ResultOverlayView({ state, onClose }: { state: ResultOverlay; onClose: () => void }) {
+  if (state.kind === 'busy') {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="paystack-result-busy">
+        <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-[#111111] p-8 text-center text-white shadow-2xl">
+          <PiCircleNotchDuotone className="mx-auto h-8 w-8 animate-spin text-[#3b82f6]" />
+          <p className="mt-4 text-sm font-semibold text-zinc-100">{state.message}</p>
+          <p className="mt-1 text-xs text-zinc-500">This can take a few seconds.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.kind === 'success') {
+    return (
+      <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm">
+        <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-6 text-white shadow-2xl" data-testid="subscription-success">
+          <div className="flex items-center gap-3">
+            <span className="icon-chip h-14 w-14 text-[#34d399]"><PiConfettiDuotone className="h-7 w-7" /></span>
+            <div>
+              <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">Subscribed</p>
+              <h3 className="text-2xl font-extrabold tracking-[-0.04em]">Payment confirmed</h3>
+            </div>
+          </div>
+          <p className="mt-4 text-sm text-zinc-400">
+            {state.total !== undefined ? (
+              <>
+                Charged {price(state.total)}
+                {state.cardLast4 ? <> · card •••• {state.cardLast4}</> : null}
+                {state.promoCode ? <> · promo <b>{state.promoCode}</b></> : null}
+              </>
+            ) : (
+              <>Your new plan is active — the page below shows what changed.</>
+            )}
+          </p>
+          <button type="button" onClick={onClose} className="focus-house mt-5 w-full rounded-xl bg-[#34d399] py-3.5 text-sm font-bold text-[#052e1c] transition-colors hover:bg-[#2bb883]">Done</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="subscription-error">
+      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-6 text-white shadow-2xl">
+        <div className="flex items-center gap-3">
+          <span className="icon-chip h-14 w-14 text-[#f87171]"><PiWarningCircleDuotone className="h-7 w-7" /></span>
+          <div>
+            <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#f87171]">Payment not confirmed</p>
+            <h3 className="text-xl font-extrabold tracking-[-0.04em]">Something went wrong</h3>
+          </div>
+        </div>
+        <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs leading-relaxed text-zinc-300">{state.message}</p>
+        <button type="button" onClick={onClose} className="focus-house mt-5 w-full rounded-xl bg-white/10 py-3.5 text-sm font-bold text-white transition-colors hover:bg-white/20">Back to plans</button>
+      </div>
+    </div>
+  );
+}
+
 export default function SubscriptionsPage() {
   const queryClient = useQueryClient();
   const plansQuery = useSubscriptionPlans();
   const data = plansQuery.data;
   const [paying, setPaying] = useState<SubscriptionPlan | null>(null);
+  const [overlay, setOverlay] = useState<ResultOverlay | null>(null);
+
+  const refreshPlans = () => {
+    void queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
+  };
+
+  // On return from the Paystack checkout the URL carries ?reference=… (Paystack
+  // appends it to the callback_url). Confirm the charge server-side, then show
+  // the outcome and drop the query params so a refresh doesn't re-confirm.
+  useEffect(() => {
+    const reference = new URLSearchParams(window.location.search).get('reference');
+    if (!reference) return;
+    let disposed = false;
+    setOverlay({ kind: 'busy', message: 'Confirming your payment…' });
+
+    void (async () => {
+      try {
+        const res = await confirmPaystackCheckout({ reference });
+        if (disposed) return;
+        window.history.replaceState(window.history.state, '', window.location.pathname);
+        if (res.granted) {
+          await queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
+          if (disposed) return;
+          setOverlay({
+            kind: 'success',
+            total: res.receipt?.total,
+            cardLast4: res.receipt?.cardLast4 ?? null,
+            promoCode: res.receipt?.promoCode ?? null,
+          });
+        } else {
+          setOverlay({
+            kind: 'error',
+            message:
+              res.error ||
+              'Your payment could not be confirmed. If you were charged, it will be applied shortly — check back in a minute or contact support.',
+          });
+        }
+      } catch (e) {
+        if (disposed) return;
+        setOverlay({
+          kind: 'error',
+          message: `${apiErrorMessage(e)} If you were charged, your plan will appear here shortly.`,
+        });
+      }
+    })();
+
+    return () => {
+      disposed = true;
+    };
+    // Runs once per page load — the reference arrives on the initial URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const activeByPlan = useMemo(() => {
     const map = new Map<string, SubscriptionRecord>();
@@ -279,54 +405,70 @@ export default function SubscriptionsPage() {
         <PayModal
           plan={paying}
           onClose={() => setPaying(null)}
-          onPaid={() => {
-            void queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
+          onGranted={(total, cardLast4, promoCode) => {
             setPaying(null);
+            refreshPlans();
+            setOverlay({ kind: 'success', total, cardLast4, promoCode });
           }}
         />
       )}
+      {overlay && <ResultOverlayView state={overlay} onClose={() => setOverlay(null)} />}
     </div>
   );
 }
 
-function formatCardNumber(value: string): string {
-  return value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-}
-function formatExpiry(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-}
+// ---------------------------------------------------------------------------
+// PayModal — confirm + pay for one plan. No card fields: clicking through
+// opens Paystack's hosted checkout (USD) in this tab; Paystack sends the user
+// back to this page (?reference=…), which confirms the charge on mount.
+// ---------------------------------------------------------------------------
 
-function PayModal({ plan, onClose, onPaid }: { plan: SubscriptionPlan; onClose: () => void; onPaid: () => void }) {
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvc, setCvc] = useState('');
+function PayModal({
+  plan,
+  onClose,
+  onGranted,
+}: {
+  plan: SubscriptionPlan;
+  onClose: () => void;
+  onGranted: (total: number, cardLast4: string | null, promoCode: string | null) => void;
+}) {
   const [promo, setPromo] = useState('');
   const [error, setError] = useState('');
-  const [result, setResult] = useState<{ cardLast4: string; total: number; promoCode: string | null } | null>(null);
+  const [opening, setOpening] = useState(false);
 
-  const purchase = usePurchaseSubscription({
+  const checkout = useCreatePaystackCheckout({
     mutation: {
       onSuccess: (res) => {
-        setResult({ cardLast4: res.receipt.cardLast4, total: res.receipt.total, promoCode: res.receipt.promoCode });
+        if (res.granted) {
+          // A FREE promo (or full discount) is granted server-side — no redirect.
+          onGranted(0, null, promo.trim() || null);
+          return;
+        }
+        setError('');
+        setOpening(true);
+        // Let the spinner paint before leaving for Paystack.
+        window.setTimeout(() => {
+          window.location.assign(res.checkoutUrl);
+        }, 350);
       },
       onError: (e: unknown) => {
-        const apiError = e as { response?: { data?: { error?: string } }; message?: string } | null;
-        setError(apiError?.response?.data?.error || apiError?.message || 'The payment could not be completed. Check your card and try again.');
+        setError(apiErrorMessage(e) || 'The payment could not be started. Please try again.');
       },
     },
   });
 
+  const callbackUrl = `${window.location.origin}${window.location.pathname}`;
+
   const pay = () => {
     setError('');
-    const digits = cardNumber.replace(/\D/g, '');
-    const [month, year] = expiry.split('/');
-    if (digits.length < 12) { setError('Enter the full card number'); return; }
-    if (!month || !year || month.length !== 2 || year.length !== 2) { setError('Enter the card expiry as MM/YY'); return; }
-    if (!cvc) { setError('Enter the security code'); return; }
-    const card: SubscriptionCard = { number: digits, expiryMonth: Number(month), expiryYear: Number(year), cvc };
-    purchase.mutate({ data: { kind: plan.kind, planId: plan.planId, card, promoCode: promo.trim() || undefined } });
+    checkout.mutate({
+      data: {
+        kind: plan.kind,
+        planId: plan.planId,
+        promoCode: promo.trim() || undefined,
+        callbackUrl,
+      },
+    });
   };
 
   return (
@@ -346,7 +488,7 @@ function PayModal({ plan, onClose, onPaid }: { plan: SubscriptionPlan; onClose: 
             <span className="font-display text-2xl font-extrabold tracking-[-0.04em]">{price(plan.priceUsd)}</span>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-zinc-400">{plan.detail} · billed per {plan.intervalLabel}.</p>
-          <button type="button" onClick={onClose} aria-label="Close" className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white"><PiXDuotone className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} disabled={opening} aria-label="Close" className="focus-house absolute right-4 top-4 rounded-full p-1.5 text-zinc-500 hover:bg-white/5 hover:text-white disabled:opacity-40"><PiXDuotone className="h-4 w-4" /></button>
         </div>
 
         <div className="relative flex items-center px-2">
@@ -355,50 +497,42 @@ function PayModal({ plan, onClose, onPaid }: { plan: SubscriptionPlan; onClose: 
           <span className="absolute -right-2 h-4 w-4 rounded-full bg-[#111111]/60" />
         </div>
 
-        {result ? (
-          <div className="rounded-b-[1.35rem] p-6 pt-5" data-testid="subscription-success">
-            <div className="flex items-center gap-3">
-              <span className="icon-chip h-14 w-14 text-[#34d399]"><PiConfettiDuotone className="h-7 w-7" /></span>
-              <div>
-                <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">Subscribed</p>
-                <h3 className="text-2xl font-extrabold tracking-[-0.04em]">{plan.planLabel}</h3>
-              </div>
-            </div>
-            <p className="mt-4 text-sm text-zinc-400">
-              Charged {price(result.total)} · card •••• {result.cardLast4}
-              {result.promoCode ? <><br />Promo <b>{result.promoCode}</b> applied.</> : null}
+        <div className="rounded-b-[1.35rem] p-6 pt-5">
+          <div className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[.03] p-3">
+            <PiLockKeyDuotone className="mt-0.5 h-4 w-4 shrink-0 text-[#34d399]" />
+            <p className="text-xs leading-relaxed text-zinc-400">
+              You'll be taken to <b className="text-zinc-200">Paystack's secure checkout</b> (USD) to pay. You'll land back here when it's done.
             </p>
-            <button type="button" onClick={onPaid} className="focus-house mt-5 w-full rounded-xl bg-[#34d399] py-3.5 text-sm font-bold text-[#052e1c] transition-colors hover:bg-[#2bb883]">Done</button>
           </div>
-        ) : (
-          <div className="rounded-b-[1.35rem] p-6 pt-5">
-            <label className="block">
-              <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Card number</span>
-              <div className="relative mt-2">
-                <PiCreditCardDuotone className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
-                <input value={cardNumber} onChange={(e) => setCardNumber(formatCardNumber(e.target.value))} placeholder="4242 4242 4242 4242" inputMode="numeric" autoComplete="cc-number" className="focus-house w-full rounded-xl border border-white/10 bg-[#111111] py-3 pl-11 pr-4 text-sm text-white placeholder:text-zinc-600" data-testid="sub-input-card" />
-              </div>
-            </label>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Expiry</span>
-                <input value={expiry} onChange={(e) => setExpiry(formatExpiry(e.target.value))} placeholder="MM/YY" inputMode="numeric" autoComplete="cc-exp" className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600" data-testid="sub-input-expiry" />
-              </label>
-              <label className="block">
-                <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">CVC</span>
-                <input value={cvc} onChange={(e) => setCvc(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="123" inputMode="numeric" autoComplete="cc-csc" className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] py-3 px-4 text-sm text-white placeholder:text-zinc-600" data-testid="sub-input-cvc" />
-              </label>
-            </div>
-            <div className="mt-4">
-              <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Promo code</span>
-              <input value={promo} onChange={(e) => setPromo(e.target.value.toUpperCase())} placeholder="PROMOCODE" className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600" data-testid="sub-input-promo" />
-            </div>
-            {error && <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-400" role="alert" data-testid="subscription-error">{error}</p>}
-            <button type="button" onClick={pay} disabled={purchase.isPending} className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b82f6] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#2563eb] disabled:cursor-wait disabled:opacity-60" data-testid="sub-button-pay">
-              {purchase.isPending ? <><PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> Processing…</> : <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay {price(plan.priceUsd)}</>}
-            </button>
+
+          <div className="mt-4">
+            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Promo code (optional)</span>
+            <input
+              value={promo}
+              onChange={(e) => setPromo(e.target.value.toUpperCase())}
+              placeholder="PROMOCODE"
+              disabled={opening}
+              className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600 disabled:opacity-50"
+              data-testid="sub-input-promo"
+            />
           </div>
-        )}
+
+          {error && <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-400" role="alert" data-testid="subscription-error">{error}</p>}
+
+          <button
+            type="button"
+            onClick={pay}
+            disabled={checkout.isPending || opening}
+            className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b82f6] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#2563eb] disabled:cursor-wait disabled:opacity-60"
+            data-testid="sub-button-pay"
+          >
+            {checkout.isPending || opening ? (
+              <><PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> {opening ? 'Opening secure checkout…' : 'Starting checkout…'}</>
+            ) : (
+              <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay {price(plan.priceUsd)}</>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

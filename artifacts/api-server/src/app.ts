@@ -46,7 +46,10 @@ if (process.env.CLERK_SECRET_KEY) {
     })),
   );
 }
-app.use(express.json());
+// Paystack signs webhook bodies with HMAC-SHA512 over the raw bytes, so the
+// JSON parser stashes the exact request buffer on the request (req.rawBody)
+// while still populating req.body for every other route.
+app.use(express.json({ verify: (req, _res, buf) => { (req as { rawBody?: Buffer }).rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);

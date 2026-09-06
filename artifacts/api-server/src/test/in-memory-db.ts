@@ -751,6 +751,22 @@ export const tandemSubscriptionsTable = sqliteTable("tandem_subscriptions", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
+export const tandemPaystackIntentsTable = sqliteTable("tandem_paystack_intents", {
+  reference: text("reference").primaryKey(),
+  userId: text("user_id").notNull(),
+  kind: text("kind").notNull(),
+  planId: text("plan_id").notNull(),
+  planLabel: text("plan_label").notNull(),
+  intervalLabel: text("interval_label").notNull().default(""),
+  amountUsd: integer("amount_usd").notNull(),
+  currency: text("currency").notNull().default("USD"),
+  status: text("status").notNull().default("PENDING"),
+  promoCode: text("promo_code"),
+  cardLast4: text("card_last_4"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const tandemUserCvsTable = sqliteTable("tandem_user_cvs", {
   userId: text("user_id").primaryKey(),
   fileName: text("file_name").notNull(),
@@ -1160,6 +1176,15 @@ export async function buildInMemoryDb() {
       created_at INTEGER NOT NULL,
       UNIQUE (project_id, day)
     );
+    CREATE TABLE tandem_paystack_intents (
+      reference TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
+      kind TEXT NOT NULL, plan_id TEXT NOT NULL, plan_label TEXT NOT NULL,
+      interval_label TEXT NOT NULL DEFAULT '', amount_usd INTEGER NOT NULL,
+      currency TEXT NOT NULL DEFAULT 'USD',
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      promo_code TEXT, card_last_4 TEXT,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
     CREATE TABLE tandem_account_quotas (
       user_id TEXT PRIMARY KEY NOT NULL,
       storage_limit_bytes INTEGER NOT NULL,
@@ -1299,6 +1324,7 @@ export async function buildInMemoryDb() {
     tandemToursTable,
     tandemPromoCodesTable,
     tandemSubscriptionsTable,
+    tandemPaystackIntentsTable,
     tandemVideoStorageSnapshotsTable,
     tandemArenaPostsTable,
     tandemArenaApplicationsTable,

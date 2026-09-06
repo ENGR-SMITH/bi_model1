@@ -6,14 +6,13 @@ import {
   getGetUserCvQueryKey,
   getSubscriptionPlansQueryKey,
   getUserCvFile,
+  useCreatePaystackCheckout,
   useDeleteUserCv,
   useGetAccountQuota,
   useGetUserCv,
-  usePurchaseSubscription,
   useSubscriptionPlans,
   useUploadUserCv,
 } from '@workspace/api-client-react';
-import type { SubscriptionCard } from '@workspace/api-client-react';
 
 // ---------------------------------------------------------------------------
 // Account panels — the workspace storage bar (2 GB free, buy-more plans) and
@@ -69,54 +68,67 @@ export function StorageBar() {
   );
 }
 
-// The buy-more space modal — $20/200GB, $40/500GB, $60/1TB as specified. The
-// in-app checkout now records a real subscription (billed through Clerk when
-// configured) and the bar updates the moment a plan is applied.
-function formatCardNumber(value: string): string {
-  return value.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 ').trim();
-}
-function formatExpiry(value: string): string {
-  const d = value.replace(/\D/g, '').slice(0, 4);
-  return d.length <= 2 ? d : `${d.slice(0, 2)}/${d.slice(2)}`;
-}
+// The buy-more space modal — $20/200GB, $40/500GB, $60/1TB as specified. Picking
+// a plan opens Paystack's hosted checkout (USD); when the customer returns to
+// the profile page, the PaystackReturnGate confirms the charge and the bar
+// refreshes. No card details are ever collected here.
 
 export function BuySpaceModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const plansQuery = useSubscriptionPlans();
-  const purchase = usePurchaseSubscription({
+  const [selected, setSelected] = useState<string | null>(plansQuery.data?.plans?.find((p) => p.kind === 'storage')?.planId ?? null);
+  const [error, setError] = useState('');
+  const [opening, setOpening] = useState(false);
+
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: getGetAccountQuotaQueryKey() });
+    void queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
+  };
+
+  const checkout = useCreatePaystackCheckout({
     mutation: {
-      onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: getGetAccountQuotaQueryKey() });
-        void queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
-        onClose();
+      onSuccess: (res) => {
+        if (res.granted) {
+          // A FREE promo (full discount) is granted server-side — nothing to pay.
+          refresh();
+          onClose();
+          return;
+        }
+        setError('');
+        setOpening(true);
+        window.setTimeout(() => {
+          window.location.assign(res.checkoutUrl);
+        }, 350);
+      },
+      onError: (e: unknown) => {
+        const err = e as { response?: { data?: { error?: string } }; message?: string } | null;
+        setError(err?.response?.data?.error || err?.message || 'The payment could not be started. Please try again.');
       },
     },
   });
 
   const plans = (plansQuery.data?.plans ?? []).filter((p) => p.kind === 'storage');
-  const [selected, setSelected] = useState<string | null>(plans[0]?.planId ?? null);
-  const [card, setCard] = useState({ number: '', expiry: '', cvc: '' });
-  const [error, setError] = useState('');
+  const busy = checkout.isPending || opening;
 
   const pay = () => {
     if (!selected) return;
     setError('');
-    const digits = card.number.replace(/\D/g, '');
-    const [month, year] = card.expiry.split('/');
-    if (digits.length < 12) { setError('Enter the full card number'); return; }
-    if (!month || !year || month.length !== 2 || year.length !== 2) { setError('Enter the card expiry as MM/YY'); return; }
-    if (!card.cvc) { setError('Enter the security code'); return; }
-    const cardPayload: SubscriptionCard = { number: digits, expiryMonth: Number(month), expiryYear: Number(year), cvc: card.cvc };
-    purchase.mutate({ data: { kind: 'storage', planId: selected, card: cardPayload } });
+    checkout.mutate({
+      data: {
+        kind: 'storage',
+        planId: selected,
+        callbackUrl: `${window.location.origin}${window.location.pathname}`,
+      },
+    });
   };
 
   return (
-    <div className="modal-backdrop" onClick={purchase.isPending ? undefined : onClose}>
+    <div className="modal-backdrop" onClick={busy ? undefined : onClose}>
       <div className="modal small-modal plan-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
-        <button type="button" className="modal-close" onClick={onClose} aria-label="Close"><X size={16} /></button>
+        <button type="button" className="modal-close" onClick={onClose} disabled={busy} aria-label="Close"><X size={16} /></button>
         <span className="eyebrow">WORKSPACE STORAGE</span>
         <h2>Buy more space.</h2>
-        <p>Pick a plan, then pay right here — it&apos;s a real subscription on your account. The bar updates the moment it applies.</p>
+        <p>Pick a plan — Paystack handles the payment (USD). You&apos;ll come back here when it&apos;s done and the bar updates.</p>
         <div className="plan-grid" data-testid="plan-grid-storage">
           {plans.map((plan) => (
             <button
@@ -124,7 +136,7 @@ export function BuySpaceModal({ onClose }: { onClose: () => void }) {
               type="button"
               className={`plan-option ${selected === plan.planId ? 'is-selected' : ''}`}
               onClick={() => setSelected(plan.planId)}
-              disabled={purchase.isPending}
+              disabled={busy}
               data-testid={`plan-${plan.planId}`}
             >
               <b>{plan.planLabel}</b>
@@ -133,37 +145,19 @@ export function BuySpaceModal({ onClose }: { onClose: () => void }) {
             </button>
           ))}
         </div>
-        <div className="buy-checkout">
-          <label className="buy-field">
-            <span>Card number</span>
-            <input value={card.number} onChange={(e) => setCard({ ...card, number: formatCardNumber(e.target.value) })} placeholder="4242 4242 4242 4242" inputMode="numeric" data-testid="buy-card-number" />
-          </label>
-          <div className="buy-field-row">
-            <label className="buy-field">
-              <span>Expiry</span>
-              <input value={card.expiry} onChange={(e) => setCard({ ...card, expiry: formatExpiry(e.target.value) })} placeholder="MM/YY" inputMode="numeric" data-testid="buy-card-expiry" />
-            </label>
-            <label className="buy-field">
-              <span>CVC</span>
-              <input value={card.cvc} onChange={(e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="123" inputMode="numeric" data-testid="buy-card-cvc" />
-            </label>
-          </div>
-        </div>
+        <p className="den-footnote mt-3" style={{ display: 'flex', gap: 6 }}>
+          <Lock size={13} /> Secure checkout by Paystack — no card details ever pass through this site.
+        </p>
         {error && <p className="buy-error" role="alert">{error}</p>}
-        {purchase.isError && <p className="buy-error" role="alert">{
-          ((purchase.error as { response?: { data?: { error?: string } }; message?: string } | null)?.response?.data?.error
-            || (purchase.error as { message?: string } | null)?.message
-            || 'The payment could not be completed. Check your card and try again.')
-        }</p>}
         <button
           type="button"
           className="primary-btn w-full mt-3"
           onClick={pay}
-          disabled={purchase.isPending || !selected}
+          disabled={busy || !selected}
           data-testid="btn-pay-space"
         >
-          {purchase.isPending ? <Loader2 size={13} className="spin" /> : <Lock size={13} />}
-          {purchase.isPending ? 'Processing…' : `Pay for more space`}
+          {busy ? <Loader2 size={13} className="spin" /> : <Lock size={13} />}
+          {busy ? (opening ? 'Opening secure checkout…' : 'Starting checkout…') : 'Pay for more space'}
         </button>
         <p className="den-footnote mt-3">
           You can also manage every plan on your{' '}
