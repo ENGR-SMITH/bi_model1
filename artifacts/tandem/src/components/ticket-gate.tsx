@@ -319,23 +319,24 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
 
         {/* Coupon stub header */}
         <div className="relative p-7 pb-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-center gap-3.5">
-              <span className="icon-chip h-12 w-12 shrink-0 text-[#60a5fa] shadow-[0_0_24px_-6px_rgba(59,130,246,.55)]">
-                <PiTicketDuotone className="h-5 w-5" />
-              </span>
-              <div className="min-w-0">
-                <p className="font-mono-ui text-[10px] uppercase tracking-[0.22em] text-[#60a5fa]">Tandem access pass</p>
-                <h2 className="mt-1 truncate font-display text-2xl font-extrabold tracking-[-0.04em] text-white">{name}</h2>
-              </div>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="font-display text-[2rem] font-extrabold leading-none tracking-[-0.05em] text-[#34d399] drop-shadow-[0_0_18px_rgba(52,211,153,.35)]">${(priceUsd / 100).toFixed(2)}</p>
-              <p className="mt-1 font-mono-ui text-[9px] uppercase tracking-[0.16em] text-[#34d399]/70">/ {weeks} weeks</p>
+          <div className="flex min-w-0 items-center gap-3.5">
+            <span className="icon-chip h-12 w-12 shrink-0 text-[#60a5fa] shadow-[0_0_24px_-6px_rgba(59,130,246,.55)]">
+              <PiTicketDuotone className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="font-mono-ui text-[10px] uppercase tracking-[0.22em] text-[#60a5fa]">Tandem access pass</p>
+              <h2 className="mt-1 truncate font-display text-2xl font-extrabold tracking-[-0.04em] text-white">{name}</h2>
             </div>
           </div>
+
+          {/* Price — its own row under the title. */}
+          <div className="mt-6 flex items-baseline gap-1.5">
+            <span className="font-display text-[2.5rem] font-extrabold leading-none tracking-[-0.05em] text-[#34d399] drop-shadow-[0_0_18px_rgba(52,211,153,.35)]">${(priceUsd / 100).toFixed(2)}</span>
+            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-[#34d399]/70">/ {weeks} weeks</span>
+          </div>
+
           <p className="mt-4 text-[13px] leading-relaxed text-zinc-400">
-            Unlocks the whole room for <b className="text-white">{weeks} weeks</b>. Renewing extends your pass.
+            Unlocks the whole room. Renewing extends your pass.
           </p>
           {/* The free tour is offered on the room page while the visitor is
               still eligible — by the time this popup renders, the one-time
