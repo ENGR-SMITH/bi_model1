@@ -128,6 +128,16 @@ export default function ArenaPostPage() {
             {post.channelName} · “{post.projectName}” · posted by {post.posterName} {timeAgo(post.createdAt)}
           </p>
         </div>
+        {/* The watch control lives in the section header's top-right, off the
+            hero card, so the action grid below stays to the core actions. */}
+        <div className="arena-post-head-actions">
+          <ArenaRoleWatchMenu
+            role={post.role}
+            channelId={post.channelId}
+            channelName={post.channelName}
+            dataTestId="arena-watch-menu"
+          />
+        </div>
       </div>
 
       {/* Hero: the pitch + live count + actions. */}
@@ -171,10 +181,9 @@ export default function ArenaPostPage() {
         </div>
 
         <div className="arena-hero-side">
-          {/* Unified 3-row × 2-column action grid: the live count (with the
-              Captain's total-received tag) next to Watch notification, then
-              Share | Preview project, then the Captain's Close | Remove row —
-              every cell is the same width. */}
+          {/* Unified action grid: the live count spans both columns at 80%
+              width, then Share | Preview project, then the Captain's
+              Close | Remove row — every cell is the same width. */}
           <div className="arena-hero-grid">
             <div className="arena-hero-count">
               <div className="arena-count-big" data-testid="arena-post-count">
@@ -198,12 +207,6 @@ export default function ArenaPostPage() {
                 </span>
               )}
             </div>
-            <ArenaRoleWatchMenu
-              role={post.role}
-              channelId={post.channelId}
-              channelName={post.channelName}
-              dataTestId="arena-watch-menu"
-            />
             <SharePostButton postId={post.id} />
             <Link href={`/projects/${post.projectId}`} className="secondary-btn" data-testid="arena-preview-project">
               <Eye size={14} /> Preview project

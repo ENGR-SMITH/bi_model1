@@ -131,7 +131,7 @@
 .icon-btn:hover, .scene-actions button:hover, .format-bar button:hover { color: hsl(var(--foreground)); background: hsl(var(--muted)); }
 .icon-btn.toggled, .format-bar button.toggled { color: hsl(var(--accent)); background: hsl(var(--accent) / .12); }
 .avatar { width: 27px; height: 27px; border-radius: 50%; background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); border: 0; font: 700 12px var(--app-font-serif); }
-.page { max-width: 1580px; margin: 0 auto; padding: 46px 44px 72px; animation: pageIn .42s ease both; }
+.page { max-width: 1580px; margin: 0 auto; padding: 46px 44px 72px; animation: pageIn .42s ease; }
 @keyframes pageIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
 .page-guide { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 24px; color: hsl(var(--muted-foreground)); }
 .page-guide > div { display: flex; flex-direction: column; gap: 4px; }

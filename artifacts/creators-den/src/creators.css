@@ -5934,6 +5934,16 @@ select optgroup {
 /* ---- Board toolbar + filter/sort segmented chips ---- */
 .arena-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 18px; }
 
+/* ---- Board: two equal-width card columns (audition-row styling) ---- */
+.arena-board {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 980px) {
+  .arena-board { grid-template-columns: 1fr; }
+}
+
 /* ---- Board cards ---- */
 .arena-card {
   display: flex;
@@ -6010,6 +6020,8 @@ select optgroup {
 .arena-back:hover { color: hsl(var(--accent)); }
 .arena-post-titleline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .arena-post-titleline h1 { flex: 0 0 auto; }
+/* The watch control sits top-right of the section header, off the hero card. */
+.arena-post-head-actions { align-self: flex-start; display: flex; align-items: center; gap: 8px; }
 .arena-hero { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 22px; padding: 20px 22px; margin-bottom: 20px; }
 .arena-hero-main { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .arena-hero-blurb { margin: 0; color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.5; }
@@ -6259,10 +6271,10 @@ select optgroup {
 .role-tabs .arena-watch-bell:hover { color: hsl(var(--accent)); transform: translateY(-1px); }
 .role-tabs .arena-watch-bell.is-watching { color: hsl(var(--accent)); background: hsl(var(--accent) / .14); }
 
-/* ---- Post hero action grid: the live count (with the Captain's total
-   received tag beneath) | Watch notification, then Share (blue) | Preview
-   project, then the Captain's Close | Remove — one 3-row × 2-column grid
-   where every cell shares the same width. ---- */
+/* ---- Post hero action grid: the live count spans both columns at 80% of
+   the width (with the Captain's total-received tag beneath), then Share
+   (blue) | Preview project, then the Captain's Close | Remove — every cell
+   shares the same width. The watch control lives in the page header. ---- */
 .arena-hero-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6283,6 +6295,8 @@ select optgroup {
   white-space: nowrap;
 }
 .arena-hero-count {
+  grid-column: 1 / -1;
+  width: 80%;
   display: flex;
   flex-direction: column;
   gap: 6px;
