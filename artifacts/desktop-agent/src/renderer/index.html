@@ -114,28 +114,42 @@
       .stack { display: grid; gap: 14px; align-content: start; }
 
       /* --- Feature area: numbered upload flow on the left, agent extras on
-             the right, connected by a dashed rail behind the step numbers. --- */
+             the right, connected by a dashed rail behind the step numbers.
+             All five cards live on ONE grid, so each right-hand card shares
+             its exact row height with the card beside it: the Floating-widget
+             card spans the height of steps 1 + 2, and the Agent-updates card
+             sits on the same row as the Submit-for-review card — the two
+             bottom cards are always the same height and end on the same line. --- */
       .feature-grid {
+        position: relative;
         display: grid;
         grid-template-columns: minmax(0, 1.55fr) minmax(0, 0.72fr);
-        gap: 18px;
+        column-gap: 18px;
+        row-gap: 16px;
         margin-top: 18px;
       }
-      .feature-col { display: grid; gap: 14px; min-width: 0; }
-      .flow-col { align-content: start; }
-      /* Right column: both cards split the full height of the three-step
-         column beside them, so the page reads as two even panels. */
-      .side-col { align-self: stretch; grid-auto-rows: minmax(0, 1fr); }
-      @media (max-width: 980px) {
-        .feature-grid { grid-template-columns: minmax(0, 1fr); }
-      }
-
-      .flow-col { position: relative; display: grid; gap: 16px; }
-      .flow-col::before {
+      /* Dashed rail joining the three step numbers down the left column. */
+      .feature-grid::before {
         content: "";
         position: absolute; left: 18px; top: 36px; bottom: 36px;
         width: 2px;
         background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0 5px, transparent 5px 10px);
+        pointer-events: none;
+      }
+      .feature-grid > .step { grid-column: 1; min-width: 0; }
+      .feature-grid > .step:nth-of-type(1) { grid-row: 1; }
+      .feature-grid > .step:nth-of-type(2) { grid-row: 2; }
+      .feature-grid > .step:nth-of-type(3) { grid-row: 3; }
+      .widget-card { grid-column: 2; grid-row: 1 / span 2; }
+      .updates-card { grid-column: 2; grid-row: 3; }
+      @media (max-width: 980px) {
+        .feature-grid { grid-template-columns: minmax(0, 1fr); }
+        .feature-grid > .step,
+        .feature-grid > .widget-card,
+        .feature-grid > .updates-card {
+          grid-column: 1 / -1;
+          grid-row: auto;
+        }
       }
       .step { position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 15px; align-items: start; }
       .step-num {
@@ -570,10 +584,9 @@
       <!-- Signed-in feature area (hidden until auth completes) -->
       <div id="feature-cards" class="hidden">
         <div class="feature-grid">
-          <!-- Main column: workspace → source file → submit -->
-          <div class="feature-col flow-col">
-            <!-- Step 1 — Workspace: pick the channel, then a project in it -->
-            <div class="step">
+          <!-- Steps 1–3 fill the left column, one grid row each. -->
+          <!-- Step 1 — Workspace: pick the channel, then a project in it -->
+          <div class="step">
               <span class="step-num">1</span>
               <div class="step-body card">
                 <p class="card-title">Workspace</p>
@@ -634,41 +647,39 @@
                 <div id="status" class="status"></div>
               </div>
             </div>
+
+          <!-- Floating widget — spans the row height of steps 1 + 2 so the
+               two cards on the right split the flow column evenly. -->
+          <div class="card widget-card">
+            <p class="card-title">Floating widget</p>
+            <p class="card-lead">
+              A compact bubble over other apps — one click back to Tandem.
+              <span id="platform-note" class="platform-note"></span>
+            </p>
+            <div class="setting-row">
+              <div>
+                <span class="setting-name">Widget</span>
+                <span class="setting-desc">Show the bubble and auto-show it while a video plays</span>
+              </div>
+              <label class="switch"><input type="checkbox" id="widget-enable" /><span class="slider"></span></label>
+            </div>
+            <div class="widget-hint" id="widget-hint">
+              Turning <b>Widget</b> on pops the bubble onto the screen right away.
+              Drag it to reposition — it stays where you put it. Press <b>Ctrl+Alt+T</b> or use
+              the tray icon (red dot) to show/hide it anytime. With the widget on, closing this
+              window keeps the agent running in the tray
+              (tray menu → <b>Quit Tandem Agent</b> to exit).
+            </div>
           </div>
 
-          <!-- Side column: widget + updates -->
-          <div class="feature-col side-col">
-            <!-- Floating widget -->
-            <div class="card">
-              <p class="card-title">Floating widget</p>
-              <p class="card-lead">
-                A compact bubble over other apps — one click back to Tandem.
-                <span id="platform-note" class="platform-note"></span>
-              </p>
-              <div class="setting-row">
-                <div>
-                  <span class="setting-name">Widget</span>
-                  <span class="setting-desc">Show the bubble and auto-show it while a video plays</span>
-                </div>
-                <label class="switch"><input type="checkbox" id="widget-enable" /><span class="slider"></span></label>
-              </div>
-              <div class="widget-hint" id="widget-hint">
-                Turning <b>Widget</b> on pops the bubble onto the screen right away.
-                Drag it to reposition — it stays where you put it. Press <b>Ctrl+Alt+T</b> or use
-                the tray icon (red dot) to show/hide it anytime. With the widget on, closing this
-                window keeps the agent running in the tray
-                (tray menu → <b>Quit Tandem Agent</b> to exit).
-              </div>
-            </div>
-
-            <!-- Updates -->
-            <div class="card">
-              <p class="card-title">Agent updates</p>
-              <p class="card-lead">Keep the desktop agent current — new versions install on restart.</p>
-              <div class="update-row">
-                <button id="update-btn" class="btn-secondary">Check for updates</button>
-                <span id="update-status" class="status"></span>
-              </div>
+          <!-- Agent updates — sits on the same grid row as the card beside
+               it (Submit for review), so it is always the same height. -->
+          <div class="card updates-card">
+            <p class="card-title">Agent updates</p>
+            <p class="card-lead">Keep the desktop agent current — new versions install on restart.</p>
+            <div class="update-row">
+              <button id="update-btn" class="btn-secondary">Check for updates</button>
+              <span id="update-status" class="status"></span>
             </div>
           </div>
         </div>
