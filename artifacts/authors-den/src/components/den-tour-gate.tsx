@@ -4,9 +4,9 @@
 // "authors" category, independently of the Creators Den tour).
 //
 //   · active pass            → the den opens normally, nothing is shown
-//   · first visit, no pass   → the 10-minute tour auto-starts; a slim top
-//                              countdown bar runs until it hits zero (timer
-//                              only — no ticket CTA while the tour is free)
+//   · first visit, no pass   → the 10-minute tour auto-starts with no banner;
+//                              the expiry notice is the only moment anything
+//                              is shown while access is restricted
 //   · tour running           → the app works normally during the countdown
 //   · tour expired           → "Your tour has ended" notice pops up — the only
 //                              moment the ticket appears, since access is now
@@ -141,45 +141,9 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
     return () => window.clearInterval(id);
   }, [phase, category]);
 
-  const inTour = phase === 'tour' && endsAt != null;
-
   return (
     <>
       {children}
-
-      {/* The slim top strip while the tour is running — quiet, with NO timer
-          and NO ticket/pass CTA: the free tour is not a sales moment. The
-          countdown runs server-side; the buy pop-up appears only once the
-          tour is exhausted and access is actually restricted. */}
-      {inTour && (
-        <div
-          role="status"
-          aria-live="polite"
-          data-testid="den-tour-bar"
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 10000,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '7px 16px',
-            background: 'linear-gradient(90deg, rgba(41,43,69,.96), rgba(62,58,88,.96))',
-            backdropFilter: 'blur(8px)',
-            color: '#fff',
-            fontFamily: 'DM Sans, system-ui, sans-serif',
-            fontSize: 12.5,
-            fontWeight: 600,
-            boxShadow: '0 1px 0 rgba(255,255,255,.08), 0 6px 18px rgba(0,0,0,.35)',
-          }}
-        >
-          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Preview tour of the {TOUR_LABEL[category]}
-          </span>
-        </div>
-      )}
 
       {/* The "tour is over" notice — then straight back to the Tandem paywall. */}
       {phase === 'expired' && (
