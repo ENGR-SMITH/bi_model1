@@ -15,7 +15,7 @@ import { BuyProjectsModal, ProfilePage } from "@/components/profile-page";
 import { PaystackReturnGate } from "@/components/paystack-return";
 import { ExplorePage } from "@/components/explore";
 import { NotificationsPage } from "@/components/notifications";
-import { continuityAudit, oracleChat, outlineAssist, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
+import { continuityAudit, oracleChat, outlineAssist, transcribeAudio, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
 import {
   acceptContinuation,
   createSeedApplication,
@@ -995,6 +995,15 @@ function Editor({ project, editorSceneId, update, setView, notify, exportFile }:
   const [coWritingSuggestion, setCoWritingSuggestion] = useState<{ content: string; providerId: string; modelId: string; attempted: string[] } | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const mediaInput = useRef<HTMLInputElement>(null);
+  // Transcription — dictate into the mic or upload an audio clip; the server
+  // (POST /api/transcribe, Groq Whisper → faster-whisper) returns the words,
+  // inserted at the current caret position.
+  const [transcribeBusy, setTranscribeBusy] = useState(false);
+  const [transcribeRecording, setTranscribeRecording] = useState(false);
+  const [transcribeError, setTranscribeError] = useState("");
+  const transcribeRecorderRef = useRef<MediaRecorder | null>(null);
+  const transcribeChunksRef = useRef<Blob[]>([]);
+  const audioInput = useRef<HTMLInputElement>(null);
   const sceneIndex = project.scenes.findIndex((item) => item.id === scene?.id);
   const coWriting = useMutation({
     mutationFn: (data: Parameters<typeof oracleChat>[0]) => oracleChat(data),
@@ -1217,6 +1226,61 @@ function Editor({ project, editorSceneId, update, setView, notify, exportFile }:
     closeRewrite();
     notify("Tone rewrite applied to the draft");
   };
+  // Transcription — insert the transcript at the caret (same insertion path
+  // as tone rewrite, so the draft's onInput saves it like typed text).
+  const insertTranscribedText = (text: string) => {
+    if (!editorRef.current) return;
+    const selection = window.getSelection();
+    if (selectionRangeRef.current) {
+      selection?.removeAllRanges();
+      selection?.addRange(selectionRangeRef.current);
+    }
+    document.execCommand("insertText", false, text);
+    editorRef.current.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: text }));
+    selectionRangeRef.current = null;
+  };
+  const runTranscription = async (file: File) => {
+    if (transcribeBusy) return;
+    setTranscribeError("");
+    setTranscribeBusy(true);
+    try {
+      const { text } = await transcribeAudio(file);
+      insertTranscribedText(text);
+      notify("Transcript inserted into the draft");
+    } catch (e) {
+      const err = e as { data?: { error?: string }; message?: string } | null;
+      setTranscribeError(err?.data?.error || err?.message || "Transcription failed. Try again.");
+    } finally {
+      setTranscribeBusy(false);
+    }
+  };
+  const toggleDictation = async () => {
+    if (transcribeRecording) {
+      transcribeRecorderRef.current?.stop();
+      return;
+    }
+    setTranscribeError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      transcribeChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) transcribeChunksRef.current.push(event.data);
+      };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const blob = new Blob(transcribeChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        setTranscribeRecording(false);
+        if (blob.size === 0) return;
+        await runTranscription(new File([blob], "dictation.webm", { type: blob.type }));
+      };
+      recorder.start();
+      transcribeRecorderRef.current = recorder;
+      setTranscribeRecording(true);
+    } catch {
+      setTranscribeError("Microphone access is needed to dictate.");
+    }
+  };
   if (!scene) return <div className="page"><Empty icon={<BookOpen size={28} />} title="No scenes yet" text="Add a scene in your outline, then come here to draft." action={<button className="primary-btn" onClick={() => setView("outline")}>Open outline</button>} /></div>;
 
   const editorStyle = {
@@ -1231,7 +1295,8 @@ function Editor({ project, editorSceneId, update, setView, notify, exportFile }:
     {focus && <button className="focus-exit" onClick={() => setFocus(false)} aria-label="Exit lock mode"><Lock size={20} /><span>Exit Lock Mode</span></button>}
     <div className="editor-layout"><button className="scene-side-nav scene-side-prev" onClick={() => go(sceneIndex - 1)} disabled={sceneIndex <= 0} aria-label="Previous scene"><ArrowLeft size={18} /></button><div className="editor-column" style={editorStyle}>
       {!focus && <section className="co-writing-bar"><div className="co-writing-top"><div className="co-writing-controls"><label className="co-writing-toggle"><input type="checkbox" checked={coWritingEnabled} onChange={(event) => { setCoWritingEnabled(event.target.checked); setCoWritingSuggestion(null); }} /><span><b>Opt-in co-writing</b></span></label><label className="co-writing-direction"><span>Optional direction</span><input value={coWritingDirection} onChange={(event) => setCoWritingDirection(event.target.value.slice(0, 300))} placeholder="e.g. keep it quiet, more sensory" /></label></div><div className="co-writing-actions"><button className="secondary-btn" onClick={coWriting.isPending ? () => { coWriting.reset(); setCoWritingSuggestion(null); } : suggestNext} disabled={!coWritingEnabled && !coWriting.isPending}>{coWriting.isPending ? <><X size={14} /> Cancel suggestion</> : <><Sparkles size={14} /> Suggest next beat</>}</button></div></div>{coWriting.isError && <div className="oracle-error"><X size={14} /> The suggestion could not reach a working model. Try again when the provider signal is ready.</div>}{coWritingSuggestion && <div className="co-writing-suggestion"><div><span className="eyebrow">SUGGESTED CONTINUATION</span><p>{coWritingSuggestion.content}</p></div><button className="primary-btn" onClick={acceptCoWriting}><Check size={14} /> Accept <kbd>Tab</kbd></button></div>}</section>}
-      <div className="format-bar"><button onMouseDown={keepSelection} onClick={() => command("undo")} aria-label="Undo"><Undo2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("redo")} aria-label="Redo"><Redo2 size={16} /></button><span className="bar-divider" /><button onMouseDown={keepSelection} onClick={() => command("bold")} aria-label="Bold" className={formatState.bold ? "toggled" : ""}><Bold size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("italic")} aria-label="Italic" className={formatState.italic ? "toggled" : ""}><Italic size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("strikeThrough")} aria-label="Strikethrough" className={formatState.strike ? "toggled" : ""}><Strikethrough size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h1")} aria-label="Title heading" className={formatState.h1 ? "toggled" : ""}><Heading1 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h2")} aria-label="Heading" className={formatState.h2 ? "toggled" : ""}><Heading2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertUnorderedList")} aria-label="Bulleted list" className={formatState.ul ? "toggled" : ""}><List size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertOrderedList")} aria-label="Numbered list" className={formatState.ol ? "toggled" : ""}><ListOrdered size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "blockquote")} aria-label="Quote" className={formatState.quote ? "toggled" : ""}><Quote size={16} /></button><button onMouseDown={keepSelection} onClick={() => { const url = window.prompt("Link URL"); if (url) command("createLink", url); }} aria-label="Link"><Link2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("removeFormat")} aria-label="Clear formatting"><Eraser size={16} /></button><span className="bar-divider" /><label className="toolbar-setting toolbar-typeface"><Type size={13} /><select value={typeface} onChange={(event) => setTypeface(event.target.value)} aria-label="Typeface"><option>Libre Baskerville</option><option>DM Sans</option><option>DM Mono</option></select></label><label className="toolbar-setting" title={`Text size · ${textSize}px`}><span className="toolbar-setting-label">Aa</span><input type="range" min="15" max="28" value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} aria-label="Text size" /><em>{textSize}px</em></label><label className="toolbar-setting" title={`Line spacing · ${lineSpacing}`}><span className="toolbar-setting-label">≡</span><input type="range" min="1.3" max="2.2" step=".1" value={lineSpacing} onChange={(event) => setLineSpacing(Number(event.target.value))} aria-label="Line spacing" /><em>{lineSpacing}</em></label><span className="toolbar-spacer" /><button className="media-import-btn" onMouseDown={keepSelection} onClick={() => mediaInput.current?.click()} aria-label="Add image"><ImagePlus size={15} /> Add image</button><input ref={mediaInput} type="file" accept="image/*" hidden onChange={addMedia} /></div>
+      <div className="format-bar"><button onMouseDown={keepSelection} onClick={() => command("undo")} aria-label="Undo"><Undo2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("redo")} aria-label="Redo"><Redo2 size={16} /></button><span className="bar-divider" /><button onMouseDown={keepSelection} onClick={() => command("bold")} aria-label="Bold" className={formatState.bold ? "toggled" : ""}><Bold size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("italic")} aria-label="Italic" className={formatState.italic ? "toggled" : ""}><Italic size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("strikeThrough")} aria-label="Strikethrough" className={formatState.strike ? "toggled" : ""}><Strikethrough size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h1")} aria-label="Title heading" className={formatState.h1 ? "toggled" : ""}><Heading1 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "h2")} aria-label="Heading" className={formatState.h2 ? "toggled" : ""}><Heading2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertUnorderedList")} aria-label="Bulleted list" className={formatState.ul ? "toggled" : ""}><List size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("insertOrderedList")} aria-label="Numbered list" className={formatState.ol ? "toggled" : ""}><ListOrdered size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("formatBlock", "blockquote")} aria-label="Quote" className={formatState.quote ? "toggled" : ""}><Quote size={16} /></button><button onMouseDown={keepSelection} onClick={() => { const url = window.prompt("Link URL"); if (url) command("createLink", url); }} aria-label="Link"><Link2 size={16} /></button><button onMouseDown={keepSelection} onClick={() => command("removeFormat")} aria-label="Clear formatting"><Eraser size={16} /></button><span className="bar-divider" /><label className="toolbar-setting toolbar-typeface"><Type size={13} /><select value={typeface} onChange={(event) => setTypeface(event.target.value)} aria-label="Typeface"><option>Libre Baskerville</option><option>DM Sans</option><option>DM Mono</option></select></label><label className="toolbar-setting" title={`Text size · ${textSize}px`}><span className="toolbar-setting-label">Aa</span><input type="range" min="15" max="28" value={textSize} onChange={(event) => setTextSize(Number(event.target.value))} aria-label="Text size" /><em>{textSize}px</em></label><label className="toolbar-setting" title={`Line spacing · ${lineSpacing}`}><span className="toolbar-setting-label">≡</span><input type="range" min="1.3" max="2.2" step=".1" value={lineSpacing} onChange={(event) => setLineSpacing(Number(event.target.value))} aria-label="Line spacing" /><em>{lineSpacing}</em></label><span className="toolbar-spacer" /><button className="media-import-btn" onMouseDown={keepSelection} onClick={() => mediaInput.current?.click()} aria-label="Add image"><ImagePlus size={15} /> Add image</button><input ref={mediaInput} type="file" accept="image/*" hidden onChange={addMedia} /><span className="bar-divider" /><button className={`dictate-btn ${transcribeRecording ? "recording" : ""}`} onMouseDown={keepSelection} onClick={toggleDictation} disabled={transcribeBusy} aria-label={transcribeRecording ? "Stop recording and transcribe" : "Dictate into the draft"} title={transcribeRecording ? "Tap to stop and transcribe" : "Record your voice and transcribe it into the draft"}>{transcribeBusy && !transcribeRecording ? <RefreshCw size={14} className="spin" /> : <Mic size={14} />}{transcribeRecording ? <><span className="rec-dot" /> Stop</> : <span>Dictate</span>}</button><button className="media-import-btn" onMouseDown={keepSelection} onClick={() => audioInput.current?.click()} disabled={transcribeBusy} aria-label="Transcribe an audio file"><Upload size={14} /> Transcribe audio</button><input ref={audioInput} type="file" accept="audio/*" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) void runTranscription(file); event.target.value = ""; }} /></div>
+      {transcribeError && <div className="transcribe-error"><X size={14} /> {transcribeError}</div>}
       <div ref={editorRef} className="draft-area rich-editor" contentEditable suppressContentEditableWarning onKeyDown={(event) => { if (event.key === "Tab" && coWritingSuggestion && coWritingEnabled) { event.preventDefault(); acceptCoWriting(); } if (event.key === "Escape" && coWritingSuggestion) setCoWritingSuggestion(null); }} onInput={(event) => setContent(event.currentTarget.innerHTML)} data-placeholder="Begin where the pressure is..." />
       <MediaBoard scene={scene} updateScene={updateScene} />
     </div><button className="scene-side-nav scene-side-next" onClick={() => go(sceneIndex + 1)} disabled={sceneIndex >= project.scenes.length - 1} aria-label="Next scene"><ArrowRight size={18} /></button></div>
