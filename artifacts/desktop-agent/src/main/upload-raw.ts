@@ -114,13 +114,16 @@ export async function uploadRawMultipart(opts: UploadRawOptions): Promise<Upload
   const noteHeader = partHeader("note", null, "");
   const fileHeader = partHeader("file", fileName, mimeType);
   const footer = Buffer.from(`${CRLF}--${BOUNDARY}--${CRLF}`, "utf8");
+  // Each part body must end with a CRLF before the next --boundary delimiter
+  // (RFC 2046); without it a parser folds the parts together and the file
+  // part is never recognised. The file part's CRLF comes from the footer.
   const bodyLength =
     kindHeader.length +
-    Buffer.byteLength(kind) +
+    Buffer.byteLength(kind) + Buffer.byteLength(CRLF) +
     reviewHeader.length +
-    Buffer.byteLength("true") +
+    Buffer.byteLength("true") + Buffer.byteLength(CRLF) +
     noteHeader.length +
-    Buffer.byteLength(note) +
+    Buffer.byteLength(note) + Buffer.byteLength(CRLF) +
     fileHeader.length +
     fileSize +
     footer.length;
@@ -158,10 +161,13 @@ export async function uploadRawMultipart(opts: UploadRawOptions): Promise<Upload
 
     req.write(kindHeader);
     req.write(kind);
+    req.write(CRLF);
     req.write(reviewHeader);
     req.write("true");
+    req.write(CRLF);
     req.write(noteHeader);
     req.write(note);
+    req.write(CRLF);
     req.write(fileHeader);
 
     // Stream the file from disk, honoring backpressure, then close the body.

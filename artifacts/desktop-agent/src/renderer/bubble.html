@@ -6,10 +6,10 @@
     <title>Tandem widget</title>
     <style>
       :root {
-        /* Tandem brand blue — matches the web apps and the agent window. */
-        --accent: #3b82f6;
-        --accent-2: #60a5fa;
-        --accent-deep: #1d4ed8;
+        /* Brand accent — red/orange, matches the agent window. */
+        --accent: #e6150a;
+        --accent-2: #ff5f4d;
+        --accent-deep: #8f0c02;
       }
       * { box-sizing: border-box; margin: 0; user-select: none; }
       html, body { background: transparent; overflow: hidden; }
@@ -35,7 +35,7 @@
           radial-gradient(circle at 32% 25%, rgba(255, 255, 255, 0.38), transparent 26%),
           radial-gradient(circle at 35% 30%, var(--accent-2), var(--accent) 52%, var(--accent-deep) 98%);
         box-shadow:
-          0 4px 12px rgba(59, 130, 246, 0.4),
+          0 4px 12px rgba(230, 21, 10, 0.4),
           0 1px 3px rgba(0, 0, 0, 0.3),
           inset 0 1px 1px rgba(255, 255, 255, 0.35),
           inset 0 -1px 3px rgba(0, 0, 0, 0.18);
@@ -53,7 +53,7 @@
         color: #fff; cursor: pointer;
         font: italic 700 13px/1 "Inter", system-ui, -apple-system, sans-serif;
         text-shadow:
-          0 1px 1px rgba(15, 40, 100, 0.6),
+          0 1px 1px rgba(60, 0, 0, 0.6),
           0 0 8px rgba(255, 255, 255, 0.2);
         transition: transform 0.1s ease;
       }
@@ -79,7 +79,7 @@
       .close:hover {
         background: var(--accent);
         border-color: rgba(255, 255, 255, 0.7);
-        box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+        box-shadow: 0 0 8px rgba(230, 21, 10, 0.6);
       }
     </style>
   </head>
