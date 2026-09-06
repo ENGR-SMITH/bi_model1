@@ -59,6 +59,30 @@ function formatDate(iso: string): string {
   }
 }
 
+// Resend-style feature checklist for a plan card. Built from the real plan
+// data (label, interval, detail) so no feature that isn't true gets promised.
+function planFeatures(plan: SubscriptionPlan): string[] {
+  if (plan.kind === 'pass') {
+    return [
+      'Renewals stack onto a live pass instead of resetting',
+      'Starts the moment your payment lands',
+      'One pass unlocks the entire room',
+    ];
+  }
+  if (plan.kind === 'storage') {
+    return [
+      `Adds ${plan.planLabel} of vault space`,
+      'Counts toward every project you own',
+      'Your quota bar updates immediately',
+    ];
+  }
+  return [
+    `Adds ${plan.planLabel.replace('+', '')} of capacity`,
+    'Applied instantly after payment',
+    'One-time purchase — no renewal',
+  ];
+}
+
 // A full-page status panel shown while a payment is being confirmed on return,
 // or right after a promo-waived (free) grant.
 type ResultOverlay =
@@ -314,46 +338,65 @@ export default function SubscriptionsPage() {
                   return (
                     <div
                       key={`${plan.kind}:${plan.planId}`}
-                      className={`soft-lift group relative flex flex-col overflow-hidden rounded-3xl p-6 ${popular ? 'card-raised glow-accent border border-[#3b82f6]/40' : 'card-surface border border-white/10'}`}
+                      className={`soft-lift group relative flex flex-col overflow-hidden rounded-3xl p-7 ${popular ? 'card-raised glow-accent border border-[#3b82f6]/40' : 'card-surface border border-white/10'}`}
                       data-testid={`plan-${plan.kind}-${plan.planId}`}
                     >
                       <span className="card-spot" />
                       <span className="card-shine" />
                       {popular && (
-                        <span className="absolute right-4 top-4 z-10 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] px-3 py-1 font-mono-ui text-[9px] font-semibold uppercase tracking-[.14em] text-white shadow-[0_8px_20px_-8px_rgba(99,102,241,0.9)]" data-testid={`plan-popular-${plan.planId}`}>
+                        <span className="absolute right-5 top-5 z-10 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] px-3 py-1 font-mono-ui text-[9px] font-semibold uppercase tracking-[.14em] text-white shadow-[0_8px_20px_-8px_rgba(99,102,241,0.9)]" data-testid={`plan-popular-${plan.planId}`}>
                           <PiSparkleDuotone className="h-3 w-3" /> Most popular
                         </span>
                       )}
+
+                      {/* Plan name + billing rhythm */}
                       <div className="flex items-center gap-3 pr-24">
-                        <span className={`icon-chip h-11 w-11 ${popular ? 'text-[#60a5fa]' : 'text-zinc-300'}`}>
+                        <span className={`icon-chip h-10 w-10 ${popular ? 'text-[#60a5fa]' : 'text-zinc-300'}`}>
                           <Icon className="h-5 w-5" />
                         </span>
                         <div className="min-w-0">
-                          <p className="truncate text-lg font-semibold text-zinc-100">{plan.planLabel}</p>
+                          <h3 className="truncate text-lg font-bold tracking-[-0.02em] text-white">{plan.planLabel}</h3>
                           <p className="font-mono-ui text-[9px] uppercase tracking-[.16em] text-zinc-500">{plan.intervalLabel}</p>
                         </div>
                       </div>
+
+                      {/* Price — the focal point, Resend style */}
                       <div className="mt-7 flex items-baseline gap-1.5">
-                        <span className={`font-display text-[2.75rem] font-extrabold leading-none tracking-[-0.05em] ${popular ? 'text-gradient-accent' : 'text-white'}`}>{price(plan.priceUsd)}</span>
+                        <span className={`font-display text-[3rem] font-extrabold leading-none tracking-[-0.05em] ${popular ? 'text-gradient-accent' : 'text-white'}`}>{price(plan.priceUsd)}</span>
                         <span className="text-sm text-zinc-500">/ {plan.intervalLabel}</span>
                       </div>
-                      <p className="mt-3 min-h-[2.75rem] text-xs leading-relaxed text-zinc-500">{plan.detail}</p>
-                      <div className="card-divider my-5" />
-                      {activeSub ? (
-                        <span className="mt-auto inline-flex items-center justify-center gap-2 rounded-xl border border-[#34d399]/25 bg-[#34d399]/10 px-4 py-3 text-center text-xs font-semibold text-[#34d399]" data-testid={`plan-active-${plan.planId}`}>
-                          <PiCheckDuotone className="h-3.5 w-3.5" />
-                          Active until {formatDate(activeSub.periodEnd)}
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setPaying(plan)}
-                          className={`focus-house mt-auto w-full rounded-xl py-3 text-center text-xs font-bold transition-all ${popular ? 'bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] text-white shadow-[0_12px_28px_-12px_rgba(59,130,246,0.8)] hover:brightness-110 hover:shadow-[0_16px_36px_-12px_rgba(139,92,246,0.9)]' : 'border border-white/10 bg-white/5 text-zinc-100 hover:border-white/25 hover:bg-white/10'}`}
-                          data-testid={`plan-buy-${plan.planId}`}
-                        >
-                          Subscribe
-                        </button>
-                      )}
+                      <p className="mt-2 min-h-[2.5rem] text-xs leading-relaxed text-zinc-500">{plan.detail}</p>
+
+                      <div className="card-divider my-6" />
+
+                      {/* What you get — Resend-style checklist */}
+                      <ul className="space-y-3">
+                        {planFeatures(plan).map((feature) => (
+                          <li key={feature} className="flex items-start gap-2.5 text-sm leading-snug text-zinc-300">
+                            <PiCheckCircleDuotone className={`mt-0.5 h-4 w-4 shrink-0 ${popular ? 'text-[#60a5fa]' : 'text-[#34d399]'}`} />
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+
+                      {/* CTA pinned to the bottom so cards stay equal height */}
+                      <div className="mt-auto pt-7">
+                        {activeSub ? (
+                          <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#34d399]/25 bg-[#34d399]/10 px-4 py-3.5 text-center text-xs font-semibold text-[#34d399]" data-testid={`plan-active-${plan.planId}`}>
+                            <PiCheckDuotone className="h-3.5 w-3.5" />
+                            Active until {formatDate(activeSub.periodEnd)}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setPaying(plan)}
+                            className={`focus-house w-full rounded-xl py-3.5 text-center text-xs font-bold transition-all ${popular ? 'bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] text-white shadow-[0_12px_28px_-12px_rgba(59,130,246,0.8)] hover:brightness-110 hover:shadow-[0_16px_36px_-12px_rgba(139,92,246,0.9)]' : 'border border-white/10 bg-white/5 text-zinc-100 hover:border-white/25 hover:bg-white/10'}`}
+                            data-testid={`plan-buy-${plan.planId}`}
+                          >
+                            Subscribe
+                          </button>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
