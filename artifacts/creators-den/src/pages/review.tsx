@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUser } from '@clerk/react';
-import { GitPullRequest, Inbox, ShieldCheck, Sparkles } from 'lucide-react';
+import { ChevronRight, GitPullRequest, Inbox, ShieldCheck, Sparkles } from 'lucide-react';
 import { useParams } from 'wouter';
 import {
   getListVideoReviewQueueQueryKey,
@@ -145,7 +145,7 @@ export default function ReviewPage() {
           </p>
         </div>
       ) : (
-        <div className="paper-card" data-testid="review-queue">
+        <div className="paper-card review-queue" data-testid="review-queue">
           <div className="den-stack">
             {items.map((item) => {
               const legMeta = RELAY_LEGS.find((leg) => leg.leg === item.leg);
@@ -167,10 +167,13 @@ export default function ReviewPage() {
                     <b className="truncate">{item.projectName}</b>
                     <small>
                       {item.submittedByName ?? item.submittedById.slice(0, 8)} · {timeAgo(item.createdAt)}
-                      {item.note ? ` — “${item.note.slice(0, 90)}”` : ''}
                     </small>
+                    {item.note && (
+                      <em className="review-item-note truncate" title={item.note}>“{item.note}”</em>
+                    )}
                   </span>
-                  <span className="den-tag gold"><GitPullRequest size={11} /> Review</span>
+                  <span className="den-tag gold review-item-cta"><GitPullRequest size={11} /> Review</span>
+                  <ChevronRight size={16} className="review-item-chevron" aria-hidden />
                 </button>
               );
             })}
