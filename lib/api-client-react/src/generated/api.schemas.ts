@@ -828,6 +828,34 @@ export interface AdminPlanSettingUpdate {
   autoRenewAvailable: boolean;
 }
 
+export interface AdminSubscription {
+  id: string;
+  userId: string;
+  /** @nullable */
+  userEmail: string | null;
+  kind: string;
+  planId: string;
+  planLabel: string;
+  priceUsd: number;
+  status: string;
+  intervalLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  source: string;
+  /** @nullable */
+  promoCode: string | null;
+  /** @nullable */
+  cardLast4: string | null;
+  autoRenew: boolean;
+  /** @nullable */
+  renewalFailure: string | null;
+  active: boolean;
+}
+
+export interface AdminSubscriptionAutoRenewUpdate {
+  enabled: boolean;
+}
+
 export type OracleMessageRole = typeof OracleMessageRole[keyof typeof OracleMessageRole];
 
 

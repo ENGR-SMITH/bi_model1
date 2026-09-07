@@ -27,6 +27,8 @@ export * from './adminPromoKind';
 export * from './adminPromoUpdate';
 export * from './adminPromoUpdateKind';
 export * from './adminSession';
+export * from './adminSubscription';
+export * from './adminSubscriptionAutoRenewUpdate';
 export * from './advisorySignal';
 export * from './advisorySignalLevel';
 export * from './arenaApplication';

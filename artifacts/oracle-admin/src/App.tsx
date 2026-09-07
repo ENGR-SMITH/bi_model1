@@ -27,6 +27,7 @@ import {
   Sparkles,
   TerminalSquare,
   Ticket,
+  Users,
   X,
   Zap,
 } from 'lucide-react';
@@ -35,6 +36,7 @@ import {
   getListAdminPlanSettingsQueryKey,
   getListAdminPromosQueryKey,
   getListAdminProvidersQueryKey,
+  getListAdminSubscriptionsQueryKey,
   useAdminLogin,
   useAdminLogout,
   useCheckAdminProvider,
@@ -43,12 +45,14 @@ import {
   useListAdminPlanSettings,
   useListAdminPromos,
   useListAdminProviders,
+  useListAdminSubscriptions,
   useOracleChat,
   useUpdateAdminPlanSetting,
   useUpdateAdminPromo,
   useUpdateAdminProvider,
+  useUpdateAdminSubscriptionAutoRenew,
 } from '@workspace/api-client-react';
-import type { AdminPlanSetting, AdminPromo, ProviderStatus, ProviderUpdate } from '@workspace/api-client-react';
+import type { AdminPlanSetting, AdminPromo, AdminSubscription, ProviderStatus, ProviderUpdate } from '@workspace/api-client-react';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -216,7 +220,7 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
   const session = useGetAdminSession();
   const providers = useListAdminProviders();
   const logout = useAdminLogout();
-  const [activeSection, setActiveSection] = useState<'overview' | 'providers' | 'promos' | 'plans'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'providers' | 'promos' | 'plans' | 'subscriptions'>('overview');
 
   const providerList = useMemo(() => providers.data || [], [providers.data]);
   const connectedCount = providerList.filter((provider) => provider.status === 'connected').length;
@@ -242,6 +246,7 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
               <button data-testid="button-nav-providers" onClick={() => { setActiveSection('providers'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'providers' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><SlidersHorizontal className="h-4 w-4" /> Provider routing</button>
               <button data-testid="button-nav-promos" onClick={() => { setActiveSection('promos'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'promos' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><Ticket className="h-4 w-4" /> Promo codes</button>
               <button data-testid="button-nav-plans" onClick={() => { setActiveSection('plans'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'plans' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><CreditCard className="h-4 w-4" /> Plan settings</button>
+              <button data-testid="button-nav-subscriptions" onClick={() => { setActiveSection('subscriptions'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'subscriptions' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><Users className="h-4 w-4" /> Subscriptions</button>
             </nav>
           </div>
           <div className="mt-auto">
@@ -261,6 +266,8 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
             <PromosSection session={session.data?.authenticated ?? false} />
           ) : activeSection === 'plans' ? (
             <PlanSettingsSection session={session.data?.authenticated ?? false} />
+          ) : activeSection === 'subscriptions' ? (
+            <SubscriptionsSection session={session.data?.authenticated ?? false} />
           ) : (
             <ProvidersSection providers={providerList} isLoading={providers.isLoading} isError={providers.isError} onRetry={() => providers.refetch()} session={session.data?.authenticated ?? false} />
           )}
@@ -696,6 +703,144 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subscriptions admin — every purchase across all accounts, newest first,
+// with the buyer's email resolved from Clerk. The auto-renew toggle here is
+// the per-account override: switch server-managed renewal on/off for one
+// specific subscription without touching the customer's other passes.
+// ---------------------------------------------------------------------------
+
+function apiErrorText(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    return String((error as { message: unknown }).message);
+  }
+  return 'Something went wrong — try again.';
+}
+
+function SubscriptionsSection({ session }: { session: boolean }) {
+  const subscriptions = useListAdminSubscriptions();
+  const queryClient = useQueryClient();
+  const update = useUpdateAdminSubscriptionAutoRenew({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminSubscriptionsQueryKey() }),
+    },
+  });
+  const [filter, setFilter] = useState('');
+  const [error, setError] = useState('');
+
+  const all = subscriptions.data ?? [];
+  const q = filter.trim().toLowerCase();
+  const rows = q
+    ? all.filter((sub) =>
+        [sub.userEmail, sub.userId, sub.planLabel, sub.planId, sub.kind, sub.status, sub.id]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(q)),
+      )
+    : all;
+
+  const toggle = (sub: AdminSubscription) => {
+    setError('');
+    update.mutate(
+      { id: sub.id, data: { enabled: !sub.autoRenew } },
+      {
+        onError: (cause: unknown) => setError(apiErrorText(cause)),
+      },
+    );
+  };
+
+  return (
+    <div className="mx-auto max-w-[1180px]">
+      <div className="animate-in">
+        <PageHeading
+          eyebrow="Control room / subscriptions"
+          title="Every subscription, every account."
+          description="See who is paying for what, and switch server-managed auto-renewal on or off for any individual pass. Turning it off stops future charges; the pass keeps running until it expires."
+          action={
+            <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
+              <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
+            </div>
+          }
+        />
+      </div>
+
+      <div className="mt-10 space-y-4 animate-in delay-100">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <input
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+            placeholder="Filter by email, user id, plan, or status…"
+            data-testid="input-subscriptions-filter"
+            className="h-10 w-full max-w-sm rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+          />
+          <span className="text-[11px] text-muted-foreground">
+            {rows.length} {rows.length === 1 ? 'subscription' : 'subscriptions'} · {rows.filter((sub) => sub.autoRenew).length} auto-renewing
+          </span>
+        </div>
+
+        {error && (
+          <p data-testid="subscriptions-error" className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs font-semibold text-destructive">{error}</p>
+        )}
+
+        {subscriptions.isError ? (
+          <ErrorState onRetry={() => subscriptions.refetch()} />
+        ) : subscriptions.isLoading ? (
+          <div className="space-y-3 animate-pulse">{[0, 1, 2, 3].map((item) => <div key={item} className="h-24 rounded-2xl border border-border bg-secondary/60" />)}</div>
+        ) : all.length === 0 ? (
+          <div data-testid="state-subscriptions-empty" className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+            <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-muted-foreground"><Users className="h-5 w-5" /></div>
+            <h3 className="mt-4 text-sm font-semibold">No subscriptions yet</h3>
+            <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Purchases from the category-pass, storage, and projects checkouts will land here.</p>
+          </div>
+        ) : rows.length === 0 ? (
+          <div data-testid="state-subscriptions-no-match" className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-xs text-muted-foreground">No subscriptions match “{filter}”.</div>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((sub) => (
+              <SubscriptionRow key={sub.id} sub={sub} updating={update.isPending} onToggle={() => toggle(sub)} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SubscriptionRow({ sub, updating, onToggle }: { sub: AdminSubscription; updating: boolean; onToggle: () => void }) {
+  return (
+    <div data-testid={`admin-sub-${sub.id}`} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{sub.userEmail ?? `User ${sub.userId}`}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {sub.planLabel} · {sub.kind} · {sub.planId} · ${(sub.priceUsd / 100).toFixed(2)} / {sub.intervalLabel}
+        </p>
+        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60">user {sub.userId} · sub {sub.id}</p>
+        {sub.renewalFailure ? (
+          <p className="mt-2 rounded-md border border-amber-600/25 bg-amber-600/5 px-2 py-1 text-[11px] leading-relaxed text-amber-600" data-testid={`admin-sub-failure-${sub.id}`}>{sub.renewalFailure}</p>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${sub.active ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600' : 'border-border bg-secondary/60 text-muted-foreground'}`}>{sub.active ? 'Active' : sub.status}</span>
+        <span className="font-mono text-[10px] text-muted-foreground">until {formatDate(sub.periodEnd)}</span>
+        {sub.cardLast4 ? <span className="font-mono text-[10px] text-muted-foreground">•••• {sub.cardLast4}</span> : null}
+        {sub.kind === 'pass' ? (
+          <button
+            type="button"
+            data-testid={`button-admin-auto-renew-${sub.id}`}
+            onClick={onToggle}
+            disabled={updating}
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${sub.autoRenew ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15' : 'border-border text-muted-foreground hover:bg-secondary'}`}
+          >
+            {sub.autoRenew ? <CircleCheck className="h-3.5 w-3.5" /> : <CircleDashed className="h-3.5 w-3.5" />}
+            {updating ? 'Saving…' : sub.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
+          </button>
+        ) : (
+          <span className="rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">no auto-renew</span>
+        )}
+      </div>
     </div>
   );
 }

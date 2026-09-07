@@ -272,6 +272,63 @@ export const DeleteAdminPromoResponse = zod.object({
 
 
 /**
+ * @summary List every subscription across all users
+ */
+export const ListAdminSubscriptionsResponseItem = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "userEmail": zod.string().nullable(),
+  "kind": zod.string(),
+  "planId": zod.string(),
+  "planLabel": zod.string(),
+  "priceUsd": zod.number().int(),
+  "status": zod.string(),
+  "intervalLabel": zod.string(),
+  "periodStart": zod.coerce.date(),
+  "periodEnd": zod.coerce.date(),
+  "source": zod.string(),
+  "promoCode": zod.string().nullable(),
+  "cardLast4": zod.string().nullable(),
+  "autoRenew": zod.boolean(),
+  "renewalFailure": zod.string().nullable(),
+  "active": zod.boolean()
+})
+export const ListAdminSubscriptionsResponse = zod.array(ListAdminSubscriptionsResponseItem)
+
+
+/**
+ * @summary Turn server-managed auto-renewal on or off for one subscription
+ */
+export const UpdateAdminSubscriptionAutoRenewParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateAdminSubscriptionAutoRenewBody = zod.object({
+  "enabled": zod.boolean()
+})
+
+export const UpdateAdminSubscriptionAutoRenewResponse = zod.object({
+  "id": zod.string(),
+  "userId": zod.string(),
+  "userEmail": zod.string().nullable(),
+  "kind": zod.string(),
+  "planId": zod.string(),
+  "planLabel": zod.string(),
+  "priceUsd": zod.number().int(),
+  "status": zod.string(),
+  "intervalLabel": zod.string(),
+  "periodStart": zod.coerce.date(),
+  "periodEnd": zod.coerce.date(),
+  "source": zod.string(),
+  "promoCode": zod.string().nullable(),
+  "cardLast4": zod.string().nullable(),
+  "autoRenew": zod.boolean(),
+  "renewalFailure": zod.string().nullable(),
+  "active": zod.boolean()
+})
+
+
+/**
  * @summary List every subscription plan with its auto-renew availability
  */
 export const ListAdminPlanSettingsResponseItem = zod.object({

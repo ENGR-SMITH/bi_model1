@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { asc, eq } from "drizzle-orm";
-import { db, tandemPromoCodesTable, tandemSubscriptionPlanSettingsTable } from "@workspace/db";
+import { asc, desc, eq } from "drizzle-orm";
+import { clerkClient } from "@clerk/express";
+import { db, tandemPromoCodesTable, tandemSubscriptionPlanSettingsTable, tandemSubscriptionsTable } from "@workspace/db";
 import {
   AdminLoginBody,
   CheckAdminProviderParams,
@@ -10,6 +11,7 @@ import {
   DeleteAdminPromoResponse,
   ListAdminPlanSettingsResponse,
   ListAdminPromosResponse,
+  ListAdminSubscriptionsResponse,
   UpdateAdminPlanSettingBody,
   UpdateAdminPlanSettingParams,
   UpdateAdminPlanSettingResponse,
@@ -17,6 +19,9 @@ import {
   UpdateAdminPromoResponse,
   UpdateAdminProviderBody,
   UpdateAdminProviderParams,
+  UpdateAdminSubscriptionAutoRenewBody,
+  UpdateAdminSubscriptionAutoRenewParams,
+  UpdateAdminSubscriptionAutoRenewResponse,
 } from "@workspace/api-zod";
 import { checkProvider, listProviderStatuses, updateProvider, type ProviderId } from "../lib/oracle";
 import { resolveSubscriptionProduct, subscriptionPlans, type SubscriptionKind } from "../video/subscriptions";
@@ -271,6 +276,114 @@ router.patch("/admin/plan-settings/:kind/:planId", requireAdmin, async (req, res
   const plans = await subscriptionPlans();
   const updated = plans.find((plan) => plan.kind === kind && plan.planId === planId);
   res.json(UpdateAdminPlanSettingResponse.parse(updated));
+});
+
+// ---------------------------------------------------------------------------
+// Subscriptions admin — every purchase across all users, newest first, with
+// the buyer's email resolved from Clerk. The auto-renew toggle here is the
+// per-account override: it switches server-managed renewal on/off for one
+// specific subscription (the user-facing toggle on the Subscriptions page
+// does the same thing for the account owner).
+// ---------------------------------------------------------------------------
+
+function adminSubscriptionView(row: typeof tandemSubscriptionsTable.$inferSelect) {
+  return {
+    id: row.id,
+    userId: row.userId,
+    kind: row.kind,
+    planId: row.planId,
+    planLabel: row.planLabel,
+    priceUsd: row.priceUsd,
+    status: row.status,
+    intervalLabel: row.intervalLabel,
+    periodStart: row.periodStart.toISOString(),
+    periodEnd: row.periodEnd.toISOString(),
+    source: row.source,
+    promoCode: row.promoCode,
+    cardLast4: row.cardLast4,
+    autoRenew: row.autoRenew === true,
+    renewalFailure: row.renewalFailure ?? null,
+    active: row.status === "ACTIVE" && row.periodEnd.getTime() > Date.now(),
+  };
+}
+
+/** Batch-resolve Clerk user emails; never fails the listing when Clerk is down. */
+async function resolveUserEmails(userIds: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(userIds)];
+  if (unique.length === 0) return new Map();
+  try {
+    const users = await clerkClient.users.getUserList({ userId: unique, limit: 100 });
+    return new Map(
+      users.data
+        .map((user) => {
+          const email = user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? null;
+          return [user.id, email] as const;
+        })
+        .filter((entry): entry is readonly [string, string] => Boolean(entry[1])),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+router.get("/admin/subscriptions", requireAdmin, async (_req, res): Promise<void> => {
+  const rows = await db
+    .select()
+    .from(tandemSubscriptionsTable)
+    .orderBy(desc(tandemSubscriptionsTable.createdAt));
+  const emails = await resolveUserEmails(rows.map((row) => row.userId));
+  res.json(
+    ListAdminSubscriptionsResponse.parse(
+      rows.map((row) => ({ ...adminSubscriptionView(row), userEmail: emails.get(row.userId) ?? null })),
+    ),
+  );
+});
+
+router.patch("/admin/subscriptions/:id/auto-renew", requireAdmin, async (req, res): Promise<void> => {
+  const params = UpdateAdminSubscriptionAutoRenewParams.safeParse(req.params);
+  const body = UpdateAdminSubscriptionAutoRenewBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Subscription id and enabled are required" });
+    return;
+  }
+
+  const [sub] = await db
+    .select()
+    .from(tandemSubscriptionsTable)
+    .where(eq(tandemSubscriptionsTable.id, params.data.id))
+    .limit(1);
+  if (!sub) {
+    res.status(404).json({ error: "Subscription not found" });
+    return;
+  }
+  if (sub.kind !== "pass") {
+    res.status(400).json({ error: "Only category passes renew automatically" });
+    return;
+  }
+  if (body.data.enabled && !sub.paystackAuthorizationCode) {
+    res.status(400).json({
+      error: "No card is on file for this subscription — automatic renewal cannot be turned on.",
+    });
+    return;
+  }
+
+  const [updated] = await db
+    .update(tandemSubscriptionsTable)
+    .set({
+      autoRenew: body.data.enabled,
+      renewalFailure: body.data.enabled ? null : sub.renewalFailure,
+      updatedAt: new Date(),
+    })
+    .where(eq(tandemSubscriptionsTable.id, params.data.id))
+    .returning();
+
+  const emails = await resolveUserEmails([updated.userId]);
+  res.json(
+    UpdateAdminSubscriptionAutoRenewResponse.parse({
+      ...adminSubscriptionView(updated),
+      userEmail: emails.get(updated.userId) ?? null,
+    }),
+  );
 });
 
 export default router;
