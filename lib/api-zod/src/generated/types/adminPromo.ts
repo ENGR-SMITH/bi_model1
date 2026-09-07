@@ -13,6 +13,7 @@ export interface AdminPromo {
   value: number;
   maxUses: number;
   uses: number;
+  active: boolean;
   /** @nullable */
   expiresAt: Date | null;
   createdAt: Date;

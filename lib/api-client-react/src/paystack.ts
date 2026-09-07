@@ -24,6 +24,8 @@ export type PaystackCheckoutInput = {
   promoCode?: string;
   /** Where Paystack should send the customer after paying (their own page). */
   callbackUrl?: string;
+  /** Sign this subscription up for server-managed auto-renewal (pass only). */
+  autoRenew?: boolean;
 };
 
 export type PaystackCheckoutResponse =

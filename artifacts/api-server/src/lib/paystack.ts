@@ -115,8 +115,22 @@ export interface PaystackTransaction {
   currency: string;
   reference: string;
   paid_at?: string | null;
-  authorization?: { last4?: string | null; channel?: string | null } | null;
+  authorization?: PaystackAuthorization | null;
+  customer?: { customer_code?: string | null; email?: string | null } | null;
   metadata?: Record<string, unknown> | null;
+}
+
+export interface PaystackAuthorization {
+  last4?: string | null;
+  channel?: string | null;
+  // The reusable card token — kept (server-only) when the customer opts into
+  // auto-renewal so the renewal scheduler can re-charge without a checkout.
+  authorization_code?: string | null;
+  card_type?: string | null;
+  bank?: string | null;
+  bin?: string | null;
+  exp_month?: string | null;
+  exp_year?: string | null;
 }
 
 /** GET /transaction/verify/:reference — server-side confirmation of a charge. */
@@ -126,6 +140,39 @@ export async function verifyTransaction(reference: string): Promise<PaystackTran
     { method: "GET" },
   );
   return json.data;
+}
+
+/**
+ * POST /transaction/charge_authorization — re-charge a previously authorized
+ * card (server-managed auto-renewal). The outcome lands as a normal
+ * charge.success / charge.failed webhook against the minted reference; a
+ * synchronous API error (declined authorization, missing card) throws.
+ */
+export interface ChargeAuthorizationInput {
+  email: string;
+  /** Amount in USD cents. */
+  amount: number;
+  authorizationCode: string;
+  /** Unique reference minted server-side (the renewal intent's reference). */
+  reference: string;
+  metadata?: Record<string, unknown>;
+}
+
+export async function chargeAuthorization(input: ChargeAuthorizationInput): Promise<void> {
+  await paystackRequest<{ status: boolean; data?: Record<string, unknown> }>(
+    "/transaction/charge_authorization",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        email: input.email,
+        amount: input.amount,
+        currency: PAYSTACK_CURRENCY,
+        authorization_code: input.authorizationCode,
+        reference: input.reference,
+        ...(input.metadata ? { metadata: input.metadata } : {}),
+      }),
+    },
+  );
 }
 
 /**

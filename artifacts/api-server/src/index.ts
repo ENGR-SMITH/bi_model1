@@ -6,6 +6,7 @@ import { initRealtime } from "./realtime";
 import { startVideoWorker } from "./video/worker";
 import { startStorageMaintenance } from "./video/storage-maintenance-runner";
 import { startChannelAnalyticsSync } from "./youtube/analytics-runner";
+import { startSubscriptionRenewalRunner } from "./video/renewals";
 
 const rawPort = process.env["PORT"];
 
@@ -36,4 +37,5 @@ server.listen(port, () => {
   startVideoWorker();
   startStorageMaintenance();
   startChannelAnalyticsSync();
+  startSubscriptionRenewalRunner();
 });

@@ -1,20 +1,25 @@
 import crypto from "node:crypto";
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { asc, eq } from "drizzle-orm";
-import { db, tandemPromoCodesTable } from "@workspace/db";
+import { db, tandemPromoCodesTable, tandemSubscriptionPlanSettingsTable } from "@workspace/db";
 import {
   AdminLoginBody,
   CheckAdminProviderParams,
   CreateAdminPromoBody,
   CreateAdminPromoResponse,
   DeleteAdminPromoResponse,
+  ListAdminPlanSettingsResponse,
   ListAdminPromosResponse,
+  UpdateAdminPlanSettingBody,
+  UpdateAdminPlanSettingParams,
+  UpdateAdminPlanSettingResponse,
   UpdateAdminPromoBody,
   UpdateAdminPromoResponse,
   UpdateAdminProviderBody,
   UpdateAdminProviderParams,
 } from "@workspace/api-zod";
 import { checkProvider, listProviderStatuses, updateProvider, type ProviderId } from "../lib/oracle";
+import { resolveSubscriptionProduct, subscriptionPlans, type SubscriptionKind } from "../video/subscriptions";
 
 const router: IRouter = Router();
 const COOKIE_NAME = "oracle_admin_session";
@@ -111,6 +116,8 @@ function promoView(promo: typeof tandemPromoCodesTable.$inferSelect) {
     value: promo.value,
     maxUses: promo.maxUses,
     uses: promo.uses,
+    // false = paused by an admin; the code stops validating immediately.
+    active: promo.active,
     expiresAt: promo.expiresAt ? promo.expiresAt.toISOString() : null,
     createdAt: promo.createdAt.toISOString(),
   };
@@ -196,6 +203,9 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
       kind: body.data.kind,
       value: Math.max(0, body.data.value),
       maxUses: Math.max(0, body.data.maxUses),
+      // An absent `active` leaves the code exactly as it is (pause/resume is
+      // a separate admin action from editing a code's discount).
+      ...(typeof body.data.active === "boolean" ? { active: body.data.active } : {}),
       expiresAt: body.data.expiresAt ? new Date(body.data.expiresAt) : null,
     })
     .where(eq(tandemPromoCodesTable.code, code))
@@ -216,6 +226,51 @@ router.delete("/admin/promos/:code", requireAdmin, async (req, res): Promise<voi
   }
   await db.delete(tandemPromoCodesTable).where(eq(tandemPromoCodesTable.code, code));
   res.json(DeleteAdminPromoResponse.parse({ deleted: true }));
+});
+
+// ---------------------------------------------------------------------------
+// Subscription plan settings — per-plan knobs on the code-defined catalog. An
+// admin can turn server-managed auto-renewal on/off for a plan here; the plans
+// endpoint (and the paystack checkout) read the same rows, so the storefront
+// checkbox follows what is switched on in this room.
+// ---------------------------------------------------------------------------
+
+const PLAN_KINDS = ["pass", "storage", "projects"] as const;
+
+router.get("/admin/plan-settings", requireAdmin, async (_req, res): Promise<void> => {
+  const plans = await subscriptionPlans();
+  res.json(ListAdminPlanSettingsResponse.parse(plans));
+});
+
+router.patch("/admin/plan-settings/:kind/:planId", requireAdmin, async (req, res): Promise<void> => {
+  const params = UpdateAdminPlanSettingParams.safeParse(req.params);
+  const body = UpdateAdminPlanSettingBody.safeParse(req.body);
+  if (!params.success || !body.success) {
+    res.status(400).json({ error: "Kind, plan id, and autoRenewAvailable are required" });
+    return;
+  }
+  const kind = params.data.kind as SubscriptionKind;
+  if (!PLAN_KINDS.includes(kind as (typeof PLAN_KINDS)[number])) {
+    res.status(400).json({ error: `Kind must be one of: ${PLAN_KINDS.join(", ")}` });
+    return;
+  }
+  const planId = params.data.planId;
+  if (!resolveSubscriptionProduct(kind, planId)) {
+    res.status(400).json({ error: `Unknown ${kind} plan: ${planId}` });
+    return;
+  }
+
+  await db
+    .insert(tandemSubscriptionPlanSettingsTable)
+    .values({ kind, planId, autoRenewAvailable: body.data.autoRenewAvailable })
+    .onConflictDoUpdate({
+      target: [tandemSubscriptionPlanSettingsTable.kind, tandemSubscriptionPlanSettingsTable.planId],
+      set: { autoRenewAvailable: body.data.autoRenewAvailable, updatedAt: new Date() },
+    });
+
+  const plans = await subscriptionPlans();
+  const updated = plans.find((plan) => plan.kind === kind && plan.planId === planId);
+  res.json(UpdateAdminPlanSettingResponse.parse(updated));
 });
 
 export default router;

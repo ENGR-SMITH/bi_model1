@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { and, eq, gt } from "drizzle-orm";
-import { db, tandemPromoCodesTable, tandemTicketsTable, tandemToursTable } from "@workspace/db";
+import { db, tandemPromoCodesTable, tandemPromoRedemptionsTable, tandemTicketsTable, tandemToursTable } from "@workspace/db";
 import { applySubscriptionPurchase } from "../video/subscriptions";
 import {
   GetTicketStatusResponse,
@@ -60,7 +60,23 @@ interface ResolvedPromo {
   label: string;
 }
 
-export async function resolvePromo(raw: string | undefined, priceUsd: number): Promise<ResolvedPromo | null> {
+/** True when this user has already redeemed the code (one per person). */
+export async function promoRedeemedByUser(code: string, userId: string): Promise<boolean> {
+  const [redemption] = await db
+    .select({ code: tandemPromoRedemptionsTable.code })
+    .from(tandemPromoRedemptionsTable)
+    .where(
+      and(eq(tandemPromoRedemptionsTable.code, code), eq(tandemPromoRedemptionsTable.userId, userId)),
+    )
+    .limit(1);
+  return Boolean(redemption);
+}
+
+export async function resolvePromo(
+  raw: string | undefined,
+  priceUsd: number,
+  userId?: string | null,
+): Promise<ResolvedPromo | null> {
   if (!raw || !raw.trim()) return null;
   const code = raw.trim().toUpperCase();
   const [promo] = await db
@@ -69,8 +85,12 @@ export async function resolvePromo(raw: string | undefined, priceUsd: number): P
     .where(eq(tandemPromoCodesTable.code, code))
     .limit(1);
   if (!promo) return null;
+  // Paused by an admin — keep the row, stop accepting it.
+  if (promo.active === false) return null;
   if (promo.expiresAt && promo.expiresAt.getTime() < Date.now()) return null;
   if (promo.maxUses > 0 && promo.uses >= promo.maxUses) return null;
+  // A shared code is still one per person — this caller already used it.
+  if (userId && (await promoRedeemedByUser(code, userId))) return null;
 
   if (promo.kind === "FREE") {
     return { code, kind: "FREE", value: 0, discount: priceUsd, label: "Free pass" };
@@ -260,7 +280,7 @@ router.post("/tickets/promo/validate", async (req: Request, res: Response): Prom
     return;
   }
 
-  const promo = await resolvePromo(body.data.code, PASS_PRICE_USD);
+  const promo = await resolvePromo(body.data.code, PASS_PRICE_USD, userId);
   if (!promo) {
     res.json(
       ValidateTicketPromoResponse.parse({
@@ -322,7 +342,7 @@ router.post("/tickets/purchase", async (req: Request, res: Response): Promise<vo
     return;
   }
 
-  const promo = await resolvePromo(body.data.promoCode ?? undefined, PASS_PRICE_USD);
+  const promo = await resolvePromo(body.data.promoCode ?? undefined, PASS_PRICE_USD, userId);
   if ((body.data.promoCode ?? "").trim() && !promo) {
     res.status(400).json({ error: "That promo code is not valid" });
     return;

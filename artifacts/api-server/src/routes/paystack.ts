@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { clerkClient, getAuth } from "@clerk/express";
-import { db, tandemPaystackIntentsTable } from "@workspace/db";
+import { db, tandemPaystackIntentsTable, tandemSubscriptionsTable } from "@workspace/db";
 import {
   applySubscriptionPurchase,
+  autoRenewAvailableForPlan,
   resolveSubscriptionProduct,
   unknownProductMessage,
   type SubscriptionKind,
@@ -80,7 +81,14 @@ async function markIntent(reference: string, status: "PENDING" | "SUCCESS" | "FA
  */
 async function grantIntent(
   reference: string,
-  options: { amount?: number; currency?: string; cardLast4?: string | null } = {},
+  options: {
+    amount?: number;
+    currency?: string;
+    cardLast4?: string | null;
+    authorizationCode?: string | null;
+    customerCode?: string | null;
+    customerEmail?: string | null;
+  } = {},
 ): Promise<"granted" | "already" | "mismatch" | null> {
   const intent = await lookupIntent(reference);
   if (!intent) return null;
@@ -102,6 +110,28 @@ async function grantIntent(
     .returning();
   if (claimed.length === 0) return "already";
 
+  // Auto-renewal context: a checkout signed up with autoRenew keeps the card
+  // authorization returned by the charge; a renewal intent reuses the card on
+  // the subscription row it is renewing (the row keeps the authorization).
+  let autoRenew = intent.autoRenew === true;
+  let authorizationCode = options.authorizationCode ?? null;
+  let customerCode = options.customerCode ?? null;
+  let customerEmail = options.customerEmail ?? intent.customerEmail ?? null;
+  const renewsSubscriptionId = intent.renewalFor ?? null;
+  if (renewsSubscriptionId) {
+    const [oldSub] = await db
+      .select()
+      .from(tandemSubscriptionsTable)
+      .where(eq(tandemSubscriptionsTable.id, renewsSubscriptionId))
+      .limit(1);
+    if (oldSub) {
+      autoRenew = true;
+      authorizationCode = oldSub.paystackAuthorizationCode ?? authorizationCode;
+      customerCode = oldSub.paystackCustomerCode ?? customerCode;
+      customerEmail = oldSub.paystackEmail ?? customerEmail;
+    }
+  }
+
   try {
     await applySubscriptionPurchase({
       userId: intent.userId,
@@ -113,6 +143,11 @@ async function grantIntent(
       promoCode: intent.promoCode,
       cardLast4: options.cardLast4 ?? intent.cardLast4,
       source: "checkout",
+      autoRenew,
+      paystackAuthorizationCode: authorizationCode,
+      paystackCustomerCode: customerCode,
+      paystackEmail: customerEmail,
+      renewsSubscriptionId,
     });
   } catch (cause) {
     // Reset so a webhook retry (or a later confirm) can complete the grant.
@@ -140,6 +175,12 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
   const kind = parseKind(body.kind);
   const planId = typeof body.planId === "string" ? body.planId : "";
   const promoCode = typeof body.promoCode === "string" && body.promoCode.trim() ? body.promoCode.trim() : undefined;
+  // Server-managed renewal only makes sense for category passes — the card
+  // authorization is kept and re-charged each pass cycle. Storage/projects are
+  // one-time purchases regardless. An admin can also turn auto-renewal off for
+  // a plan, which hides the checkout checkbox and refuses the flag here.
+  const autoRenew =
+    kind === "pass" && body.autoRenew === true && (await autoRenewAvailableForPlan("pass", planId));
 
   if (!kind) {
     res.status(400).json({ error: "A subscription kind (pass, storage, or projects) is required" });
@@ -156,7 +197,7 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
     return;
   }
 
-  const promo = await resolvePromo(promoCode, product.priceUsd);
+  const promo = await resolvePromo(promoCode, product.priceUsd, userId);
   if (promoCode && !promo) {
     res.status(400).json({ error: "That promo code is not valid" });
     return;
@@ -207,6 +248,8 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
     currency: "USD",
     status: "PENDING",
     promoCode: promo?.code ?? null,
+    autoRenew,
+    customerEmail: email,
   });
 
   try {
@@ -239,7 +282,13 @@ router.post("/paystack/webhook", async (req: Request, res: Response): Promise<vo
 
   const payload = (req.body ?? {}) as {
     event?: string;
-    data?: { reference?: string; amount?: number; currency?: string; authorization?: { last4?: string | null } | null };
+    data?: {
+      reference?: string;
+      amount?: number;
+      currency?: string;
+      authorization?: { last4?: string | null; authorization_code?: string | null } | null;
+      customer?: { customer_code?: string | null; email?: string | null } | null;
+    };
   };
   const event = payload.event ?? "";
   const data = payload.data ?? {};
@@ -256,6 +305,9 @@ router.post("/paystack/webhook", async (req: Request, res: Response): Promise<vo
         amount: typeof data.amount === "number" ? data.amount : undefined,
         currency: typeof data.currency === "string" ? data.currency : undefined,
         cardLast4: data.authorization?.last4 ?? null,
+        authorizationCode: data.authorization?.authorization_code ?? null,
+        customerCode: data.customer?.customer_code ?? null,
+        customerEmail: data.customer?.email ?? null,
       });
       if (result === null) logger.warn({ reference }, "paystack webhook: unknown reference (ignored)");
     } else if (event === "charge.failed" || event === "charge.void" || event === "charge.abandoned") {
@@ -331,7 +383,14 @@ router.post("/paystack/confirm", async (req: Request, res: Response): Promise<vo
 
   // Success (or already granted by the webhook while we verified) — make sure
   // the grant has happened, then hand back the receipt for the success UI.
-  const result = await grantIntent(reference, { amount: txn.amount, currency: txn.currency, cardLast4 });
+  const result = await grantIntent(reference, {
+    amount: txn.amount,
+    currency: txn.currency,
+    cardLast4,
+    authorizationCode: txn.authorization?.authorization_code ?? null,
+    customerCode: txn.customer?.customer_code ?? null,
+    customerEmail: txn.customer?.email ?? null,
+  });
   if (result === "mismatch") {
     res.status(402).json({ error: "The payment amount did not match — contact support." });
     return;

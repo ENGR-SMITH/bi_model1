@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
 // Paystack payment intents — one row per checkout session opened with Paystack
@@ -33,6 +33,15 @@ export const tandemPaystackIntentsTable = pgTable("tandem_paystack_intents", {
   // Last four digits of the card, filled in from the Paystack response once
   // the charge succeeds.
   cardLast4: text("card_last_4"),
+  // True when this checkout signed the subscription up for server-managed
+  // auto-renewal (a category pass); renewal intents re-charge the saved card.
+  autoRenew: boolean("auto_renew").notNull().default(false),
+  // For renewal charges: the subscription row being renewed, so the grant can
+  // hand the extension to the right record and no two cycles ever double-charge.
+  renewalFor: text("renewal_for"),
+  // The customer email used to open the checkout — needed to re-charge the
+  // saved authorization during renewal.
+  customerEmail: text("customer_email"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

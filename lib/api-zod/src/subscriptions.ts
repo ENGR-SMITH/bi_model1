@@ -16,6 +16,8 @@ export const SubscriptionPlanSchema = zod.object({
   priceUsd: zod.number().int(),
   intervalLabel: zod.string(),
   detail: zod.string(),
+  // Whether customers may sign this plan up for server-managed auto-renewal.
+  autoRenewAvailable: zod.boolean(),
 });
 
 export const SubscriptionRecordSchema = zod.object({
@@ -31,6 +33,8 @@ export const SubscriptionRecordSchema = zod.object({
   source: zod.string(),
   promoCode: zod.string().nullable(),
   cardLast4: zod.string().nullable(),
+  autoRenew: zod.boolean(),
+  renewalFailure: zod.string().nullable(),
   active: zod.boolean(),
 });
 
@@ -87,3 +91,7 @@ export type SubscriptionUsageStorage = { usedBytes: number; totalBytes: number; 
 export type SubscriptionUsageProjects = { used: number; total: number; remaining: number };
 export type SubscriptionCard = zod.infer<typeof SubscriptionCardSchema>;
 export type SubscriptionReceipt = zod.infer<typeof SubscriptionReceiptSchema>;
+export type SubscriptionAutoRenewInput = zod.infer<typeof SubscriptionAutoRenewInputSchema>;
+export const SubscriptionAutoRenewInputSchema = zod.object({
+  enabled: zod.boolean(),
+});

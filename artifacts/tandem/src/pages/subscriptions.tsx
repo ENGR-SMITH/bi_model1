@@ -8,6 +8,7 @@ import {
   confirmPaystackCheckout,
   getSubscriptionPlansQueryKey,
   useCreatePaystackCheckout,
+  useSetSubscriptionAutoRenew,
   useSubscriptionPlans,
   type SubscriptionPlan,
   type SubscriptionRecord,
@@ -67,6 +68,7 @@ function planFeatures(plan: SubscriptionPlan): string[] {
       'Renewals stack onto a live pass instead of resetting',
       'Starts the moment your payment lands',
       'One pass unlocks the entire room',
+      ...(plan.autoRenewAvailable ? ['Optional auto-renew with the card you use today'] : []),
     ];
   }
   if (plan.kind === 'storage') {
@@ -89,6 +91,72 @@ type ResultOverlay =
   | { kind: 'busy'; message: string }
   | { kind: 'success'; total?: number; cardLast4?: string | null; promoCode?: string | null }
   | { kind: 'error'; message: string };
+
+// Manage automatic renewal for one active category pass: turn it on/off in
+// place. Turning it off (cancel) stops future charges but keeps the pass until
+// its current expiry; turning it back on requires a card already on file.
+function AutoRenewControl({ sub, onChanged }: { sub: SubscriptionRecord; onChanged: () => void }) {
+  const mutation = useSetSubscriptionAutoRenew({
+    mutation: {
+      onSuccess: onChanged,
+    },
+  });
+  const [error, setError] = useState('');
+
+  const toggle = (enabled: boolean) => {
+    setError('');
+    mutation.mutate(
+      { data: { id: sub.id, enabled } },
+      {
+        onError: (e: unknown) => setError(apiErrorMessage(e)),
+      },
+    );
+  };
+
+  return (
+    <div className="mt-3 space-y-2 border-t border-white/5 pt-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">Automatic renewal</span>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono-ui text-[10px] uppercase tracking-[.1em] ${sub.autoRenew ? 'bg-[#34d399]/10 text-[#34d399]' : 'bg-white/5 text-zinc-500'}`}>
+          {sub.autoRenew ? 'On' : 'Off'}
+        </span>
+      </div>
+      {sub.autoRenew ? (
+        <>
+          <p className="text-[11px] leading-relaxed text-zinc-500">Renews your pass on its own with the card on file — next charge around {formatDate(sub.periodEnd)}.</p>
+          <button
+            type="button"
+            disabled={mutation.isPending}
+            onClick={() => toggle(false)}
+            className="w-full rounded-lg border border-red-400/25 px-3 py-2 text-[11px] font-bold text-red-400 transition hover:bg-red-400/10 disabled:opacity-50"
+            data-testid={`auto-renew-off-${sub.id}`}
+          >
+            Turn off auto-renew
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-[11px] leading-relaxed text-zinc-500">You'll renew manually each cycle, or switch it on to charge the card already on file.</p>
+          {sub.renewalFailure && (
+            <p className="rounded-lg border border-amber-400/25 bg-amber-400/5 p-2.5 text-[11px] leading-relaxed text-amber-300" data-testid={`auto-renew-failed-${sub.id}`}>
+              Last renewal didn't go through: {sub.renewalFailure}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={mutation.isPending}
+            onClick={() => toggle(true)}
+            className="w-full rounded-lg border border-[#34d399]/30 px-3 py-2 text-[11px] font-bold text-[#34d399] transition hover:bg-[#34d399]/10 disabled:opacity-50"
+            data-testid={`auto-renew-on-${sub.id}`}
+          >
+            Turn on auto-renew
+          </button>
+        </>
+      )}
+      {error && <p className="text-[11px] leading-relaxed text-red-400" role="alert">{error}</p>}
+    </div>
+  );
+}
 
 function ResultOverlayView({ state, onClose }: { state: ResultOverlay; onClose: () => void }) {
   if (state.kind === 'busy') {
@@ -382,10 +450,15 @@ export default function SubscriptionsPage() {
                       {/* CTA pinned to the bottom so cards stay equal height */}
                       <div className="mt-auto pt-7">
                         {activeSub ? (
-                          <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#34d399]/25 bg-[#34d399]/10 px-4 py-3.5 text-center text-xs font-semibold text-[#34d399]" data-testid={`plan-active-${plan.planId}`}>
-                            <PiCheckDuotone className="h-3.5 w-3.5" />
-                            Active until {formatDate(activeSub.periodEnd)}
-                          </span>
+                          <div className="space-y-3">
+                            <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#34d399]/25 bg-[#34d399]/10 px-4 py-3.5 text-center text-xs font-semibold text-[#34d399]" data-testid={`plan-active-${plan.planId}`}>
+                              <PiCheckDuotone className="h-3.5 w-3.5" />
+                              Active until {formatDate(activeSub.periodEnd)}
+                            </span>
+                            {plan.kind === 'pass' && (
+                              <AutoRenewControl sub={activeSub} onChanged={refreshPlans} />
+                            )}
+                          </div>
                         ) : (
                           <button
                             type="button"
@@ -430,7 +503,11 @@ export default function SubscriptionsPage() {
                       <p className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-zinc-500">
                         {sub.kind} · {sub.intervalLabel} · {price(sub.priceUsd)}
                         {sub.promoCode ? ` · promo ${sub.promoCode}` : ''}
+                        {sub.autoRenew ? <span className="ml-1.5 text-[#34d399]">· auto-renew</span> : null}
                       </p>
+                      {sub.renewalFailure ? (
+                        <p className="mt-1.5 rounded-md border border-amber-400/20 bg-amber-400/5 px-2 py-1 text-[11px] leading-relaxed text-amber-300">{sub.renewalFailure}</p>
+                      ) : null}
                     </div>
                   </div>
                   <div className="text-right">
@@ -476,6 +553,7 @@ function PayModal({
   onGranted: (total: number, cardLast4: string | null, promoCode: string | null) => void;
 }) {
   const [promo, setPromo] = useState('');
+  const [autoRenew, setAutoRenew] = useState(false);
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
 
@@ -510,6 +588,7 @@ function PayModal({
         planId: plan.planId,
         promoCode: promo.trim() || undefined,
         callbackUrl,
+        autoRenew: plan.kind === 'pass' ? autoRenew : false,
       },
     });
   };
@@ -547,6 +626,23 @@ function PayModal({
               You'll be taken to <b className="text-zinc-200">Paystack's secure checkout</b> (USD) to pay. You'll land back here when it's done.
             </p>
           </div>
+
+          {plan.kind === 'pass' && plan.autoRenewAvailable && (
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-white/5 bg-white/[.03] p-3">
+              <input
+                type="checkbox"
+                checked={autoRenew}
+                onChange={(event) => setAutoRenew(event.target.checked)}
+                disabled={opening}
+                className="mt-0.5 h-4 w-4 accent-[#34d399]"
+                data-testid="sub-check-auto-renew"
+              />
+              <span className="min-w-0">
+                <span className="block text-xs font-semibold text-zinc-200">Turn on automatic renewal</span>
+                <span className="mt-0.5 block text-[11px] leading-relaxed text-zinc-500">We'll renew this pass automatically every {plan.intervalLabel} with the card you use now. You can turn it off anytime here.</span>
+              </span>
+            </label>
+          )}
 
           <div className="mt-4">
             <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Promo code (optional)</span>
