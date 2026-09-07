@@ -318,6 +318,59 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/plan-settings:
+    get:
+      operationId: listAdminPlanSettings
+      tags: [admin]
+      summary: List every subscription plan with its auto-renew availability
+      responses:
+        "200":
+          description: Plan settings for the full catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminPlanSetting" }
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/plan-settings/{kind}/{planId}:
+    patch:
+      operationId: updateAdminPlanSetting
+      tags: [admin]
+      summary: Set whether a plan may be subscribed with server-managed auto-renewal
+      parameters:
+        - name: kind
+          in: path
+          required: true
+          schema: { type: string }
+        - name: planId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminPlanSettingUpdate" }
+      responses:
+        "200":
+          description: Updated plan setting
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminPlanSetting" }
+        "400":
+          description: Unknown plan or invalid body
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /oracle/chat:
     post:
       operationId: oracleChat
@@ -5340,9 +5393,12 @@ components:
         value: { type: integer }
         maxUses: { type: integer }
         uses: { type: integer }
+        # false = paused by an admin — the code stops validating immediately
+        # but keeps its row/history so it can be switched back on.
+        active: { type: boolean }
         expiresAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
-      required: [code, kind, value, maxUses, uses, expiresAt, createdAt]
+      required: [code, kind, value, maxUses, uses, active, expiresAt, createdAt]
     AdminPromoInput:
       type: object
       properties:
@@ -5362,6 +5418,9 @@ components:
           enum: [FREE, PERCENT, FLAT]
         value: { type: integer }
         maxUses: { type: integer }
+        # Optional pause/resume flag. Editing a code's discount without this
+        # field leaves its enabled state untouched.
+        active: { type: boolean }
         expiresAt: { type: ["string", "null"], format: date-time }
       required: [kind, value, maxUses]
     AdminPromoDeleteResult:
@@ -5369,6 +5428,24 @@ components:
       properties:
         deleted: { type: boolean }
       required: [deleted]
+    AdminPlanSetting:
+      type: object
+      properties:
+        kind: { type: string }
+        planId: { type: string }
+        planLabel: { type: string }
+        priceUsd: { type: integer }
+        intervalLabel: { type: string }
+        # Whether customers may turn on server-managed auto-renewal for this
+        # plan. Defaults on for category passes, off for storage/projects;
+        # only rows in tandem_subscription_plan_settings override the default.
+        autoRenewAvailable: { type: boolean }
+      required: [kind, planId, planLabel, priceUsd, intervalLabel, autoRenewAvailable]
+    AdminPlanSettingUpdate:
+      type: object
+      properties:
+        autoRenewAvailable: { type: boolean }
+      required: [autoRenewAvailable]
     OracleMessage:
       type: object
       properties:

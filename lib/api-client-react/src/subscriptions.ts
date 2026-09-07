@@ -32,6 +32,10 @@ export type SubscriptionRecord = {
   source: string;
   promoCode: string | null;
   cardLast4: string | null;
+  /** Server-managed auto-renewal is on (category passes). */
+  autoRenew: boolean;
+  /** Why the last auto-renew charge failed, when it did. */
+  renewalFailure: string | null;
   active: boolean;
 };
 
@@ -42,6 +46,8 @@ export type SubscriptionPlan = {
   priceUsd: number;
   intervalLabel: string;
   detail: string;
+  /** Whether customers may sign this plan up for server-managed auto-renewal. */
+  autoRenewAvailable: boolean;
 };
 
 export type SubscriptionPlansResponse = {
@@ -119,6 +125,73 @@ export function useListSubscriptions<
   const queryOptions = getListSubscriptionsQueryOptions(options);
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & { queryKey: QueryKey };
   return withQueryKey(query, queryOptions.queryKey);
+}
+
+// ---- auto-renew (turn server-managed renewal on/off for a pass) ----
+
+export const getSubscriptionAutoRenewUrl = (id: string) => `/api/subscriptions/${encodeURIComponent(id)}/auto-renew`;
+
+export const setSubscriptionAutoRenew = async (
+  body: { id: string; enabled: boolean },
+  options?: Parameters<typeof customFetch>[1],
+): Promise<SubscriptionRecord | null> =>
+  customFetch<SubscriptionRecord | null>(getSubscriptionAutoRenewUrl(body.id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify({ enabled: body.enabled }),
+  });
+
+export const getSetSubscriptionAutoRenewMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setSubscriptionAutoRenew>>,
+    TError,
+    { data: { id: string; enabled: boolean } },
+    TContext
+  >;
+  request?: Parameters<typeof customFetch>[1];
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setSubscriptionAutoRenew>>,
+  TError,
+  { data: { id: string; enabled: boolean } },
+  TContext
+> => {
+  const mutationKey = ["setSubscriptionAutoRenew"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setSubscriptionAutoRenew>>,
+    { data: { id: string; enabled: boolean } }
+  > = ({ data }) => setSubscriptionAutoRenew(data, requestOptions);
+  return { mutationFn, ...mutationOptions };
+};
+
+export const useSetSubscriptionAutoRenewId = "setSubscriptionAutoRenew";
+
+export function useSetSubscriptionAutoRenew<
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setSubscriptionAutoRenew>>,
+    TError,
+    { data: { id: string; enabled: boolean } },
+    TContext
+  >;
+  request?: Parameters<typeof customFetch>[1];
+}): UseMutationResult<
+  Awaited<ReturnType<typeof setSubscriptionAutoRenew>>,
+  TError,
+  { data: { id: string; enabled: boolean } },
+  TContext
+> {
+  return useMutation(getSetSubscriptionAutoRenewMutationOptions(options));
 }
 
 // ---- plans (catalog + current entitlements) ----

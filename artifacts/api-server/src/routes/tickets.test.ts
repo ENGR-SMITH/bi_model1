@@ -45,14 +45,15 @@ const VALID_CARD = {
   cvc: "123",
 };
 
-async function seedPromo(code: string, kind: "FREE" | "PERCENT" | "FLAT", value: number, maxUses = 0) {
-  await state.db.insert(state.tables.tandemPromoCodesTable).values({ code, kind, value, maxUses, uses: 0 });
+async function seedPromo(code: string, kind: "FREE" | "PERCENT" | "FLAT", value: number, maxUses = 0, active = true) {
+  await state.db.insert(state.tables.tandemPromoCodesTable).values({ code, kind, value, maxUses, uses: 0, active });
 }
 
 async function resetDb() {
   const t = state.tables;
   await state.db.delete(t.tandemTicketsTable);
   await state.db.delete(t.tandemToursTable);
+  await state.db.delete(t.tandemPromoRedemptionsTable);
   await state.db.delete(t.tandemPromoCodesTable);
   state.userId = null;
 }
@@ -207,6 +208,57 @@ describe("promo codes", () => {
     });
     expect(exhausted.status).toBe(400);
     expect(exhausted.body.error).toMatch(/promo/i);
+  });
+
+  it("lets many people use a shared code, but only once per person", async () => {
+    await seedPromo("TOGETHER", "FLAT", 25, 0); // unlimited people
+    state.userId = "user-1";
+
+    // First person redeems it for the authors pass.
+    const first = await request(API).post("/api/tickets/purchase").send({
+      category: "authors",
+      card: VALID_CARD,
+      promoCode: "TOGETHER",
+    });
+    expect(first.status).toBe(201);
+
+    // The SAME person cannot use it again, even though the code is not exhausted.
+    const again = await request(API).post("/api/tickets/purchase").send({
+      category: "content-creators",
+      card: VALID_CARD,
+      promoCode: "TOGETHER",
+    });
+    expect(again.status).toBe(400);
+    expect(again.body.error).toMatch(/promo/i);
+    const check = await request(API).post("/api/tickets/promo/validate").send({ code: "TOGETHER" });
+    expect(check.body.valid).toBe(false);
+
+    // A second person can still use it.
+    state.userId = "user-2";
+    const second = await request(API).post("/api/tickets/purchase").send({
+      category: "content-creators",
+      card: VALID_CARD,
+      promoCode: "TOGETHER",
+    });
+    expect(second.status).toBe(201);
+    expect(second.body.receipt.discount).toBe(25);
+  });
+
+  it("rejects a code an admin has paused (soft-disable)", async () => {
+    await seedPromo("PAUSEDCODE", "FLAT", 50, 0, false);
+    state.userId = "user-1";
+
+    const check = await request(API).post("/api/tickets/promo/validate").send({ code: "PAUSEDCODE" });
+    expect(check.status).toBe(200);
+    expect(check.body.valid).toBe(false);
+
+    const purchase = await request(API).post("/api/tickets/purchase").send({
+      category: "authors",
+      card: VALID_CARD,
+      promoCode: "PAUSEDCODE",
+    });
+    expect(purchase.status).toBe(400);
+    expect(purchase.body.error).toMatch(/promo/i);
   });
 
   it("requires authentication for promo validation", async () => {

@@ -56,6 +56,8 @@ async function resetDb() {
   await state.db.delete(t.tandemSubscriptionsTable);
   await state.db.delete(t.tandemTicketsTable);
   await state.db.delete(t.tandemAccountQuotasTable);
+  await state.db.delete(t.tandemPromoRedemptionsTable);
+  await state.db.delete(t.tandemSubscriptionPlanSettingsTable);
   state.userId = null;
   state.clerkEmail = "buyer@example.com";
   state.paystackCalls = [];
@@ -159,6 +161,42 @@ describe("POST /api/paystack/checkout", () => {
       .from(state.tables.tandemPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent).toMatchObject({ kind: "pass", planId: "authors", amountUsd: 188, currency: "USD", status: "PENDING" });
+  });
+
+  it("keeps the auto-renew flag when the plan allows it", async () => {
+    state.userId = "user-1";
+    const res = await request(API)
+      .post("/api/paystack/checkout")
+      .send({ kind: "pass", planId: "authors", autoRenew: true });
+    expect(res.status).toBe(201);
+
+    const reference: string = res.body.reference;
+    const [intent] = await state.db
+      .select()
+      .from(state.tables.tandemPaystackIntentsTable)
+      .where((t: any) => t.reference === reference);
+    expect(intent.autoRenew).toBe(true);
+  });
+
+  it("ignores the auto-renew flag when an admin turned it off for the plan", async () => {
+    state.userId = "user-1";
+    await state.db.insert(state.tables.tandemSubscriptionPlanSettingsTable).values({
+      kind: "pass",
+      planId: "authors",
+      autoRenewAvailable: false,
+    });
+
+    const res = await request(API)
+      .post("/api/paystack/checkout")
+      .send({ kind: "pass", planId: "authors", autoRenew: true });
+    expect(res.status).toBe(201);
+
+    const reference: string = res.body.reference;
+    const [intent] = await state.db
+      .select()
+      .from(state.tables.tandemPaystackIntentsTable)
+      .where((t: any) => t.reference === reference);
+    expect(intent.autoRenew).toBe(false);
   });
 
   it("grants immediately for a FREE promo (no charge, no checkout)", async () => {

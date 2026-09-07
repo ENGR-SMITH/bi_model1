@@ -46,6 +46,8 @@ async function resetDb() {
   await state.db.delete(t.tandemSubscriptionsTable);
   await state.db.delete(t.tandemTicketsTable);
   await state.db.delete(t.tandemAccountQuotasTable);
+  await state.db.delete(t.tandemPromoRedemptionsTable);
+  await state.db.delete(t.tandemSubscriptionPlanSettingsTable);
   state.userId = null;
 }
 
@@ -65,6 +67,28 @@ describe("subscription plans", () => {
     const authorPass = res.body.plans.find((p: any) => p.kind === "pass" && p.planId === "authors");
     expect(authorPass.priceUsd).toBe(188);
     expect(res.body.current).toEqual([]);
+  });
+
+  it("reflects admin auto-renew availability per plan", async () => {
+    state.userId = "user-1";
+
+    // Defaults: passes may auto-renew, storage/projects may not.
+    let res = await request(API).get("/api/subscriptions/plans");
+    const authorsDefault = res.body.plans.find((p: any) => p.kind === "pass" && p.planId === "authors");
+    expect(authorsDefault.autoRenewAvailable).toBe(true);
+    const g200Default = res.body.plans.find((p: any) => p.kind === "storage" && p.planId === "g200");
+    expect(g200Default.autoRenewAvailable).toBe(false);
+
+    // An admin override (settings row) flips the authors pass off.
+    await state.db.insert(state.tables.tandemSubscriptionPlanSettingsTable).values({
+      kind: "pass",
+      planId: "authors",
+      autoRenewAvailable: false,
+    });
+    res = await request(API).get("/api/subscriptions/plans");
+    expect(res.body.plans.find((p: any) => p.kind === "pass" && p.planId === "authors").autoRenewAvailable).toBe(false);
+    // Other passes are untouched.
+    expect(res.body.plans.find((p: any) => p.kind === "pass" && p.planId === "content-creators").autoRenewAvailable).toBe(true);
   });
 
   it("requires authentication", async () => {

@@ -1,5 +1,5 @@
 import { createInsertSchema } from "drizzle-zod";
-import { integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
 // TANDEM category passes — the ticket 🎫 paywall. Each available category
@@ -48,14 +48,36 @@ export const tandemPromoCodesTable = pgTable("tandem_promo_codes", {
   // 0 = unlimited uses.
   maxUses: integer("max_uses").notNull().default(0),
   uses: integer("uses").notNull().default(0),
+  // false = paused by an admin: the code stops validating but keeps its row,
+  // usage history, and settings so it can be switched back on later.
+  active: boolean("active").notNull().default(true),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ---------------------------------------------------------------------------
+// Promo redemptions — one row per (code, user), so a code can be shared by
+// many people while each person can redeem it only once. Written by the same
+// grant path that bumps the code's `uses` counter; the checkout refuses a
+// code the caller has already redeemed.
+// ---------------------------------------------------------------------------
+
+export const tandemPromoRedemptionsTable = pgTable(
+  "tandem_promo_redemptions",
+  {
+    code: text("code").notNull(),
+    userId: text("user_id").notNull(),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.code, table.userId] })],
+);
+
 export const insertTandemTicketSchema = createInsertSchema(tandemTicketsTable);
 export const insertTandemPromoCodeSchema = createInsertSchema(tandemPromoCodesTable);
+export const insertTandemPromoRedemptionSchema = createInsertSchema(tandemPromoRedemptionsTable);
 export const insertTandemTourSchema = createInsertSchema(tandemToursTable);
 
 export type TandemTicket = typeof tandemTicketsTable.$inferSelect;
 export type TandemPromoCode = typeof tandemPromoCodesTable.$inferSelect;
+export type TandemPromoRedemption = typeof tandemPromoRedemptionsTable.$inferSelect;
 export type TandemTour = typeof tandemToursTable.$inferSelect;

@@ -9,13 +9,16 @@ import {
   CircleCheck,
   CircleDashed,
   Clock3,
+  CreditCard,
   Eye,
   EyeOff,
   KeyRound,
   LogOut,
   Menu,
   Network,
+  PauseCircle,
   Pencil,
+  PlayCircle,
   Plus,
   RefreshCw,
   Save,
@@ -24,27 +27,28 @@ import {
   Sparkles,
   TerminalSquare,
   Ticket,
-  Trash2,
   X,
   Zap,
 } from 'lucide-react';
 import {
   getGetAdminSessionQueryKey,
+  getListAdminPlanSettingsQueryKey,
   getListAdminPromosQueryKey,
   getListAdminProvidersQueryKey,
   useAdminLogin,
   useAdminLogout,
   useCheckAdminProvider,
   useCreateAdminPromo,
-  useDeleteAdminPromo,
   useGetAdminSession,
+  useListAdminPlanSettings,
   useListAdminPromos,
   useListAdminProviders,
   useOracleChat,
+  useUpdateAdminPlanSetting,
   useUpdateAdminPromo,
   useUpdateAdminProvider,
 } from '@workspace/api-client-react';
-import type { AdminPromo, ProviderStatus, ProviderUpdate } from '@workspace/api-client-react';
+import type { AdminPlanSetting, AdminPromo, ProviderStatus, ProviderUpdate } from '@workspace/api-client-react';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -212,7 +216,7 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
   const session = useGetAdminSession();
   const providers = useListAdminProviders();
   const logout = useAdminLogout();
-  const [activeSection, setActiveSection] = useState<'overview' | 'providers' | 'promos'>('overview');
+  const [activeSection, setActiveSection] = useState<'overview' | 'providers' | 'promos' | 'plans'>('overview');
 
   const providerList = useMemo(() => providers.data || [], [providers.data]);
   const connectedCount = providerList.filter((provider) => provider.status === 'connected').length;
@@ -237,6 +241,7 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
               <button data-testid="button-nav-overview" onClick={() => { setActiveSection('overview'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'overview' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><Activity className="h-4 w-4" /> System overview</button>
               <button data-testid="button-nav-providers" onClick={() => { setActiveSection('providers'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'providers' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><SlidersHorizontal className="h-4 w-4" /> Provider routing</button>
               <button data-testid="button-nav-promos" onClick={() => { setActiveSection('promos'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'promos' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><Ticket className="h-4 w-4" /> Promo codes</button>
+              <button data-testid="button-nav-plans" onClick={() => { setActiveSection('plans'); setMobileOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${activeSection === 'plans' ? 'bg-sidebar-accent text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground'}`}><CreditCard className="h-4 w-4" /> Plan settings</button>
             </nav>
           </div>
           <div className="mt-auto">
@@ -254,6 +259,8 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
             <Overview providers={providerList} isLoading={providers.isLoading} isError={providers.isError} onRetry={() => providers.refetch()} connectedCount={connectedCount} configuredCount={configuredCount} onConfigure={() => setActiveSection('providers')} />
           ) : activeSection === 'promos' ? (
             <PromosSection session={session.data?.authenticated ?? false} />
+          ) : activeSection === 'plans' ? (
+            <PlanSettingsSection session={session.data?.authenticated ?? false} />
           ) : (
             <ProvidersSection providers={providerList} isLoading={providers.isLoading} isError={providers.isError} onRetry={() => providers.refetch()} session={session.data?.authenticated ?? false} />
           )}
@@ -419,12 +426,6 @@ function PromoValueLabel(promo: AdminPromo): string {
 
 function PromosSection({ session }: { session: boolean }) {
   const promos = useListAdminPromos();
-  const queryClient = useQueryClient();
-  const remove = useDeleteAdminPromo({
-    mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminPromosQueryKey() }),
-    },
-  });
 
   return (
     <div className="mx-auto max-w-[1180px]">
@@ -432,7 +433,7 @@ function PromosSection({ session }: { session: boolean }) {
         <PageHeading
           eyebrow="Control room / ticket passes"
           title="Manage the promo codes."
-          description="Create, tune, and retire the codes the $1.88 category-pass checkout accepts. A code that is deleted stops working immediately."
+          description="Create, tune, and retire the codes the $1.88 category-pass checkout accepts. Every code can be shared by many people — each person may redeem it once — and a code that is paused stops working immediately without losing its history."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
@@ -456,7 +457,7 @@ function PromosSection({ session }: { session: boolean }) {
         ) : (
           <div className="space-y-3">
             {(promos.data ?? []).map((promo) => (
-              <PromoRow key={promo.code} promo={promo} onDelete={() => remove.mutate({ code: promo.code })} deleting={remove.isPending} />
+              <PromoRow key={promo.code} promo={promo} />
             ))}
           </div>
         )}
@@ -483,7 +484,8 @@ function CreatePromoForm() {
         queryClient.invalidateQueries({ queryKey: getListAdminPromosQueryKey() });
         setCode('');
         setValue('');
-        setMaxUses('0');
+        setUsage('multi-unlimited');
+        setCap('10');
         setExpiry('');
         setNotice('');
       },
@@ -496,9 +498,16 @@ function CreatePromoForm() {
   const [code, setCode] = useState('');
   const [kind, setKind] = useState<'FREE' | 'PERCENT' | 'FLAT'>('PERCENT');
   const [value, setValue] = useState('50');
-  const [maxUses, setMaxUses] = useState('0');
+  const [usage, setUsage] = useState<'single' | 'multi-unlimited' | 'multi-capped'>('multi-unlimited');
+  const [cap, setCap] = useState('10');
   const [expiry, setExpiry] = useState('');
   const [notice, setNotice] = useState('');
+
+  const maxUsesOf = (): number => {
+    if (usage === 'single') return 1;
+    if (usage === 'multi-capped') return Math.max(2, Number(cap) || 2);
+    return 0; // unlimited people
+  };
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -512,7 +521,7 @@ function CreatePromoForm() {
         code: code.trim(),
         kind,
         value: Number(value) || 0,
-        maxUses: Number(maxUses) || 0,
+        maxUses: maxUsesOf(),
         expiresAt: expiry ? new Date(expiry).toISOString() : undefined,
       },
     });
@@ -547,8 +556,15 @@ function CreatePromoForm() {
           <input type="number" min="0" value={value} onChange={(event) => setValue(event.target.value)} className={inputClass} data-testid="input-promo-value" />
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Max uses</span>
-          <input type="number" min="0" value={maxUses} onChange={(event) => setMaxUses(event.target.value)} className={inputClass} data-testid="input-promo-max-uses" />
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Who can use it</span>
+          <select value={usage} onChange={(event) => setUsage(event.target.value as 'single' | 'multi-unlimited' | 'multi-capped')} className={inputClass} data-testid="select-promo-usage">
+            <option value="multi-unlimited">Many people · no limit</option>
+            <option value="single">One person only</option>
+            <option value="multi-capped">Many people · limited</option>
+          </select>
+          {usage === 'multi-capped' && (
+            <input type="number" min="2" value={cap} onChange={(event) => setCap(event.target.value)} className={`${inputClass} mt-2`} aria-label="People limit" data-testid="input-promo-max-uses" />
+          )}
         </label>
         <label className="block">
           <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Expires (optional)</span>
@@ -563,7 +579,14 @@ function CreatePromoForm() {
   );
 }
 
-function PromoRow({ promo, onDelete, deleting }: { promo: AdminPromo; onDelete: () => void; deleting: boolean }) {
+type PromoUsage = 'single' | 'multi-unlimited' | 'multi-capped';
+
+function usageForMaxUses(maxUses: number): PromoUsage {
+  if (maxUses <= 1) return maxUses === 1 ? 'single' : 'multi-unlimited';
+  return 'multi-capped';
+}
+
+function PromoRow({ promo }: { promo: AdminPromo }) {
   const queryClient = useQueryClient();
   const update = useUpdateAdminPromo({
     mutation: {
@@ -573,12 +596,19 @@ function PromoRow({ promo, onDelete, deleting }: { promo: AdminPromo; onDelete: 
   const [editing, setEditing] = useState(false);
   const [kind, setKind] = useState<'FREE' | 'PERCENT' | 'FLAT'>(promo.kind as 'FREE' | 'PERCENT' | 'FLAT');
   const [value, setValue] = useState(String(promo.value));
-  const [maxUses, setMaxUses] = useState(String(promo.maxUses));
+  const [usage, setUsage] = useState<PromoUsage>(usageForMaxUses(promo.maxUses));
+  const [cap, setCap] = useState(String(promo.maxUses > 1 ? promo.maxUses : 10));
   const [expiry, setExpiry] = useState(promo.expiresAt ? new Date(promo.expiresAt).toISOString().slice(0, 10) : '');
 
   const meta = PROMO_KIND_META[promo.kind] ?? PROMO_KIND_META.PERCENT;
   const exhausted = promo.maxUses > 0 && promo.uses >= promo.maxUses;
   const inputClass = 'h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15';
+
+  const maxUsesOf = (): number => {
+    if (usage === 'single') return 1;
+    if (usage === 'multi-capped') return Math.max(2, Number(cap) || 2);
+    return 0;
+  };
 
   const save = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -587,11 +617,25 @@ function PromoRow({ promo, onDelete, deleting }: { promo: AdminPromo; onDelete: 
       data: {
         kind,
         value: Number(value) || 0,
-        maxUses: Number(maxUses) || 0,
+        maxUses: maxUsesOf(),
+        active: promo.active,
         expiresAt: expiry ? new Date(expiry).toISOString() : undefined,
       },
     });
     setEditing(false);
+  };
+
+  const pauseOrResume = () => {
+    update.mutate({
+      code: promo.code,
+      data: {
+        kind: promo.kind as 'FREE' | 'PERCENT' | 'FLAT',
+        value: promo.value,
+        maxUses: promo.maxUses,
+        active: !promo.active,
+        expiresAt: promo.expiresAt ? new Date(promo.expiresAt).toISOString() : undefined,
+      },
+    });
   };
 
   return (
@@ -611,8 +655,15 @@ function PromoRow({ promo, onDelete, deleting }: { promo: AdminPromo; onDelete: 
             <input type="number" min="0" value={value} onChange={(event) => setValue(event.target.value)} className={inputClass} />
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Max uses</span>
-            <input type="number" min="0" value={maxUses} onChange={(event) => setMaxUses(event.target.value)} className={inputClass} />
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Who can use it</span>
+            <select value={usage} onChange={(event) => setUsage(event.target.value as PromoUsage)} className={inputClass}>
+              <option value="multi-unlimited">Many people · no limit</option>
+              <option value="single">One person only</option>
+              <option value="multi-capped">Many people · limited</option>
+            </select>
+            {usage === 'multi-capped' && (
+              <input type="number" min="2" value={cap} onChange={(event) => setCap(event.target.value)} className={`${inputClass} mt-2`} aria-label="People limit" />
+            )}
           </label>
           <label className="block">
             <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Expires (optional)</span>
@@ -629,14 +680,129 @@ function PromoRow({ promo, onDelete, deleting }: { promo: AdminPromo; onDelete: 
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">{PromoValueLabel(promo)}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {promo.uses} of {promo.maxUses > 0 ? promo.maxUses : '∞'} used
-              {exhausted && <span className="ml-2 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">exhausted</span>}
+              <span className={promo.active ? '' : 'text-amber-600'}>
+                {promo.active ? 'Live' : 'Paused'} · redeemed by {promo.uses}
+                {promo.maxUses > 0 ? ` of ${promo.maxUses} ${promo.maxUses === 1 ? 'person' : 'people'}` : ' · unlimited people'}
+              </span>
+              {exhausted && promo.active && <span className="ml-2 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">all uses taken</span>}
               {promo.expiresAt && <span className="ml-2">· expires {formatDate(promo.expiresAt)}</span>}
             </p>
+            <p className="mt-1 text-[11px] text-muted-foreground/80">Each person can redeem this code once.</p>
           </div>
           <button data-testid={`button-edit-${promo.code}`} type="button" onClick={() => setEditing(true)} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-secondary"><Pencil className="h-3.5 w-3.5" /> Edit</button>
-          <button data-testid={`button-delete-${promo.code}`} type="button" onClick={onDelete} disabled={deleting} className="flex items-center gap-2 rounded-lg border border-destructive/25 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/5 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /> {deleting ? 'Removing…' : 'Delete'}</button>
+          <button data-testid={`button-toggle-${promo.code}`} type="button" onClick={pauseOrResume} disabled={update.isPending} className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${promo.active ? 'border-amber-600/30 text-amber-600 hover:bg-amber-600/5' : 'border-primary/30 bg-primary/5 text-primary hover:bg-primary/10'}`}>
+            {promo.active ? <PauseCircle className="h-3.5 w-3.5" /> : <PlayCircle className="h-3.5 w-3.5" />}
+            {update.isPending ? 'Saving…' : promo.active ? 'Pause' : 'Resume'}
+          </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Subscription plan settings — the operational knobs on the code-defined plan
+// catalog. Each category pass can have server-managed auto-renewal switched on
+// or off here; the storefront checkbox and the paystack checkout follow this
+// switch. Storage and projects plans stay per-purchase, so their rows read
+// "not applicable".
+// ---------------------------------------------------------------------------
+
+const PLAN_SETTING_GROUPS: Array<{ kind: string; label: string; hint: string }> = [
+  { kind: 'pass', label: 'Category passes', hint: 'Auto-renew re-charges the card each pass cycle. The checkout checkbox follows this switch.' },
+  { kind: 'storage', label: 'Creator Den storage', hint: 'Charged per purchase — auto-renew does not apply here.' },
+  { kind: 'projects', label: 'Author Den projects', hint: 'One-time plans — auto-renew does not apply here.' },
+];
+
+function PlanSettingsSection({ session }: { session: boolean }) {
+  const settings = useListAdminPlanSettings();
+  const queryClient = useQueryClient();
+  const update = useUpdateAdminPlanSetting({
+    mutation: {
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminPlanSettingsQueryKey() }),
+    },
+  });
+
+  const plans = settings.data ?? [];
+
+  return (
+    <div className="mx-auto max-w-[1180px]">
+      <div className="animate-in">
+        <PageHeading
+          eyebrow="Control room / subscriptions"
+          title="Tune the subscription plans."
+          description="Turn server-managed auto-renewal on or off per category pass. The checkout checkbox and the renewal scheduler follow this switch; storage and projects plans are always charged per purchase."
+          action={
+            <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
+              <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
+            </div>
+          }
+        />
+      </div>
+
+      <div className="mt-10 space-y-8 animate-in delay-100">
+        {settings.isError ? (
+          <ErrorState onRetry={() => settings.refetch()} />
+        ) : settings.isLoading ? (
+          <div className="space-y-3 animate-pulse">{[0, 1, 2, 3].map((item) => <div key={item} className="h-20 rounded-2xl border border-border bg-secondary/60" />)}</div>
+        ) : (
+          PLAN_SETTING_GROUPS.map((group) => {
+            const rows = plans.filter((plan) => plan.kind === group.kind);
+            if (rows.length === 0) return null;
+            return (
+              <div key={group.kind}>
+                <div className="mb-3">
+                  <h3 className="text-sm font-semibold">{group.label}</h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{group.hint}</p>
+                </div>
+                <div className="space-y-3">
+                  {rows.map((plan) => (
+                    <PlanSettingRow
+                      key={`${plan.kind}:${plan.planId}`}
+                      plan={plan}
+                      updating={update.isPending}
+                      onToggle={() =>
+                        update.mutate({
+                          kind: plan.kind,
+                          planId: plan.planId,
+                          data: { autoRenewAvailable: !plan.autoRenewAvailable },
+                        })
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlanSettingRow({ plan, updating, onToggle }: { plan: AdminPlanSetting; updating: boolean; onToggle: () => void }) {
+  const toggleable = plan.kind === 'pass';
+  return (
+    <div data-testid={`plan-setting-${plan.kind}-${plan.planId}`} className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">{plan.planLabel}</p>
+        <p className="mt-0.5 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+          {plan.kind} · {plan.planId} · ${(plan.priceUsd / 100).toFixed(2)} / {plan.intervalLabel}
+        </p>
+      </div>
+      {toggleable ? (
+        <button
+          type="button"
+          data-testid={`button-toggle-auto-renew-${plan.planId}`}
+          onClick={onToggle}
+          disabled={updating}
+          className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${plan.autoRenewAvailable ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15' : 'border-border text-muted-foreground hover:bg-secondary'}`}
+        >
+          {plan.autoRenewAvailable ? <CircleCheck className="h-3.5 w-3.5" /> : <CircleDashed className="h-3.5 w-3.5" />}
+          {updating ? 'Saving…' : plan.autoRenewAvailable ? 'Auto-renew on' : 'Auto-renew off'}
+        </button>
+      ) : (
+        <span className="shrink-0 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">not applicable</span>
       )}
     </div>
   );

@@ -17,6 +17,8 @@ export * from './accountQuotaPurchaseResponse';
 export * from './accountQuotaStorage';
 export * from './activityEvent';
 export * from './adminLoginInput';
+export * from './adminPlanSetting';
+export * from './adminPlanSettingUpdate';
 export * from './adminPromo';
 export * from './adminPromoDeleteResult';
 export * from './adminPromoInput';

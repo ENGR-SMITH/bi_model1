@@ -11,6 +11,7 @@ export interface AdminPromoUpdate {
   kind: AdminPromoUpdateKind;
   value: number;
   maxUses: number;
+  active?: boolean;
   /** @nullable */
   expiresAt?: Date | null;
 }

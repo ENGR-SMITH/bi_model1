@@ -4,6 +4,8 @@ import {
   db,
   tandemAccountQuotasTable,
   tandemPromoCodesTable,
+  tandemPromoRedemptionsTable,
+  tandemSubscriptionPlanSettingsTable,
   tandemSubscriptionsTable,
   tandemTicketsTable,
 } from "@workspace/db";
@@ -29,9 +31,41 @@ export interface SubscriptionPlan {
   priceUsd: number;
   intervalLabel: string;
   detail: string;
+  /** Whether customers may sign this plan up for server-managed auto-renewal. */
+  autoRenewAvailable: boolean;
 }
 
-export function subscriptionPlans(): SubscriptionPlan[] {
+/** Whether a plan kind allows auto-renewal when no admin override exists. */
+function defaultAutoRenewAvailable(kind: SubscriptionKind): boolean {
+  return kind === "pass";
+}
+
+/**
+ * Resolve whether customers may turn on server-managed auto-renewal for one
+ * plan: a row in tandem_subscription_plan_settings (written by an admin) wins,
+ * otherwise the code-defined default (on for passes, off for storage/projects).
+ */
+export async function autoRenewAvailableForPlan(kind: SubscriptionKind, planId: string): Promise<boolean> {
+  const [setting] = await db
+    .select({ autoRenewAvailable: tandemSubscriptionPlanSettingsTable.autoRenewAvailable })
+    .from(tandemSubscriptionPlanSettingsTable)
+    .where(
+      and(
+        eq(tandemSubscriptionPlanSettingsTable.kind, kind),
+        eq(tandemSubscriptionPlanSettingsTable.planId, planId),
+      ),
+    )
+    .limit(1);
+  return setting ? setting.autoRenewAvailable : defaultAutoRenewAvailable(kind);
+}
+
+export async function subscriptionPlans(): Promise<SubscriptionPlan[]> {
+  const overrides = await db.select().from(tandemSubscriptionPlanSettingsTable);
+  const availableFor = (kind: SubscriptionKind, planId: string): boolean => {
+    const row = overrides.find((setting) => setting.kind === kind && setting.planId === planId);
+    return row ? row.autoRenewAvailable : defaultAutoRenewAvailable(kind);
+  };
+
   const passes: SubscriptionPlan[] = TICKET_CATEGORIES.map((category) => ({
     kind: "pass",
     planId: category,
@@ -39,6 +73,7 @@ export function subscriptionPlans(): SubscriptionPlan[] {
     priceUsd: PASS_PRICE_USD,
     intervalLabel: `${PASS_WEEKS} weeks`,
     detail: `A ticket into the ${category === "authors" ? "Author&pos;s Atrium" : "Content Creators room"} for ${PASS_WEEKS} weeks`,
+    autoRenewAvailable: availableFor("pass", category),
   }));
 
   const storage: SubscriptionPlan[] = STORAGE_PLANS.map((plan) => ({
@@ -48,6 +83,7 @@ export function subscriptionPlans(): SubscriptionPlan[] {
     priceUsd: plan.priceUsd,
     intervalLabel: "recurring",
     detail: `Extend your workspace storage with another ${plan.label}`,
+    autoRenewAvailable: availableFor("storage", plan.id),
   }));
 
   const projects: SubscriptionPlan[] = PROJECT_PLANS.map((plan) => ({
@@ -57,6 +93,7 @@ export function subscriptionPlans(): SubscriptionPlan[] {
     priceUsd: plan.priceUsd,
     intervalLabel: "one-time",
     detail: plan.label,
+    autoRenewAvailable: availableFor("projects", plan.id),
   }));
 
   return [...passes, ...storage, ...projects];
@@ -130,6 +167,10 @@ export interface RecordSubscriptionInput {
   clerkSubscriptionId?: string | null;
   promoCode?: string | null;
   cardLast4?: string | null;
+  autoRenew?: boolean;
+  paystackAuthorizationCode?: string | null;
+  paystackCustomerCode?: string | null;
+  paystackEmail?: string | null;
 }
 
 /** Inserts a subscription record for an entitlement that was just granted. */
@@ -150,6 +191,10 @@ export async function recordSubscription(input: RecordSubscriptionInput): Promis
     clerkSubscriptionId: input.clerkSubscriptionId ?? null,
     promoCode: input.promoCode ?? null,
     cardLast4: input.cardLast4 ?? null,
+    autoRenew: input.autoRenew === true,
+    paystackAuthorizationCode: input.paystackAuthorizationCode ?? null,
+    paystackCustomerCode: input.paystackCustomerCode ?? null,
+    paystackEmail: input.paystackEmail ?? null,
   });
   return id;
 }
@@ -174,6 +219,16 @@ export interface ApplySubscriptionPurchaseInput {
   promoCode?: string | null;
   cardLast4?: string | null;
   source?: "checkout" | "clerk";
+  /** Sign this subscription up for server-managed auto-renewal (pass only). */
+  autoRenew?: boolean;
+  /** Card authorization + customer details kept for renewals (paystack). */
+  paystackAuthorizationCode?: string | null;
+  paystackCustomerCode?: string | null;
+  paystackEmail?: string | null;
+  /** When this purchase is an auto-renewal of an existing row, the id of the
+      row being renewed — cleared of auto-renew so only the newest record is
+      the live renewal (one charge chain per pass). */
+  renewsSubscriptionId?: string | null;
 }
 
 export interface AppliedSubscription {
@@ -190,6 +245,22 @@ export interface AppliedSubscription {
  * checkout, the Paystack webhook, and the Paystack verify-on-return), so a
  * paid plan always lands the same way.
  */
+/**
+ * True when a granted pass should carry the auto-renewal flag: requested at
+ * checkout and confirmed with a stored Paystack card authorization, or a
+ * scheduled renewal charge of an existing auto-renewing row.
+ */
+function shouldAutoRenew(input: {
+  kind: SubscriptionKind;
+  autoRenew?: boolean;
+  paystackAuthorizationCode?: string | null;
+  renewsSubscriptionId?: string | null;
+}): boolean {
+  if (input.kind !== "pass") return false;
+  if (input.renewsSubscriptionId) return true; // a renewal of an auto-renew row
+  return Boolean(input.autoRenew && input.paystackAuthorizationCode);
+}
+
 export async function applySubscriptionPurchase(
   input: ApplySubscriptionPurchaseInput,
 ): Promise<AppliedSubscription> {
@@ -242,8 +313,16 @@ export async function applySubscriptionPurchase(
       .update(tandemPromoCodesTable)
       .set({ uses: sql`${tandemPromoCodesTable.uses} + 1` })
       .where(eq(tandemPromoCodesTable.code, input.promoCode));
+    // One redemption per person — this is what makes a shared code safe to
+    // hand out to many people. (Validated before checkout; kept authoritative
+    // here so racing purchases can never double-redeem.)
+    await db
+      .insert(tandemPromoRedemptionsTable)
+      .values({ code: input.promoCode, userId: input.userId })
+      .onConflictDoNothing();
   }
 
+  const autoRenew = shouldAutoRenew(input);
   const subscriptionId = await recordSubscription({
     userId: input.userId,
     kind: input.kind,
@@ -256,7 +335,20 @@ export async function applySubscriptionPurchase(
     source: input.source ?? "checkout",
     promoCode: input.promoCode ?? null,
     cardLast4: input.cardLast4 ?? null,
+    autoRenew,
+    paystackAuthorizationCode: input.paystackAuthorizationCode ?? null,
+    paystackCustomerCode: input.paystackCustomerCode ?? null,
+    paystackEmail: input.paystackEmail ?? null,
   });
+
+  // The row this renewal extended stops being the live auto-renew record —
+  // the new row above takes over (keeps exactly one renewal chain per pass).
+  if (input.renewsSubscriptionId) {
+    await db
+      .update(tandemSubscriptionsTable)
+      .set({ autoRenew: false })
+      .where(eq(tandemSubscriptionsTable.id, input.renewsSubscriptionId));
+  }
 
   return { subscriptionId, periodStart, periodEnd };
 }
@@ -274,6 +366,10 @@ export interface UserSubscriptionView {
   source: string;
   promoCode: string | null;
   cardLast4: string | null;
+  /** Server-managed renewal is on for this subscription (category passes). */
+  autoRenew: boolean;
+  /** When the last auto-renew charge failed, why (shown to the user). */
+  renewalFailure: string | null;
   active: boolean;
 }
 
@@ -298,6 +394,8 @@ export async function listUserSubscriptions(userId: string): Promise<UserSubscri
     source: row.source,
     promoCode: row.promoCode,
     cardLast4: row.cardLast4,
+    autoRenew: row.autoRenew === true,
+    renewalFailure: row.renewalFailure ?? null,
     active: row.status === "ACTIVE" && row.periodEnd.getTime() > now,
   }));
 }

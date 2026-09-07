@@ -42,6 +42,8 @@ const API = createApp();
 async function resetDb() {
   const t = state.tables;
   await state.db.delete(t.tandemPromoCodesTable);
+  await state.db.delete(t.tandemPromoRedemptionsTable);
+  await state.db.delete(t.tandemSubscriptionPlanSettingsTable);
   await state.db.delete(t.oracleHealthEventsTable);
   await state.db.delete(t.oracleProvidersTable);
 }
@@ -120,6 +122,7 @@ describe("admin promo codes", () => {
     expect(created.body.code).toBe("HALFPASS");
     expect(created.body.kind).toBe("PERCENT");
     expect(created.body.uses).toBe(0);
+    expect(created.body.active).toBe(true);
 
     // Duplicate code → 409.
     const dup = await request(API)
@@ -151,6 +154,27 @@ describe("admin promo codes", () => {
     const list = await request(API).get("/api/admin/promos").set("Cookie", cookie);
     expect(list.body).toHaveLength(1);
     expect(list.body[0].code).toBe("HALFPASS");
+
+    // Pause (soft-disable) — the code stays listed but stops validating.
+    const paused = await request(API)
+      .patch("/api/admin/promos/HALFPASS")
+      .set("Cookie", cookie)
+      .send({ kind: "FLAT", value: 25, maxUses: 5, active: false });
+    expect(paused.status).toBe(200);
+    expect(paused.body.active).toBe(false);
+    state.userId = "user-2";
+    const pausedCheck = await request(API).post("/api/tickets/promo/validate").send({ code: "HALFPASS" });
+    expect(pausedCheck.body.valid).toBe(false);
+
+    // Resume — valid again.
+    const resumed = await request(API)
+      .patch("/api/admin/promos/HALFPASS")
+      .set("Cookie", cookie)
+      .send({ kind: "FLAT", value: 25, maxUses: 5, active: true });
+    expect(resumed.status).toBe(200);
+    expect(resumed.body.active).toBe(true);
+    const resumedCheck = await request(API).post("/api/tickets/promo/validate").send({ code: "HALFPASS" });
+    expect(resumedCheck.body.valid).toBe(true);
 
     // Delete.
     const deleted = await request(API).delete("/api/admin/promos/HALFPASS").set("Cookie", cookie);
@@ -186,5 +210,73 @@ describe("admin promo codes", () => {
     expect((await request(API).post("/api/admin/promos").send({ code: "X", kind: "FREE", value: 0, maxUses: 0 })).status).toBe(401);
     expect((await request(API).patch("/api/admin/promos/X").send({ kind: "FREE", value: 0, maxUses: 0 })).status).toBe(401);
     expect((await request(API).delete("/api/admin/promos/X")).status).toBe(401);
+  });
+});
+
+describe("admin plan settings", () => {
+  async function login(): Promise<string> {
+    const loginRes = await request(API).post("/api/admin/login").send({ accessCode: "TANDEM_123" });
+    const cookie = loginRes.headers["set-cookie"]?.[0]?.split(";")[0];
+    expect(cookie).toBeTruthy();
+    return cookie as string;
+  }
+
+  it("lists the catalog with auto-renew defaults (passes on, others off)", async () => {
+    const cookie = await login();
+    const res = await request(API).get("/api/admin/plan-settings").set("Cookie", cookie);
+    expect(res.status).toBe(200);
+
+    const authors = res.body.find((plan: any) => plan.kind === "pass" && plan.planId === "authors");
+    expect(authors).toMatchObject({ kind: "pass", planId: "authors", autoRenewAvailable: true });
+    const g200 = res.body.find((plan: any) => plan.kind === "storage" && plan.planId === "g200");
+    expect(g200.autoRenewAvailable).toBe(false);
+    const p50 = res.body.find((plan: any) => plan.kind === "projects" && plan.planId === "p50");
+    expect(p50.autoRenewAvailable).toBe(false);
+  });
+
+  it("toggles auto-renew availability per plan and persists it", async () => {
+    const cookie = await login();
+
+    // Turn auto-renew OFF for the authors pass.
+    const off = await request(API)
+      .patch("/api/admin/plan-settings/pass/authors")
+      .set("Cookie", cookie)
+      .send({ autoRenewAvailable: false });
+    expect(off.status).toBe(200);
+    expect(off.body).toMatchObject({ kind: "pass", planId: "authors", autoRenewAvailable: false });
+
+    // The list reflects the override.
+    const list = await request(API).get("/api/admin/plan-settings").set("Cookie", cookie);
+    expect(list.body.find((plan: any) => plan.kind === "pass" && plan.planId === "authors").autoRenewAvailable).toBe(false);
+
+    // Switching it back on upserts the same row.
+    const on = await request(API)
+      .patch("/api/admin/plan-settings/pass/authors")
+      .set("Cookie", cookie)
+      .send({ autoRenewAvailable: true });
+    expect(on.status).toBe(200);
+    expect(on.body.autoRenewAvailable).toBe(true);
+  });
+
+  it("rejects unknown plans, invalid bodies, and unauthenticated callers", async () => {
+    const cookie = await login();
+
+    const unknownPlan = await request(API)
+      .patch("/api/admin/plan-settings/storage/nope")
+      .set("Cookie", cookie)
+      .send({ autoRenewAvailable: true });
+    expect(unknownPlan.status).toBe(400);
+
+    const badKind = await request(API)
+      .patch("/api/admin/plan-settings/singers/authors")
+      .set("Cookie", cookie)
+      .send({ autoRenewAvailable: true });
+    expect(badKind.status).toBe(400);
+
+    const missingBody = await request(API).patch("/api/admin/plan-settings/pass/authors").set("Cookie", cookie).send({});
+    expect(missingBody.status).toBe(400);
+
+    expect((await request(API).get("/api/admin/plan-settings")).status).toBe(401);
+    expect((await request(API).patch("/api/admin/plan-settings/pass/authors").send({ autoRenewAvailable: true })).status).toBe(401);
   });
 });

@@ -202,6 +202,7 @@ export const ListAdminPromosResponseItem = zod.object({
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
   "uses": zod.number().int(),
+  "active": zod.boolean(),
   "expiresAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -225,6 +226,7 @@ export const CreateAdminPromoResponse = zod.object({
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
   "uses": zod.number().int(),
+  "active": zod.boolean(),
   "expiresAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -241,6 +243,7 @@ export const UpdateAdminPromoBody = zod.object({
   "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
+  "active": zod.boolean().optional(),
   "expiresAt": zod.coerce.date().nullish()
 })
 
@@ -250,6 +253,7 @@ export const UpdateAdminPromoResponse = zod.object({
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
   "uses": zod.number().int(),
+  "active": zod.boolean(),
   "expiresAt": zod.coerce.date().nullable(),
   "createdAt": zod.coerce.date()
 })
@@ -264,6 +268,42 @@ export const DeleteAdminPromoParams = zod.object({
 
 export const DeleteAdminPromoResponse = zod.object({
   "deleted": zod.boolean()
+})
+
+
+/**
+ * @summary List every subscription plan with its auto-renew availability
+ */
+export const ListAdminPlanSettingsResponseItem = zod.object({
+  "kind": zod.string(),
+  "planId": zod.string(),
+  "planLabel": zod.string(),
+  "priceUsd": zod.number().int(),
+  "intervalLabel": zod.string(),
+  "autoRenewAvailable": zod.boolean()
+})
+export const ListAdminPlanSettingsResponse = zod.array(ListAdminPlanSettingsResponseItem)
+
+
+/**
+ * @summary Set whether a plan may be subscribed with server-managed auto-renewal
+ */
+export const UpdateAdminPlanSettingParams = zod.object({
+  "kind": zod.coerce.string(),
+  "planId": zod.coerce.string()
+})
+
+export const UpdateAdminPlanSettingBody = zod.object({
+  "autoRenewAvailable": zod.boolean()
+})
+
+export const UpdateAdminPlanSettingResponse = zod.object({
+  "kind": zod.string(),
+  "planId": zod.string(),
+  "planLabel": zod.string(),
+  "priceUsd": zod.number().int(),
+  "intervalLabel": zod.string(),
+  "autoRenewAvailable": zod.boolean()
 })
 
 

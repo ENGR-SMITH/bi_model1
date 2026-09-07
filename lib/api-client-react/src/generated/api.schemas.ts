@@ -769,6 +769,7 @@ export interface AdminPromo {
   value: number;
   maxUses: number;
   uses: number;
+  active: boolean;
   /** @nullable */
   expiresAt: string | null;
   createdAt: string;
@@ -805,12 +806,26 @@ export interface AdminPromoUpdate {
   kind: AdminPromoUpdateKind;
   value: number;
   maxUses: number;
+  active?: boolean;
   /** @nullable */
   expiresAt?: string | null;
 }
 
 export interface AdminPromoDeleteResult {
   deleted: boolean;
+}
+
+export interface AdminPlanSetting {
+  kind: string;
+  planId: string;
+  planLabel: string;
+  priceUsd: number;
+  intervalLabel: string;
+  autoRenewAvailable: boolean;
+}
+
+export interface AdminPlanSettingUpdate {
+  autoRenewAvailable: boolean;
 }
 
 export type OracleMessageRole = typeof OracleMessageRole[keyof typeof OracleMessageRole];
@@ -2394,6 +2409,16 @@ export const ArenaPostSummaryMyApplication = {
 } as const;
 
 /**
+ * Public profile of the creator who filled a role — present on the post once it is FILLED
+ */
+export interface ArenaHireProfile {
+  id: string;
+  name: string;
+  /** @nullable */
+  imageUrl: string | null;
+}
+
+/**
  * An open role post as shown on the Arena board / lists
  */
 export interface ArenaPostSummary {
@@ -2420,16 +2445,6 @@ export interface ArenaPostSummary {
   myApplication: ArenaPostSummaryMyApplication;
   createdAt: string;
   updatedAt: string;
-}
-
-/**
- * Public profile of the creator who filled a role — present on the post once it is FILLED
- */
-export interface ArenaHireProfile {
-  id: string;
-  name: string;
-  /** @nullable */
-  imageUrl: string | null;
 }
 
 export type ArenaPostDetail = ArenaPostSummary & ({

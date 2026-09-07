@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/sql-js";
 import { sql } from "drizzle-orm";
 import {
   integer,
+  primaryKey,
   sqliteTable,
   text,
   unique,
@@ -728,9 +729,20 @@ export const tandemPromoCodesTable = sqliteTable("tandem_promo_codes", {
   value: integer("value").notNull().default(0),
   maxUses: integer("max_uses").notNull().default(0),
   uses: integer("uses").notNull().default(0),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
   expiresAt: integer("expires_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
+
+export const tandemPromoRedemptionsTable = sqliteTable(
+  "tandem_promo_redemptions",
+  {
+    code: text("code").notNull(),
+    userId: text("user_id").notNull(),
+    redeemedAt: integer("redeemed_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => [primaryKey({ columns: [table.code, table.userId] })],
+);
 
 export const tandemSubscriptionsTable = sqliteTable("tandem_subscriptions", {
   id: text("id").primaryKey(),
@@ -747,9 +759,25 @@ export const tandemSubscriptionsTable = sqliteTable("tandem_subscriptions", {
   clerkSubscriptionId: text("clerk_subscription_id"),
   promoCode: text("promo_code"),
   cardLast4: text("card_last_4"),
+  autoRenew: integer("auto_renew", { mode: "boolean" }).notNull().default(false),
+  paystackAuthorizationCode: text("paystack_authorization_code"),
+  paystackCustomerCode: text("paystack_customer_code"),
+  paystackEmail: text("paystack_email"),
+  renewalFailure: text("renewal_failure"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
+
+export const tandemSubscriptionPlanSettingsTable = sqliteTable(
+  "tandem_subscription_plan_settings",
+  {
+    kind: text("kind").notNull(),
+    planId: text("plan_id").notNull(),
+    autoRenewAvailable: integer("auto_renew_available", { mode: "boolean" }).notNull().default(false),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => [primaryKey({ columns: [table.kind, table.planId] })],
+);
 
 export const tandemPaystackIntentsTable = sqliteTable("tandem_paystack_intents", {
   reference: text("reference").primaryKey(),
@@ -763,6 +791,9 @@ export const tandemPaystackIntentsTable = sqliteTable("tandem_paystack_intents",
   status: text("status").notNull().default("PENDING"),
   promoCode: text("promo_code"),
   cardLast4: text("card_last_4"),
+  autoRenew: integer("auto_renew", { mode: "boolean" }).notNull().default(false),
+  renewalFor: text("renewal_for"),
+  customerEmail: text("customer_email"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
@@ -1156,8 +1187,14 @@ export async function buildInMemoryDb() {
     CREATE TABLE tandem_promo_codes (
       code TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL,
       value INTEGER NOT NULL DEFAULT 0, max_uses INTEGER NOT NULL DEFAULT 0,
-      uses INTEGER NOT NULL DEFAULT 0, expires_at INTEGER,
-      created_at INTEGER NOT NULL
+      uses INTEGER NOT NULL DEFAULT 0,
+      active INTEGER NOT NULL DEFAULT 1,
+      expires_at INTEGER, created_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_promo_redemptions (
+      code TEXT NOT NULL, user_id TEXT NOT NULL,
+      redeemed_at INTEGER NOT NULL,
+      PRIMARY KEY (code, user_id)
     );
     CREATE TABLE tandem_subscriptions (
       id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
@@ -1167,7 +1204,16 @@ export async function buildInMemoryDb() {
       period_start INTEGER NOT NULL, period_end INTEGER NOT NULL,
       source TEXT NOT NULL DEFAULT 'checkout',
       clerk_subscription_id TEXT, promo_code TEXT, card_last_4 TEXT,
+      auto_renew INTEGER NOT NULL DEFAULT 0,
+      paystack_authorization_code TEXT, paystack_customer_code TEXT,
+      paystack_email TEXT, renewal_failure TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_subscription_plan_settings (
+      kind TEXT NOT NULL, plan_id TEXT NOT NULL,
+      auto_renew_available INTEGER NOT NULL DEFAULT 0,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (kind, plan_id)
     );
     CREATE TABLE tandem_video_storage_snapshots (
       project_id TEXT NOT NULL, owner_id TEXT NOT NULL,
@@ -1183,6 +1229,8 @@ export async function buildInMemoryDb() {
       currency TEXT NOT NULL DEFAULT 'USD',
       status TEXT NOT NULL DEFAULT 'PENDING',
       promo_code TEXT, card_last_4 TEXT,
+      auto_renew INTEGER NOT NULL DEFAULT 0,
+      renewal_for TEXT, customer_email TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
     CREATE TABLE tandem_account_quotas (
@@ -1323,7 +1371,9 @@ export async function buildInMemoryDb() {
     tandemTicketsTable,
     tandemToursTable,
     tandemPromoCodesTable,
+    tandemPromoRedemptionsTable,
     tandemSubscriptionsTable,
+    tandemSubscriptionPlanSettingsTable,
     tandemPaystackIntentsTable,
     tandemVideoStorageSnapshotsTable,
     tandemArenaPostsTable,
