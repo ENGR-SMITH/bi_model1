@@ -29,6 +29,12 @@ if (!basePath) {
 
 export default defineConfig({
   base: basePath,
+  // Load .env from the repo root so the admin app shares the root
+  // CLERK_PUBLISHABLE_KEY instead of needing artifacts/oracle-admin/.env.
+  // envPrefix keeps only VITE_* vars plus exactly CLERK_PUBLISHABLE_KEY
+  // visible to client code — CLERK_SECRET_KEY and other secrets stay out.
+  envDir: path.resolve(import.meta.dirname, '..', '..'),
+  envPrefix: ['VITE_', 'CLERK_PUBLISHABLE_KEY'],
   plugins: [
     react(),
     tailwindcss(),

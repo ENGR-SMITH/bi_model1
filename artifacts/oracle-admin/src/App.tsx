@@ -64,7 +64,7 @@ const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
-  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+  import.meta.env.CLERK_PUBLISHABLE_KEY,
 );
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
@@ -131,7 +131,7 @@ function ClerkSetupHint() {
       <div className="w-full max-w-md rounded-[1.75rem] border border-border bg-card p-8 text-center shadow-xl">
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="h-5 w-5" /></div>
         <h1 className="mt-5 text-2xl font-semibold tracking-[-0.045em]">Clerk is not configured here</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">The Oracle Admin signs in with a Clerk magic link. Add <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px]">VITE_CLERK_PUBLISHABLE_KEY</code> to <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px]">artifacts/oracle-admin/.env</code> (the same key the other apps use).</p>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">The Oracle Admin signs in with a Clerk magic link. Set <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px]">CLERK_PUBLISHABLE_KEY</code> in the repo-root <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px]">.env</code> (the same key the other apps use), then restart the dev server.</p>
       </div>
     </main>
   );

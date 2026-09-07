@@ -76,15 +76,17 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 
 # artifacts/creators-den/.env
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-
-# artifacts/oracle-admin/.env (the private admin app — shows a setup hint
-# without this)
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
+
+The **Oracle Admin** (`artifacts/oracle-admin`) is the exception — its Vite
+config loads the repo-root `.env` (`envDir`), so it reads
+`CLERK_PUBLISHABLE_KEY` straight from there and needs **no** per-app `.env`
+file.
 
 > Test mode keys (`_test_`) are for development. When you go live, switch
 > every app to the same `_live_` keys (from the Clerk dashboard → **Production**
-> instance) and update all four files.
+> instance) and update the three files (the admin app follows the root `.env`
+> automatically).
 
 ---
 
@@ -355,9 +357,10 @@ Dashboard settings make the link flow work:
   `http://localhost:5176/oracle-admin/verify` in dev (the exact production
   URL once deployed).
 
-The admin app also needs the Clerk publishable key at build time — create
-`artifacts/oracle-admin/.env` with `VITE_CLERK_PUBLISHABLE_KEY` (section 1).
-Without it the admin page shows a setup hint instead of the login form.
+The admin app reads `CLERK_PUBLISHABLE_KEY` straight from the repo-root
+`.env` (its Vite config loads it via `envDir`), so no separate
+`artifacts/oracle-admin/.env` is needed. Without a key in the root `.env` the
+admin page shows a setup hint instead of the login form.
 
 > **Upgrading from the access code:** remove `ADMIN_ACCESS_CODE` from any
 > `.env` copied from an older template and add `ADMIN_EMAIL`. In production

@@ -216,13 +216,9 @@ cd artifacts/oracle-admin
 PORT=5176 BASE_PATH=/oracle-admin/ pnpm run dev
 ```
 
-Then create `artifacts/oracle-admin/.env` with the Clerk publishable key (the
-admin page signs in through the same Clerk instance as the rest of the app):
-
-```bash
-# artifacts/oracle-admin/.env
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-```
+No `artifacts/oracle-admin/.env` is needed — the admin app's Vite config loads
+the repo-root `.env` directly, so it picks up `CLERK_PUBLISHABLE_KEY` from
+there automatically (same Clerk instance as the rest of the app).
 
 Open `http://localhost:5176/oracle-admin/`, type the email you set as
 `ADMIN_EMAIL`, and click **Email me a sign-in link**. Clerk emails you a magic
