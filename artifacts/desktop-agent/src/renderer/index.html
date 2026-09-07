@@ -255,6 +255,24 @@
       .roles-note.is-blocked { color: #ffb4ab; }
       .roles-note:not(.is-blocked) { font-family: var(--font-mono); font-size: 10.5px; }
 
+      /* --- Dubbing language (audio files only) --- */
+      .language-field {
+        margin-top: 12px;
+        display: grid; gap: 6px;
+      }
+      .language-field label {
+        font: 600 10px var(--font-mono);
+        text-transform: uppercase; letter-spacing: 0.12em;
+        color: var(--muted-fg);
+      }
+      .language-field select.is-invalid {
+        border-color: rgba(248, 113, 113, 0.55);
+        box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.12);
+      }
+      .language-hint {
+        font-size: 11px; color: var(--faint-fg); line-height: 1.5;
+      }
+
       .dropzone.is-disabled { cursor: not-allowed; opacity: 0.6; }
       .dropzone.is-disabled:hover, .dropzone.is-disabled.drag {
         border-color: var(--border-strong);
@@ -626,6 +644,20 @@
                     <span class="dz-sub" id="dz-sub">or <b>click to choose</b> — a file from your PC to hand in for review</span>
                   </div>
                   <span class="dz-change" id="dz-change" style="display:none;">Change</span>
+                </div>
+                <!-- Dubbing language — audio files are language dubs, so the
+                     language is compulsory before an audio file can be handed
+                     in (hidden for video/image files). -->
+                <div id="language-field" class="language-field hidden">
+                  <label for="upload-language">Dubbing language</label>
+                  <select id="upload-language" aria-label="Dubbing language">
+                    <option value="" disabled>Choose the dubbing language…</option>
+                    <option value="English">English</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="Portuguese">Portuguese</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="Indonesian">Indonesian</option>
+                  </select>
                 </div>
               </div>
             </div>

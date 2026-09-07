@@ -1136,6 +1136,12 @@ select optgroup {
 
 .snake-card-head { display: flex; align-items: center; gap: var(--sp-2); }
 .snake-card-ver { font: 700 16px var(--app-font-serif); letter-spacing: -.02em; color: hsl(var(--foreground)); }
+.snake-card-lang {
+  flex: none;
+  padding: 2px 7px;
+  font: 700 9px var(--app-font-sans);
+  letter-spacing: .02em;
+}
 .snake-card-file { min-width: 0; flex: 1; font: 600 13px var(--app-font-sans); color: hsl(var(--foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .snake-card-kind { margin: 0; font: 500 11px var(--app-font-mono); letter-spacing: .03em; color: hsl(212 62% 74%); }
 .snake-tag-upload {
@@ -2678,21 +2684,22 @@ select optgroup {
 .role-upload-row { flex-wrap: wrap; }
 .agent-launch-btn {
   flex: 0 0 auto;
-  height: 34px;
-  padding: 0 11px;
+  height: 40px;
+  padding: 0 16px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   border: 1px solid hsl(var(--border));
   background: hsl(var(--card));
-  color: hsl(var(--muted-foreground));
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
+  color: hsl(var(--foreground));
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 700;
   white-space: nowrap;
   transition: border-color .15s, color .15s, background .15s;
 }
-.agent-launch-btn:hover:not(:disabled) { border-color: hsl(var(--accent) / .55); color: hsl(var(--foreground)); }
+.agent-launch-btn svg { flex: 0 0 auto; }
+.agent-launch-btn:hover:not(:disabled) { border-color: hsl(var(--accent) / .6); background: hsl(var(--accent) / .08); color: hsl(var(--foreground)); }
 .agent-launch-btn:disabled { opacity: .65; cursor: default; }
 .agent-flow-note {
   flex: 1 1 100%;
@@ -2708,20 +2715,6 @@ select optgroup {
 .agent-flow-note .link-btn { flex: 0 0 auto; }
 .agent-flow-note.is-done { color: hsl(152 58% 40%); }
 .agent-flow-note.is-error { color: hsl(var(--foreground)); }
-
-/* Script desk — the agent upload option sits in a slim row under the header
-   (below the transcribe toolbar), so it never crowds the editor tools. */
-.pv-script-agent-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 14px;
-  border-bottom: 1px solid hsl(var(--border));
-  background: hsl(var(--secondary) / .25);
-}
-.pv-script-agent-row .agent-launch-btn { height: 28px; }
-.pv-script-agent-row .agent-flow-note { flex: 1 1 auto; }
 
 /* The modal's secondary "already have it?" launch link. */
 .agent-upload-open-link {
@@ -2912,6 +2905,15 @@ select optgroup {
   align-items: center;
   gap: 7px;
   min-width: 0;
+  flex-wrap: wrap;
+}
+/* Dubbing language chip on vault audio/script shelf items — reads as a real
+   word (not the 8px uppercase mono den-tag), so the language is scannable. */
+.vs-lang {
+  font: 700 9px var(--app-font-sans) !important;
+  letter-spacing: .02em !important;
+  text-transform: none !important;
+  padding: 2px 7px !important;
 }
 .vs-leg {
   font: 700 9px var(--app-font-mono);
@@ -3917,6 +3919,40 @@ select optgroup {
   color: inherit;
 }
 
+/* Dubbing-language notch — sits above the versions strip on the audio preview
+   page: filters the uploaded vault audio to one language at a time. */
+.pv-language-notch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pv-language-notch .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+.pv-language-notch select {
+  height: 28px;
+  min-width: 0;
+  max-width: 220px;
+  padding: 0 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font: 600 11px var(--app-font-sans);
+}
+.pv-canvas-lang {
+  margin-left: 8px;
+  font: 700 9px var(--app-font-sans) !important;
+  letter-spacing: .02em !important;
+  text-transform: none !important;
+  padding: 2px 7px !important;
+}
+
 /* ---------------------------------------------------------------------------
    Finish — the export desk (latest-only download cards, grant-aware).
 --------------------------------------------------------------------------- */
@@ -4077,6 +4113,42 @@ select optgroup {
 .finish-card.accent-teal { border-top: 3px solid hsl(164 33% 45% / .6); }
 .finish-card.accent-muted { border-top: 3px solid hsl(var(--muted-foreground) / .4); }
 .finish-card.accent-primary { border-top: 3px solid hsl(var(--primary) / .6); }
+
+/* Per-language audio dubs — each language's latest version, listed with its
+   own download (plus a whole-languages download under the card). */
+.finish-lang-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.finish-lang-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font: 11px var(--app-font-mono);
+  color: hsl(var(--muted-foreground));
+}
+.finish-lang-list li .den-tag {
+  flex: 0 0 auto;
+  font: 700 9px var(--app-font-sans) !important;
+  letter-spacing: .02em !important;
+  text-transform: none !important;
+  padding: 2px 7px !important;
+}
+.finish-lang-list li .link-btn { flex: 0 0 auto; }
+.finish-lang-select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font: 600 11px var(--app-font-sans);
+}
 
 /* ---------------------------------------------------------------------------
    Vault — the crew roster (avatars + roles, moved from the chat).

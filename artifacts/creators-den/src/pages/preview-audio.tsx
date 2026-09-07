@@ -23,6 +23,7 @@ import {
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
+import { DUBBING_LANGUAGES } from '@/lib/dubbing-languages';
 import { EmptyPlayer, pollWhileProcessing, proxyUrlFor } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { predecessorOf, PreviewDiff, type PreviewDiffSelection } from '@/components/preview-diff';
@@ -230,6 +231,22 @@ export default function AudioPreviewPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
+  // The dubbing-language notch: filters the vault audio to one uploaded
+  // language (defaults to all). Versions stay visible — they are mixes, not
+  // per-language files.
+  const audioAssets = (project.data?.assets ?? []).filter((a) => AUDIO_KINDS.has(a.kind));
+  const availableLanguages = useMemo(() => {
+    const found = new Set<string>();
+    for (const a of audioAssets) if (a.language) found.add(a.language);
+    // Catalog order first (English…Indonesian), then any uploaded languages
+    // outside the catalog, newest-first is not important here.
+    const known = DUBBING_LANGUAGES.filter((lang) => found.has(lang));
+    const extra = [...found].filter(
+      (lang) => !(DUBBING_LANGUAGES as readonly string[]).includes(lang),
+    );
+    return [...known, ...extra];
+  }, [audioAssets, project.data?.assets]);
+  const [languageFilter, setLanguageFilter] = useState<string>('all');
   // Preview / split-screen diff-map toggle for the big-canvas column.
   const [view, setView] = useState<PreviewView>('preview');
   // Diff-map settings, driven by the settings dropdown beside the toggle.
@@ -275,7 +292,7 @@ export default function AudioPreviewPage() {
     // No saved versions yet — default to the newest vault audio that has an
     // older sibling (so the diff engages on open showing the recent media),
     // falling back to the newest upload.
-    const mediaAssets = (project.data?.assets ?? []).filter((a) => AUDIO_KINDS.has(a.kind));
+    const mediaAssets = (project.data?.assets ?? []).filter((a) => AUDIO_KINDS.has(a.kind) && (languageFilter === 'all' || a.language === languageFilter));
     const byRecency = [...mediaAssets].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     const withDiff = byRecency.find((a) => {
       const item = diffVersions.find((s) => s.key === `asset-${a.id}`) ?? null;
@@ -284,7 +301,7 @@ export default function AudioPreviewPage() {
     const firstAsset = withDiff ?? byRecency[0];
     if (firstAsset) setVaultAssetId(firstAsset.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versions, selectedId, vaultAssetId, project.data?.assets, diffVersions, queryPick]);
+  }, [versions, selectedId, vaultAssetId, project.data?.assets, diffVersions, queryPick, languageFilter]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
   const selectedDetail = useGetVideoTimelineVersion(projectId, selected?.leg ?? '', selected?.id ?? '', {
@@ -331,7 +348,8 @@ export default function AudioPreviewPage() {
     if (!hasDiff) setView('preview');
   }, [hasDiff]);
 
-  // Timeline row: versions (newest first) + the vault's audio uploads.
+  // Timeline row: versions (newest first) + the vault's audio uploads,
+  // filtered to the selected dubbing language when one is picked.
   const carouselItems = useMemo<CarouselItem[]>(() => {
     const versionItems: CarouselItem[] = versions.map((v) => ({
       key: `version-${v.id}`,
@@ -345,6 +363,7 @@ export default function AudioPreviewPage() {
     }));
     const vaultItems: CarouselItem[] = (project.data?.assets ?? [])
       .filter((a) => AUDIO_KINDS.has(a.kind))
+      .filter((a) => languageFilter === 'all' || a.language === languageFilter)
       .slice()
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .map((a) => ({
@@ -355,11 +374,18 @@ export default function AudioPreviewPage() {
         kindLabel: VAULT_KIND_LABELS[a.kind] ?? a.kind,
         status: a.status,
         media: 'audio',
+        language: a.language,
         thumbUrl: a.status === 'PROCESSED' ? proxyUrlFor(projectId, a.id) : undefined,
       }));
     return [...versionItems, ...vaultItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versions, project.data?.assets, projectId]);
+  }, [versions, project.data?.assets, projectId, languageFilter]);
+
+  // The dubbing language of whatever is on the big canvas right now (a vault
+  // file) — the notch shows it as the current language.
+  const activeAssetLanguage = vaultAssetId
+    ? audioAssets.find((a) => a.id === vaultAssetId)?.language ?? null
+    : null;
 
   const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : carouselItems[0]?.key ?? null;
 
@@ -400,7 +426,9 @@ export default function AudioPreviewPage() {
           view={view}
           onViewChange={setView}
           hasDiff={hasDiff}
-          eyebrow={<span className="eyebrow">Big canvas</span>}
+          eyebrow={
+            <span className="eyebrow">Big canvas{activeAssetLanguage ? <span className="den-tag teal pv-canvas-lang">{activeAssetLanguage}</span> : null}</span>
+          }
           annotationHeaderRef={annotationHeaderRef}
           settings={diffSettings}
           onSettingsChange={setDiffSettings}
@@ -439,12 +467,34 @@ export default function AudioPreviewPage() {
         />
       }
       versions={
-        <VersionCarousel
-          items={carouselItems}
-          activeKey={activeKey}
-          onSelect={onCarouselSelect}
-          emptyText="No sound versions saved yet — save a snapshot in the Sound studio first."
-        />
+        <>
+          {availableLanguages.length > 0 && (
+            <div className="pv-language-notch" data-testid="preview-language-notch">
+              <span className="eyebrow"><AudioLines size={12} /> Language</span>
+              <select
+                value={languageFilter}
+                onChange={(event) => {
+                  setLanguageFilter(event.target.value);
+                  setVaultAssetId(null);
+                  setSelectedId(null);
+                }}
+                aria-label="Dubbing language"
+                data-testid="preview-language-select"
+              >
+                <option value="all">All languages</option>
+                {availableLanguages.map((lang) => (
+                  <option key={lang} value={lang}>{lang}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <VersionCarousel
+            items={carouselItems}
+            activeKey={activeKey}
+            onSelect={onCarouselSelect}
+            emptyText="No sound versions saved yet — save a snapshot in the Sound studio first."
+          />
+        </>
       }
     />
   );

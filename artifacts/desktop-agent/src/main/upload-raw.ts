@@ -71,6 +71,9 @@ export interface UploadRawOptions {
   filePath: string;
   /** Optional note to the Captain — travels with the submission for review. */
   note?: string;
+  /** Dubbing language of an audio file (a language dub) — the renderer makes
+      it compulsory before audio uploads; video/image files omit it. */
+  language?: string;
   onProgress?: (sentBytes: number, totalBytes: number) => void;
 }
 
@@ -107,11 +110,14 @@ export async function uploadRawMultipart(opts: UploadRawOptions): Promise<Upload
 
   // Submit-for-review: the agent never writes straight to the vault anymore —
   // the file + note are handed to the Captain as a review submission and only
-  // an approval moves them into the vault.
+  // an approval moves them into the vault. Audio dubs also carry the dubbing
+  // language the member picked before the upload could start.
   const note = (opts.note ?? "").slice(0, 2000);
+  const language = (opts.language ?? "").slice(0, 60);
   const kindHeader = partHeader("kind", null, "");
   const reviewHeader = partHeader("review", null, "");
   const noteHeader = partHeader("note", null, "");
+  const languageHeader = language ? partHeader("language", null, "") : null;
   const fileHeader = partHeader("file", fileName, mimeType);
   const footer = Buffer.from(`${CRLF}--${BOUNDARY}--${CRLF}`, "utf8");
   // Each part body must end with a CRLF before the next --boundary delimiter
@@ -124,6 +130,9 @@ export async function uploadRawMultipart(opts: UploadRawOptions): Promise<Upload
     Buffer.byteLength("true") + Buffer.byteLength(CRLF) +
     noteHeader.length +
     Buffer.byteLength(note) + Buffer.byteLength(CRLF) +
+    (languageHeader
+      ? languageHeader.length + Buffer.byteLength(language) + Buffer.byteLength(CRLF)
+      : 0) +
     fileHeader.length +
     fileSize +
     footer.length;
@@ -168,6 +177,11 @@ export async function uploadRawMultipart(opts: UploadRawOptions): Promise<Upload
     req.write(noteHeader);
     req.write(note);
     req.write(CRLF);
+    if (languageHeader && language) {
+      req.write(languageHeader);
+      req.write(language);
+      req.write(CRLF);
+    }
     req.write(fileHeader);
 
     // Stream the file from disk, honoring backpressure, then close the body.

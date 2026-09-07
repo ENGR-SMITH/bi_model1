@@ -46,9 +46,10 @@ import {
 } from '@workspace/api-client-react';
 import type { VideoTranscriptSegment } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
+import { DUBBING_LANGUAGES } from '@/lib/dubbing-languages';
 import { pollWhileProcessing } from '@/components/asset-preview';
 import { formatTimecode } from '@/components/timeline';
-import { AgentLaunchButton, AgentUploadModal, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
+import { AgentUploadModal, exceedsBrowserUploadCap } from '@/components/agent-upload-modal';
 import {
   findScriptMark,
   parseScriptRange,
@@ -237,6 +238,9 @@ export default function RoleScriptPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadName, setUploadName] = useState('');
   const [uploadAssetId, setUploadAssetId] = useState<string | null>(null);
+  // The dubbing language of the media being uploaded to transcribe —
+  // compulsory before a file can be handed in.
+  const [uploadLanguage, setUploadLanguage] = useState('');
   // A picked transcribe file that is too big for the browser path.
   const [blockedFile, setBlockedFile] = useState<File | null>(null);
   const pickedDetail = useGetVideoAsset(projectId, pickerId, {
@@ -394,6 +398,12 @@ export default function RoleScriptPage() {
   };
 
   const startTranscribeUpload = (file: File) => {
+    // Compulsory dubbing language: the Captain needs to know what language
+    // the media (and the script transcribed from it) is in.
+    if (!uploadLanguage) {
+      setToast('Choose the dubbing language first — it is required before you can upload.');
+      return;
+    }
     // Files at/over the cap need the desktop agent, never a browser POST.
     if (exceedsBrowserUploadCap(file)) {
       setBlockedFile(file);
@@ -408,6 +418,7 @@ export default function RoleScriptPage() {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('kind', kind);
+    formData.append('language', uploadLanguage);
 
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
@@ -560,7 +571,7 @@ export default function RoleScriptPage() {
                 >
                   <option value="">Transcribe a file…</option>
                   {processedMedia.map((asset) => (
-                    <option key={asset.id} value={asset.id}>{asset.fileName}</option>
+                    <option key={asset.id} value={asset.id}>{asset.fileName}{asset.language ? ` (${asset.language})` : ''}</option>
                   ))}
                 </select>
                 <button
@@ -590,6 +601,19 @@ export default function RoleScriptPage() {
                 >
                   <FileUp size={15} />
                 </button>
+                <select
+                  value={uploadLanguage}
+                  onChange={(event) => setUploadLanguage(event.target.value)}
+                  className={`pv-head-select ${uploadLanguage ? '' : 'is-required'}`}
+                  aria-label="Dubbing language"
+                  title="Dubbing language of the file you upload"
+                  data-testid="script-upload-language"
+                >
+                  <option value="" disabled>Dubbing language…</option>
+                  {DUBBING_LANGUAGES.map((lang) => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
               </div>
 
               <label className="pv-script-name-wrap" title="Click to name this script">
@@ -629,21 +653,6 @@ export default function RoleScriptPage() {
                   <Save size={15} />
                 </button>
               </div>
-            </div>
-
-            {/* The second upload method — hand the file to the desktop agent
-                instead of the browser. The user picks between the two any
-                time; oversized files still land in the modal above. */}
-            <div className="pv-script-agent-row">
-              <AgentLaunchButton
-                projectId={p.id}
-                label="Upload with the desktop agent"
-                context="media file"
-                onDone={() => {
-                  queryClient.invalidateQueries({ queryKey: getGetVideoProjectQueryKey(p.id) });
-                  setToast('Uploaded with the desktop agent — the file is in the vault.');
-                }}
-              />
             </div>
 
             <div className="pv-toolbar" data-testid="script-toolbar">

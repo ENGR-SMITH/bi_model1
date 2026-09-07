@@ -59,7 +59,10 @@ export default function ContentCreatorsPage() {
                     className="focus-house mt-3 inline-flex items-center gap-3 rounded-full border border-white/15 bg-transparent px-5 py-2.5 text-sm font-bold text-zinc-100 transition-colors hover:bg-[#111111]/10"
                     data-testid="link-download-desktop-agent"
                   >
-                    <PiDownloadSimpleDuotone className="h-4 w-4" />
+                    <span className="agent-dl-icon" aria-hidden>
+                      <PiDownloadSimpleDuotone className="h-4 w-4" />
+                      <i />
+                    </span>
                     Desktop agent for large files
                   </a>
                 );

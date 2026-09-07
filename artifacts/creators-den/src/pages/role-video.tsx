@@ -298,9 +298,11 @@ export default function RoleVideoPage() {
 
   const p = project.data;
 
-  // The Video studio only opens for members with the VIDEO role (or the
-  // Captain). The nav tab stays visible — this page explains why it is locked.
-  if (!hasRole(p.myRoles, 'VIDEO')) {
+  // The Video studio opens for members with the VIDEO role (or the Captain)
+  // AND — by default — members with the AUDIO role, so a sound designer can
+  // cut the picture and its downloads too. The nav tab stays visible — this
+  // page explains why it is locked for everyone else.
+  if (!hasRole(p.myRoles, 'VIDEO') && !hasRole(p.myRoles, 'AUDIO')) {
     return <RoleAccessDenied role="Video" projectId={p.id} />;
   }
 

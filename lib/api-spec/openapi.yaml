@@ -6166,8 +6166,12 @@ components:
         contentHash: { type: ["string", "null"] }
         status: { type: string }
         version: { type: integer }
+        # Dubbing language of the audio/script content (English | Spanish |
+        # Portuguese | Hindi | Indonesian). Compulsory on the audio and script
+        # role uploads; defaults to English for legacy rows.
+        language: { type: string }
         createdAt: { type: string, format: date-time }
-      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, contentHash, status, version, createdAt]
+      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, contentHash, status, version, language, createdAt]
     VideoAssetUploadInput:
       type: object
       description: Multipart upload of a raw asset into the project vault
@@ -6178,6 +6182,9 @@ components:
         kind:
           type: string
           enum: [RAW_VIDEO, RAW_AUDIO, SCREEN_REC, B_ROLL, REFERENCE, VO_PICKUP, GRAPHIC, THUMBNAIL_DESIGN]
+        # Dubbing language (English | Spanish | Portuguese | Hindi |
+        # Indonesian) — required on audio/script uploads.
+        language: { type: string }
       required: [file, kind]
     VideoAssetFile:
       type: object
@@ -6224,12 +6231,13 @@ components:
         contentHash: { type: ["string", "null"] }
         status: { type: string }
         version: { type: integer }
+        language: { type: string }
         createdAt: { type: string, format: date-time }
         files:
           type: array
           items: { $ref: "#/components/schemas/VideoAssetFile" }
         transcript: { type: ["object", "null"], allOf: [{ $ref: "#/components/schemas/VideoTranscript" }] }
-      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, contentHash, status, version, createdAt, files, transcript]
+      required: [id, projectId, uploaderId, kind, fileName, mimeType, sizeBytes, durationMs, contentHash, status, version, language, createdAt, files, transcript]
     VideoTimelineState:
       type: object
       properties:

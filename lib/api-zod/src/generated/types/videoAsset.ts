@@ -20,5 +20,6 @@ export interface VideoAsset {
   contentHash: string | null;
   status: string;
   version: number;
+  language: string;
   createdAt: Date;
 }

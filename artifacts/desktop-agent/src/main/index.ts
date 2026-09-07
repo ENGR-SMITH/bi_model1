@@ -441,7 +441,7 @@ ipcMain.handle(
 // + the agent reopens its return URL once the submission lands.
 ipcMain.handle(
   "agent:upload-raw",
-  async (_e, opts: { projectId: string; localFile: string; note?: string }) => {
+  async (_e, opts: { projectId: string; localFile: string; note?: string; language?: string }) => {
     const cfg = loadConfig();
     ensureAuthenticated(); // fail fast when not signed in
     const launchCtx = getLaunchContext();
@@ -462,6 +462,7 @@ ipcMain.handle(
         projectId: opts.projectId,
         filePath: opts.localFile,
         note: opts.note,
+        language: opts.language,
         onProgress: (sentBytes, totalBytes) =>
           sendJobProgress({
             phase: "upload",

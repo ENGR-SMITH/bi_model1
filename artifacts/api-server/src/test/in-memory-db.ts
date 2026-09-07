@@ -535,6 +535,7 @@ export const tandemVideoAssetsTable = sqliteTable("tandem_video_assets", {
   contentHash: text("content_hash"),
   status: text("status").notNull().default("UPLOADED"),
   version: integer("version").notNull().default(0),
+  language: text("language").notNull().default("English"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -1082,7 +1083,9 @@ export async function buildInMemoryDb() {
       storage_key TEXT NOT NULL, storage_provider TEXT NOT NULL DEFAULT 'local',
       content_hash TEXT,
       status TEXT NOT NULL DEFAULT 'UPLOADED',
-      version INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
+      version INTEGER NOT NULL DEFAULT 0,
+      language TEXT NOT NULL DEFAULT 'English',
+      created_at INTEGER NOT NULL
     );
     CREATE TABLE tandem_video_asset_files (
       id TEXT PRIMARY KEY NOT NULL, asset_id TEXT,

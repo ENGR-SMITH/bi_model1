@@ -22,6 +22,7 @@ export interface VideoAssetDetail {
   contentHash: string | null;
   status: string;
   version: number;
+  language: string;
   createdAt: Date;
   files: VideoAssetFile[];
   /** @nullable */

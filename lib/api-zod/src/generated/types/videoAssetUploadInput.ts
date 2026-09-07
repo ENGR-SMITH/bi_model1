@@ -13,4 +13,5 @@ import type { VideoAssetUploadInputKind } from './videoAssetUploadInputKind';
 export interface VideoAssetUploadInput {
   file: Blob;
   kind: VideoAssetUploadInputKind;
+  language?: string;
 }

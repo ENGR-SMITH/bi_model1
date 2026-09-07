@@ -79,8 +79,9 @@ export function StageSubmitCard({
   /** e.g. "Visual Editor" / "Sound Designer" — used in the card copy. */
   roleName: string;
   /** A file picked in the upload card — it travels with the description as a
-      submit-for-review upload (approve moves it into the vault). */
-  pendingFile?: { file: File; kind: string } | null;
+      submit-for-review upload (approve moves it into the vault). The language
+      is the dubbing language chosen on the audio/script upload cards. */
+  pendingFile?: { file: File; kind: string; language?: string } | null;
   /** Called once a pending file has been handed in (page clears the pick). */
   onFileSubmitted?: () => void;
 }) {
@@ -127,9 +128,15 @@ export function StageSubmitCard({
   // is nothing to hand in yet.
   const hasSnapshot = (legVersionQueries.find((entry) => entry.leg === leg)?.query.data?.length ?? 0) > 0;
 
+  // Video/Audio share the picture + sound stages by default (mirrors the
+  // server's memberCanEditLeg): a video editor can hand in the audio pass and
+  // a sound designer can cut the picture. Other legs stay exclusive.
+  const myRoles = project.data?.myRoles ?? [];
   const canSubmit =
-    project.data?.myRoles?.includes('CAPTAIN') ||
-    project.data?.myRoles?.includes(LEG_ROLE[leg]);
+    myRoles.includes('CAPTAIN') ||
+    ((leg === 'SELECTS' || leg === 'CUT') && (myRoles.includes('VIDEO') || myRoles.includes('AUDIO'))) ||
+    (leg === 'SOUND' && (myRoles.includes('AUDIO') || myRoles.includes('VIDEO'))) ||
+    myRoles.includes(LEG_ROLE[leg]);
 
   // A different pick resets the last upload's result note.
   useEffect(() => {
@@ -175,10 +182,13 @@ export function StageSubmitCard({
   // description below go to the Captain's review desk together, and only an
   // approval moves the file into the vault.
   const submitFile = useMutation({
-    mutationFn: async ({ file, kind, note }: { file: File; kind: string; note: string }) => {
+    mutationFn: async ({ file, kind, language, note }: { file: File; kind: string; language?: string; note: string }) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('kind', kind);
+      // Dubbing language chosen on the upload card (audio/script pages) — the
+      // Captain needs to know what language the submission is in.
+      if (language) formData.append('language', language);
       formData.append('review', 'true');
       // The card is "Submit file for review", so it means it even when the
       // uploader is the project's Captain: forceReview overrides the usual
@@ -233,6 +243,7 @@ export function StageSubmitCard({
       submitFile.mutate({
         file: pendingFile.file,
         kind: pendingFile.kind,
+        language: pendingFile.language,
         note: finalNote,
       });
       return;

@@ -142,6 +142,8 @@ interface TLNode {
   fileName?: string;
   sizeBytes?: number;
   durationMs?: number | null;
+  /** Dubbing language of an audio/script vault file, shown as a tag. */
+  language?: string | null;
 }
 
 interface SnakeRow {
@@ -282,6 +284,7 @@ export function VersionTimeline({
         fileName: asset.fileName,
         sizeBytes: asset.sizeBytes,
         durationMs: asset.durationMs,
+        language: asset.language,
       })),
     [project.data?.assets],
   );
@@ -424,6 +427,11 @@ export function VersionTimeline({
               <Icon size={11} />
               Vault
             </span>
+            {node.language && (
+              <span className="den-tag teal snake-card-lang" data-testid={`snake-lang-${node.id.slice(0, 8)}`}>
+                {node.language}
+              </span>
+            )}
             <span className="snake-card-file" title={node.fileName}>
               {node.fileName}
             </span>
