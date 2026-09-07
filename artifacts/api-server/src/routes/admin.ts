@@ -70,20 +70,45 @@ function isAdminEmail(email: string | null | undefined): boolean {
   return allowed !== "" && Boolean(email) && email!.trim().toLowerCase() === allowed;
 }
 
-/** Resolve the Clerk-authenticated user's email, or null when not signed in. */
+/**
+ * Bound an outbound Clerk Backend API call so a stalled Clerk connection
+ * cannot hang the admin surface forever (the admin page would otherwise sit
+ * on its loading skeleton with no way to recover).
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`Clerk backend request timed out after ${ms}ms`)),
+      ms,
+    );
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/**
+ * Resolve the Clerk-authenticated user's email, or null when not signed in.
+ * A failed/unreachable Clerk Backend API rejects (fail closed) rather than
+ * silently reporting "not an admin" — the frontend then shows the session
+ * check as failed with a retry instead of an endless loading state.
+ */
 async function clerkUserEmail(req: Request): Promise<string | null> {
   const { userId } = getAuth(req) ?? {};
   if (!userId) return null;
-  try {
-    const user = await clerkClient.users.getUser(userId);
-    return (
-      user.primaryEmailAddress?.emailAddress ??
-      user.emailAddresses?.[0]?.emailAddress ??
-      null
-    );
-  } catch {
-    return null;
-  }
+  const user = await withTimeout(clerkClient.users.getUser(userId), 5_000);
+  return (
+    user.primaryEmailAddress?.emailAddress ??
+    user.emailAddresses?.[0]?.emailAddress ??
+    null
+  );
 }
 
 /** True when the request carries a Clerk session for the ADMIN_EMAIL user. */
@@ -345,7 +370,10 @@ async function resolveUserEmails(userIds: string[]): Promise<Map<string, string>
   const unique = [...new Set(userIds)];
   if (unique.length === 0) return new Map();
   try {
-    const users = await clerkClient.users.getUserList({ userId: unique, limit: 100 });
+    const users = await withTimeout(
+      clerkClient.users.getUserList({ userId: unique, limit: 100 }),
+      5_000,
+    );
     return new Map(
       users.data
         .map((user) => {
