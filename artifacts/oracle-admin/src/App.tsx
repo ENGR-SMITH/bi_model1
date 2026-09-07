@@ -328,12 +328,23 @@ function LoginScreen() {
   );
 }
 
-// The magic-link destination: Clerk redirects the clicked email link here, and
-// this page reports what happened. The tab that requested the link keeps
-// waiting and opens the control room on its own; this tab can be closed.
+// The magic-link destination: Clerk redirects the clicked email link here and
+// verifies it in this tab. Once the session goes live, this page drops the
+// user straight into the control room.
 function VerifyEmailLink() {
+  const { isLoaded, isSignedIn } = useAuth();
   const { signIn } = useSignIn();
+  const [, setLocation] = useLocation();
   const verification = signIn.emailLink.verification;
+
+  // Clerk finalizes the sign-in here and then clears the in-progress sign-in,
+  // so the verification object above is gone right after success — auth state
+  // is the source of truth for when to move on.
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      setLocation('/', { replace: true });
+    }
+  }, [isLoaded, isSignedIn, setLocation]);
 
   let title = 'Confirming your link…';
   let body = 'This tab is confirming the sign-in link from your email.';
@@ -342,9 +353,7 @@ function VerifyEmailLink() {
     const status = verification.status;
     if (status === 'verified') {
       title = 'You are signed in.';
-      body = verification.verifiedFromTheSameClient
-        ? 'The control room is opening in this tab.'
-        : 'You can close this tab — the control room is opening in the tab where you requested the link.';
+      body = 'Opening the control room…';
     } else if (status === 'expired') {
       title = 'This link has expired';
       body = 'Go back to the admin page and request a new link.';
