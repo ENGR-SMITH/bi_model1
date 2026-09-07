@@ -119,7 +119,7 @@ function ContributionsGraph({ days, total }: { days: VideoContributionDay[]; tot
       </div>
 
       <div className="contrib-wrap">
-        <div className="contrib-months" style={{ gridTemplateColumns: `repeat(${weeks.length}, 12px)` }}>
+        <div className="contrib-months" style={{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }}>
           {monthLabels.map((label, index) => (
             <span key={index} className="contrib-month" style={{ gridColumn: index + 1 }}>{label ?? ''}</span>
           ))}

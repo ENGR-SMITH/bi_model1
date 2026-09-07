@@ -7946,3 +7946,23 @@ a.profile-track-row:hover .ptr-arrow {
   color: hsl(var(--muted-foreground));
 }
 .profile-uid-value .profile-uid-copied { color: hsl(164 33% 55%); opacity: 1; }
+
+/* ---- Contributions heat grid: stretch across the card ---- */
+.contrib-months { gap: 4px; }
+.contrib-grid {
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  height: clamp(150px, 13vw, 230px);
+}
+.contrib-cell {
+  width: 100%;
+  height: 100%;
+}
+.contrib-legend .contrib-cell {
+  width: 10px;
+  height: 10px;
+}
+@media (max-width: 620px) {
+  .contrib-grid { height: clamp(120px, 34vw, 180px); }
+}
