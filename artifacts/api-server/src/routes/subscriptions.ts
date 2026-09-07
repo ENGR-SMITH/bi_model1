@@ -74,17 +74,24 @@ router.get("/subscriptions", async (req: Request, res: Response): Promise<void> 
   res.json(await listUserSubscriptions(userId));
 });
 
-// POST /subscriptions/purchase — subscribe to any product (category pass,
-// storage plan, or project plan). This is the card-checkout path used while
-// no payment provider is connected: the card is validated in-house (Luhn +
-// expiry + cvc), only the last-4 is kept, and the entitlement is granted
-// immediately. When Paystack is wired to the buy buttons this endpoint is
-// superseded by the /paystack/checkout → webhook/verify flow, which grants
-// through the same applySubscriptionPurchase helper.
+// POST /subscriptions/purchase — dev/test simulated card checkout for any
+// product (category pass, storage plan, or project plan). The card is
+// validated in-house (Luhn + expiry + cvc), only the last-4 is kept, and the
+// entitlement is granted immediately. This is NOT a payment rail: real
+// purchases go through Paystack hosted checkout (/paystack/checkout →
+// webhook/verify), which grants through the same applySubscriptionPurchase
+// helper and never collects card details. Disabled in production.
 router.post("/subscriptions/purchase", async (req: Request, res: Response): Promise<void> => {
   const userId = getAuth(req).userId;
   if (!userId) {
     res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  // Simulated no-charge checkout — only for local dev and tests. All real
+  // payments run through Paystack, so never allow free grants in production.
+  if (process.env.NODE_ENV === "production") {
+    res.status(403).json({ error: "Payments are processed through Paystack; this simulated checkout is disabled in production." });
     return;
   }
 

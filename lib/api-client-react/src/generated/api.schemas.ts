@@ -616,7 +616,7 @@ export interface TicketPromoValidateResponse {
 }
 
 /**
- * Credit-card details for the pass checkout. Validated in-house (Luhn, expiry, cvc); only the last-4 is stored.
+ * Credit-card details for the dev/test simulated card checkout (Luhn, expiry, cvc); only the last-4 is stored.
  */
 export interface CardInput {
   number: string;

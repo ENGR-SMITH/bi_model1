@@ -15,6 +15,24 @@ import {
 import router from "./routes";
 import { logger } from "./lib/logger";
 
+// CORS: development reflects any origin (localhost ports, tunnels, and the
+// Vite proxies), but production serves only the explicit allowlist from
+// CORS_ORIGINS and refuses to boot without one — a misconfigured deploy fails
+// fast instead of silently exposing credentialed API responses to any site.
+const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+
+if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
+  throw new Error(
+    "CORS_ORIGINS must list the allowed production origins (comma-separated, e.g. " +
+      "https://app.tandem.com,https://authors.tandem.com) — refusing to boot without an explicit CORS allowlist.",
+  );
+}
+
+const corsOrigin: true | string[] = process.env.NODE_ENV === "production" ? allowedOrigins : true;
+
 const app: Express = express();
 
 app.use(
@@ -37,7 +55,7 @@ app.use(
   }),
 );
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
-app.use(cors({ credentials: true, origin: true }));
+app.use(cors({ credentials: true, origin: corsOrigin }));
 app.use(cookieParser());
 if (process.env.CLERK_SECRET_KEY) {
   app.use(

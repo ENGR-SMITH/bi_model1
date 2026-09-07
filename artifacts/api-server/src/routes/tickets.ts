@@ -302,17 +302,22 @@ router.post("/tickets/promo/validate", async (req: Request, res: Response): Prom
   );
 });
 
-// POST /tickets/purchase — buy a category pass with a credit card.
-//
-// Card handling today: the card is validated in-house (Luhn + expiry + cvc)
-// and only the last-4 is kept, so the checkout works end-to-end without a
-// payment provider. When Stripe keys are added, this becomes a Stripe Checkout
-// session — the ticket grant below stays identical, just triggered by the
-// checkout webhook instead of this request body.
+// POST /tickets/purchase — dev/test simulated card checkout for a category
+// pass. The card is validated in-house (Luhn + expiry + cvc), only the last-4
+// is kept, and the ticket is granted immediately. This is NOT a payment rail:
+// real purchases run through Paystack hosted checkout (/paystack/checkout →
+// webhook/verify), which never collects card details. Disabled in production.
 router.post("/tickets/purchase", async (req: Request, res: Response): Promise<void> => {
   const userId = getAuth(req).userId;
   if (!userId) {
     res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+
+  // Simulated no-charge checkout — only for local dev and tests. All real
+  // payments run through Paystack, so never allow free grants in production.
+  if (process.env.NODE_ENV === "production") {
+    res.status(403).json({ error: "Payments are processed through Paystack; this simulated checkout is disabled in production." });
     return;
   }
 
