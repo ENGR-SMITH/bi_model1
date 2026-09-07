@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
+  ArrowLeft,
   ArrowRight,
+  BookOpen,
   Check,
   ChevronDown,
   CircleAlert,
@@ -10,6 +12,7 @@ import {
   CircleDashed,
   Clock3,
   CreditCard,
+  Database,
   Eye,
   EyeOff,
   KeyRound,
@@ -721,6 +724,29 @@ function apiErrorText(error: unknown): string {
   return 'Something went wrong — try again.';
 }
 
+type SubscriptionKindFilter = 'pass' | 'storage' | 'projects';
+
+const SUBSCRIPTION_PRODUCT_META: Record<SubscriptionKindFilter, { label: string; title: string; description: string; icon: React.ReactNode }> = {
+  pass: {
+    label: 'TANDEM pass',
+    title: 'Category passes',
+    description: 'Every pass purchase across both categories, arranged by category and account, with auto-renewal control per pass.',
+    icon: <Ticket className="h-5 w-5" />,
+  },
+  storage: {
+    label: 'Creator Den',
+    title: 'Workspace storage',
+    description: 'Every storage extension (GB/TB) purchased across all Creator Den accounts, arranged by plan and account.',
+    icon: <Database className="h-5 w-5" />,
+  },
+  projects: {
+    label: 'Author Den',
+    title: 'Project capacity',
+    description: 'Every project-count plan purchased across all Author Den accounts, arranged by plan and account.',
+    icon: <BookOpen className="h-5 w-5" />,
+  },
+};
+
 function SubscriptionsSection({ session }: { session: boolean }) {
   const subscriptions = useListAdminSubscriptions();
   const queryClient = useQueryClient();
@@ -729,19 +755,10 @@ function SubscriptionsSection({ session }: { session: boolean }) {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: getListAdminSubscriptionsQueryKey() }),
     },
   });
-  const [filter, setFilter] = useState('');
+  const [kind, setKind] = useState<SubscriptionKindFilter | null>(null);
   const [error, setError] = useState('');
 
   const all = subscriptions.data ?? [];
-  const q = filter.trim().toLowerCase();
-  const rows = q
-    ? all.filter((sub) =>
-        [sub.userEmail, sub.userId, sub.planLabel, sub.planId, sub.kind, sub.status, sub.id]
-          .filter(Boolean)
-          .some((field) => String(field).toLowerCase().includes(q)),
-      )
-    : all;
-
   const toggle = (sub: AdminSubscription) => {
     setError('');
     update.mutate(
@@ -752,13 +769,30 @@ function SubscriptionsSection({ session }: { session: boolean }) {
     );
   };
 
+  if (kind) {
+    return (
+      <SubscriptionKindPage
+        kind={kind}
+        rows={all.filter((sub) => sub.kind === kind)}
+        isLoading={subscriptions.isLoading}
+        isError={subscriptions.isError}
+        onRetry={() => subscriptions.refetch()}
+        onBack={() => setKind(null)}
+        updating={update.isPending}
+        onToggle={toggle}
+        error={error}
+        session={session}
+      />
+    );
+  }
+
   return (
     <div className="mx-auto max-w-[1180px]">
       <div className="animate-in">
         <PageHeading
           eyebrow="Control room / subscriptions"
           title="Every subscription, every account."
-          description="See who is paying for what, and switch server-managed auto-renewal on or off for any individual pass. Turning it off stops future charges; the pass keeps running until it expires."
+          description="Pick a product to see who is paying for what — arranged by plan and account — and switch server-managed auto-renewal on or off for any individual pass."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
@@ -768,6 +802,134 @@ function SubscriptionsSection({ session }: { session: boolean }) {
       </div>
 
       <div className="mt-10 space-y-4 animate-in delay-100">
+        {error && (
+          <p data-testid="subscriptions-error" className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs font-semibold text-destructive">{error}</p>
+        )}
+
+        {subscriptions.isError ? (
+          <ErrorState onRetry={() => subscriptions.refetch()} />
+        ) : subscriptions.isLoading ? (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 animate-pulse">{[0, 1, 2].map((item) => <div key={item} className="h-52 rounded-2xl border border-border bg-secondary/60" />)}</div>
+        ) : all.length === 0 ? (
+          <div data-testid="state-subscriptions-empty" className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+            <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-muted-foreground"><Users className="h-5 w-5" /></div>
+            <h3 className="mt-4 text-sm font-semibold">No subscriptions yet</h3>
+            <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Purchases from the category-pass, storage, and projects checkouts will land here.</p>
+          </div>
+        ) : (
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {(Object.keys(SUBSCRIPTION_PRODUCT_META) as SubscriptionKindFilter[]).map((productKind) => {
+              const rows = all.filter((sub) => sub.kind === productKind);
+              const meta = SUBSCRIPTION_PRODUCT_META[productKind];
+              return (
+                <button
+                  key={productKind}
+                  type="button"
+                  data-testid={`card-subscriptions-${productKind}`}
+                  onClick={() => setKind(productKind)}
+                  className="group flex flex-col rounded-2xl border border-border bg-card p-6 text-left transition hover:border-primary/40 hover:bg-secondary/40"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-muted-foreground transition group-hover:text-primary">{meta.icon}</span>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold">{meta.label}</h3>
+                      <p className="text-[11px] text-muted-foreground">{meta.title}</p>
+                    </div>
+                  </div>
+                  <div className="mt-5 grid grid-cols-3 gap-2">
+                    <StatBox label="Subscriptions" value={rows.length} />
+                    <StatBox label="Active" value={rows.filter((sub) => sub.active).length} />
+                    <StatBox label="Users" value={new Set(rows.map((sub) => sub.userId)).size} />
+                  </div>
+                  {productKind === 'pass' && (
+                    <p className="mt-3 text-[11px] text-muted-foreground">
+                      {rows.filter((sub) => sub.autoRenew).length} auto-renewing · {new Set(rows.map((sub) => sub.planId)).size} categories
+                    </p>
+                  )}
+                  <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition group-hover:text-primary">
+                    Open <ArrowRight className="h-3.5 w-3.5" />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatBox({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-border bg-background/60 px-2 py-2 text-center">
+      <p className="font-mono text-sm font-bold">{value}</p>
+      <p className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function SubscriptionKindPage({
+  kind,
+  rows,
+  isLoading,
+  isError,
+  onRetry,
+  onBack,
+  updating,
+  onToggle,
+  error,
+  session,
+}: {
+  kind: SubscriptionKindFilter;
+  rows: AdminSubscription[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+  onBack: () => void;
+  updating: boolean;
+  onToggle: (sub: AdminSubscription) => void;
+  error: string;
+  session: boolean;
+}) {
+  const meta = SUBSCRIPTION_PRODUCT_META[kind];
+  const [filter, setFilter] = useState('');
+
+  const q = filter.trim().toLowerCase();
+  const filtered = q
+    ? rows.filter((sub) =>
+        [sub.userEmail, sub.userId, sub.planLabel, sub.planId, sub.status, sub.id]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(q)),
+      )
+    : rows;
+
+  const planGroups = groupByPlanId(filtered).sort((a, b) => a.planId.localeCompare(b.planId));
+
+  return (
+    <div className="mx-auto max-w-[1180px]">
+      <button
+        type="button"
+        onClick={onBack}
+        data-testid="button-subscriptions-back"
+        className="mb-5 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> All subscriptions
+      </button>
+
+      <div className="animate-in">
+        <PageHeading
+          eyebrow={`Control room / ${meta.label}`}
+          title={meta.title}
+          description={meta.description}
+          action={
+            <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
+              <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
+            </div>
+          }
+        />
+      </div>
+
+      <div className="mt-8 space-y-4 animate-in delay-100">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <input
             value={filter}
@@ -777,7 +939,7 @@ function SubscriptionsSection({ session }: { session: boolean }) {
             className="h-10 w-full max-w-sm rounded-xl border border-input bg-background px-3 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
           />
           <span className="text-[11px] text-muted-foreground">
-            {rows.length} {rows.length === 1 ? 'subscription' : 'subscriptions'} · {rows.filter((sub) => sub.autoRenew).length} auto-renewing
+            {filtered.length} {filtered.length === 1 ? 'subscription' : 'subscriptions'} · {filtered.filter((sub) => sub.active).length} active · {filtered.filter((sub) => sub.autoRenew).length} auto-renewing
           </span>
         </div>
 
@@ -785,22 +947,44 @@ function SubscriptionsSection({ session }: { session: boolean }) {
           <p data-testid="subscriptions-error" className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs font-semibold text-destructive">{error}</p>
         )}
 
-        {subscriptions.isError ? (
-          <ErrorState onRetry={() => subscriptions.refetch()} />
-        ) : subscriptions.isLoading ? (
-          <div className="space-y-3 animate-pulse">{[0, 1, 2, 3].map((item) => <div key={item} className="h-24 rounded-2xl border border-border bg-secondary/60" />)}</div>
-        ) : all.length === 0 ? (
-          <div data-testid="state-subscriptions-empty" className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
-            <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-muted-foreground"><Users className="h-5 w-5" /></div>
-            <h3 className="mt-4 text-sm font-semibold">No subscriptions yet</h3>
-            <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Purchases from the category-pass, storage, and projects checkouts will land here.</p>
-          </div>
+        {isError ? (
+          <ErrorState onRetry={onRetry} />
+        ) : isLoading ? (
+          <div className="space-y-3 animate-pulse">{[0, 1, 2].map((item) => <div key={item} className="h-24 rounded-2xl border border-border bg-secondary/60" />)}</div>
         ) : rows.length === 0 ? (
-          <div data-testid="state-subscriptions-no-match" className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-xs text-muted-foreground">No subscriptions match “{filter}”.</div>
+          <div data-testid={`state-${kind}-empty`} className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-xs text-muted-foreground">
+            No {meta.label} subscriptions yet — they'll appear here after the first purchase.
+          </div>
+        ) : filtered.length === 0 ? (
+          <div data-testid="state-subscriptions-no-match" className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-xs text-muted-foreground">No {meta.label} subscriptions match “{filter}”.</div>
         ) : (
-          <div className="space-y-3">
-            {rows.map((sub) => (
-              <SubscriptionRow key={sub.id} sub={sub} updating={update.isPending} onToggle={() => toggle(sub)} />
+          <div className="space-y-6">
+            {planGroups.map((group) => (
+              <div key={group.planId}>
+                <div className="mb-3 flex items-center gap-3">
+                  <h3 className="text-sm font-semibold">{group.planLabel}</h3>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">{group.planId}</span>
+                  <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">{group.subs.length} {group.subs.length === 1 ? 'subscription' : 'subscriptions'}</span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <div className="space-y-3">
+                  {groupByUser(group.subs)
+                    .sort((a, b) => (a.userEmail ?? a.userId).localeCompare(b.userEmail ?? b.userId))
+                    .map((user) => (
+                      <div key={user.userId} className="rounded-2xl border border-border/60 bg-background/40 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
+                          <p className="text-xs font-semibold">{user.userEmail ?? `User ${user.userId}`}</p>
+                          <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60">{user.userId}</p>
+                        </div>
+                        <div className="space-y-2">
+                          {user.subs.map((sub) => (
+                            <SubscriptionRow key={sub.id} sub={sub} updating={updating} onToggle={() => onToggle(sub)} compact />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
@@ -809,15 +993,43 @@ function SubscriptionsSection({ session }: { session: boolean }) {
   );
 }
 
-function SubscriptionRow({ sub, updating, onToggle }: { sub: AdminSubscription; updating: boolean; onToggle: () => void }) {
+function groupByPlanId(rows: AdminSubscription[]): Array<{ planId: string; planLabel: string; subs: AdminSubscription[] }> {
+  const groups: Array<{ planId: string; planLabel: string; subs: AdminSubscription[] }> = [];
+  for (const sub of rows) {
+    let group = groups.find((item) => item.planId === sub.planId);
+    if (!group) {
+      group = { planId: sub.planId, planLabel: sub.planLabel, subs: [] };
+      groups.push(group);
+    }
+    group.subs.push(sub);
+  }
+  return groups;
+}
+
+function groupByUser(rows: AdminSubscription[]): Array<{ userId: string; userEmail: string | null; subs: AdminSubscription[] }> {
+  const groups: Array<{ userId: string; userEmail: string | null; subs: AdminSubscription[] }> = [];
+  for (const sub of rows) {
+    let group = groups.find((item) => item.userId === sub.userId);
+    if (!group) {
+      group = { userId: sub.userId, userEmail: sub.userEmail, subs: [] };
+      groups.push(group);
+    }
+    group.subs.push(sub);
+  }
+  return groups;
+}
+
+function SubscriptionRow({ sub, updating, onToggle, compact = false }: { sub: AdminSubscription; updating: boolean; onToggle: () => void; compact?: boolean }) {
   return (
-    <div data-testid={`admin-sub-${sub.id}`} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
+    <div data-testid={`admin-sub-${sub.id}`} className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card ${compact ? 'p-3.5' : 'p-5'}`}>
       <div className="min-w-0">
-        <p className="text-sm font-semibold">{sub.userEmail ?? `User ${sub.userId}`}</p>
+        <p className={`${compact ? 'text-xs' : 'text-sm'} font-semibold`}>{sub.userEmail ?? `User ${sub.userId}`}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {sub.planLabel} · {sub.kind} · {sub.planId} · ${(sub.priceUsd / 100).toFixed(2)} / {sub.intervalLabel}
         </p>
-        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60">user {sub.userId} · sub {sub.id}</p>
+        {!compact && (
+          <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground/60">user {sub.userId} · sub {sub.id}</p>
+        )}
         {sub.renewalFailure ? (
           <p className="mt-2 rounded-md border border-amber-600/25 bg-amber-600/5 px-2 py-1 text-[11px] leading-relaxed text-amber-600" data-testid={`admin-sub-failure-${sub.id}`}>{sub.renewalFailure}</p>
         ) : null}
