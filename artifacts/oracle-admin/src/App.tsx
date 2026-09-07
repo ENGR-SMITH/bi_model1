@@ -164,14 +164,34 @@ function OracleAdmin() {
   const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const session = useGetAdminSession();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sessionStalled, setSessionStalled] = useState(false);
   const isAuthenticated = Boolean(session.data?.authenticated);
+
+  // The session check is the only gate into the control room — if it neither
+  // resolves nor errors (API server down, proxy hang, stalled Clerk lookup),
+  // surface the failure with a retry instead of an endless loading skeleton.
+  useEffect(() => {
+    if (!session.isLoading && !session.isFetching) return;
+    const timer = window.setTimeout(() => setSessionStalled(true), 8000);
+    return () => window.clearTimeout(timer);
+  }, [session.isLoading, session.isFetching]);
+
+  const stuck = sessionStalled && (session.isLoading || session.isFetching);
 
   if (!clerkLoaded) return <LoadingScreen />;
   if (!isSignedIn) return <LoginScreen />;
-  if (session.isLoading || session.isFetching) return <LoadingScreen />;
-  if (session.isError || !isAuthenticated) {
-    return <DeniedScreen sessionError={session.isError} onRetry={() => session.refetch()} />;
+  if (session.isError || !isAuthenticated || stuck) {
+    return (
+      <DeniedScreen
+        sessionError={session.isError || stuck}
+        onRetry={() => {
+          setSessionStalled(false);
+          session.refetch();
+        }}
+      />
+    );
   }
+  if (session.isLoading || session.isFetching) return <LoadingScreen />;
   return <ControlRoom mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />;
 }
 
