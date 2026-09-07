@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -13,10 +13,9 @@ import {
   Clock3,
   CreditCard,
   Database,
-  Eye,
-  EyeOff,
   KeyRound,
   LogOut,
+  Mail,
   Menu,
   Network,
   PauseCircle,
@@ -34,14 +33,14 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import { ClerkProvider, useAuth, useClerk, useSignIn } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
 import {
   getGetAdminSessionQueryKey,
   getListAdminPlanSettingsQueryKey,
   getListAdminPromosQueryKey,
   getListAdminProvidersQueryKey,
   getListAdminSubscriptionsQueryKey,
-  useAdminLogin,
-  useAdminLogout,
   useCheckAdminProvider,
   useCreateAdminPromo,
   useGetAdminSession,
@@ -56,12 +55,24 @@ import {
   useUpdateAdminSubscriptionAutoRenew,
 } from '@workspace/api-client-react';
 import type { AdminPlanSetting, AdminPromo, AdminSubscription, ProviderStatus, ProviderUpdate } from '@workspace/api-client-react';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 const queryClient = new QueryClient();
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+
+function stripBase(path: string) {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || '/'
+    : path;
+}
 
 type ProviderId = 'groq' | 'openrouter' | 'ollama' | 'lmstudio' | 'freebuff';
 
@@ -74,17 +85,16 @@ const providerMeta: Record<ProviderId, { eyebrow: string; description: string; t
 };
 
 function App() {
+  // Without the Clerk publishable key the magic-link flow has nothing to talk
+  // to — show a setup hint instead of an endless loading screen.
+  if (!clerkPubKey) {
+    return <ClerkSetupHint />;
+  }
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-          <ErrorBoundary resetKey={window.location.pathname}>
-            <Switch>
-              <Route path="/" component={OracleAdmin} />
-              <Route path="/oracle-admin/" component={OracleAdmin} />
-              <Route component={OracleAdmin} />
-            </Switch>
-          </ErrorBoundary>
+        <WouterRouter base={basePath}>
+          <ClerkApp />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
@@ -92,14 +102,74 @@ function App() {
   );
 }
 
+function ClerkApp() {
+  const [, setLocation] = useLocation();
+
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      proxyUrl={clerkProxyUrl}
+      routerPush={(to) => setLocation(stripBase(to))}
+      routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+    >
+      <ClerkQueryClientCacheInvalidator />
+      <ErrorBoundary resetKey={window.location.pathname}>
+        <Switch>
+          <Route path="/verify" component={VerifyEmailLink} />
+          <Route path="/" component={OracleAdmin} />
+          <Route path="/oracle-admin/" component={OracleAdmin} />
+          <Route component={OracleAdmin} />
+        </Switch>
+      </ErrorBoundary>
+    </ClerkProvider>
+  );
+}
+
+function ClerkSetupHint() {
+  return (
+    <main className="flex min-h-[100dvh] items-center justify-center bg-background px-5 py-8">
+      <div className="w-full max-w-md rounded-[1.75rem] border border-border bg-card p-8 text-center shadow-xl">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="h-5 w-5" /></div>
+        <h1 className="mt-5 text-2xl font-semibold tracking-[-0.045em]">Clerk is not configured here</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">The Oracle Admin signs in with a Clerk magic link. Add <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px]">VITE_CLERK_PUBLISHABLE_KEY</code> to <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px]">artifacts/oracle-admin/.env</code> (the same key the other apps use).</p>
+      </div>
+    </main>
+  );
+}
+
+function ClerkQueryClientCacheInvalidator() {
+  const { addListener } = useClerk();
+  const previousUserId = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const unsubscribe = addListener(({ user }) => {
+      const userId = user?.id ?? null;
+      if (
+        previousUserId.current !== undefined &&
+        previousUserId.current !== userId
+      ) {
+        queryClient.clear();
+      }
+      previousUserId.current = userId;
+    });
+
+    return unsubscribe;
+  }, [addListener]);
+
+  return null;
+}
+
 function OracleAdmin() {
+  const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const session = useGetAdminSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAuthenticated = Boolean(session.data?.authenticated);
 
-  if (session.isLoading) return <LoadingScreen />;
-  if (!isAuthenticated) {
-    return <LoginScreen sessionError={session.isError} onRetry={() => session.refetch()} />;
+  if (!clerkLoaded) return <LoadingScreen />;
+  if (!isSignedIn) return <LoginScreen />;
+  if (session.isLoading || session.isFetching) return <LoadingScreen />;
+  if (session.isError || !isAuthenticated) {
+    return <DeniedScreen sessionError={session.isError} onRetry={() => session.refetch()} />;
   }
   return <ControlRoom mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />;
 }
@@ -120,26 +190,64 @@ function LoadingScreen() {
   );
 }
 
-function LoginScreen({ sessionError, onRetry }: { sessionError: boolean; onRetry: () => void }) {
-  const login = useAdminLogin();
-  const [accessCode, setAccessCode] = useState('');
-  const [showCode, setShowCode] = useState(false);
+function LoginScreen() {
+  const { signIn } = useSignIn();
+  const [email, setEmail] = useState('');
+  const [verifying, setVerifying] = useState(false);
   const [message, setMessage] = useState('');
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  // Clerk's email-link strategy: Clerk emails the sign-in link, the user
+  // clicks it, and the session lands back here. No password to create or lose.
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!accessCode.trim()) {
-      setMessage('Enter the private access code to continue.');
+    if (!email.trim()) {
+      setMessage('Enter your admin email to continue.');
       return;
     }
     setMessage('');
-    login.mutate({ data: { accessCode: accessCode.trim() } }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetAdminSessionQueryKey() });
-        setAccessCode('');
-      },
-      onError: () => setMessage('That access code was not accepted. Check it and try again.'),
-    });
+    setVerifying(true);
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    try {
+      const { error: sendError } = await signIn.emailLink.sendLink({
+        emailAddress: email.trim(),
+        verificationUrl: `${protocol}//${host}${basePath}/verify`,
+      });
+      if (sendError) {
+        setVerifying(false);
+        setMessage('That email could not receive a sign-in link. Check it and try again.');
+        return;
+      }
+      // Resolves once the user clicks the link in the email (or it expires).
+      const { error: waitError } = await signIn.emailLink.waitForVerification();
+      if (waitError) {
+        setVerifying(false);
+        setMessage('The link was not confirmed in time. Request a new link and try again.');
+        return;
+      }
+      if (signIn.status === 'complete') {
+        const { error: finalizeError } = await signIn.finalize();
+        if (finalizeError) {
+          setVerifying(false);
+          setMessage('Sign-in did not finish. Request a new link.');
+          return;
+        }
+        // finalize activates the session — ClerkProvider re-renders and the
+        // control room opens on its own.
+      } else {
+        setVerifying(false);
+        setMessage('Sign-in did not complete. Request a new link.');
+      }
+    } catch {
+      setVerifying(false);
+      setMessage('Something went wrong. Request a new link.');
+    }
+  };
+
+  const reset = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setVerifying(false);
+    setMessage('');
   };
 
   return (
@@ -165,43 +273,116 @@ function LoginScreen({ sessionError, onRetry }: { sessionError: boolean; onRetry
         <section className="flex min-h-[620px] flex-col justify-center p-7 sm:p-12">
           <div className="lg:hidden"><Brand /></div>
           <div className="mt-12 max-w-sm lg:mt-0">
-            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Story Oracle / Admin</p>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.045em] text-foreground">Enter the control room.</h2>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">This workspace is intentionally separate from the author experience.</p>
-            <form onSubmit={submit} className="mt-9 space-y-4">
-              <label className="block">
-                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Private access code</span>
-                <div className="relative">
-                  <KeyRound className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
-                  <input
-                    data-testid="input-access-code"
-                    autoComplete="current-password"
-                    type={showCode ? 'text' : 'password'}
-                    value={accessCode}
-                    onChange={(event) => setAccessCode(event.target.value)}
-                    placeholder="Enter access code"
-                    className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-11 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
-                  />
-                  <button data-testid="button-toggle-access-code" type="button" onClick={() => setShowCode((value) => !value)} className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground hover:text-foreground">
-                    {showCode ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            {verifying ? (
+              <>
+                <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Story Oracle / Admin</p>
+                <h2 className="mt-4 text-3xl font-semibold tracking-[-0.045em] text-foreground">Check your inbox.</h2>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">A sign-in link is on its way to <span className="font-semibold text-foreground">{email.trim()}</span>. Click it and the control room opens — no password needed, ever.</p>
+                <form onSubmit={reset} className="mt-9">
+                  <button data-testid="button-resend-magic-link" className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm font-semibold transition hover:bg-secondary">
+                    <RefreshCw className="h-4 w-4" /> Request a new link
                   </button>
-                </div>
-              </label>
-              {(message || sessionError) && (
-                <div data-testid="status-login-error" className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs leading-5 text-destructive">
-                  <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{message || 'The admin session could not be checked. Retry or sign in below.'}</span>
-                </div>
-              )}
-              <button data-testid="button-admin-login" disabled={login.isPending} className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">
-                {login.isPending ? 'Verifying access…' : 'Open control room'}
-                {!login.isPending && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />}
-              </button>
-              {sessionError && <button data-testid="button-retry-session" type="button" onClick={onRetry} className="flex w-full items-center justify-center gap-2 text-xs font-semibold text-muted-foreground hover:text-foreground"><RefreshCw className="h-3.5 w-3.5" /> Retry session check</button>}
-            </form>
-            <p className="mt-10 flex items-center gap-2 text-[11px] leading-5 text-muted-foreground"><ShieldCheck className="h-4 w-4 text-primary" /> Keys are never displayed after they are saved.</p>
+                </form>
+                <p className="mt-10 flex items-center gap-2 text-[11px] leading-5 text-muted-foreground"><ShieldCheck className="h-4 w-4 text-primary" /> The link expires after a few minutes — request another any time.</p>
+              </>
+            ) : (
+              <>
+                <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Story Oracle / Admin</p>
+                <h2 className="mt-4 text-3xl font-semibold tracking-[-0.045em] text-foreground">Enter the control room.</h2>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">No password to create, remember, or lose. Type your admin email and we'll send you a magic link.</p>
+                <form onSubmit={submit} className="mt-9 space-y-4">
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Admin email</span>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground" />
+                      <input
+                        data-testid="input-admin-email"
+                        autoComplete="email"
+                        type="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        placeholder="you@yourdomain.com"
+                        className="h-12 w-full rounded-xl border border-input bg-background pl-10 pr-4 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15"
+                      />
+                    </div>
+                  </label>
+                  {message && (
+                    <div data-testid="status-login-error" className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/5 p-3 text-xs leading-5 text-destructive">
+                      <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{message}</span>
+                    </div>
+                  )}
+                  <button data-testid="button-request-magic-link" disabled={verifying} className="group flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60">
+                    {verifying ? 'Sending link…' : 'Email me a sign-in link'}
+                    {!verifying && <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />}
+                  </button>
+                  <div id="clerk-captcha" />
+                </form>
+                <p className="mt-10 flex items-center gap-2 text-[11px] leading-5 text-muted-foreground"><ShieldCheck className="h-4 w-4 text-primary" /> Keys are never displayed after they are saved.</p>
+              </>
+            )}
           </div>
         </section>
+      </div>
+    </main>
+  );
+}
+
+// The magic-link destination: Clerk redirects the clicked email link here, and
+// this page reports what happened. The tab that requested the link keeps
+// waiting and opens the control room on its own; this tab can be closed.
+function VerifyEmailLink() {
+  const { signIn } = useSignIn();
+  const verification = signIn.emailLink.verification;
+
+  let title = 'Confirming your link…';
+  let body = 'This tab is confirming the sign-in link from your email.';
+
+  if (verification) {
+    const status = verification.status;
+    if (status === 'verified') {
+      title = 'You are signed in.';
+      body = verification.verifiedFromTheSameClient
+        ? 'The control room is opening in this tab.'
+        : 'You can close this tab — the control room is opening in the tab where you requested the link.';
+    } else if (status === 'expired') {
+      title = 'This link has expired';
+      body = 'Go back to the admin page and request a new link.';
+    } else if (status === 'client_mismatch') {
+      title = 'Open the link on the same device';
+      body = 'For security, the link must be opened in the same browser where you requested it.';
+    } else if (status === 'failed') {
+      title = 'The link did not work';
+      body = 'Request a new link from the admin page and try again.';
+    }
+  }
+
+  return (
+    <main className="flex min-h-[100dvh] items-center justify-center bg-background px-5 py-8">
+      <div className="w-full max-w-md rounded-[1.75rem] border border-border bg-card p-8 text-center shadow-xl">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary"><Mail className="h-5 w-5" /></div>
+        <h1 className="mt-5 text-2xl font-semibold tracking-[-0.045em]">{title}</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{body}</p>
+        <a href={basePath || '/'} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-all hover:gap-3">Back to the admin page <ArrowRight className="h-4 w-4" /></a>
+      </div>
+    </main>
+  );
+}
+
+function DeniedScreen({ sessionError, onRetry }: { sessionError: boolean; onRetry: () => void }) {
+  const { signOut } = useClerk();
+
+  return (
+    <main className="flex min-h-[100dvh] items-center justify-center bg-background px-5 py-8">
+      <div className="w-full max-w-md rounded-[1.75rem] border border-border bg-card p-8 text-center shadow-xl">
+        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-destructive/10 text-destructive"><ShieldCheck className="h-5 w-5" /></div>
+        <h1 className="mt-5 text-2xl font-semibold tracking-[-0.045em]">This account can't open the control room.</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">Only the admin email configured on the server (ADMIN_EMAIL) is allowed in here. Sign out and request the magic link with that address.</p>
+        {sessionError && <p className="mt-3 text-xs leading-5 text-destructive">The session check also failed — retry below or sign in again.</p>}
+        <div className="mt-6 flex flex-col gap-3">
+          <button data-testid="button-sign-out" onClick={() => signOut()} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-105"><LogOut className="h-4 w-4" /> Sign out and switch account</button>
+          {sessionError && <button data-testid="button-retry-session" type="button" onClick={onRetry} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border bg-card text-sm font-semibold transition hover:bg-secondary"><RefreshCw className="h-4 w-4" /> Retry session check</button>}
+        </div>
       </div>
     </main>
   );
@@ -222,16 +403,23 @@ function Brand({ light = false }: { light?: boolean }) {
 function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (value: boolean) => void }) {
   const session = useGetAdminSession();
   const providers = useListAdminProviders();
-  const logout = useAdminLogout();
+  const { signOut } = useClerk();
   const [activeSection, setActiveSection] = useState<'overview' | 'providers' | 'promos' | 'plans' | 'subscriptions'>('overview');
+  const [signingOut, setSigningOut] = useState(false);
 
   const providerList = useMemo(() => providers.data || [], [providers.data]);
   const connectedCount = providerList.filter((provider) => provider.status === 'connected').length;
   const configuredCount = providerList.filter((provider) => provider.configured).length;
 
-  const signOut = () => logout.mutate(undefined, {
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetAdminSessionQueryKey() }),
-  });
+  const signOutOfAdmin = async () => {
+    setSigningOut(true);
+    try {
+      await signOut();
+      queryClient.invalidateQueries({ queryKey: getGetAdminSessionQueryKey() });
+    } finally {
+      setSigningOut(false);
+    }
+  };
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -258,7 +446,7 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
               <p className="mt-3 text-xs text-sidebar-foreground/70">Private operator mode</p>
               <p className="mt-1 font-mono text-[10px] text-sidebar-foreground/40">credentials sealed</p>
             </div>
-            <button data-testid="button-admin-logout" onClick={signOut} disabled={logout.isPending} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground disabled:opacity-50"><LogOut className="h-4 w-4" /> {logout.isPending ? 'Closing session…' : 'Close session'}</button>
+            <button data-testid="button-admin-logout" onClick={signOutOfAdmin} disabled={signingOut} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-sidebar-foreground/55 hover:bg-sidebar-accent hover:text-sidebar-foreground disabled:opacity-50"><LogOut className="h-4 w-4" /> {signingOut ? 'Closing session…' : 'Close session'}</button>
           </div>
         </aside>
         {mobileOpen && <button data-testid="button-mobile-overlay" onClick={() => setMobileOpen(false)} className="fixed inset-0 z-30 bg-foreground/20 lg:hidden" aria-label="Close menu" />}

@@ -14,6 +14,11 @@ vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: state.userId }),
   clerkClient: {
     users: {
+      getUser: async (id: string) => ({
+        id,
+        primaryEmailAddress: state.emails[id] ? { emailAddress: state.emails[id] } : null,
+        emailAddresses: state.emails[id] ? [{ emailAddress: state.emails[id] }] : [],
+      }),
       getUserList: async (params: { userId?: string[] }) => {
         const ids = params.userId ?? Object.keys(state.emails);
         return {
@@ -39,6 +44,16 @@ vi.mock("@workspace/db", async () => {
 import adminRouter from "./admin";
 import ticketsRouter from "./tickets";
 
+// The admin gates on the Clerk user's email matching ADMIN_EMAIL; tests
+// default to this address and flip the Clerk user via the state mock.
+process.env.ADMIN_EMAIL = "admin@example.com";
+
+/** Point the mocked Clerk session at the ADMIN_EMAIL user. */
+function signInAsAdmin() {
+  state.userId = "admin-user";
+  state.emails["admin-user"] = "admin@example.com";
+}
+
 function createApp(): Express {
   const app = express();
   app.use(express.json());
@@ -63,51 +78,71 @@ async function resetDb() {
   await state.db.delete(t.oracleHealthEventsTable);
   await state.db.delete(t.oracleProvidersTable);
   state.emails = {};
+  state.userId = null;
 }
 
 beforeEach(async () => {
-  delete process.env.ADMIN_ACCESS_CODE;
+  process.env.ADMIN_EMAIL = "admin@example.com";
   await resetDb();
 });
 
 afterEach(() => {
-  delete process.env.ADMIN_ACCESS_CODE;
+  delete process.env.ADMIN_EMAIL;
   vi.unstubAllGlobals();
 });
 
 describe("admin access", () => {
-  it("unlocks with the default access code TANDEM_123 when no env var is set", async () => {
+  // Simulate a Clerk-signed-in user whose email lives in state.emails.
+  function signInAs(email: string, id = "user-" + Math.random().toString(36).slice(2, 10)) {
+    state.userId = id;
+    state.emails[id] = email;
+  }
+
+  it("opens for the ADMIN_EMAIL user signed in through Clerk", async () => {
     const unauth = await request(API).get("/api/admin/providers");
     expect(unauth.status).toBe(401);
 
-    const login = await request(API).post("/api/admin/login").send({ accessCode: "TANDEM_123" });
-    expect(login.status).toBe(200);
-    expect(login.body.authenticated).toBe(true);
+    signInAs("admin@example.com");
 
-    const cookie = login.headers["set-cookie"]?.[0]?.split(";")[0];
-    expect(cookie).toBeTruthy();
+    const session = await request(API).get("/api/admin/session");
+    expect(session.status).toBe(200);
+    expect(session.body.authenticated).toBe(true);
 
-    const providers = await request(API).get("/api/admin/providers").set("Cookie", cookie);
+    const providers = await request(API).get("/api/admin/providers");
     expect(providers.status).toBe(200);
     expect(providers.body).toHaveLength(5);
     expect(providers.body.map((item: any) => item.id)).toEqual(["groq", "openrouter", "ollama", "lmstudio", "freebuff"]);
   });
 
-  it("rejects a wrong access code and respects an ADMIN_ACCESS_CODE override", async () => {
-    process.env.ADMIN_ACCESS_CODE = "SECRET_OVERRIDE";
-    const wrong = await request(API).post("/api/admin/login").send({ accessCode: "TANDEM_123" });
-    expect(wrong.status).toBe(401);
+  it("rejects signed-out requests and Clerk users whose email is not ADMIN_EMAIL", async () => {
+    // Signed in, but a different email -> still locked out.
+    signInAs("someone-else@example.com");
+    expect((await request(API).get("/api/admin/providers")).status).toBe(401);
+    expect((await request(API).get("/api/admin/session")).body.authenticated).toBe(false);
 
-    const right = await request(API).post("/api/admin/login").send({ accessCode: "SECRET_OVERRIDE" });
-    expect(right.status).toBe(200);
+    // Signed in as a user Clerk cannot resolve -> treated as not an admin.
+    signInAs("admin@example.com");
+    state.userId = "ghost-user";
+    delete state.emails["ghost-user"];
+    expect((await request(API).get("/api/admin/providers")).status).toBe(401);
+    expect((await request(API).get("/api/admin/session")).body.authenticated).toBe(false);
+  });
+
+  it("respects an ADMIN_EMAIL override", async () => {
+    process.env.ADMIN_EMAIL = "owner@example.com";
+
+    signInAs("admin@example.com");
+    expect((await request(API).get("/api/admin/session")).body.authenticated).toBe(false);
+
+    signInAs("owner@example.com");
+    expect((await request(API).get("/api/admin/session")).body.authenticated).toBe(true);
   });
 
   it("seeds provider API keys from the environment when the row has none", async () => {
     process.env.GROQ_API_KEY = "env-groq-key-123";
-    const login = await request(API).post("/api/admin/login").send({ accessCode: "TANDEM_123" });
-    const cookie = login.headers["set-cookie"]?.[0]?.split(";")[0];
+    signInAs("admin@example.com");
 
-    const providers = await request(API).get("/api/admin/providers").set("Cookie", cookie);
+    const providers = await request(API).get("/api/admin/providers");
     const groq = providers.body.find((item: any) => item.id === "groq");
     expect(groq.configured).toBe(true);
     expect(groq.keyHint).toContain("-123");
@@ -115,11 +150,14 @@ describe("admin access", () => {
 });
 
 describe("admin promo codes", () => {
+  // Sign in as the ADMIN_EMAIL user through the mocked Clerk session.
   async function login(): Promise<string> {
-    const loginRes = await request(API).post("/api/admin/login").send({ accessCode: "TANDEM_123" });
-    const cookie = loginRes.headers["set-cookie"]?.[0]?.split(";")[0];
-    expect(cookie).toBeTruthy();
-    return cookie as string;
+    state.userId = "admin-user";
+    state.emails["admin-user"] = "admin@example.com";
+    const session = await request(API).get("/api/admin/session");
+    expect(session.status).toBe(200);
+    expect(session.body.authenticated).toBe(true);
+    return "session";
   }
 
   it("creates, lists, updates, and deletes promo codes", async () => {
@@ -168,6 +206,7 @@ describe("admin promo codes", () => {
     expect(validated.body.discountedPriceUsd).toBe(588 - 25);
 
     // List reflects the row.
+    signInAsAdmin();
     const list = await request(API).get("/api/admin/promos").set("Cookie", cookie);
     expect(list.body).toHaveLength(1);
     expect(list.body[0].code).toBe("HALFPASS");
@@ -184,6 +223,7 @@ describe("admin promo codes", () => {
     expect(pausedCheck.body.valid).toBe(false);
 
     // Resume — valid again.
+    signInAsAdmin();
     const resumed = await request(API)
       .patch("/api/admin/promos/HALFPASS")
       .set("Cookie", cookie)
@@ -194,6 +234,7 @@ describe("admin promo codes", () => {
     expect(resumedCheck.body.valid).toBe(true);
 
     // Delete.
+    signInAsAdmin();
     const deleted = await request(API).delete("/api/admin/promos/HALFPASS").set("Cookie", cookie);
     expect(deleted.status).toBe(200);
     expect(deleted.body.deleted).toBe(true);
@@ -231,11 +272,14 @@ describe("admin promo codes", () => {
 });
 
 describe("admin plan settings", () => {
+  // Sign in as the ADMIN_EMAIL user through the mocked Clerk session.
   async function login(): Promise<string> {
-    const loginRes = await request(API).post("/api/admin/login").send({ accessCode: "TANDEM_123" });
-    const cookie = loginRes.headers["set-cookie"]?.[0]?.split(";")[0];
-    expect(cookie).toBeTruthy();
-    return cookie as string;
+    state.userId = "admin-user";
+    state.emails["admin-user"] = "admin@example.com";
+    const session = await request(API).get("/api/admin/session");
+    expect(session.status).toBe(200);
+    expect(session.body.authenticated).toBe(true);
+    return "session";
   }
 
   it("lists the catalog with auto-renew defaults (passes on, others off)", async () => {
@@ -293,17 +337,22 @@ describe("admin plan settings", () => {
     const missingBody = await request(API).patch("/api/admin/plan-settings/pass/authors").set("Cookie", cookie).send({});
     expect(missingBody.status).toBe(400);
 
+    // Signed out -> every admin route is 401 again.
+    state.userId = null;
     expect((await request(API).get("/api/admin/plan-settings")).status).toBe(401);
     expect((await request(API).patch("/api/admin/plan-settings/pass/authors").send({ autoRenewAvailable: true })).status).toBe(401);
   });
 });
 
 describe("admin subscriptions", () => {
+  // Sign in as the ADMIN_EMAIL user through the mocked Clerk session.
   async function login(): Promise<string> {
-    const loginRes = await request(API).post("/api/admin/login").send({ accessCode: "TANDEM_123" });
-    const cookie = loginRes.headers["set-cookie"]?.[0]?.split(";")[0];
-    expect(cookie).toBeTruthy();
-    return cookie as string;
+    state.userId = "admin-user";
+    state.emails["admin-user"] = "admin@example.com";
+    const session = await request(API).get("/api/admin/session");
+    expect(session.status).toBe(200);
+    expect(session.body.authenticated).toBe(true);
+    return "session";
   }
 
   async function seedSubscription(overrides: Record<string, unknown> = {}) {
@@ -423,6 +472,8 @@ describe("admin subscriptions", () => {
       .send({ enabled: true });
     expect(notFound.status).toBe(404);
 
+    // Signed out -> every admin route is 401 again.
+    state.userId = null;
     expect((await request(API).get("/api/admin/subscriptions")).status).toBe(401);
     expect((await request(API).patch("/api/admin/subscriptions/sub-1/auto-renew").send({ enabled: true })).status).toBe(401);
   });

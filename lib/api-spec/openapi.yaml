@@ -104,38 +104,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdminSession"
-  /admin/login:
-    post:
-      operationId: adminLogin
-      tags: [admin]
-      summary: Start a private admin session
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AdminLoginInput"
-      responses:
-        "200":
-          description: Authenticated session
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AdminSession"
-        "401":
-          description: Invalid access code
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /admin/logout:
-    post:
-      operationId: adminLogout
-      tags: [admin]
-      summary: End a private admin session
-      responses:
-        "204":
-          description: Logged out
   /admin/providers:
     get:
       operationId: listAdminProviders
@@ -1855,7 +1823,7 @@ paths:
       operationId: purchaseTicket
       tags: [tandems]
       summary: Buy a category pass with a credit card
-      description: Dev/test simulated checkout for a category pass: validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass. Only the card's last-4 is stored and no real charge is made — production purchases run through Paystack hosted checkout, and this endpoint is disabled in production.
+      description: "Dev/test simulated checkout for a category pass: validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass. Only the card's last-4 is stored and no real charge is made — production purchases run through Paystack hosted checkout, and this endpoint is disabled in production."
       requestBody:
         required: true
         content:
@@ -5357,13 +5325,6 @@ components:
         authenticated:
           type: boolean
       required: [authenticated]
-    AdminLoginInput:
-      type: object
-      properties:
-        accessCode:
-          type: string
-          minLength: 1
-      required: [accessCode]
     ProviderModel:
       type: object
       properties:

@@ -1,10 +1,8 @@
-import crypto from "node:crypto";
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { asc, desc, eq } from "drizzle-orm";
-import { clerkClient } from "@clerk/express";
+import { clerkClient, getAuth } from "@clerk/express";
 import { db, tandemPromoCodesTable, tandemSubscriptionPlanSettingsTable, tandemSubscriptionsTable } from "@workspace/db";
 import {
-  AdminLoginBody,
   CheckAdminProviderParams,
   CreateAdminPromoBody,
   CreateAdminPromoResponse,
@@ -27,72 +25,82 @@ import { checkProvider, listProviderStatuses, updateProvider, type ProviderId } 
 import { resolveSubscriptionProduct, subscriptionPlans, type SubscriptionKind } from "../video/subscriptions";
 
 const router: IRouter = Router();
-const COOKIE_NAME = "oracle_admin_session";
 
-// The default admin access code keeps the admin page usable out of the box;
-// set ADMIN_ACCESS_CODE in .env to change it.
-const DEFAULT_ADMIN_ACCESS_CODE = "TANDEM_123";
-// Dev-only fallback that signs the admin session cookie and (via lib/secrets)
-// encrypts stored provider API keys.
+// Dev-only fallback that (via lib/secrets) encrypts stored provider API keys.
 const DEFAULT_SESSION_SECRET = "manuskript-development-key";
 
+// The Oracle Admin signs in with a Clerk magic link (the email-link strategy:
+// type your admin email, Clerk emails you a link, click it, you're in). No
+// password to create, remember, or lose. The link flow lives entirely in
+// Clerk, so there is no SMTP/email provider to configure; this server only
+// needs to recognise the one email that may open the control room.
+//
 // Fail closed in production: the Oracle Admin panel manages provider
-// credentials, subscriptions, and promo codes, so a missing or default
-// ADMIN_ACCESS_CODE / SESSION_SECRET must stop the server from booting
-// rather than silently leaving the panel wide open. Dev and tests keep the
-// defaults so the admin page works out of the box.
+// credentials, subscriptions, and promo codes, so a missing ADMIN_EMAIL or a
+// weak SESSION_SECRET must stop the server from booting rather than silently
+// leaving the panel locked out or the keys weakly encrypted.
 if (process.env.NODE_ENV === "production") {
-  if (!process.env.ADMIN_ACCESS_CODE || process.env.ADMIN_ACCESS_CODE === DEFAULT_ADMIN_ACCESS_CODE) {
+  if (!process.env.ADMIN_EMAIL) {
     throw new Error(
-      "ADMIN_ACCESS_CODE must be set to a strong, non-default value in production " +
-        "— the Oracle Admin panel would otherwise be open to anyone who knows the default.",
+      "ADMIN_EMAIL must be set in production — the Oracle Admin signs in via a Clerk magic link " +
+        "sent to this address (e.g. ADMIN_EMAIL=you@yourdomain.com).",
     );
   }
   if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === DEFAULT_SESSION_SECRET) {
     throw new Error(
       "SESSION_SECRET must be set to a strong, non-default value in production " +
-        "— it signs the admin session cookie and encrypts stored provider API keys.",
+        "— it encrypts the stored provider API keys.",
     );
+  }
+  if (!process.env.CLERK_SECRET_KEY) {
+    throw new Error(
+      "CLERK_SECRET_KEY must be set in production — the Oracle Admin authenticates through the " +
+        "Clerk session, so Clerk must be configured for the API server.",
+    );
+  }
+} else if (!process.env.ADMIN_EMAIL) {
+  console.warn(
+    "[oracle-admin] ADMIN_EMAIL is not set — the Oracle Admin login is disabled. " +
+      "Set ADMIN_EMAIL to your email in .env to open the control room.",
+  );
+}
+
+function isAdminEmail(email: string | null | undefined): boolean {
+  const allowed = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+  return allowed !== "" && Boolean(email) && email!.trim().toLowerCase() === allowed;
+}
+
+/** Resolve the Clerk-authenticated user's email, or null when not signed in. */
+async function clerkUserEmail(req: Request): Promise<string | null> {
+  const { userId } = getAuth(req) ?? {};
+  if (!userId) return null;
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    return (
+      user.primaryEmailAddress?.emailAddress ??
+      user.emailAddresses?.[0]?.emailAddress ??
+      null
+    );
+  } catch {
+    return null;
   }
 }
 
-const adminAccessCode = (): string => process.env.ADMIN_ACCESS_CODE ?? DEFAULT_ADMIN_ACCESS_CODE;
-
-function sessionValue(): string {
-  return crypto.createHmac("sha256", process.env.SESSION_SECRET ?? DEFAULT_SESSION_SECRET)
-    .update(adminAccessCode())
-    .digest("base64url");
+/** True when the request carries a Clerk session for the ADMIN_EMAIL user. */
+async function isAdminRequest(req: Request): Promise<boolean> {
+  return isAdminEmail(await clerkUserEmail(req));
 }
 
-function isAuthenticated(req: Request): boolean {
-  return req.cookies?.[COOKIE_NAME] === sessionValue();
-}
-
-export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  if (!isAuthenticated(req)) {
+export async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  if (!(await isAdminRequest(req))) {
     res.status(401).json({ error: "Admin session required" });
     return;
   }
   next();
 }
 
-router.get("/admin/session", (req, res) => {
-  res.json({ authenticated: isAuthenticated(req) });
-});
-
-router.post("/admin/login", (req, res): void => {
-  const parsed = AdminLoginBody.safeParse(req.body);
-  if (!parsed.success || parsed.data.accessCode !== adminAccessCode()) {
-    res.status(401).json({ error: "Invalid admin access code" });
-    return;
-  }
-  res.cookie(COOKIE_NAME, sessionValue(), { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 8 * 60 * 60 * 1000 });
-  res.json({ authenticated: true });
-});
-
-router.post("/admin/logout", (req, res) => {
-  res.clearCookie(COOKIE_NAME);
-  res.sendStatus(204);
+router.get("/admin/session", async (req, res) => {
+  res.json({ authenticated: await isAdminRequest(req) });
 });
 
 router.get("/admin/providers", requireAdmin, async (_req, res): Promise<void> => {

@@ -19,7 +19,7 @@ to run them from. Paths are relative to the repo root (the folder that contains
 | **Creator Den** | `artifacts/creators-den` | `5175` | `/creators-den/` | Video version-control platform — Selects / Cut / Sound / Finish / Thumbnail review stages; external-editor checkout & import, commits, pull requests, A/B compare (no in-browser editing). |
 | **API server** | `artifacts/api-server` | `3000` | — | Express REST API + Socket.IO realtime + Clerk auth + AI (Story Oracle) + video job queue. |
 | **PostgreSQL** | — | `5432` | — | The database. Schema lives in `lib/db`. |
-| Oracle Admin *(optional)* | `artifacts/oracle-admin` | `5176` | `/oracle-admin/` | Private control room for AI model providers (login code `ADMIN_ACCESS_CODE`). |
+| Oracle Admin *(optional)* | `artifacts/oracle-admin` | `5176` | `/oracle-admin/` | Private control room for AI model providers (sign in with an email magic link to `ADMIN_EMAIL`). |
 | Desktop Agent *(optional)* | `artifacts/desktop-agent` | — | — | Electron app for uploading large files via FFmpeg + R2 presigned URLs. Not part of the web server. |
 | Mockup sandbox *(optional)* | `artifacts/mockup-sandbox` | `5177` | `/` | Standalone UI sandbox, not part of the main flow. |
 
@@ -96,7 +96,7 @@ Edit `.env` and set at least:
 | `DATABASE_URL` | `postgresql://postgres:<your-password>@localhost:5432/tandem` |
 | `CLERK_PUBLISHABLE_KEY` | Your Clerk instance's publishable key (sign up at clerk.com) |
 | `CLERK_SECRET_KEY` | Your Clerk instance's secret key |
-| `ADMIN_ACCESS_CODE` | Password for the Oracle Admin (default `TANDEM_123`) |
+| `ADMIN_EMAIL` | The email allowed into the Oracle Admin (magic-link login, e.g. `you@yourdomain.com`) |
 | `SESSION_SECRET` | Any long random string (keep it stable across restarts) |
 
 Optional AI provider credentials (used by the Story Oracle AI in Author/Creator Den):
@@ -216,9 +216,23 @@ cd artifacts/oracle-admin
 PORT=5176 BASE_PATH=/oracle-admin/ pnpm run dev
 ```
 
-Then open `http://localhost:5176/oracle-admin/` and log in with `ADMIN_ACCESS_CODE`
-(default `TANDEM_123`). Here you configure the AI model providers (Groq, OpenRouter,
-Ollama, LM Studio, Freebuff) that power the Story Oracle.
+Then create `artifacts/oracle-admin/.env` with the Clerk publishable key (the
+admin page signs in through the same Clerk instance as the rest of the app):
+
+```bash
+# artifacts/oracle-admin/.env
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+```
+
+Open `http://localhost:5176/oracle-admin/`, type the email you set as
+`ADMIN_EMAIL`, and click **Email me a sign-in link**. Clerk emails you a magic
+link — click it and the control room opens. No password to remember. (If you
+don't get the email, make sure **Email verification link** is enabled for sign-in
+under **User & authentication → Email, phone, username → Email** in the Clerk
+dashboard, and that `http://localhost:5176` is in the dashboard's Redirect URLs.)
+
+Here you configure the AI model providers (Groq, OpenRouter, Ollama, LM Studio,
+Freebuff) that power the Story Oracle.
 
 ### Video workers + Redis (only needed for heavy video processing)
 
