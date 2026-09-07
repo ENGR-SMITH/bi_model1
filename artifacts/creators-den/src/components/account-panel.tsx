@@ -70,9 +70,6 @@ export function StorageBar() {
               <b className="storage-left">{formatBytes(remaining)}</b>
             </li>
           </ul>
-          <p className="account-bar-note">
-            Shared by every project you captain — uploads pause when the vault runs out.
-          </p>
         </div>
       </div>
 
