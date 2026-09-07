@@ -66,6 +66,9 @@ function AudioCanvas({
   assets,
   vaultAssetId,
   seekRequest,
+  availableLanguages,
+  languageFilter,
+  onLanguageChange,
 }: {
   projectId: string;
   version: { id: string; leg: StudioLeg; version: number; snapshot: unknown } | null;
@@ -74,6 +77,11 @@ function AudioCanvas({
   vaultAssetId?: string;
   /** A note-click seek from the comments rail — jumps the player to it. */
   seekRequest?: { ms: number; n: number } | null;
+  /** Languages actually uploaded to this project's vault (drives the notch). */
+  availableLanguages: string[];
+  /** Current dubbing-language filter — 'all' shows every uploaded language. */
+  languageFilter: string;
+  onLanguageChange: (value: string) => void;
 }) {
   const [playheadMs, setPlayheadMs] = useState(0);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -142,7 +150,25 @@ function AudioCanvas({
     <div className="paper-card pv-stage" ref={stageRef} data-testid="audio-canvas">
       <div className="inline-heading">
         <span className="eyebrow"><AudioLines size={13} /> Big canvas{version ? ` · SOUND v${version.version}` : ''}</span>
-        {activeLanguage && <span className="den-tag teal" data-testid="audio-canvas-language">{activeLanguage}</span>}
+        {/* The dubbing-language notch lives at the top of the canvas, beside
+            the current language tag — same spot the preview/audio page uses. */}
+        <span className="pv-canvas-lang-tools">
+          {availableLanguages.length > 0 && (
+            <select
+              className="pv-canvas-lang-select"
+              value={languageFilter}
+              onChange={(event) => onLanguageChange(event.target.value)}
+              aria-label="Dubbing language"
+              data-testid="role-canvas-language-select"
+            >
+              <option value="all">All languages</option>
+              {availableLanguages.map((lang) => (
+                <option key={lang} value={lang}>{lang}</option>
+              ))}
+            </select>
+          )}
+          {activeLanguage && <span className="den-tag teal" data-testid="audio-canvas-language">{activeLanguage}</span>}
+        </span>
       </div>
       <div className="pv-stage-player mt-2">
         {assetId ? (
@@ -335,36 +361,12 @@ export default function RoleAudioPage() {
   return (
     <RoleLayout
       versions={
-        <>
-          {availableLanguages.length > 0 && (
-            <div className="pv-language-notch" data-testid="role-language-notch">
-              <span className="eyebrow"><AudioLines size={12} /> Language</span>
-              <select
-                value={languageFilter}
-                onChange={(event) => {
-                  setLanguageFilter(event.target.value);
-                  // A hidden item must not stay active on the canvas — clear
-                  // so the default (filtered) selection takes over.
-                  setVaultAssetId(null);
-                  setSelectedId(null);
-                }}
-                aria-label="Dubbing language"
-                data-testid="role-language-select"
-              >
-                <option value="all">All languages</option>
-                {availableLanguages.map((lang) => (
-                  <option key={lang} value={lang}>{lang}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          <VersionShelf
-            items={shelfItems}
-            activeKey={activeKey}
-            onSelect={onShelfSelect}
-            emptyText="Nothing here yet — save a snapshot in the Sound studio. Files you hand in for review reach the vault once the Captain approves them."
-          />
-        </>
+        <VersionShelf
+          items={shelfItems}
+          activeKey={activeKey}
+          onSelect={onShelfSelect}
+          emptyText="Nothing here yet — save a snapshot in the Sound studio. Files you hand in for review reach the vault once the Captain approves them."
+        />
       }
       canvas={
         <AudioCanvas
@@ -373,6 +375,15 @@ export default function RoleAudioPage() {
           assets={p.assets}
           vaultAssetId={vaultAssetId ?? undefined}
           seekRequest={seekRequest}
+          availableLanguages={availableLanguages}
+          languageFilter={languageFilter}
+          onLanguageChange={(value) => {
+            setLanguageFilter(value);
+            // A hidden item must not stay active on the canvas — clear so the
+            // default (filtered) selection takes over.
+            setVaultAssetId(null);
+            setSelectedId(null);
+          }}
         />
       }
       notes={

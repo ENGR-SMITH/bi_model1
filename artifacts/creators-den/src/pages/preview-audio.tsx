@@ -427,7 +427,31 @@ export default function AudioPreviewPage() {
           onViewChange={setView}
           hasDiff={hasDiff}
           eyebrow={
-            <span className="eyebrow">Big canvas{activeAssetLanguage ? <span className="den-tag teal pv-canvas-lang">{activeAssetLanguage}</span> : null}</span>
+            <div className="pv-canvas-eyebrow-wrap">
+              <span className="eyebrow">Big canvas</span>
+              {/* The dubbing-language notch lives at the top of the canvas,
+                  beside the current language tag — same spot the audio studio
+                  page uses. Filtering still narrows the vault files below. */}
+              {availableLanguages.length > 0 && (
+                <select
+                  className="pv-canvas-lang-select"
+                  value={languageFilter}
+                  onChange={(event) => {
+                    setLanguageFilter(event.target.value);
+                    setVaultAssetId(null);
+                    setSelectedId(null);
+                  }}
+                  aria-label="Dubbing language"
+                  data-testid="preview-canvas-language-select"
+                >
+                  <option value="all">All languages</option>
+                  {availableLanguages.map((lang) => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+              )}
+              {activeAssetLanguage && <span className="den-tag teal pv-canvas-lang">{activeAssetLanguage}</span>}
+            </div>
           }
           annotationHeaderRef={annotationHeaderRef}
           settings={diffSettings}
@@ -467,34 +491,12 @@ export default function AudioPreviewPage() {
         />
       }
       versions={
-        <>
-          {availableLanguages.length > 0 && (
-            <div className="pv-language-notch" data-testid="preview-language-notch">
-              <span className="eyebrow"><AudioLines size={12} /> Language</span>
-              <select
-                value={languageFilter}
-                onChange={(event) => {
-                  setLanguageFilter(event.target.value);
-                  setVaultAssetId(null);
-                  setSelectedId(null);
-                }}
-                aria-label="Dubbing language"
-                data-testid="preview-language-select"
-              >
-                <option value="all">All languages</option>
-                {availableLanguages.map((lang) => (
-                  <option key={lang} value={lang}>{lang}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          <VersionCarousel
-            items={carouselItems}
-            activeKey={activeKey}
-            onSelect={onCarouselSelect}
-            emptyText="No sound versions saved yet — save a snapshot in the Sound studio first."
-          />
-        </>
+        <VersionCarousel
+          items={carouselItems}
+          activeKey={activeKey}
+          onSelect={onCarouselSelect}
+          emptyText="No sound versions saved yet — save a snapshot in the Sound studio first."
+        />
       }
     />
   );

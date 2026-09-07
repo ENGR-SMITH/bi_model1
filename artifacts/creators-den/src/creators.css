@@ -3921,24 +3921,27 @@ select optgroup {
 
 /* Dubbing-language notch — sits above the versions strip on the audio preview
    page: filters the uploaded vault audio to one language at a time. */
-.pv-language-notch {
+/* Dubbing-language notch at the TOP of the big canvas (audio studio + audio
+   preview) — the dropdown sits beside the canvas title, right where the
+   current-language chip is shown, and filters the vault files below. */
+.pv-canvas-eyebrow-wrap {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 10px;
+  min-width: 0;
 }
-.pv-language-notch .eyebrow {
+.pv-canvas-lang-tools {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  margin: 0;
-  flex: 0 0 auto;
-}
-.pv-language-notch select {
-  height: 28px;
+  gap: 8px;
   min-width: 0;
-  max-width: 220px;
-  padding: 0 8px;
+  margin-left: auto;
+}
+.pv-canvas-lang-select {
+  height: 26px;
+  min-width: 0;
+  max-width: 170px;
+  padding: 0 7px;
   border: 1px solid hsl(var(--border));
   border-radius: 6px;
   background: hsl(var(--card));
@@ -3946,7 +3949,7 @@ select optgroup {
   font: 600 11px var(--app-font-sans);
 }
 .pv-canvas-lang {
-  margin-left: 8px;
+  margin-left: 2px;
   font: 700 9px var(--app-font-sans) !important;
   letter-spacing: .02em !important;
   text-transform: none !important;
@@ -4187,12 +4190,37 @@ select optgroup {
   cursor: pointer;
 }
 .finish-tick-row input { flex: 0 0 auto; }
+/* Boxed per-language rows — one clean strip per language with a hover and a
+   checked state so the ticking reads as a list, not a jumble of chips. */
+.finish-lang-tick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.finish-lang-tick-list li {
+  padding: 7px 9px;
+  border: 1px solid hsl(var(--border) / .65);
+  border-radius: 8px;
+  background: hsl(var(--card) / .35);
+  transition: border-color .12s, background .12s;
+}
+.finish-lang-tick-list li:hover {
+  border-color: hsl(164 33% 45% / .45);
+  background: hsl(var(--secondary) / .55);
+}
+.finish-lang-tick-list li.is-checked {
+  border-color: hsl(164 33% 45% / .6);
+  background: hsl(164 33% 45% / .09);
+}
+.finish-lang-tick-list .finish-zip-file { font-size: 10px; }
+.finish-lang-meta { flex: 0 0 auto; white-space: nowrap; }
 .finish-lang-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 2px;
+  padding-top: 10px;
+  margin-top: 2px;
   border-top: 1px dashed hsl(var(--border) / .7);
 }
 .finish-tick-all {
@@ -4204,6 +4232,48 @@ select optgroup {
   cursor: pointer;
 }
 .finish-tick-all .mono-label { color: hsl(var(--muted-foreground)); }
+/* Script card: compact language pick pills that light up when ticked (the
+   check appears and the pill gains a teal ring) instead of full-width rows. */
+.finish-pick-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.finish-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 9px 3px 3px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  background: hsl(var(--card));
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.finish-pick:hover { border-color: hsl(164 33% 45% / .55); }
+.finish-pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  margin: 0;
+}
+.finish-pick-check {
+  opacity: 0;
+  color: hsl(164 60% 62%);
+  transition: opacity .12s;
+}
+.finish-pick.is-on {
+  border-color: hsl(164 45% 45%);
+  background: hsl(164 33% 45% / .1);
+}
+.finish-pick.is-on .finish-pick-check { opacity: 1; }
 
 /* ---------------------------------------------------------------------------
    Vault — the crew roster (avatars + roles, moved from the chat).
