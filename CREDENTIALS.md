@@ -28,7 +28,7 @@ step-by-step how to obtain it. Everything ends up in your `.env` file (copy
 | 11 | Paystack | Secret key (+ USD account) | Direct USD card payments for subscriptions | For real payments |
 
 App-defined secrets (not from a platform — you create them):
-`ADMIN_ACCESS_CODE`, `SESSION_SECRET` — see section 12.
+`ADMIN_EMAIL`, `SESSION_SECRET` — see section 12.
 
 ---
 
@@ -50,6 +50,12 @@ uses the same secret key.
    - **Secret key** — starts with `sk_test_…` (or `sk_live_…` in prod)
 4. Click the eye / **Copy** buttons to copy each.
 
+**Also enable email links** (needed for the Oracle Admin's magic-link login):
+under **User & authentication → Email, phone, username → Email**, enable
+**Sign in with email** and **Email verification link**. If you want to allow
+new addresses to receive links, also enable **Sign up with email** →
+**Verify at sign-up** → **Email verification link**.
+
 **Where they go:**
 
 ```env
@@ -69,6 +75,10 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 
 # artifacts/creators-den/.env
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+
+# artifacts/oracle-admin/.env (the private admin app — shows a setup hint
+# without this)
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 ```
 
@@ -309,19 +319,50 @@ PAYSTACK_PUBLIC_KEY=pk_test_...
 
 ---
 
-## 12. App-defined secrets (you create these — no platform)
+## 12. App-defined settings (you create these — no platform)
 
-These aren't from any external service; you invent them.
+These aren't from any external service; you create them.
 
 ```env
-# Password for the Oracle Admin page (/oracle-admin). Change from the default!
-ADMIN_ACCESS_CODE=TANDEM_123
+# The email that may open the Oracle Admin page (/oracle-admin). Sign-in is a
+# Clerk magic link (the Slack/Notion flow): enter this address on the admin
+# login page, Clerk emails you a link, click it, and you're in — no password
+# to create, remember, or lose. Set it to the email of whoever runs the app.
+ADMIN_EMAIL=you@yourdomain.com
 
-# Signs the admin session cookie + encrypts stored provider API keys.
+# Encrypts the provider API keys stored by the Oracle Admin.
 # Use a long random string and keep it STABLE across restarts
 # (changing it makes saved provider keys unreadable).
 SESSION_SECRET=<generate: openssl rand -hex 32>
 ```
+
+**How the Oracle Admin login works** — there is **no shared access code
+anymore** (the old `ADMIN_ACCESS_CODE` login was removed). Instead:
+
+1. Open `/oracle-admin` and type your admin email → **Email me a sign-in link**.
+2. Clerk emails a magic link to that address. Click it.
+3. The server opens the control room only when the signed-in Clerk user's
+   email matches `ADMIN_EMAIL` exactly — every other signed-in account is
+   turned away at the door.
+
+Clerk does the emailing, so **no SMTP/email provider is needed**. Two Clerk
+Dashboard settings make the link flow work:
+
+- **User & authentication → Email, phone, username → Email**: enable
+  **Sign in with email** + **Email verification link** (see section 1).
+- **User & authentication → Redirect URLs**: allow the admin app's origin and
+  its verify route, e.g. `http://localhost:5176` and
+  `http://localhost:5176/oracle-admin/verify` in dev (the exact production
+  URL once deployed).
+
+The admin app also needs the Clerk publishable key at build time — create
+`artifacts/oracle-admin/.env` with `VITE_CLERK_PUBLISHABLE_KEY` (section 1).
+Without it the admin page shows a setup hint instead of the login form.
+
+> **Upgrading from the access code:** remove `ADMIN_ACCESS_CODE` from any
+> `.env` copied from an older template and add `ADMIN_EMAIL`. In production
+> the server refuses to boot without `ADMIN_EMAIL`, a strong `SESSION_SECRET`,
+> and `CLERK_SECRET_KEY` — the admin panel fails closed instead of open.
 
 ---
 

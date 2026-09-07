@@ -673,11 +673,6 @@ export interface AdminSession {
   authenticated: boolean;
 }
 
-export interface AdminLoginInput {
-  /** @minLength 1 */
-  accessCode: string;
-}
-
 export type ProviderModelStatus = typeof ProviderModelStatus[keyof typeof ProviderModelStatus];
 
 

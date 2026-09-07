@@ -60,27 +60,6 @@ export const GetAdminSessionResponse = zod.object({
 
 
 /**
- * @summary Start a private admin session
- */
-
-
-
-export const AdminLoginBody = zod.object({
-  "accessCode": zod.string().min(1)
-})
-
-export const AdminLoginResponse = zod.object({
-  "authenticated": zod.boolean()
-})
-
-
-/**
- * @summary End a private admin session
- */
-export const AdminLogoutResponse = zod.void()
-
-
-/**
  * @summary List provider and model health without secrets
  */
 export const ListAdminProvidersResponseItem = zod.object({
@@ -2104,7 +2083,7 @@ export const PurchaseTicketBody = zod.object({
   "expiryMonth": zod.number().int(),
   "expiryYear": zod.number().int(),
   "cvc": zod.string()
-}).describe('Credit-card details for the dev/test simulated card checkout (Luhn, expiry, cvc); only the last-4 is stored.'),
+}).describe('Credit-card details for the dev\/test simulated card checkout (Luhn, expiry, cvc); only the last-4 is stored.'),
   "promoCode": zod.string().nullish()
 })
 
