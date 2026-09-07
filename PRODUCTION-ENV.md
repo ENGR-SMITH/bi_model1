@@ -125,8 +125,11 @@ CLERK_SECRET_KEY=sk_test_...
   instead of the login form.
 - **Admin magic links:** in the Clerk dashboard, enable **User &
   authentication → Email, phone, username → Email → Sign in with email →
-  Email verification link**, and add your deployed app origins (including
-  `/oracle-admin/verify`) under **Redirect URLs**.
+  Email verification link**, turn **OFF “Require the same device and
+  browser”** (on by default — otherwise the link is rejected unless it is
+  opened in the exact browser profile that requested it), and add your
+  deployed app origins (including `/oracle-admin/verify`) under **Redirect
+  URLs**.
 
 ---
 
