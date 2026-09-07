@@ -924,6 +924,7 @@ describe("submit-for-review uploads (review = true)", () => {
     fileName: string;
     bytes?: string;
     note?: string;
+    language?: string;
     asUser?: string;
     /** Owner override: route the Captain's own upload through review too. */
     forceReview?: boolean;
@@ -935,6 +936,7 @@ describe("submit-for-review uploads (review = true)", () => {
       .field("review", "true");
     if (opts.forceReview) req = req.field("forceReview", "true");
     if (opts.note !== undefined) req = req.field("note", opts.note);
+    if (opts.language !== undefined) req = req.field("language", opts.language);
     return req.attach("file", Buffer.from(opts.bytes ?? "pending upload bytes"), opts.fileName);
   }
 
@@ -991,6 +993,7 @@ describe("submit-for-review uploads (review = true)", () => {
       kind: "RAW_VIDEO",
       fileName: "held-preview.mp4",
       note: "Check this one.",
+      language: "Spanish",
       asUser: "user-2",
     });
     expect(upload.status).toBe(201);
@@ -999,17 +1002,20 @@ describe("submit-for-review uploads (review = true)", () => {
       .from(state.tables.tandemVideoAssetsTable)
       .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
     expect(pendingRow.status).toBe("PENDING_REVIEW");
+    expect(pendingRow.language).toBe("Spanish");
     const stagedPath = path.join(process.env.VIDEO_UPLOAD_DIR!, pendingRow.storageKey);
     expect(fs.existsSync(stagedPath)).toBe(true);
 
     // The staged file's detail is readable by project members — the review
-    // canvas needs kind/mime to pick the right player for the held file.
+    // canvas needs kind/mime to pick the right player for the held file, and
+    // the review desk reads the dubbing language off this same detail.
     state.userId = "captain-1";
     const detail = await request(API).get(`/api/video/projects/${project.id}/assets/${pendingRow.id}`);
     expect(detail.status).toBe(200);
     expect(detail.body.status).toBe("PENDING_REVIEW");
     expect(detail.body.kind).toBe("RAW_VIDEO");
     expect(detail.body.fileName).toBe("held-preview.mp4");
+    expect(detail.body.language).toBe("Spanish");
 
     // And the staged original streams to the Captain so the Big canvas plays
     // the actual submission before the decision.
