@@ -7863,3 +7863,86 @@ a.profile-track-row:hover .ptr-arrow {
   a.profile-track-row:hover { transform: none; }
   .profile-track-row, .ptr-arrow { transition: none; }
 }
+
+/* ============================================================================
+   PROFILE CARDS III — clearer storage figures + a neutral Tandem ID pill.
+   ============================================================================ */
+
+/* ---- Workspace storage: Used / Total / Left as clear, readable tiles ---- */
+.storage-usage-foot { display: block; }
+.account-bar-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.account-bar-stats li {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid hsl(var(--border) / .8);
+  border-radius: 12px;
+  background: linear-gradient(180deg, hsl(0 0% 100% / .04), hsl(0 0% 100% / .015));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05), var(--shadow-xs);
+}
+.account-bar-stats li + li {
+  padding-left: 14px;
+  border-left: 1px solid hsl(var(--border) / .8);
+}
+.account-bar-stats li span {
+  color: hsl(var(--muted-foreground));
+  font: 8px var(--app-font-mono);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+.account-bar-stats li b {
+  color: hsl(var(--foreground));
+  font: 700 17px/1.1 var(--app-font-sans);
+  letter-spacing: -.01em;
+  text-transform: none;
+}
+.account-bar-stats li b.storage-left { color: hsl(164 48% 62%); }
+@media (max-width: 560px) {
+  .account-bar-stats { grid-template-columns: 1fr; gap: 8px; }
+}
+
+/* ---- Profile Tandem ID: stacked label above a neutral copyable pill ---- */
+.profile-uid {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 14px;
+}
+.profile-uid-label {
+  font: 600 12px var(--app-font-sans);
+  letter-spacing: .01em;
+  color: hsl(var(--foreground) / .85);
+}
+.profile-uid-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid hsl(var(--border) / .9);
+  border-radius: 10px;
+  background: hsl(0 0% 100% / .04);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / .05), var(--shadow-xs);
+  color: hsl(var(--foreground));
+  font: 600 13px var(--app-font-mono);
+  letter-spacing: .08em;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, transform .12s ease;
+}
+.profile-uid-value:hover {
+  border-color: hsl(var(--accent) / .55);
+  background: hsl(0 0% 100% / .07);
+  transform: translateY(-1px);
+}
+.profile-uid-value svg {
+  flex: 0 0 auto;
+  opacity: .72;
+  color: hsl(var(--muted-foreground));
+}
+.profile-uid-value .profile-uid-copied { color: hsl(164 33% 55%); opacity: 1; }

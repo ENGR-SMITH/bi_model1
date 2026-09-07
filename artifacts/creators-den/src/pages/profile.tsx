@@ -302,7 +302,7 @@ export default function ProfilePage() {
                 <p className="profile-sub">{email || `@${profileUserId.slice(0, 12)}`}</p>
                 {/* The unique Tandem ID — invite someone with it, no email needed. */}
                 <div className="profile-uid" data-testid="profile-uid">
-                  <span className="mono-label">{viewingSelf ? 'Your unique Tandem ID' : 'Tandem ID'}</span>
+                  <span className="profile-uid-label">{viewingSelf ? 'Your unique Tandem ID' : 'Tandem ID'}</span>
                   <button
                     type="button"
                     className="profile-uid-value"

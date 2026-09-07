@@ -394,10 +394,12 @@ section[id^="plans-"] { scroll-margin-top: 110px; }
   .reveal, .reveal-1, .reveal-2, .reveal-3, .reveal-4, .reveal-5,
   .animate-float, .animate-float-slow, .animate-spin-slow,
   .animate-pulse-soft, .animate-breathe, .animate-wiggle,
-  .agent-dl-icon > svg, .agent-dl-icon > i,
   .group:hover .animate-wiggle-on-hover, .group:hover .icon-lift,
   .group:hover > .card-shine, .group:hover .card-shine {
     animation: none !important;
     transition: none !important;
   }
+  /* The desktop-agent download loop is intentionally NOT disabled here —
+     the Creator Den vault billboard keeps its live download icon animating
+     too, so the two buttons stay in step. */
 }
