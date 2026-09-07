@@ -33,6 +33,8 @@ export type ShelfItem =
       media: 'video' | 'audio' | 'image';
       /** Proxy stream for the thumbnail — present once the asset is PROCESSED. */
       thumbUrl?: string;
+      /** Dubbing language of an audio/script vault file, shown as a tag. */
+      language?: string;
     };
 
 // The focal point sits in the upper part of the column (25% down) instead of
@@ -255,6 +257,7 @@ export function VersionShelf({
                             )}
                           </span>
                           <span className="vs-leg">{item.kindLabel}</span>
+                          {item.language && <span className="den-tag teal vs-lang">{item.language}</span>}
                           {item.status !== 'PROCESSED' && <span className="den-tag gold">processing</span>}
                         </span>
                         <span className="vs-title">{item.fileName}</span>

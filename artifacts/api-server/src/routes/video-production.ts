@@ -180,6 +180,18 @@ async function requireMember(
   return member ?? null;
 }
 
+// The Video and Audio studios share access by default: a member holding the
+// VIDEO role may work the SOUND leg (and vice versa), so a video editor can
+// hand in the audio pass and a sound designer can cut the picture. FINISH and
+// THUMBNAIL stay exclusive to the Captain / Thumbnail role respectively.
+function memberCanEditLeg(member: TandemVideoMember, leg: string): boolean {
+  const roles = member.roles ?? [];
+  if (roles.includes("CAPTAIN")) return true;
+  if (leg === "SELECTS" || leg === "CUT") return roles.includes("VIDEO") || roles.includes("AUDIO");
+  if (leg === "SOUND") return roles.includes("AUDIO") || roles.includes("VIDEO");
+  return roles.includes(LEG_ROLES[leg]);
+}
+
 async function requireLegEditor(
   projectId: string,
   leg: string,
@@ -187,8 +199,8 @@ async function requireLegEditor(
 ): Promise<TandemVideoMember | null> {
   const member = await requireMember(projectId, userId);
   if (!member) return null;
-  if ((member.roles ?? []).includes("CAPTAIN")) return member;
-  return (member.roles ?? []).includes(LEG_ROLES[leg]) ? member : null;
+  if (memberCanEditLeg(member, leg)) return member;
+  return null;
 }
 
 async function buildTimelineResponse(projectId: string, leg: string) {
@@ -1316,6 +1328,7 @@ async function decideSubmission(
             sizeBytes: Number(pending.sizeBytes),
             filePath: stagedPath,
             storageKey: pending.storageKey,
+            language: pending.language,
           });
           // The staged placeholder becomes the real vault row — repoint the
           // submission at it so decided history links to the live file.

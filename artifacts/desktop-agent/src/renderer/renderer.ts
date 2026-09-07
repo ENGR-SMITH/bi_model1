@@ -12,6 +12,9 @@ let updateReady = false;
 let pendingSignInUrl = "";
 let pendingLaunchProjectId: string | null = null;
 let chosenFile: { path: string; name: string; sizeBytes: number } | null = null;
+// Dubbing language of the chosen AUDIO file — compulsory before an audio
+// file (a language dub) can be handed in. Video/image files skip it.
+let chosenLanguage = "";
 let uploading = false;
 
 // ---------------------------------------------------------------------------
@@ -517,6 +520,28 @@ async function loadRolesFor(projectId: string): Promise<void> {
 // ---------------------------------------------------------------------------
 // Source file (drag & drop / choose)
 // ---------------------------------------------------------------------------
+/** Audio files are dubbing submissions — the language is compulsory. */
+function isAudioFile(filePath: string): boolean {
+  return AUDIO_EXTS.includes(extOf(filePath));
+}
+
+function renderLanguageField(): void {
+  const field = $("language-field");
+  const select = $("upload-language") as HTMLSelectElement;
+  const isAudio = Boolean(chosenFile) && isAudioFile(chosenFile!.path);
+  field.classList.toggle("hidden", !isAudio);
+  // A non-audio pick (or no pick) clears the requirement; a fresh audio pick
+  // keeps the previously chosen language when it is still a sensible default.
+  if (!isAudio) {
+    chosenLanguage = "";
+    select.value = "";
+  } else if (chosenLanguage) {
+    select.value = chosenLanguage;
+  }
+  select.classList.toggle("is-invalid", isAudio && !chosenLanguage);
+  updateUploadEnabled();
+}
+
 function setFileChip(): void {
   const dz = $("dropzone");
   const title = $("dz-title");
@@ -541,7 +566,7 @@ function setFileChip(): void {
     }
     change.style.display = "none";
   }
-  updateUploadEnabled();
+  renderLanguageField();
 }
 
 function wrongFileTypeMessage(filePath: string): string {
@@ -571,6 +596,10 @@ async function adoptPath(filePath: string | null | undefined): Promise<void> {
     return;
   }
   chosenFile = { path: info.path, name: info.name, sizeBytes: info.sizeBytes };
+  // A language picked for a previous file may not fit the new one — the
+  // dropdown re-opens empty so the upload can't slip through with a stale tag.
+  chosenLanguage = "";
+  ($("upload-language") as HTMLSelectElement).value = "";
   setStatus("");
   setFileChip();
 }
@@ -579,7 +608,12 @@ function updateUploadEnabled(): void {
   const btn = $("upload") as HTMLButtonElement;
   const projectReady = ($("project") as HTMLSelectElement).value !== "";
   const perm = uploadPermission();
-  const ready = signedIn && projectReady && projectRoles.status === "ready" && perm.canUpload && Boolean(chosenFile) && !uploading;
+  // An audio file needs its dubbing language picked first (it is a language
+  // dub submission); video/image files upload straight away.
+  const languageReady = !chosenFile || !isAudioFile(chosenFile.path) || Boolean(chosenLanguage);
+  const ready =
+    signedIn && projectReady && projectRoles.status === "ready" && perm.canUpload &&
+    Boolean(chosenFile) && languageReady && !uploading;
   if (ready) btn.removeAttribute("disabled");
   else btn.setAttribute("disabled", "true");
 }
@@ -673,6 +707,12 @@ async function runUpload() {
     setStatus("Pick a project and a source file first.", "err");
     return;
   }
+  // Compulsory dubbing language for audio files — the Captain needs to know
+  // what language dub is being handed in before the upload can start.
+  if (isAudioFile(chosenFile.path) && !chosenLanguage) {
+    setStatus("Choose the dubbing language first — it is required before you can upload.", "err");
+    return;
+  }
   uploading = true;
   updateUploadEnabled();
   resetProgress();
@@ -681,7 +721,12 @@ async function runUpload() {
   btn.textContent = "Submitting…";
   const note = ($("upload-note") as HTMLTextAreaElement).value.trim();
   try {
-    const result = await window.tandemAgent.uploadRaw({ projectId, localFile: chosenFile.path, note });
+    const result = await window.tandemAgent.uploadRaw({
+      projectId,
+      localFile: chosenFile.path,
+      note,
+      language: isAudioFile(chosenFile.path) ? chosenLanguage : undefined,
+    });
     const fill = $("barfill");
     fill.classList.remove("indeterminate");
     fill.style.width = "100%";
@@ -842,9 +887,17 @@ function initListeners() {
     } else {
       projectRoles = { status: "idle" };
       chosenFile = null;
+      chosenLanguage = "";
       setFileChip();
       renderRoles();
     }
+  });
+
+  // Dubbing language of the chosen audio file — compulsory before upload.
+  ($("upload-language") as HTMLSelectElement).addEventListener("change", () => {
+    chosenLanguage = ($("upload-language") as HTMLSelectElement).value;
+    ($("upload-language") as HTMLSelectElement).classList.toggle("is-invalid", !chosenLanguage);
+    updateUploadEnabled();
   });
 
   // Picking a channel narrows the Project dropdown to that channel's projects

@@ -12,7 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, AudioLines } from 'lucide-react';
 import { Link, useParams } from 'wouter';
 import {
   getGetVideoAssetQueryKey,
@@ -25,6 +25,7 @@ import {
   useListVideoTimelineVersions,
 } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
+import { DUBBING_LANGUAGES } from '@/lib/dubbing-languages';
 import { EmptyPlayer, pollWhileProcessing } from '@/components/asset-preview';
 import { AnnotationCanvas } from '@/components/annotation-canvas';
 import { VersionShelf, type ShelfItem } from '@/components/version-shelf';
@@ -68,7 +69,7 @@ function AudioCanvas({
 }: {
   projectId: string;
   version: { id: string; leg: StudioLeg; version: number; snapshot: unknown } | null;
-  assets: Array<{ id: string; fileName: string; kind: string; status: string }>;
+  assets: Array<{ id: string; fileName: string; kind: string; status: string; language?: string }>;
   /** Explicit vault asset to preview (picked from the version shelf). */
   vaultAssetId?: string;
   /** A note-click seek from the comments rail — jumps the player to it. */
@@ -108,6 +109,8 @@ function AudioCanvas({
   const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : undefined;
   const firstValid = (id?: string) => (id && assets.some((a) => a.id === id) ? id : undefined);
   const assetId = explicitAsset ?? firstValid(clips[0]?.assetId) ?? firstValid(music[0]?.assetId) ?? firstValid(pickups[0]?.assetId) ?? fallback?.id ?? '';
+  // The dubbing language of whatever audio is on the canvas right now.
+  const activeLanguage = assets.find((a) => a.id === assetId)?.language;
   const detail = useGetVideoAsset(projectId, assetId, {
     query: {
       queryKey: getGetVideoAssetQueryKey(projectId, assetId),
@@ -135,7 +138,11 @@ function AudioCanvas({
 
   return (
     <div className="paper-card pv-stage" ref={stageRef} data-testid="audio-canvas">
-      <div className="pv-stage-player">
+      <div className="inline-heading">
+        <span className="eyebrow"><AudioLines size={13} /> Big canvas{version ? ` · SOUND v${version.version}` : ''}</span>
+        {activeLanguage && <span className="den-tag teal" data-testid="audio-canvas-language">{activeLanguage}</span>}
+      </div>
+      <div className="pv-stage-player mt-2">
         {assetId ? (
           <WaveformPlayer
             projectId={projectId}
@@ -205,7 +212,8 @@ export default function RoleAudioPage() {
   const [vaultAssetId, setVaultAssetId] = useState<string | null>(null);
   // A file picked in the upload card — handed in together with the description
   // by the "Hand this stage in" card (submit-for-review, no direct upload).
-  const [pendingUpload, setPendingUpload] = useState<{ file: File; kind: string } | null>(null);
+  // The dubbing language is compulsory before a file can be picked here.
+  const [pendingUpload, setPendingUpload] = useState<{ file: File; kind: string; language?: string } | null>(null);
 
   // Default to the newest version once the list arrives (unless a vault file
   // has been picked from the version shelf).
@@ -246,6 +254,7 @@ export default function RoleAudioPage() {
         kindLabel: VAULT_KIND_LABELS[a.kind] ?? a.kind,
         status: a.status,
         media: 'audio' as const,
+        language: a.language,
       }));
     return [...versionItems, ...vaultItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -284,9 +293,11 @@ export default function RoleAudioPage() {
 
   const p = project.data;
 
-  // The Audio studio only opens for members with the AUDIO role (or the
-  // Captain). The nav tab stays visible — this page explains why it is locked.
-  if (!hasRole(p.myRoles, 'AUDIO')) {
+  // The Audio studio opens for members with the AUDIO role (or the Captain)
+  // AND — by default — members with the VIDEO role, so a video editor can
+  // hand in the sound pass and its downloads too. The nav tab stays visible —
+  // this page explains why it is locked for everyone else.
+  if (!hasRole(p.myRoles, 'AUDIO') && !hasRole(p.myRoles, 'VIDEO')) {
     return <RoleAccessDenied role="Audio" projectId={p.id} />;
   }
 
@@ -334,7 +345,8 @@ export default function RoleAudioPage() {
           defaultKind="RAW_AUDIO"
           accept={AUDIO_ACCEPT}
           checkFormat={checkAudioFile}
-          onPick={(file, kind) => setPendingUpload({ file, kind })}
+          languages={DUBBING_LANGUAGES}
+          onPick={(file, kind, language) => setPendingUpload({ file, kind, language })}
           onClear={() => setPendingUpload(null)}
           selected={pendingUpload}
         />

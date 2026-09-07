@@ -9018,6 +9018,9 @@ export const uploadVideoAsset = async (projectId: string,
     const formData = new FormData();
 formData.append(`file`, videoAssetUploadInput.file);
 formData.append(`kind`, videoAssetUploadInput.kind);
+if(videoAssetUploadInput.language !== undefined) {
+ formData.append(`language`, videoAssetUploadInput.language);
+ }
 
   return customFetch<VideoAsset>(getUploadVideoAssetUrl(projectId),
   {

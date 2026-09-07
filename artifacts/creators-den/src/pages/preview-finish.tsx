@@ -34,6 +34,7 @@ import {
   useListVideoGrants,
 } from '@workspace/api-client-react';
 import { useProjectRealtime } from '@/lib/realtime';
+import { DUBBING_LANGUAGES } from '@/lib/dubbing-languages';
 import { SectionEyebrow } from '@/components/shell';
 import { MemberAvatar } from '@/components/member-avatar';
 import { proxyUrlFor } from '@/components/asset-preview';
@@ -138,6 +139,8 @@ interface ExportAsset {
   sizeBytes: number;
   version: number;
   createdAt: string;
+  /** Dubbing language chosen at upload — defaults to 'English'. */
+  language?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,6 +212,9 @@ export default function FinishPreviewPage() {
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Language tag chosen for the script download (named after the dubbing
+  // language the draft accompanies).
+  const [scriptLanguage, setScriptLanguage] = useState('');
 
   const assets = (project.data?.assets ?? []) as ExportAsset[];
   const released = project.data?.status === 'RELEASED';
@@ -223,6 +229,26 @@ export default function FinishPreviewPage() {
   const latestImage = latestOf(IMAGE_KINDS);
   const latestAudio = latestOf(AUDIO_KINDS);
   const script = latestScript(projectId ?? '');
+
+  // The latest audio of EACH dubbing language uploaded — the export desk
+  // shows them all (with per-language downloads) plus a whole-languages
+  // download, in the catalog's order.
+  const latestAudioPerLanguage = useMemo(() => {
+    const byLanguage = new Map<string, ExportAsset>();
+    for (const asset of assets) {
+      if (!AUDIO_KINDS.has(asset.kind)) continue;
+      const lang = asset.language || 'English';
+      const current = byLanguage.get(lang);
+      if (!current || new Date(asset.createdAt).getTime() > new Date(current.createdAt).getTime()) {
+        byLanguage.set(lang, asset);
+      }
+    }
+    const languages = new Set<string>([...DUBBING_LANGUAGES, ...[...byLanguage.keys()]]);
+    return [...languages]
+      .filter((lang) => byLanguage.has(lang))
+      .map((lang) => ({ language: lang, latest: byLanguage.get(lang)! }));
+  }, [assets]);
+  const allAudioLanguages = latestAudioPerLanguage.map((entry) => entry.language);
 
   const members = useMemo(() => project.data?.members ?? [], [project.data?.members]);
   const membersById = useMemo(
@@ -289,7 +315,30 @@ export default function FinishPreviewPage() {
     setBusyId('script');
     setError(null);
     try {
-      saveBlob(new Blob([script.html], { type: 'text/html;charset=utf-8' }), script.name);
+      // A chosen language tags the file name (e.g. "script-Spanish.html").
+      const name = scriptLanguage
+        ? script.name.replace(/\.html$/i, '') + `-${slugify(scriptLanguage)}.html`
+        : script.name;
+      saveBlob(new Blob([script.html], { type: 'text/html;charset=utf-8' }), name);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Download every available dubbing language's latest audio, one after the
+  // other (each goes through the same Lock/grant gate).
+  const downloadAllAudios = async () => {
+    if (latestAudioPerLanguage.length === 0) return;
+    setBusyId('all-audios');
+    setError(null);
+    try {
+      for (const entry of latestAudioPerLanguage) {
+        setBusyId(`asset-${entry.latest.id}`);
+        const blob = await downloadVideoFile(projectId, entry.latest.id);
+        saveBlob(blob, entry.latest.fileName);
+      }
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setBusyId(null);
     }
@@ -555,6 +604,66 @@ export default function FinishPreviewPage() {
 
         {mediaCard('Image', <ImageIcon size={26} />, latestImage, 'No design in the vault yet.', 'accent')}
 
+        {/* Audio dubbings — the latest version of EVERY uploaded dubbing
+            language, each with its own download, plus a whole-languages
+            download. */}
+        <div className="finish-card accent-teal" data-testid="finish-card-audio-languages">
+          <div className="finish-card-thumb">
+            <span className="finish-card-thumb-icon"><Mic2 size={26} /></span>
+            <span className="finish-card-badge">Audio dubs</span>
+          </div>
+          <div className="finish-card-body">
+            <div className="finish-card-title">
+              <span className="eyebrow">Audio · every dubbing language</span>
+              <span className="finish-card-name">
+                {latestAudioPerLanguage.length > 0
+                  ? `${latestAudioPerLanguage.length} language${latestAudioPerLanguage.length === 1 ? '' : 's'} · latest version each`
+                  : 'No dubbed audio in the vault yet.'}
+              </span>
+            </div>
+            {latestAudioPerLanguage.length > 0 ? (
+              <>
+                <ul className="finish-lang-list" data-testid="finish-audio-languages">
+                  {latestAudioPerLanguage.map((entry) => (
+                    <li key={entry.language} data-testid={`finish-audio-language-${entry.language.toLowerCase()}`}>
+                      <span className="den-tag teal">{entry.language}</span>
+                      <span className="finish-zip-file" title={entry.latest.fileName}>{entry.latest.fileName}</span>
+                      <span className="mono-label">{formatBytes(entry.latest.sizeBytes)} · {timeAgo(entry.latest.createdAt)}</span>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => downloadAsset(entry.latest.id, entry.latest.fileName)}
+                        disabled={busyId === `asset-${entry.latest.id}` || entry.latest.status !== 'PROCESSED'}
+                        data-testid={`finish-download-audio-${entry.language.toLowerCase()}`}
+                      >
+                        <Download size={11} />
+                        {busyId === `asset-${entry.latest.id}` ? 'Downloading…' : 'Download'}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <AccessStrip
+                  members={members}
+                  holders={isCaptain ? latestAudioPerLanguage.flatMap((entry) => grantHoldersFor(entry.latest)) : []}
+                  released={released}
+                />
+                <button
+                  type="button"
+                  className="primary-btn finish-card-btn"
+                  onClick={() => void downloadAllAudios()}
+                  disabled={busyId === 'all-audios'}
+                  data-testid="finish-download-all-audios"
+                >
+                  <Download size={13} />
+                  {busyId === 'all-audios' ? 'Downloading languages…' : 'Download all languages'}
+                </button>
+              </>
+            ) : (
+              <p className="finish-card-meta">Audio uploads land here by their dubbing language — download the latest of each or the whole set.</p>
+            )}
+          </div>
+        </div>
+
         {/* Script — the latest script saved in this browser (the script desk autosaves there). */}
         <div className="finish-card accent-muted" data-testid="finish-card-script">
           <div className="finish-card-thumb">
@@ -580,6 +689,23 @@ export default function FinishPreviewPage() {
                 <Sparkles size={11} /> Everyone on the project can view the script — only this browser holds the text.
               </span>
             </div>
+            {/* Language tag for the download — the desk holds one draft, but the
+                downloaded file can be named after the dubbing language it
+                accompanies (same dropdown behaviour as the audio dubs). */}
+            {script && allAudioLanguages.length > 0 && (
+              <select
+                value={scriptLanguage}
+                onChange={(event) => setScriptLanguage(event.target.value)}
+                aria-label="Script language"
+                className="finish-lang-select"
+                data-testid="finish-script-language"
+              >
+                <option value="">Language…</option>
+                {allAudioLanguages.map((lang) => (
+                  <option key={lang} value={lang}>{lang}</option>
+                ))}
+              </select>
+            )}
             <button
               type="button"
               className="primary-btn finish-card-btn"
@@ -588,7 +714,7 @@ export default function FinishPreviewPage() {
               data-testid="finish-download-script"
             >
               <Download size={13} />
-              {busyId === 'script' ? 'Preparing…' : 'Download script'}
+              {busyId === 'script' ? 'Preparing…' : scriptLanguage ? `Download script (${scriptLanguage})` : 'Download script'}
             </button>
           </div>
         </div>

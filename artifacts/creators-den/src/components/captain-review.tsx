@@ -190,6 +190,12 @@ export function CaptainReviewSurface({
   const isAssetSubmission = submission.timelineVersionId.startsWith('ASSET:');
   const pendingAssetId = isAssetSubmission ? submission.timelineVersionId.slice('ASSET:'.length) : '';
   const fileParts = isAssetSubmission ? fileSubmissionParts(submission) : null;
+  // The dubbing language of a submitted file — read off the staged asset so
+  // the Captain knows what language the hand-in is in at a glance.
+  const submittedLanguage =
+    isAssetSubmission && project.data
+      ? (project.data.assets ?? []).find((a) => a.id === pendingAssetId)?.language ?? null
+      : null;
 
   // The submitted version + the leg's head version (diff baseline).
   const version = useGetVideoTimelineVersion(projectId, leg, submission.timelineVersionId, {
@@ -444,6 +450,7 @@ export function CaptainReviewSurface({
             <div className="inline-heading">
               <span className="eyebrow"><Send size={13} /> Submitted for review</span>
               <span className={`den-tag ${LEG_TONES[leg] ?? 'muted'}`}>{legLabel(leg)}</span>
+              {submittedLanguage && <span className="den-tag teal" data-testid="review-submission-language">{submittedLanguage}</span>}
             </div>
             <blockquote className="review-description-text">
               {isAssetSubmission ? fileParts?.message || '—' : submission.note || '—'}

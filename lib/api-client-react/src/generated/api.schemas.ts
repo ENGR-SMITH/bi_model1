@@ -1701,6 +1701,7 @@ export interface VideoAsset {
   contentHash: string | null;
   status: string;
   version: number;
+  language: string;
   createdAt: string;
 }
 
@@ -1784,6 +1785,7 @@ export const VideoAssetUploadInputKind = {
 export interface VideoAssetUploadInput {
   file: Blob;
   kind: VideoAssetUploadInputKind;
+  language?: string;
 }
 
 /**
@@ -1833,6 +1835,7 @@ export interface VideoAssetDetail {
   contentHash: string | null;
   status: string;
   version: number;
+  language: string;
   createdAt: string;
   files: VideoAssetFile[];
   /** @nullable */

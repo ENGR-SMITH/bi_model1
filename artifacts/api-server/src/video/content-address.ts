@@ -188,6 +188,8 @@ export async function createAssetFromUpload(opts: {
   filePath: string;
   /** The multer storage key (basename of filePath). */
   storageKey: string;
+  /** Dubbing language (English | Spanish | Portuguese | Hindi | Indonesian). */
+  language?: string;
 }): Promise<CreatedAsset> {
   const contentHash = await hashFile(opts.filePath);
   // Content-addressed reuse. The physical blob is the vault-wide flat file on
@@ -242,6 +244,7 @@ export async function createAssetFromUpload(opts: {
       contentHash,
       status: "UPLOADED",
       version: 0,
+      language: opts.language ?? "English",
     })
     .returning();
 

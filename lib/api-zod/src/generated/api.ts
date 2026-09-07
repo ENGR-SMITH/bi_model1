@@ -2197,6 +2197,7 @@ export const CreateVideoProjectResponse = zod.object({
   "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
+  "language": zod.string(),
   "createdAt": zod.coerce.date()
 })),
   "createdAt": zod.coerce.date(),
@@ -2952,6 +2953,7 @@ export const GetVideoProjectResponse = zod.object({
   "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
+  "language": zod.string(),
   "createdAt": zod.coerce.date()
 })),
   "createdAt": zod.coerce.date(),
@@ -3102,6 +3104,7 @@ export const ListVideoAssetsResponseItem = zod.object({
   "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
+  "language": zod.string(),
   "createdAt": zod.coerce.date()
 })
 export const ListVideoAssetsResponse = zod.array(ListVideoAssetsResponseItem)
@@ -3119,7 +3122,8 @@ export const UploadVideoAssetParams = zod.object({
 
 export const UploadVideoAssetBody = zod.object({
   "file": zod.instanceof(File),
-  "kind": zod.enum(['RAW_VIDEO', 'RAW_AUDIO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE', 'VO_PICKUP', 'GRAPHIC', 'THUMBNAIL_DESIGN'])
+  "kind": zod.enum(['RAW_VIDEO', 'RAW_AUDIO', 'SCREEN_REC', 'B_ROLL', 'REFERENCE', 'VO_PICKUP', 'GRAPHIC', 'THUMBNAIL_DESIGN']),
+  "language": zod.string().optional()
 }).describe('Multipart upload of a raw asset into the project vault')
 
 export const UploadVideoAssetResponse = zod.object({
@@ -3134,6 +3138,7 @@ export const UploadVideoAssetResponse = zod.object({
   "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
+  "language": zod.string(),
   "createdAt": zod.coerce.date()
 })
 
@@ -3162,6 +3167,7 @@ export const GetVideoAssetResponse = zod.object({
   "contentHash": zod.string().nullable(),
   "status": zod.string(),
   "version": zod.number().int(),
+  "language": zod.string(),
   "createdAt": zod.coerce.date(),
   "files": zod.array(zod.object({
   "id": zod.string(),

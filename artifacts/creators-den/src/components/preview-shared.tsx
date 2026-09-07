@@ -347,6 +347,8 @@ export type CarouselItem =
       /** Optional override for the bottom line (e.g. "awaiting your review")
        * — replaces the in-the-vault / processing caption. */
       statusLine?: string;
+      /** Dubbing language of an audio/script vault file, shown as a tag. */
+      language?: string;
     };
 
 export function VersionCarousel({
@@ -426,6 +428,7 @@ export function VersionCarousel({
                           )}
                         </span>
                         <span className="pv-version-leg">{item.kindLabel}</span>
+                        {item.language && <span className="den-tag teal pv-version-lang">{item.language}</span>}
                         {item.statusTag
                           ? <span className="den-tag gold">{item.statusTag}</span>
                           : item.status !== 'PROCESSED' && <span className="den-tag gold">processing</span>}
@@ -534,6 +537,7 @@ export function RoleUploadCard({
   onPick,
   onClear,
   selected,
+  languages,
 }: {
   projectId: string;
   /** e.g. "video file" / "audio file" / "thumbnail design". */
@@ -547,26 +551,39 @@ export function RoleUploadCard({
   /** Client-side format guard — returns an error message for a disallowed file. */
   checkFormat: (file: File) => string | null;
   /** Reports a newly picked file (and kind) so the submit card can send it. */
-  onPick: (file: File, kind: string) => void;
+  onPick: (file: File, kind: string, language?: string) => void;
   /** Clears the picked file (page resets its controlled state). */
   onClear: () => void;
   /** The currently picked file (controlled by the page). */
-  selected: { file: File; kind: string } | null;
+  selected: { file: File; kind: string; language?: string } | null;
+  /** When set, the card requires picking one of these dubbing languages
+      before a file can be handed in (audio + script role pages). */
+  languages?: readonly string[];
 }) {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState(selected?.kind ?? defaultKind);
+  const [language, setLanguage] = useState(selected?.language ?? '');
   const [drag, setDrag] = useState(false);
   const [error, setError] = useState('');
   // A picked file that is too big for the browser path — the agent modal
   // (download + instructions + hand-off) steps in, exactly as before.
   const [blockedFile, setBlockedFile] = useState<File | null>(null);
 
+  const requireLanguage = (languages?.length ?? 0) > 0;
+
   const pickFile = (file: File | undefined | null) => {
     if (!file) return;
     const invalid = checkFormat(file);
     if (invalid) {
       setError(invalid);
+      return;
+    }
+    // Compulsory dubbing language on the audio/script pages: the file cannot
+    // be picked until one is chosen — the Captain needs to know what language
+    // the submission is in.
+    if (requireLanguage && !language) {
+      setError('Choose the dubbing language first — it is required before you can upload.');
       return;
     }
     setError('');
@@ -576,17 +593,30 @@ export function RoleUploadCard({
       setBlockedFile(file);
       return;
     }
-    onPick(file, kind);
+    onPick(file, kind, requireLanguage ? language : undefined);
     if (fileRef.current) fileRef.current.value = '';
   };
 
   const changeKind = (value: string) => {
     setKind(value);
     // Re-label the pending pick so the submitted kind stays in sync.
-    if (selected?.file) onPick(selected.file, value);
+    if (selected?.file) onPick(selected.file, value, selected.language);
   };
 
-  const onDropZoneClick = () => fileRef.current?.click();
+  const changeLanguage = (value: string) => {
+    setLanguage(value);
+    setError('');
+    // Re-tag the pending pick so the submitted language stays in sync.
+    if (selected?.file) onPick(selected.file, selected.kind, value || undefined);
+  };
+
+  const onDropZoneClick = () => {
+    if (requireLanguage && !language) {
+      setError('Choose the dubbing language first — it is required before you can upload.');
+      return;
+    }
+    fileRef.current?.click();
+  };
 
   const onDrop = (event: React.DragEvent) => {
     event.preventDefault();
@@ -607,6 +637,20 @@ export function RoleUploadCard({
             <option key={option.value} value={option.value}>{option.label}</option>
           ))}
         </select>
+        {requireLanguage && (
+          <select
+            value={language}
+            onChange={(event) => changeLanguage(event.target.value)}
+            aria-label="Dubbing language"
+            data-testid="role-upload-language"
+            className={language ? '' : 'is-required'}
+          >
+            <option value="" disabled>Dubbing language…</option>
+            {languages!.map((lang) => (
+              <option key={lang} value={lang}>{lang}</option>
+            ))}
+          </select>
+        )}
         {/* The second method — hand the file in through the desktop agent
             instead (no browser cap; it submits for review with its own
             description field). */}
@@ -618,7 +662,7 @@ export function RoleUploadCard({
         />
       </div>
       <div
-        className={`role-upload-drop ${drag ? 'drag' : ''} ${selected ? 'has-file' : ''}`}
+        className={`role-upload-drop ${drag ? 'drag' : ''} ${selected ? 'has-file' : ''} ${requireLanguage && !language ? 'is-blocked' : ''}`}
         role="button"
         tabIndex={0}
         onClick={onDropZoneClick}
@@ -641,8 +685,11 @@ export function RoleUploadCard({
           <span>
             <FolderOpen size={14} />
             <b>{selected.file.name}</b>
-            {VAULT_KIND_LABELS[selected.kind] ?? selected.kind} — will travel with your submission
+            {VAULT_KIND_LABELS[selected.kind] ?? selected.kind}
+            {selected.language ? ` · ${selected.language}` : ''} — will travel with your submission
           </span>
+        ) : requireLanguage && !language ? (
+          <span><FolderOpen size={14} /> Choose the dubbing language above to unlock the drop zone</span>
         ) : (
           <span><FolderOpen size={14} /> Drag &amp; drop your {label} here, or click to browse</span>
         )}

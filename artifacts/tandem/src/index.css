@@ -314,6 +314,39 @@
   opacity: 1;
 }
 
+/* Live download animation — the arrow bobs while a progress bar fills
+   beneath it (the same affordance the Creators Den vault's desktop-agent
+   link wears). */
+.agent-dl-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+.agent-dl-icon > svg { animation: agentDlBob 1.4s ease-in-out infinite; }
+.agent-dl-icon > i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.9;
+  transform-origin: left center;
+  animation: agentDlFill 1.4s ease-in-out infinite;
+}
+@keyframes agentDlBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+@keyframes agentDlFill {
+  0% { transform: scaleX(0.1); opacity: 0.4; }
+  50%, 100% { transform: scaleX(1); opacity: 0.9; }
+}
+
 @keyframes reveal {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
@@ -343,6 +376,7 @@
   .reveal, .reveal-1, .reveal-2, .reveal-3, .reveal-4, .reveal-5,
   .animate-float, .animate-float-slow, .animate-spin-slow,
   .animate-pulse-soft, .animate-breathe, .animate-wiggle,
+  .agent-dl-icon > svg, .agent-dl-icon > i,
   .group:hover .animate-wiggle-on-hover, .group:hover .icon-lift,
   .group:hover > .card-shine, .group:hover .card-shine {
     animation: none !important;

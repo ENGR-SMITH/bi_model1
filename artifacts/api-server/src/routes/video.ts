@@ -58,6 +58,7 @@ import { channelMembership, ensureChannelEditor, syncChannelEditors } from "../c
 import { visibleChannelProjectRows } from "./channels";
 import { upload } from "../video/upload";
 import { createAssetFromUpload } from "../video/content-address";
+import { normalizeDubbingLanguage } from "../video/dubbing";
 import { ensureUploadFits } from "../video/quota";
 import { uploadBlockReason } from "../video/roles";
 import { captureVaultStorage, reclaimDeletedVaultFiles } from "../video/storage-cleanup";
@@ -1044,6 +1045,10 @@ router.post(
       return;
     }
 
+    // Dubbing language for audio/script content — compulsory at upload time on
+    // those role pages; normalized here so a bad value can never be stored.
+    const language = normalizeDubbingLanguage(req.body?.language);
+
     // Role gate: a member may only add the vault kinds their project roles own
     // (THUMBNAIL_DESIGN/GRAPHIC images need the THUMBNAIL role, footage the
     // VIDEO role, sound the AUDIO role), so a Video member can't drop images
@@ -1140,6 +1145,7 @@ router.post(
           contentHash: null,
           status: "PENDING_REVIEW",
           version: 0,
+          language,
         })
         .returning();
       const [submission] = await db
@@ -1204,6 +1210,7 @@ router.post(
         sizeBytes: pendingAsset.sizeBytes,
         status: pendingAsset.status,
         version: pendingAsset.version,
+        language: pendingAsset.language,
         submissionId: submission.id,
         review: true,
       });
@@ -1219,6 +1226,7 @@ router.post(
       sizeBytes: req.file.size,
       filePath: req.file.path,
       storageKey: req.file.filename,
+      language,
     });
 
     // Realtime: the vault shows the new locked file as it lands (and a fully

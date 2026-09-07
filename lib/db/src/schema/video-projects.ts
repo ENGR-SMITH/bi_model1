@@ -83,6 +83,10 @@ export const tandemVideoAssetsTable = pgTable("tandem_video_assets", {
   status: text("status").notNull().default("UPLOADED"),
   // Raw upload is version 0; processed artifacts increment it (Git-style).
   version: integer("version").notNull().default(0),
+  // Dubbing language of the audio/script content (English | Spanish |
+  // Portuguese | Hindi | Indonesian). Compulsory at upload time on the audio
+  // and script role pages; defaults to English for legacy rows.
+  language: text("language").notNull().default("English"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
