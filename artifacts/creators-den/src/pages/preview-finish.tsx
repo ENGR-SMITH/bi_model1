@@ -168,7 +168,7 @@ function AccessStrip({
           {members.length > 6 && <span className="den-chat-avatar finish-access-more">+{members.length - 6}</span>}
         </span>
         <span className="finish-access-note">
-          <Check size={11} /> Lock released — every member can download
+          <Check size={11} /> Lock released — everyone can download
         </span>
       </div>
     );
@@ -183,7 +183,7 @@ function AccessStrip({
           {holders.length > 6 && <span className="den-chat-avatar finish-access-more">+{holders.length - 6}</span>}
         </span>
         <span className="finish-access-note">
-          <Check size={11} /> {holders.length} {holders.length === 1 ? 'member has' : 'members have'} a Captain grant
+          <Check size={11} /> {holders.length} with a Captain grant
         </span>
       </div>
     );
@@ -191,7 +191,7 @@ function AccessStrip({
   return (
     <div className="finish-access">
       <span className="finish-access-note">
-        <LockKeyhole size={11} /> Locked — only members with a Captain grant can download
+        <LockKeyhole size={11} /> Locked — Captain grants only
       </span>
     </div>
   );
@@ -564,10 +564,9 @@ export default function FinishPreviewPage() {
           <SectionEyebrow>Finish · export</SectionEyebrow>
           <h1>The export desk.</h1>
           <p>
-            The FINISH master — the latest video muxed together with the latest audio, synced
-            as one file — plus the latest image and script, and the whole project as one ZIP.
-            Only the most recent asset of each kind is ever handed out, and downloads obey
-            the Captain's grants until the Lock is released.
+            The latest video and audio muxed into one synced master, plus the latest image,
+            the script, and the whole project as a ZIP. Downloads follow the Captain's
+            grants until the Lock is released.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -595,7 +594,7 @@ export default function FinishPreviewPage() {
             <div className="finish-card-title">
               <span className="eyebrow">Master · video + audio</span>
               <span className="finish-card-name" title={latestVideo?.fileName ?? latestAudio?.fileName ?? ''}>
-                {latestVideo ? latestVideo.fileName : latestAudio ? latestAudio.fileName : 'No media in the vault yet.'}
+                {latestVideo ? latestVideo.fileName : latestAudio ? latestAudio.fileName : 'Nothing here yet'}
               </span>
             </div>
             {latestVideo || latestAudio ? (
@@ -607,8 +606,8 @@ export default function FinishPreviewPage() {
                 </p>
                 <p className="finish-card-sync">
                   {latestVideo && latestAudio
-                    ? 'Latest video + latest audio muxed & waveform-synced into one file.'
-                    : 'No separate audio in the vault yet — the master is the latest video.'}
+                    ? 'Video + audio muxed into one synced file.'
+                    : 'No audio yet — the master is the latest video.'}
                 </p>
               </>
             ) : (
@@ -640,18 +639,22 @@ export default function FinishPreviewPage() {
           </div>
           <div className="finish-card-body">
             <div className="finish-card-title">
-              <span className="eyebrow">Audio · every dubbing language</span>
+              <span className="eyebrow">Audio · per language</span>
               <span className="finish-card-name">
                 {latestAudioPerLanguage.length > 0
-                  ? `${latestAudioPerLanguage.length} language${latestAudioPerLanguage.length === 1 ? '' : 's'} · latest version each`
-                  : 'No dubbed audio in the vault yet.'}
+                  ? `${latestAudioPerLanguage.length} ${latestAudioPerLanguage.length === 1 ? 'language' : 'languages'} — latest of each`
+                  : 'No dubbed audio yet.'}
               </span>
             </div>
             {latestAudioPerLanguage.length > 0 ? (
               <>
                 <ul className="finish-lang-list finish-lang-tick-list" data-testid="finish-audio-languages">
                   {latestAudioPerLanguage.map((entry) => (
-                    <li key={entry.language} data-testid={`finish-audio-language-${entry.language.toLowerCase()}`}>
+                    <li
+                      key={entry.language}
+                      className={audioSelection.has(entry.language) ? 'is-checked' : ''}
+                      data-testid={`finish-audio-language-${entry.language.toLowerCase()}`}
+                    >
                       <label className="finish-tick-row">
                         <input
                           type="checkbox"
@@ -663,7 +666,7 @@ export default function FinishPreviewPage() {
                         <span className="den-tag teal">{entry.language}</span>
                       </label>
                       <span className="finish-zip-file" title={entry.latest.fileName}>{entry.latest.fileName}</span>
-                      <span className="mono-label">{formatBytes(entry.latest.sizeBytes)} · {timeAgo(entry.latest.createdAt)}</span>
+                      <span className="mono-label finish-lang-meta">{formatBytes(entry.latest.sizeBytes)} · {timeAgo(entry.latest.createdAt)}</span>
                       <button
                         type="button"
                         className="link-btn"
@@ -697,23 +700,23 @@ export default function FinishPreviewPage() {
                   holders={isCaptain ? latestAudioPerLanguage.flatMap((entry) => grantHoldersFor(entry.latest)) : []}
                   released={released}
                 />
-                <button
-                  type="button"
-                  className="primary-btn finish-card-btn"
-                  onClick={() => void downloadAudios(audioSelection.size > 0 ? audioSelection : undefined)}
-                  disabled={busyId === 'audios'}
-                  data-testid="finish-download-selected-audios"
-                >
-                  <Download size={13} />
-                  {busyId === 'audios'
-                    ? 'Downloading languages…'
-                    : audioSelection.size > 0
-                      ? `Download selected (${audioSelection.size})`
-                      : 'Download all languages'}
-                </button>
+            <button
+              type="button"
+              className="primary-btn finish-card-btn"
+              onClick={() => void downloadAudios(audioSelection.size > 0 ? audioSelection : undefined)}
+              disabled={busyId === 'audios'}
+              data-testid="finish-download-selected-audios"
+            >
+              <Download size={13} />
+              {busyId === 'audios'
+                ? 'Downloading…'
+                : audioSelection.size > 0
+                  ? `Download selected (${audioSelection.size})`
+                  : 'Download all languages'}
+            </button>
               </>
             ) : (
-              <p className="finish-card-meta">Audio uploads land here by their dubbing language — download the latest of each or the whole set.</p>
+              <p className="finish-card-meta">Uploads land here per language — tick the ones to download.</p>
             )}
           </div>
         </div>
@@ -733,14 +736,14 @@ export default function FinishPreviewPage() {
             </div>
             {script ? (
               <p className="finish-card-meta">
-                {words(script.html)} words · {stripHtml(script.html).length} characters · saved on this device
+                {words(script.html)} words · {stripHtml(script.html).length} chars
               </p>
             ) : (
-              <p className="finish-card-meta">The script is autosaved in the browser it was written in — open the Script desk there to export it.</p>
+              <p className="finish-card-meta">Autosaved in the browser it was written in — open the Script desk there to export.</p>
             )}
             <div className="finish-access">
               <span className="finish-access-note">
-                <Sparkles size={11} /> Everyone on the project can view the script — only this browser holds the text.
+                <Sparkles size={11} /> Everyone can view it — this browser holds the only copy.
               </span>
             </div>
             {/* Per-language download ticks — the desk holds one draft, but you
@@ -748,10 +751,10 @@ export default function FinishPreviewPage() {
                 named for each (e.g. script-Spanish.html). */}
             {script && allAudioLanguages.length > 0 && (
               <>
-                <ul className="finish-lang-list finish-lang-tick-list" data-testid="finish-script-languages">
+                <ul className="finish-pick-grid" data-testid="finish-script-languages">
                   {allAudioLanguages.map((lang) => (
                     <li key={lang} data-testid={`finish-script-language-${lang.toLowerCase()}`}>
-                      <label className="finish-tick-row">
+                      <label className={`finish-pick ${scriptSelection.has(lang) ? 'is-on' : ''}`}>
                         <input
                           type="checkbox"
                           checked={scriptSelection.has(lang)}
@@ -760,8 +763,8 @@ export default function FinishPreviewPage() {
                           data-testid={`finish-script-tick-${lang.toLowerCase()}`}
                         />
                         <span className="den-tag teal">{lang}</span>
+                        <Check size={11} className="finish-pick-check" />
                       </label>
-                      <span className="finish-zip-file">script copy</span>
                     </li>
                   ))}
                 </ul>
@@ -782,20 +785,20 @@ export default function FinishPreviewPage() {
                 </div>
               </>
             )}
-            <button
-              type="button"
-              className="primary-btn finish-card-btn"
-              onClick={downloadScript}
-              disabled={!script || busyId === 'script'}
-              data-testid="finish-download-script"
-            >
-              <Download size={13} />
-              {busyId === 'script'
-                ? 'Preparing…'
-                : scriptSelection.size > 0
-                  ? `Download script (${scriptSelection.size} ${scriptSelection.size === 1 ? 'language' : 'languages'})`
-                  : 'Download script'}
-            </button>
+          <button
+            type="button"
+            className="primary-btn finish-card-btn"
+            onClick={downloadScript}
+            disabled={!script || busyId === 'script'}
+            data-testid="finish-download-script"
+          >
+            <Download size={13} />
+            {busyId === 'script'
+              ? 'Preparing…'
+              : scriptSelection.size > 0
+                ? `Download script (${scriptSelection.size} ${scriptSelection.size === 1 ? 'language' : 'languages'})`
+                : 'Download script'}
+          </button>
           </div>
         </div>
 
