@@ -1142,6 +1142,8 @@ select optgroup {
   font: 700 9px var(--app-font-sans);
   letter-spacing: .02em;
 }
+/* The language tag lives on the card's bottom (meta) row, pinned right. */
+.snake-card-meta .snake-card-lang { margin-left: auto; }
 .snake-card-file { min-width: 0; flex: 1; font: 600 13px var(--app-font-sans); color: hsl(var(--foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .snake-card-kind { margin: 0; font: 500 11px var(--app-font-mono); letter-spacing: .03em; color: hsl(212 62% 74%); }
 .snake-tag-upload {
@@ -4190,15 +4192,20 @@ select optgroup {
   cursor: pointer;
 }
 .finish-tick-row input { flex: 0 0 auto; }
-/* Boxed per-language rows — one clean strip per language with a hover and a
-   checked state so the ticking reads as a list, not a jumble of chips. */
+/* Boxed per-language rows — one clean two-line strip per language (top:
+   tick + chip with Download on the right; below: the file name + meta), so
+   the ticking reads as a tidy list and nothing overlaps on a narrow card. */
 .finish-lang-tick-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 .finish-lang-tick-list li {
-  padding: 7px 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 10px;
   border: 1px solid hsl(var(--border) / .65);
   border-radius: 8px;
   background: hsl(var(--card) / .35);
@@ -4212,7 +4219,30 @@ select optgroup {
   border-color: hsl(164 33% 45% / .6);
   background: hsl(164 33% 45% / .09);
 }
-.finish-lang-tick-list .finish-zip-file { font-size: 10px; }
+.finish-lang-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+.finish-lang-row-top .finish-tick-row { flex: 0 1 auto; min-width: 0; }
+.finish-lang-dl { flex: 0 0 auto; }
+.finish-lang-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font: 10px var(--app-font-mono);
+  color: hsl(var(--muted-foreground));
+}
+.finish-lang-file .finish-zip-file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .finish-lang-meta { flex: 0 0 auto; white-space: nowrap; }
 .finish-lang-toolbar {
   display: flex;

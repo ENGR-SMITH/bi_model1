@@ -427,11 +427,6 @@ export function VersionTimeline({
               <Icon size={11} />
               Vault
             </span>
-            {node.language && (
-              <span className="den-tag teal snake-card-lang" data-testid={`snake-lang-${node.id.slice(0, 8)}`}>
-                {node.language}
-              </span>
-            )}
             <span className="snake-card-file" title={node.fileName}>
               {node.fileName}
             </span>
@@ -442,6 +437,9 @@ export function VersionTimeline({
             )}
           </div>
           <p className="snake-card-kind">{KIND_LABELS[node.assetKind ?? ''] ?? node.assetKind}</p>
+          {/* The language chip rides the card's LAST (meta) row, right-aligned,
+              so the upload's header stays clean and the dubbing language reads
+              at the bottom of the card. */}
           <div className="snake-card-meta">
             {idButton}
             <span className="snake-card-person" title={`Uploaded by ${author}`}>
@@ -454,6 +452,11 @@ export function VersionTimeline({
             </span>
             {node.sizeBytes != null && (
               <span className="snake-card-size">{formatBytes(node.sizeBytes)}</span>
+            )}
+            {node.language && (
+              <span className="den-tag teal snake-card-lang" data-testid={`snake-lang-${node.id.slice(0, 8)}`}>
+                {node.language}
+              </span>
             )}
           </div>
         </article>
