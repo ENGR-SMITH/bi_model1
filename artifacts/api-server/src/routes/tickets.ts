@@ -14,9 +14,9 @@ import {
 
 const router: IRouter = Router();
 
-// The category pass: $1.88 for 3 weeks, per category. One active pass opens
+// The category pass: $5.88 for 3 weeks, per category. One active pass opens
 // the whole category (Author-Writer room / Content-Creators room).
-export const PASS_PRICE_USD = 188; // $1.88 in cents
+export const PASS_PRICE_USD = 588; // $5.88 in cents
 export const PASS_WEEKS = 3;
 // A visitor without a pass gets ONE 10-minute preview tour per den (a row in
 // tandem_tours). Each den tours independently, matching its own pass.

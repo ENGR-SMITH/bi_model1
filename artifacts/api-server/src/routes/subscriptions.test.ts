@@ -63,9 +63,9 @@ describe("subscription plans", () => {
     expect(kinds).toContain("pass");
     expect(kinds).toContain("storage");
     expect(kinds).toContain("projects");
-    // Authors pass is $1.88.
+    // Authors pass is $5.88.
     const authorPass = res.body.plans.find((p: any) => p.kind === "pass" && p.planId === "authors");
-    expect(authorPass.priceUsd).toBe(188);
+    expect(authorPass.priceUsd).toBe(588);
     expect(res.body.current).toEqual([]);
   });
 
@@ -108,8 +108,8 @@ describe("subscription purchase", () => {
     expect(res.body.subscription.kind).toBe("pass");
     expect(res.body.subscription.planLabel).toBe("Author & Writer pass");
     expect(res.body.subscription.active).toBe(true);
-    expect(res.body.subscription.priceUsd).toBe(188);
-    expect(res.body.receipt.total).toBe(188);
+    expect(res.body.subscription.priceUsd).toBe(588);
+    expect(res.body.receipt.total).toBe(588);
 
     // Listing reflects the recorded subscription.
     const list = await request(API).get("/api/subscriptions");

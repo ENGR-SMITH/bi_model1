@@ -90,7 +90,7 @@ function stubPaystack(overrides: {
     } else if (path.startsWith("/transaction/verify/")) {
       const verify = overrides.verify ?? {};
       httpStatus = 200;
-      json = { status: true, data: { status: verify.status ?? "success", amount: verify.amount ?? 188, currency: verify.currency ?? "USD", authorization: { last4: verify.last4 ?? "4081" } } };
+      json = { status: true, data: { status: verify.status ?? "success", amount: verify.amount ?? 588, currency: verify.currency ?? "USD", authorization: { last4: verify.last4 ?? "4081" } } };
     }
     return {
       ok: httpStatus >= 200 && httpStatus < 300,
@@ -150,7 +150,7 @@ describe("POST /api/paystack/checkout", () => {
     expect(initCall).toBeTruthy();
     expect(initCall!.body).toMatchObject({
       email: "buyer@example.com",
-      amount: 188,
+      amount: 588,
       currency: "USD",
       callback_url: "https://tandem.app/subscriptions",
       reference,
@@ -160,7 +160,7 @@ describe("POST /api/paystack/checkout", () => {
       .select()
       .from(state.tables.tandemPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
-    expect(intent).toMatchObject({ kind: "pass", planId: "authors", amountUsd: 188, currency: "USD", status: "PENDING" });
+    expect(intent).toMatchObject({ kind: "pass", planId: "authors", amountUsd: 588, currency: "USD", status: "PENDING" });
   });
 
   it("keeps the auto-renew flag when the plan allows it", async () => {
@@ -234,7 +234,7 @@ describe("POST /api/paystack/webhook", () => {
 
   it("rejects requests with a bad signature", async () => {
     const reference = await createPassIntent();
-    const { raw } = signWebhook({ event: "charge.success", data: { reference, amount: 188, currency: "USD" } });
+    const { raw } = signWebhook({ event: "charge.success", data: { reference, amount: 588, currency: "USD" } });
     const res = await request(API)
       .post("/api/paystack/webhook")
       .set("Content-Type", "application/json")
@@ -251,7 +251,7 @@ describe("POST /api/paystack/webhook", () => {
 
   it("grants the entitlement on charge.success and is idempotent on replay", async () => {
     const reference = await createPassIntent();
-    const { raw, signature } = signWebhook({ event: "charge.success", data: { reference, amount: 188, currency: "USD", authorization: { last4: "4081" } } });
+    const { raw, signature } = signWebhook({ event: "charge.success", data: { reference, amount: 588, currency: "USD", authorization: { last4: "4081" } } });
 
     const first = await request(API)
       .post("/api/paystack/webhook")
@@ -265,7 +265,7 @@ describe("POST /api/paystack/webhook", () => {
     const subs = await state.db.select().from(state.tables.tandemSubscriptionsTable);
     expect(tickets).toHaveLength(1);
     expect(subs).toHaveLength(1);
-    expect(subs[0].priceUsd).toBe(188);
+    expect(subs[0].priceUsd).toBe(588);
     const [intent] = await state.db
       .select()
       .from(state.tables.tandemPaystackIntentsTable)
@@ -338,7 +338,7 @@ describe("POST /api/paystack/confirm", () => {
 
     expect(res.status).toBe(200);
     expect(res.body.granted).toBe(true);
-    expect(res.body.receipt).toEqual({ total: 188, cardLast4: "4081", promoCode: null });
+    expect(res.body.receipt).toEqual({ total: 588, cardLast4: "4081", promoCode: null });
 
     const tickets = await state.db.select().from(state.tables.tandemTicketsTable);
     const subs = await state.db.select().from(state.tables.tandemSubscriptionsTable);
@@ -355,7 +355,7 @@ describe("POST /api/paystack/confirm", () => {
     const reference = await createPassIntent();
 
     // Webhook grants first.
-    const { raw, signature } = signWebhook({ event: "charge.success", data: { reference, amount: 188, currency: "USD" } });
+    const { raw, signature } = signWebhook({ event: "charge.success", data: { reference, amount: 588, currency: "USD" } });
     await request(API)
       .post("/api/paystack/webhook")
       .set("Content-Type", "application/json")

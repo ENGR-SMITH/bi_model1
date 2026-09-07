@@ -12,7 +12,7 @@ import {
 
 // ---------------------------------------------------------------------------
 // Ticket gate — the TANDEM category paywall. Each available category
-// (Author-Writer, Content-Creators) requires an active pass ($1.88 / 3 weeks)
+// (Author-Writer, Content-Creators) requires an active pass ($5.88 / 3 weeks)
 // before the room opens. Without a pass the page renders dimmed behind a
 // coupon-style popup. Payment runs through Paystack's hosted checkout (USD):
 // the popup opens a Paystack page, and when the customer returns the gate
@@ -112,7 +112,7 @@ export function TicketGate({
           total={returnStamp.total}
           cardLast4={returnStamp.cardLast4}
           promoCode={returnStamp.promoCode}
-          discount={Math.max(0, (status.data?.priceUsd ?? 188) - returnStamp.total)}
+          discount={Math.max(0, (status.data?.priceUsd ?? 588) - returnStamp.total)}
           onDone={() => setReturnStamp(null)}
         />
       )}
@@ -242,7 +242,7 @@ function FreePreviewStrip({
 function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; onPurchased: () => void }) {
   const queryClient = useQueryClient();
   const status = useGetTicketStatus();
-  const priceUsd = status.data?.priceUsd ?? 188;
+  const priceUsd = status.data?.priceUsd ?? 588;
   const weeks = status.data?.weeks ?? 3;
 
   const [promoInput, setPromoInput] = useState('');

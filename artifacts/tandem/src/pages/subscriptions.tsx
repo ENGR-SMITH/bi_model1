@@ -65,9 +65,13 @@ function formatDate(iso: string): string {
 function planFeatures(plan: SubscriptionPlan): string[] {
   if (plan.kind === 'pass') {
     return [
-      'Renewals stack onto a live pass instead of resetting',
-      'Starts the moment your payment lands',
-      'One pass unlocks the entire room',
+      'Collaboration — every role, studio, and room in the category',
+      'Uploads of your footage, files, and drafts',
+      'Downloads of released and finished work',
+      'Hire specialists or audition for open roles',
+      'Partnerships on shared projects',
+      'Community — creators, reviews, and follows',
+      'Analytics tracking on how your work performs',
       ...(plan.autoRenewAvailable ? ['Optional auto-renew with the card you use today'] : []),
     ];
   }

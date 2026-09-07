@@ -165,7 +165,7 @@ describe("admin promo codes", () => {
       .send({ code: "HALFPASS" });
     expect(validated.body.valid).toBe(true);
     expect(validated.body.kind).toBe("FLAT");
-    expect(validated.body.discountedPriceUsd).toBe(188 - 25);
+    expect(validated.body.discountedPriceUsd).toBe(588 - 25);
 
     // List reflects the row.
     const list = await request(API).get("/api/admin/promos").set("Cookie", cookie);
@@ -314,7 +314,7 @@ describe("admin subscriptions", () => {
       kind: "pass",
       planId: "authors",
       planLabel: "Author & Writer pass",
-      priceUsd: 188,
+      priceUsd: 588,
       status: "ACTIVE",
       intervalLabel: "4 weeks",
       periodStart: new Date(now),
