@@ -109,8 +109,10 @@ function AudioCanvas({
   const explicitAsset = vaultAssetId && assets.some((a) => a.id === vaultAssetId) ? vaultAssetId : undefined;
   const firstValid = (id?: string) => (id && assets.some((a) => a.id === id) ? id : undefined);
   const assetId = explicitAsset ?? firstValid(clips[0]?.assetId) ?? firstValid(music[0]?.assetId) ?? firstValid(pickups[0]?.assetId) ?? fallback?.id ?? '';
-  // The dubbing language of whatever audio is on the canvas right now.
-  const activeLanguage = assets.find((a) => a.id === assetId)?.language;
+  // The dubbing language of whatever audio is on the canvas right now. Only a
+  // vault file preview names one — a version mix can weave several languages
+  // together, so its canvas carries no language tag.
+  const activeLanguage = !version ? assets.find((a) => a.id === assetId)?.language : null;
   const detail = useGetVideoAsset(projectId, assetId, {
     query: {
       queryKey: getGetVideoAssetQueryKey(projectId, assetId),
@@ -214,12 +216,28 @@ export default function RoleAudioPage() {
   // by the "Hand this stage in" card (submit-for-review, no direct upload).
   // The dubbing language is compulsory before a file can be picked here.
   const [pendingUpload, setPendingUpload] = useState<{ file: File; kind: string; language?: string } | null>(null);
+  // The dubbing-language notch (same as the preview/audio page): narrows the
+  // shelf's vault audio to one uploaded language. Saved versions stay visible
+  // — they are mixes, not per-language files.
+  const [languageFilter, setLanguageFilter] = useState('all');
 
-  // Default to the newest version once the list arrives (unless a vault file
-  // has been picked from the version shelf).
+  // Default the canvas: newest version once the list arrives; with no saved
+  // versions yet, the newest vault audio of the filtered language (so the
+  // notch controls what plays on a fresh studio too).
   useEffect(() => {
-    if (!selectedId && !vaultAssetId && versions.length > 0) setSelectedId(versions[0].id);
-  }, [versions, selectedId, vaultAssetId]);
+    if (selectedId || vaultAssetId) return;
+    if (versions.length > 0) {
+      setSelectedId(versions[0].id);
+      return;
+    }
+    const mediaAssets = (project.data?.assets ?? [])
+      .filter((a) => AUDIO_KINDS.has(a.kind))
+      .filter((a) => languageFilter === 'all' || a.language === languageFilter)
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    if (mediaAssets[0]) setVaultAssetId(mediaAssets[0].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versions, selectedId, vaultAssetId, project.data?.assets, languageFilter]);
 
   const selected = versions.find((v) => v.id === selectedId) ?? versions[0] ?? null;
   const selectedDetail = useGetVideoTimelineVersion(projectId, selected?.leg ?? '', selected?.id ?? '', {
@@ -233,7 +251,8 @@ export default function RoleAudioPage() {
   // canvas shows the picked file instead of the newest version's mix.
   const activeVersion = vaultAssetId ? null : selected;
 
-  // Version shelf: SOUND versions (newest first) + the vault's audio uploads.
+  // Version shelf: SOUND versions (newest first) + the vault's audio uploads,
+  // narrowed to the selected dubbing language when the notch is used.
   const shelfItems = useMemo<ShelfItem[]>(() => {
     const proj = project.data;
     const versionItems: ShelfItem[] = versions.map((v) => ({
@@ -247,6 +266,7 @@ export default function RoleAudioPage() {
     }));
     const vaultItems: ShelfItem[] = (proj?.assets ?? [])
       .filter((a) => AUDIO_KINDS.has(a.kind))
+      .filter((a) => languageFilter === 'all' || a.language === languageFilter)
       .map((a) => ({
         key: `asset-${a.id}`,
         kind: 'asset' as const,
@@ -258,7 +278,7 @@ export default function RoleAudioPage() {
       }));
     return [...versionItems, ...vaultItems];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versions, project.data?.assets]);
+  }, [versions, project.data?.assets, languageFilter]);
 
   const activeKey = vaultAssetId ? `asset-${vaultAssetId}` : selected ? `version-${selected.id}` : shelfItems[0]?.key ?? null;
 
@@ -301,15 +321,50 @@ export default function RoleAudioPage() {
     return <RoleAccessDenied role="Audio" projectId={p.id} />;
   }
 
+  // The languages actually uploaded to this project's vault (catalog order
+  // first), driving the same notch the preview/audio page shows.
+  const foundLanguages = new Set<string>();
+  for (const asset of p.assets) {
+    if (AUDIO_KINDS.has(asset.kind) && asset.language) foundLanguages.add(asset.language);
+  }
+  const availableLanguages = [
+    ...DUBBING_LANGUAGES.filter((lang) => foundLanguages.has(lang)),
+    ...[...foundLanguages].filter((lang) => !(DUBBING_LANGUAGES as readonly string[]).includes(lang)),
+  ];
+
   return (
     <RoleLayout
       versions={
-        <VersionShelf
-          items={shelfItems}
-          activeKey={activeKey}
-          onSelect={onShelfSelect}
-          emptyText="Nothing here yet — save a snapshot in the Sound studio. Files you hand in for review reach the vault once the Captain approves them."
-        />
+        <>
+          {availableLanguages.length > 0 && (
+            <div className="pv-language-notch" data-testid="role-language-notch">
+              <span className="eyebrow"><AudioLines size={12} /> Language</span>
+              <select
+                value={languageFilter}
+                onChange={(event) => {
+                  setLanguageFilter(event.target.value);
+                  // A hidden item must not stay active on the canvas — clear
+                  // so the default (filtered) selection takes over.
+                  setVaultAssetId(null);
+                  setSelectedId(null);
+                }}
+                aria-label="Dubbing language"
+                data-testid="role-language-select"
+              >
+                <option value="all">All languages</option>
+                {availableLanguages.map((lang) => (
+                  <option key={lang} value={lang}>{lang}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <VersionShelf
+            items={shelfItems}
+            activeKey={activeKey}
+            onSelect={onShelfSelect}
+            emptyText="Nothing here yet — save a snapshot in the Sound studio. Files you hand in for review reach the vault once the Captain approves them."
+          />
+        </>
       }
       canvas={
         <AudioCanvas
