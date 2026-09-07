@@ -34,6 +34,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { ClerkProvider, useAuth, useClerk, useSignIn } from '@clerk/react';
+import { isEmailLinkError, EmailLinkErrorCodeStatus } from '@clerk/react/errors';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import {
   getGetAdminSessionQueryKey,
@@ -328,48 +329,112 @@ function LoginScreen() {
   );
 }
 
-// The magic-link destination: Clerk redirects the clicked email link here and
-// verifies it in this tab. Once the session goes live, this page drops the
+type VerifyStatus = 'loading' | 'verified' | 'expired' | 'failed' | 'client_mismatch' | 'other_device';
+
+const verifyCopy: Record<VerifyStatus, { title: string; body: string }> = {
+  loading: {
+    title: 'Confirming your link…',
+    body: 'This tab is confirming the sign-in link from your email.',
+  },
+  verified: {
+    title: 'You are signed in.',
+    body: 'Opening the control room…',
+  },
+  other_device: {
+    title: 'You are signed in.',
+    body: 'The control room is opening in the tab where you requested the link — you can close this one.',
+  },
+  expired: {
+    title: 'This link has expired',
+    body: 'Go back to the admin page and request a new link.',
+  },
+  failed: {
+    title: 'The link did not work',
+    body: 'Request a new link from the admin page and try again.',
+  },
+  client_mismatch: {
+    title: 'Open the link on the same device',
+    body: 'For security, the link must be opened in the same browser where you requested it.',
+  },
+};
+
+// The magic-link destination: Clerk redirects the clicked email link here.
+// Clerk does not process the link on its own — this page drives the
+// verification with handleEmailLinkVerification(), which activates the session
+// when it exists on this client. Once the session is active, the page drops the
 // user straight into the control room.
 function VerifyEmailLink() {
-  const { isLoaded, isSignedIn } = useAuth();
-  const { signIn } = useSignIn();
+  const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
+  const { loaded, handleEmailLinkVerification } = useClerk();
   const [, setLocation] = useLocation();
-  const verification = signIn.emailLink.verification;
+  const [status, setStatus] = useState<VerifyStatus>('loading');
 
-  // Clerk finalizes the sign-in here and then clears the in-progress sign-in,
-  // so the verification object above is gone right after success — auth state
-  // is the source of truth for when to move on.
+  // Safety net: the instant the session is active here, open the control room.
+  // handleEmailLinkVerification() activates it via setActive; this effect also
+  // covers the case where the requesting tab finished the sign-in on its own.
   useEffect(() => {
-    if (isLoaded && isSignedIn) {
+    if (clerkLoaded && isSignedIn) {
       setLocation('/', { replace: true });
     }
-  }, [isLoaded, isSignedIn, setLocation]);
+  }, [clerkLoaded, isSignedIn, setLocation]);
 
-  let title = 'Confirming your link…';
-  let body = 'This tab is confirming the sign-in link from your email.';
+  // Drive the email-link verification explicitly (Clerk's documented pattern).
+  // The redirect URL carries the link's outcome (__clerk_status /
+  // __clerk_created_session): a session already on this client gets activated,
+  // an expired or mismatched link throws, and a link verified elsewhere reports
+  // through onVerifiedOnOtherDevice. When the session lives on the requesting
+  // tab, that tab finalizes a moment after the click — retry briefly so this
+  // tab can pick the session up itself instead of leaving the user hanging.
+  useEffect(() => {
+    if (!loaded) return;
+    let cancelled = false;
+    let retryTimer: number | undefined;
 
-  if (verification) {
-    const status = verification.status;
-    if (status === 'verified') {
-      title = 'You are signed in.';
-      body = 'Opening the control room…';
-    } else if (status === 'expired') {
-      title = 'This link has expired';
-      body = 'Go back to the admin page and request a new link.';
-    } else if (status === 'client_mismatch') {
-      title = 'Open the link on the same device';
-      body = 'For security, the link must be opened in the same browser where you requested it.';
-    } else if (status === 'failed') {
-      title = 'The link did not work';
-      body = 'Request a new link from the admin page and try again.';
-    }
-  }
+    const verify = (retriesLeft: number) => {
+      if (cancelled) return;
+      handleEmailLinkVerification({
+        onVerifiedOnOtherDevice: () => {
+          if (cancelled) return;
+          if (retriesLeft > 0) {
+            retryTimer = window.setTimeout(() => verify(retriesLeft - 1), 1200);
+          } else {
+            setStatus('other_device');
+          }
+        },
+      })
+        .then(() => {
+          if (!cancelled) setStatus('verified');
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          let next: VerifyStatus = 'failed';
+          const emailLinkError = error as Error;
+          if (isEmailLinkError(emailLinkError)) {
+            if (emailLinkError.code === EmailLinkErrorCodeStatus.Expired) next = 'expired';
+            else if (emailLinkError.code === EmailLinkErrorCodeStatus.ClientMismatch) next = 'client_mismatch';
+          }
+          setStatus(next);
+        });
+    };
+
+    verify(5);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
+  }, [loaded, handleEmailLinkVerification]);
+
+  const isError = status === 'expired' || status === 'failed' || status === 'client_mismatch';
+  const isDone = status === 'verified' || status === 'other_device';
+  const { title, body } = verifyCopy[status];
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-background px-5 py-8">
       <div className="w-full max-w-md rounded-[1.75rem] border border-border bg-card p-8 text-center shadow-xl">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary"><Mail className="h-5 w-5" /></div>
+        <div className={`mx-auto grid h-12 w-12 place-items-center rounded-xl ${isError ? 'bg-destructive/10 text-destructive' : isDone ? 'bg-primary/10 text-primary' : 'bg-secondary text-muted-foreground'}`}>
+          {isError ? <CircleAlert className="h-5 w-5" /> : isDone ? <CircleCheck className="h-5 w-5" /> : <RefreshCw className="h-5 w-5 animate-spin" />}
+        </div>
         <h1 className="mt-5 text-2xl font-semibold tracking-[-0.045em]">{title}</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">{body}</p>
         <a href={basePath || '/'} className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-primary transition-all hover:gap-3">Back to the admin page <ArrowRight className="h-4 w-4" /></a>
