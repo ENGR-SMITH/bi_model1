@@ -32,6 +32,8 @@ import type {
   AdminPromoInput,
   AdminPromoUpdate,
   AdminSession,
+  AdminSubscription,
+  AdminSubscriptionAutoRenewUpdate,
   ArenaApplication,
   ArenaApplicationInput,
   ArenaPostDetail,
@@ -1153,6 +1155,155 @@ export const useDeleteAdminPromo = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getDeleteAdminPromoMutationOptions(options));
+    }
+
+export const getListAdminSubscriptionsUrl = () => {
+
+
+
+
+  return `/api/admin/subscriptions`
+}
+
+/**
+ * @summary List every subscription across all users
+ */
+export const listAdminSubscriptions = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminSubscription[]> => {
+
+  return customFetch<AdminSubscription[]>(getListAdminSubscriptionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAdminSubscriptionsQueryKey = () => {
+    return [
+    `/api/admin/subscriptions`
+    ] as const;
+    }
+
+
+export const getListAdminSubscriptionsQueryOptions = <TData = Awaited<ReturnType<typeof listAdminSubscriptions>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminSubscriptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAdminSubscriptionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminSubscriptions>>> = ({ signal }) => listAdminSubscriptions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAdminSubscriptions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAdminSubscriptionsQueryResult = NonNullable<Awaited<ReturnType<typeof listAdminSubscriptions>>>
+export type ListAdminSubscriptionsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List every subscription across all users
+ */
+
+export function useListAdminSubscriptions<TData = Awaited<ReturnType<typeof listAdminSubscriptions>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminSubscriptions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAdminSubscriptionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAdminSubscriptionAutoRenewUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/subscriptions/${id}/auto-renew`
+}
+
+/**
+ * @summary Turn server-managed auto-renewal on or off for one subscription
+ */
+export const updateAdminSubscriptionAutoRenew = async (id: string,
+    adminSubscriptionAutoRenewUpdate: AdminSubscriptionAutoRenewUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AdminSubscription> => {
+
+  return customFetch<AdminSubscription>(getUpdateAdminSubscriptionAutoRenewUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminSubscriptionAutoRenewUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminSubscriptionAutoRenewMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminSubscriptionAutoRenew>>, TError,{id: string;data: BodyType<AdminSubscriptionAutoRenewUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminSubscriptionAutoRenew>>, TError,{id: string;data: BodyType<AdminSubscriptionAutoRenewUpdate>}, TContext> => {
+
+const mutationKey = ['updateAdminSubscriptionAutoRenew'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminSubscriptionAutoRenew>>, {id: string;data: BodyType<AdminSubscriptionAutoRenewUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAdminSubscriptionAutoRenew(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminSubscriptionAutoRenewMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminSubscriptionAutoRenew>>>
+    export type UpdateAdminSubscriptionAutoRenewMutationBody = BodyType<AdminSubscriptionAutoRenewUpdate>
+    export type UpdateAdminSubscriptionAutoRenewMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Turn server-managed auto-renewal on or off for one subscription
+ */
+export const useUpdateAdminSubscriptionAutoRenew = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminSubscriptionAutoRenew>>, TError,{id: string;data: BodyType<AdminSubscriptionAutoRenewUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminSubscriptionAutoRenew>>,
+        TError,
+        {id: string;data: BodyType<AdminSubscriptionAutoRenewUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminSubscriptionAutoRenewMutationOptions(options));
     }
 
 export const getListAdminPlanSettingsUrl = () => {

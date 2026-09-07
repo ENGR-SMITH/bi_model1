@@ -318,6 +318,60 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/subscriptions:
+    get:
+      operationId: listAdminSubscriptions
+      tags: [admin]
+      summary: List every subscription across all users
+      responses:
+        "200":
+          description: All subscriptions, newest first, with the user's email
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/AdminSubscription" }
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /admin/subscriptions/{id}/auto-renew:
+    patch:
+      operationId: updateAdminSubscriptionAutoRenew
+      tags: [admin]
+      summary: Turn server-managed auto-renewal on or off for one subscription
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AdminSubscriptionAutoRenewUpdate" }
+      responses:
+        "200":
+          description: Updated subscription
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminSubscription" }
+        "400":
+          description: Not a pass or no card on file for renewal
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Admin session required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Subscription not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
   /admin/plan-settings:
     get:
       operationId: listAdminPlanSettings
@@ -5446,6 +5500,34 @@ components:
       properties:
         autoRenewAvailable: { type: boolean }
       required: [autoRenewAvailable]
+    AdminSubscription:
+      type: object
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        # Resolved from Clerk when available; null when the account cannot be
+        # looked up (then the UI falls back to the user id).
+        userEmail: { type: ["string", "null"] }
+        kind: { type: string }
+        planId: { type: string }
+        planLabel: { type: string }
+        priceUsd: { type: integer }
+        status: { type: string }
+        intervalLabel: { type: string }
+        periodStart: { type: string, format: date-time }
+        periodEnd: { type: string, format: date-time }
+        source: { type: string }
+        promoCode: { type: ["string", "null"] }
+        cardLast4: { type: ["string", "null"] }
+        autoRenew: { type: boolean }
+        renewalFailure: { type: ["string", "null"] }
+        active: { type: boolean }
+      required: [id, userId, userEmail, kind, planId, planLabel, priceUsd, status, intervalLabel, periodStart, periodEnd, source, promoCode, cardLast4, autoRenew, renewalFailure, active]
+    AdminSubscriptionAutoRenewUpdate:
+      type: object
+      properties:
+        enabled: { type: boolean }
+      required: [enabled]
     OracleMessage:
       type: object
       properties:

@@ -7,10 +7,25 @@ const state = vi.hoisted(() => ({
   userId: null as string | null,
   db: null as any,
   tables: null as any,
+  emails: {} as Record<string, string>,
 }));
 
 vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: state.userId }),
+  clerkClient: {
+    users: {
+      getUserList: async (params: { userId?: string[] }) => {
+        const ids = params.userId ?? Object.keys(state.emails);
+        return {
+          data: ids.map((id) => ({
+            id,
+            primaryEmailAddress: state.emails[id] ? { emailAddress: state.emails[id] } : null,
+            emailAddresses: state.emails[id] ? [{ emailAddress: state.emails[id] }] : [],
+          })),
+        };
+      },
+    },
+  },
 }));
 
 vi.mock("@workspace/db", async () => {
@@ -41,11 +56,13 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
+  await state.db.delete(t.tandemSubscriptionsTable);
   await state.db.delete(t.tandemPromoCodesTable);
   await state.db.delete(t.tandemPromoRedemptionsTable);
   await state.db.delete(t.tandemSubscriptionPlanSettingsTable);
   await state.db.delete(t.oracleHealthEventsTable);
   await state.db.delete(t.oracleProvidersTable);
+  state.emails = {};
 }
 
 beforeEach(async () => {
@@ -278,5 +295,135 @@ describe("admin plan settings", () => {
 
     expect((await request(API).get("/api/admin/plan-settings")).status).toBe(401);
     expect((await request(API).patch("/api/admin/plan-settings/pass/authors").send({ autoRenewAvailable: true })).status).toBe(401);
+  });
+});
+
+describe("admin subscriptions", () => {
+  async function login(): Promise<string> {
+    const loginRes = await request(API).post("/api/admin/login").send({ accessCode: "TANDEM_123" });
+    const cookie = loginRes.headers["set-cookie"]?.[0]?.split(";")[0];
+    expect(cookie).toBeTruthy();
+    return cookie as string;
+  }
+
+  async function seedSubscription(overrides: Record<string, unknown> = {}) {
+    const now = Date.now();
+    await state.db.insert(state.tables.tandemSubscriptionsTable).values({
+      id: "sub-" + Math.random().toString(36).slice(2, 10),
+      userId: "user-1",
+      kind: "pass",
+      planId: "authors",
+      planLabel: "Author & Writer pass",
+      priceUsd: 188,
+      status: "ACTIVE",
+      intervalLabel: "4 weeks",
+      periodStart: new Date(now),
+      periodEnd: new Date(now + 4 * 7 * 24 * 60 * 60 * 1000),
+      ...overrides,
+    });
+  }
+
+  it("lists every subscription with the buyer's email, newest first", async () => {
+    const cookie = await login();
+    state.emails["user-1"] = "buyer@example.com";
+
+    await seedSubscription({
+      id: "sub-old",
+      kind: "storage",
+      planId: "g200",
+      planLabel: "200 GB more space",
+      priceUsd: 2000,
+      intervalLabel: "recurring",
+      createdAt: new Date(1000),
+    });
+    await seedSubscription({
+      id: "sub-new",
+      autoRenew: true,
+      paystackAuthorizationCode: "auth_123",
+      cardLast4: "4081",
+      createdAt: new Date(2000),
+    });
+
+    const res = await request(API).get("/api/admin/subscriptions").set("Cookie", cookie);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0].id).toBe("sub-new");
+    expect(res.body[0]).toMatchObject({
+      userEmail: "buyer@example.com",
+      userId: "user-1",
+      kind: "pass",
+      planId: "authors",
+      autoRenew: true,
+      cardLast4: "4081",
+      active: true,
+    });
+    expect(res.body[1].autoRenew).toBe(false);
+  });
+
+  it("falls back to a null email when Clerk cannot resolve the user", async () => {
+    const cookie = await login();
+    await seedSubscription({ id: "sub-ghost", userId: "no-such-clerk-user" });
+
+    const res = await request(API).get("/api/admin/subscriptions").set("Cookie", cookie);
+    expect(res.status).toBe(200);
+    expect(res.body[0].userEmail).toBeNull();
+  });
+
+  it("toggles auto-renew on and off for one pass", async () => {
+    const cookie = await login();
+    await seedSubscription({ id: "sub-1", paystackAuthorizationCode: "auth_123" });
+
+    const on = await request(API)
+      .patch("/api/admin/subscriptions/sub-1/auto-renew")
+      .set("Cookie", cookie)
+      .send({ enabled: true });
+    expect(on.status).toBe(200);
+    expect(on.body.autoRenew).toBe(true);
+
+    const off = await request(API)
+      .patch("/api/admin/subscriptions/sub-1/auto-renew")
+      .set("Cookie", cookie)
+      .send({ enabled: false });
+    expect(off.status).toBe(200);
+    expect(off.body.autoRenew).toBe(false);
+  });
+
+  it("refuses to enable auto-renew without a card on file", async () => {
+    const cookie = await login();
+    await seedSubscription({ id: "sub-nocard" });
+
+    const res = await request(API)
+      .patch("/api/admin/subscriptions/sub-nocard/auto-renew")
+      .set("Cookie", cookie)
+      .send({ enabled: true });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/card is on file/i);
+  });
+
+  it("rejects non-pass subscriptions, unknown ids, and unauthenticated callers", async () => {
+    const cookie = await login();
+    await seedSubscription({
+      id: "sub-storage",
+      kind: "storage",
+      planId: "g200",
+      planLabel: "200 GB more space",
+      priceUsd: 2000,
+      intervalLabel: "recurring",
+    });
+
+    const nonPass = await request(API)
+      .patch("/api/admin/subscriptions/sub-storage/auto-renew")
+      .set("Cookie", cookie)
+      .send({ enabled: true });
+    expect(nonPass.status).toBe(400);
+
+    const notFound = await request(API)
+      .patch("/api/admin/subscriptions/sub-nope/auto-renew")
+      .set("Cookie", cookie)
+      .send({ enabled: true });
+    expect(notFound.status).toBe(404);
+
+    expect((await request(API).get("/api/admin/subscriptions")).status).toBe(401);
+    expect((await request(API).patch("/api/admin/subscriptions/sub-1/auto-renew").send({ enabled: true })).status).toBe(401);
   });
 });
