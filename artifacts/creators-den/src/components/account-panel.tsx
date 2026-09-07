@@ -36,9 +36,12 @@ export function StorageBar() {
   const total = quota.data?.storageBytes.totalBytes ?? 0;
   const remaining = quota.data?.storageBytes.remainingBytes ?? 0;
   const percent = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+  // When the workspace is nearly out of room, the panel turns a warning tone
+  // and the "Buy more space" CTA pulses so the need reads at a glance.
+  const nearFull = used > 0 && percent >= 85;
 
   return (
-    <div className="paper-card storage-panel" data-testid="panel-storage-bar">
+    <div className={`paper-card storage-panel${nearFull ? ' storage-near-full' : ''}`} data-testid="panel-storage-bar">
       <div className="inline-heading account-panel-head">
         <span className="account-panel-head-title">
           <span className="account-panel-icon"><HardDrive size={15} /></span>

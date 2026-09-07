@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'wouter';
 import { useUser } from '@clerk/react';
-import { ArrowLeft, Check, Copy, Eye, Film, LockKeyhole, UserRound } from 'lucide-react';
+import { Activity, ArrowLeft, Check, ChevronRight, Copy, Eye, Film, LockKeyhole, UserRound } from 'lucide-react';
 import { tandemUid } from '@/lib/tandem-uid';
 import {
   getGetUserProfileQueryKey,
@@ -42,6 +42,12 @@ function levelOf(count: number): number {
   return 4;
 }
 
+/** "Sep 3"-style label for a YYYY-MM-DD contribution day. */
+function prettyDate(date: string): string {
+  const [, month, day] = date.split('-').map(Number);
+  return `${MONTHS[month - 1] ?? ''} ${day}`.trim();
+}
+
 function ContributionsGraph({ days, total }: { days: VideoContributionDay[]; total: number }) {
   // Column-major: chunk the contiguous day stream into 7-cell week columns.
   const weeks = useMemo(() => {
@@ -49,6 +55,22 @@ function ContributionsGraph({ days, total }: { days: VideoContributionDay[]; tot
     for (let i = 0; i < days.length; i += 7) cols.push(days.slice(i, i + 7));
     return cols;
   }, [days]);
+
+  // Summary numbers for the scoreboard strip above the heat grid.
+  const activeDays = useMemo(() => days.reduce((count, day) => count + (day.count > 0 ? 1 : 0), 0), [days]);
+  const bestStreak = useMemo(() => {
+    let best = 0;
+    let run = 0;
+    for (const day of days) {
+      run = day.count > 0 ? run + 1 : 0;
+      if (run > best) best = run;
+    }
+    return best;
+  }, [days]);
+  const bestDay = useMemo(
+    () => days.reduce<VideoContributionDay | null>((best, day) => (!best || day.count > best.count ? day : best), null),
+    [days],
+  );
 
   // Month labels along the top — shown when a week column starts a new month.
   const monthLabels = useMemo(() => {
@@ -68,13 +90,36 @@ function ContributionsGraph({ days, total }: { days: VideoContributionDay[]; tot
   }, [weeks]);
 
   return (
-    <div className="paper-card" data-testid="panel-contributions">
-      <div className="inline-heading">
-        <span className="eyebrow"><Film size={13} /> Contributions</span>
-        <span className="mono-label">{total} in the last 26 weeks</span>
+    <div className="paper-card contrib-panel" data-testid="panel-contributions">
+      <div className="inline-heading account-panel-head contrib-head">
+        <span className="account-panel-head-title">
+          <span className="account-panel-icon activity"><Activity size={15} /></span>
+          <span className="eyebrow">Contributions</span>
+        </span>
+        <span className="mono-label account-panel-summary">Last 26 weeks</span>
       </div>
+
+      <div className="contrib-score" data-testid="contrib-score">
+        <span className="contrib-score-item is-hero">
+          <b>{total}</b>
+          <span>Contributions</span>
+        </span>
+        <span className="contrib-score-item">
+          <b>{activeDays}</b>
+          <span>Active days</span>
+        </span>
+        <span className="contrib-score-item">
+          <b>{bestStreak}</b>
+          <span>Longest streak</span>
+        </span>
+        <span className="contrib-score-item">
+          <b>{bestDay?.count ?? 0}</b>
+          <span>Top day{bestDay ? ` · ${prettyDate(bestDay.date)}` : ''}</span>
+        </span>
+      </div>
+
       <div className="contrib-wrap">
-        <div className="contrib-months" style={{ gridTemplateColumns: `repeat(${weeks.length}, 11px)` }}>
+        <div className="contrib-months" style={{ gridTemplateColumns: `repeat(${weeks.length}, 12px)` }}>
           {monthLabels.map((label, index) => (
             <span key={index} className="contrib-month" style={{ gridColumn: index + 1 }}>{label ?? ''}</span>
           ))}
@@ -98,7 +143,7 @@ function ContributionsGraph({ days, total }: { days: VideoContributionDay[]; tot
           <span>More</span>
         </div>
       </div>
-      <p className="den-footnote mt-3">
+      <p className="den-footnote contrib-note">
         <Eye size={13} />
         Activity inside public projects only — private vaults stay off the record.
       </p>
@@ -110,22 +155,30 @@ function TrackRow({ project, profileUserId, linkable }: { project: VideoProject;
   const created = project.ownerId === profileUserId;
   const body = (
     <>
-      <span className="world-symbol"><Film size={13} /></span>
-      <span className="min-w-0">
+      <span className="ptr-icon" aria-hidden><Film size={16} /></span>
+      <span className="ptr-main">
         <b className="truncate">{project.name}</b>
-        <small>
-          {new Date(project.createdAt).toLocaleDateString()}
-          {project.description ? ` · ${project.description}` : ''}
-        </small>
+        <span className="ptr-meta">
+          <span>{new Date(project.createdAt).toLocaleDateString()}</span>
+          {project.description ? (
+            <>
+              <i className="ptr-dot" aria-hidden />
+              <span className="ptr-desc truncate">{project.description}</span>
+            </>
+          ) : null}
+        </span>
       </span>
-      <span className={`den-tag ${created ? 'danger' : 'accent'}`} title={created ? 'They created this project' : 'They participated in this project'}>
-        {created ? 'Created · Captain' : 'Participated'}
+      <span className="ptr-chips">
+        <span className={`den-tag ${created ? 'danger' : 'accent'}`} title={created ? 'They created this project' : 'They participated in this project'}>
+          {created ? 'Created · Captain' : 'Participated'}
+        </span>
+        <span className="den-tag muted">{project.status.replaceAll('_', ' ')}</span>
       </span>
-      <span className="den-tag muted">{project.status.replaceAll('_', ' ')}</span>
+      {linkable ? <ChevronRight size={16} className="ptr-arrow" aria-hidden /> : null}
     </>
   );
 
-  const className = `list-row ${linkable ? '' : 'is-static'}`;
+  const className = `profile-track-row ${linkable ? '' : 'is-static'}`;
   const testId = `track-project-${project.id}`;
 
   return linkable ? (
@@ -318,8 +371,8 @@ export default function ProfilePage() {
         {projects.isLoading ? (
           <div className="panel-empty">Opening the track record…</div>
         ) : track.length > 0 ? (
-          <div className="paper-card">
-            <div className="den-stack">
+          <div className="paper-card profile-track-card">
+            <div className="profile-track-list">
               {track.map((project) => (
                 <TrackRow
                   key={project.id}

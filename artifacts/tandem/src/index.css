@@ -314,9 +314,10 @@
   opacity: 1;
 }
 
-/* Live download animation — the download arrow drops into its tray while a
-   progress bar fills beneath it and snaps back, looping so the button always
-   reads as "click to download", never as a static icon. */
+/* Live download animation — matches the Creator Den vault billboard's agent
+   link: the arrow bobs gently while a thin progress bar sweeps in beneath it,
+   looping so the button always reads as "click to download", never as a
+   static icon. */
 .agent-dl-icon {
   position: relative;
   display: inline-flex;
@@ -326,37 +327,27 @@
   height: 20px;
 }
 .agent-dl-icon > svg {
-  animation: agentDlBob 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
-.agent-dl-icon > svg * {
-  animation: agentDlArrowInk 1.3s ease-in-out infinite;
+  animation: agentDlBob 1.4s ease-in-out infinite;
 }
 .agent-dl-icon > i {
   position: absolute;
-  left: 1px;
-  right: 1px;
-  bottom: 0;
-  height: 3px;
-  border-radius: 3px;
+  left: 2px;
+  right: 2px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
   background: currentColor;
-  opacity: 0.95;
+  opacity: 0.9;
   transform-origin: left center;
-  animation: agentDlFill 1.3s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation: agentDlFill 1.4s ease-in-out infinite;
 }
 @keyframes agentDlBob {
   0%, 100% { transform: translateY(0); }
-  30% { transform: translateY(3px); }
-  55% { transform: translateY(0); }
-}
-@keyframes agentDlArrowInk {
-  0%, 100% { opacity: 1; }
-  35% { opacity: 0.55; }
-  55% { opacity: 1; }
+  50% { transform: translateY(2px); }
 }
 @keyframes agentDlFill {
-  0% { transform: scaleX(0.08); opacity: 0.35; }
-  45% { transform: scaleX(0.9); opacity: 1; }
-  70%, 100% { transform: scaleX(1); opacity: 1; }
+  0% { transform: scaleX(0.1); opacity: 0.4; }
+  50%, 100% { transform: scaleX(1); opacity: 0.9; }
 }
 
 @keyframes reveal {
