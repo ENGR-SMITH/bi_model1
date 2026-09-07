@@ -655,28 +655,37 @@ export default function FinishPreviewPage() {
                       className={audioSelection.has(entry.language) ? 'is-checked' : ''}
                       data-testid={`finish-audio-language-${entry.language.toLowerCase()}`}
                     >
-                      <label className="finish-tick-row">
-                        <input
-                          type="checkbox"
-                          checked={audioSelection.has(entry.language)}
-                          onChange={() => toggleAudioLanguage(entry.language)}
-                          aria-label={`Select ${entry.language} for download`}
-                          data-testid={`finish-audio-tick-${entry.language.toLowerCase()}`}
-                        />
-                        <span className="den-tag teal">{entry.language}</span>
-                      </label>
-                      <span className="finish-zip-file" title={entry.latest.fileName}>{entry.latest.fileName}</span>
-                      <span className="mono-label finish-lang-meta">{formatBytes(entry.latest.sizeBytes)} · {timeAgo(entry.latest.createdAt)}</span>
-                      <button
-                        type="button"
-                        className="link-btn"
-                        onClick={() => downloadAsset(entry.latest.id, entry.latest.fileName)}
-                        disabled={busyId === `asset-${entry.latest.id}` || entry.latest.status !== 'PROCESSED'}
-                        data-testid={`finish-download-audio-${entry.language.toLowerCase()}`}
-                      >
-                        <Download size={11} />
-                        {busyId === `asset-${entry.latest.id}` ? 'Downloading…' : 'Download'}
-                      </button>
+                      {/* Line one: the language tick (checkbox + chip) with the
+                          single-file Download on the right. */}
+                      <div className="finish-lang-row-top">
+                        <label className="finish-tick-row">
+                          <input
+                            type="checkbox"
+                            checked={audioSelection.has(entry.language)}
+                            onChange={() => toggleAudioLanguage(entry.language)}
+                            aria-label={`Select ${entry.language} for download`}
+                            data-testid={`finish-audio-tick-${entry.language.toLowerCase()}`}
+                          />
+                          <span className="den-tag teal">{entry.language}</span>
+                        </label>
+                        <button
+                          type="button"
+                          className="link-btn finish-lang-dl"
+                          onClick={() => downloadAsset(entry.latest.id, entry.latest.fileName)}
+                          disabled={busyId === `asset-${entry.latest.id}` || entry.latest.status !== 'PROCESSED'}
+                          data-testid={`finish-download-audio-${entry.language.toLowerCase()}`}
+                        >
+                          <Download size={11} />
+                          {busyId === `asset-${entry.latest.id}` ? 'Downloading…' : 'Download'}
+                        </button>
+                      </div>
+                      {/* Line two: the file (truncated) with its size · time on
+                          the right — kept to its own line so the tight card
+                          width never lets the text crowd the controls above. */}
+                      <div className="finish-lang-file" title={entry.latest.fileName}>
+                        <span className="finish-zip-file">{entry.latest.fileName}</span>
+                        <span className="mono-label finish-lang-meta">{formatBytes(entry.latest.sizeBytes)} · {timeAgo(entry.latest.createdAt)}</span>
+                      </div>
                     </li>
                   ))}
                 </ul>
