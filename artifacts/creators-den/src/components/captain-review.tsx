@@ -28,7 +28,9 @@ import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } 
 import { useUser } from '@clerk/react';
 import { ArrowLeft, Send } from 'lucide-react';
 import {
+  getGetVideoAssetQueryKey,
   getGetVideoTimelineVersionQueryKey,
+  useGetVideoAsset,
   useGetVideoProject,
   useGetVideoTimelineVersion,
   useListVideoComments,
@@ -190,12 +192,18 @@ export function CaptainReviewSurface({
   const isAssetSubmission = submission.timelineVersionId.startsWith('ASSET:');
   const pendingAssetId = isAssetSubmission ? submission.timelineVersionId.slice('ASSET:'.length) : '';
   const fileParts = isAssetSubmission ? fileSubmissionParts(submission) : null;
-  // The dubbing language of a submitted file — read off the staged asset so
-  // the Captain knows what language the hand-in is in at a glance.
-  const submittedLanguage =
-    isAssetSubmission && project.data
-      ? (project.data.assets ?? []).find((a) => a.id === pendingAssetId)?.language ?? null
-      : null;
+  // The staged asset is held as PENDING_REVIEW, so it is deliberately NOT in
+  // the project's asset list (that only surfaces vault files) — fetch it by
+  // id instead (the same detail query the review canvas streams it from), and
+  // read its dubbing language so the Captain knows what language the hand-in
+  // is in at a glance.
+  const pendingDetail = useGetVideoAsset(projectId, pendingAssetId, {
+    query: {
+      queryKey: getGetVideoAssetQueryKey(projectId, pendingAssetId),
+      enabled: isAssetSubmission && Boolean(pendingAssetId),
+    },
+  });
+  const submittedLanguage = pendingDetail.data?.language ?? null;
 
   // The submitted version + the leg's head version (diff baseline).
   const version = useGetVideoTimelineVersion(projectId, leg, submission.timelineVersionId, {
