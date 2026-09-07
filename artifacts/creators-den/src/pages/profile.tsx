@@ -218,58 +218,79 @@ export default function ProfilePage() {
 
   return (
     <div className="page">
-      <div className="cd-billboard mb-6" data-testid="profile-billboard">
+      <div className="cd-billboard profile-billboard mb-6" data-testid="profile-billboard">
         <div className="cd-billboard-scrim" />
-        <div className="cd-billboard-body">
-          <SectionEyebrow>Creator profile · track history</SectionEyebrow>
-          <div className="profile-hero">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="profile-avatar" data-testid="profile-avatar" />
-            ) : (
-              <span className="profile-avatar" aria-hidden data-testid="profile-avatar">
-                <UserRound size={22} />
-              </span>
-            )}
-            <div className="min-w-0">
-              <h1>{displayName}</h1>
-              <p className="profile-sub">
-                {email || `@${profileUserId.slice(0, 12)}`}
-                <span className="mono-label ml-2">{track.length} public project{track.length === 1 ? '' : 's'}</span>
-                <span className="mono-label ml-2">{followerCount} follower{followerCount === 1 ? '' : 's'} · {followingCount} following</span>
-              </p>
-              {/* The unique Tandem ID — invite someone with it, no email needed. */}
-              <div className="profile-uid" data-testid="profile-uid">
-                <span className="mono-label">{viewingSelf ? 'Your unique Tandem ID' : 'Tandem ID'}</span>
-                <button
-                  type="button"
-                  className="profile-uid-value"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(tandemUid(profileUserId)).then(() => {
-                      setCopiedUid(true);
-                      window.setTimeout(() => setCopiedUid(false), 1800);
-                    });
-                  }}
-                  title="Copy to clipboard"
-                  data-testid="profile-uid-copy"
-                >
-                  {tandemUid(profileUserId)}
-                  {copiedUid ? <Check size={12} className="profile-uid-copied" /> : <Copy size={12} />}
-                </button>
-                <span className="profile-uid-hint mono-label">{copiedUid ? 'Copied!' : 'share this to be invited'}</span>
+        <div className="cd-billboard-body profile-bill-body">
+          {/* Top bar: the eyebrow on the left, page actions on the right — no
+              longer buried at the bottom of the card. */}
+          <div className="profile-bill-top">
+            <SectionEyebrow>Creator profile · track history</SectionEyebrow>
+            <div className="cd-billboard-actions profile-bill-actions">
+              <Link href="/" className="cd-actionbtn" data-testid="link-profile-home">
+                <ArrowLeft size={14} /> Home
+              </Link>
+              {!viewingSelf && <FollowButton userId={profileUserId} isFollowing={social.data?.isFollowing ?? null} size="md" />}
+            </div>
+          </div>
+
+          {/* Main spread: identity on the left, live stat tiles on the right,
+              so the card's content is balanced instead of hugging one side. */}
+          <div className="profile-bill-main">
+            <div className="profile-hero">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="profile-avatar" data-testid="profile-avatar" />
+              ) : (
+                <span className="profile-avatar" aria-hidden data-testid="profile-avatar">
+                  <UserRound size={24} />
+                </span>
+              )}
+              <div className="profile-hero-id">
+                <h1>{displayName}</h1>
+                <p className="profile-sub">{email || `@${profileUserId.slice(0, 12)}`}</p>
+                {/* The unique Tandem ID — invite someone with it, no email needed. */}
+                <div className="profile-uid" data-testid="profile-uid">
+                  <span className="mono-label">{viewingSelf ? 'Your unique Tandem ID' : 'Tandem ID'}</span>
+                  <button
+                    type="button"
+                    className="profile-uid-value"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(tandemUid(profileUserId)).then(() => {
+                        setCopiedUid(true);
+                        window.setTimeout(() => setCopiedUid(false), 1800);
+                      });
+                    }}
+                    title="Copy to clipboard"
+                    data-testid="profile-uid-copy"
+                  >
+                    {tandemUid(profileUserId)}
+                    {copiedUid ? <Check size={12} className="profile-uid-copied" /> : <Copy size={12} />}
+                  </button>
+                  <span className="profile-uid-hint mono-label">{copiedUid ? 'Copied!' : 'share this to be invited'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="profile-stat-grid" data-testid="profile-stat-grid">
+              <div className="profile-stat" data-testid="profile-stat-projects">
+                <b>{track.length}</b>
+                <span><Film size={11} /> Public projects</span>
+              </div>
+              <div className="profile-stat" data-testid="profile-stat-followers">
+                <b>{followerCount}</b>
+                <span><UserRound size={11} /> Followers</span>
+              </div>
+              <div className="profile-stat" data-testid="profile-stat-following">
+                <b>{followingCount}</b>
+                <span><UserRound size={11} /> Following</span>
               </div>
             </div>
           </div>
-          <div className="cd-billboard-actions">
-            <Link href="/" className="cd-actionbtn" data-testid="link-profile-home">
-              <ArrowLeft size={14} /> Home
-            </Link>
-            {!viewingSelf && <FollowButton userId={profileUserId} isFollowing={social.data?.isFollowing ?? null} size="md" />}
-            {viewingSelf && (
-              <span className="den-tag muted" title="Open a project on the home page and flip its eye to change what appears here">
-                <Eye size={12} /> Visibility is set per project — Captain only
-              </span>
-            )}
-          </div>
+
+          {viewingSelf && (
+            <p className="profile-visibility-note" title="Open a project on the home page and flip its eye to change what appears here">
+              <Eye size={12} /> Visibility is set per project — Captain only
+            </p>
+          )}
         </div>
       </div>
 

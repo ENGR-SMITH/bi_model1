@@ -222,6 +222,23 @@ export default function SubscriptionsPage() {
   const data = plansQuery.data;
   const [paying, setPaying] = useState<SubscriptionPlan | null>(null);
   const [overlay, setOverlay] = useState<ResultOverlay | null>(null);
+  // Deep link from a den's "buy more" (e.g. the Creator Den workspace storage
+  // card): ?focus=<kind> scrolls the plans page to that product's row and
+  // briefly rings it so the exact plan you came for is unmistakable.
+  const [focusedKind, setFocusedKind] = useState<string | null>(null);
+  const plansLoaded = Boolean(plansQuery.data?.plans?.length);
+  useEffect(() => {
+    if (!plansLoaded) return;
+    const focus = new URLSearchParams(window.location.search).get('focus');
+    if (!focus || !['pass', 'storage', 'projects'].includes(focus)) return;
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`plans-${focus}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setFocusedKind(focus);
+      window.setTimeout(() => setFocusedKind(null), 3200);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [plansLoaded]);
 
   const refreshPlans = () => {
     void queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
@@ -389,7 +406,11 @@ export default function SubscriptionsPage() {
           const meta = KIND_META[kind] ?? { icon: PiTicketDuotone, label: 'Plans' };
           const Icon = meta.icon;
           return (
-            <section key={kind} className="reveal mt-12">
+            <section
+              key={kind ?? `kind-${index}`}
+              id={kind ? `plans-${kind}` : undefined}
+              className={`reveal mt-12 ${focusedKind === kind ? 'plan-focus-ring' : ''}`}
+            >
               <div className="flex items-center gap-4">
                 <span className="icon-chip h-11 w-11 text-[#3b82f6]"><Icon className="h-5 w-5" /></span>
                 <div>
