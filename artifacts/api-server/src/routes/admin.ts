@@ -31,10 +31,35 @@ const COOKIE_NAME = "oracle_admin_session";
 
 // The default admin access code keeps the admin page usable out of the box;
 // set ADMIN_ACCESS_CODE in .env to change it.
-const adminAccessCode = (): string => process.env.ADMIN_ACCESS_CODE ?? "TANDEM_123";
+const DEFAULT_ADMIN_ACCESS_CODE = "TANDEM_123";
+// Dev-only fallback that signs the admin session cookie and (via lib/secrets)
+// encrypts stored provider API keys.
+const DEFAULT_SESSION_SECRET = "manuskript-development-key";
+
+// Fail closed in production: the Oracle Admin panel manages provider
+// credentials, subscriptions, and promo codes, so a missing or default
+// ADMIN_ACCESS_CODE / SESSION_SECRET must stop the server from booting
+// rather than silently leaving the panel wide open. Dev and tests keep the
+// defaults so the admin page works out of the box.
+if (process.env.NODE_ENV === "production") {
+  if (!process.env.ADMIN_ACCESS_CODE || process.env.ADMIN_ACCESS_CODE === DEFAULT_ADMIN_ACCESS_CODE) {
+    throw new Error(
+      "ADMIN_ACCESS_CODE must be set to a strong, non-default value in production " +
+        "— the Oracle Admin panel would otherwise be open to anyone who knows the default.",
+    );
+  }
+  if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET === DEFAULT_SESSION_SECRET) {
+    throw new Error(
+      "SESSION_SECRET must be set to a strong, non-default value in production " +
+        "— it signs the admin session cookie and encrypts stored provider API keys.",
+    );
+  }
+}
+
+const adminAccessCode = (): string => process.env.ADMIN_ACCESS_CODE ?? DEFAULT_ADMIN_ACCESS_CODE;
 
 function sessionValue(): string {
-  return crypto.createHmac("sha256", process.env.SESSION_SECRET ?? "manuskript-development-key")
+  return crypto.createHmac("sha256", process.env.SESSION_SECRET ?? DEFAULT_SESSION_SECRET)
     .update(adminAccessCode())
     .digest("base64url");
 }

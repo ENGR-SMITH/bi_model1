@@ -16,21 +16,19 @@ step-by-step how to obtain it. Everything ends up in your `.env` file (copy
 | # | Platform | What you get | Used for | Required? |
 |---|----------|--------------|----------|-----------|
 | 1 | Clerk | Publishable + Secret keys | Sign-in / auth for all three apps | **Yes** |
-| 2 | Clerk (Billing) | Stripe connection + plan slugs + webhook secret | Subscriptions, passes, space/project purchases | For real payments |
-| 3 | Neon / Supabase (or local Postgres) | `DATABASE_URL` | Database | **Yes** |
-| 4 | Cloudflare R2 | Account ID + bucket + Access/Secret keys | Video proxies/exports/bundles storage | For R2 storage |
-| 5 | Groq | `GROQ_API_KEY` | Story Oracle AI (fast hosted models) | No (optional AI) |
-| 6 | OpenRouter | `OPENROUTER_API_KEY` | Story Oracle AI (multi-model) | No (optional AI) |
-| 7 | Ollama | Nothing (local) | Local AI inference | No |
-| 8 | LM Studio | Nothing (local) | Local AI inference | No |
-| 9 | Freebuff | `FREEBUFF_API_KEY` | Model gateway AI | No (optional AI) |
-| 10 | Redis (Upstash/Redis Cloud/local) | `REDIS_URL` | BullMQ video job queue | No (optional) |
-| 11 | Stripe | Account | Real card payments via Clerk Billing | For real payments |
-| 12 | GitHub | Secrets + vars | CI build of the desktop agent | For CI |
-| 13 | Paystack | Secret key (+ USD account) | Direct USD card payments for subscriptions | For real payments |
+| 2 | Neon / Supabase (or local Postgres) | `DATABASE_URL` | Database | **Yes** |
+| 3 | Cloudflare R2 | Account ID + bucket + Access/Secret keys | Video proxies/exports/bundles storage | For R2 storage |
+| 4 | Groq | `GROQ_API_KEY` | Story Oracle AI (fast hosted models) | No (optional AI) |
+| 5 | OpenRouter | `OPENROUTER_API_KEY` | Story Oracle AI (multi-model) | No (optional AI) |
+| 6 | Ollama | Nothing (local) | Local AI inference | No |
+| 7 | LM Studio | Nothing (local) | Local AI inference | No |
+| 8 | Freebuff | `FREEBUFF_API_KEY` | Model gateway AI | No (optional AI) |
+| 9 | Redis (Upstash/Redis Cloud/local) | `REDIS_URL` | BullMQ video job queue | No (optional) |
+| 10 | GitHub | Secrets + vars | CI build of the desktop agent | For CI |
+| 11 | Paystack | Secret key (+ USD account) | Direct USD card payments for subscriptions | For real payments |
 
 App-defined secrets (not from a platform — you create them):
-`ADMIN_ACCESS_CODE`, `SESSION_SECRET` — see section 14.
+`ADMIN_ACCESS_CODE`, `SESSION_SECRET` — see section 12.
 
 ---
 
@@ -80,49 +78,7 @@ VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 
 ---
 
-## 2. Clerk Billing (Subscriptions/Commerce) — payments
-
-**Platform:** https://dashboard.clerk.com → your app → **Billing**
-
-The ticket passes (TANDEM), storage space (Creator Den), and project-count
-extensions (Author Den) are subscription products. Real card charging runs
-through **Clerk Billing**, which connects to **Stripe** behind the scenes.
-
-**Step-by-step (test mode first — no Stripe account needed):**
-
-1. In your Clerk app, open **Billing → Settings** and click **Enable Billing**.
-   In development this automatically uses a shared **Stripe test account**, so
-   you can test with Stripe test cards (e.g. `4242 4242 4242 4242`) with zero
-   Stripe setup.
-2. Open **Billing → Subscription plans** → **User** tab → **Create plan**, and
-   create each product you sell:
-   - TANDEM ticket pass — `$1.88` per 3 weeks
-   - Creator Den storage — `$20`/200 GB, `$40`/500 GB, `$60`/1 TB
-   - Author Den projects — `$5`/+10, `$20`/+50, `$50`/+200
-3. (Optional) Create **Features** under the **Features** section and attach
-   them to plans (e.g. `storage_200gb`, `projects_50`).
-4. Note the **exact plan slugs** you created (Clerk names them, e.g.
-   `plan_xxx` or your chosen slugs) — the app's buy buttons need to reference
-   them.
-5. **Webhook** (to keep your subscription records in sync): open **Webhooks →
-   Add Endpoint**, point it at your API server's webhook URL
-   (`https://<api-host>/api/clerk/webhook`), subscribe to
-   `subscription.created`, `subscription.updated`, `subscription.ended`,
-   `invoice.paid`, `invoice.payment_failed`, `checkout.session.completed`, and
-   copy the **Signing Secret** (starts `whsec_…`).
-
-**Where they go:**
-
-```env
-CLERK_WEBHOOK_SIGNING_SECRET=whsec_...
-```
-
-**Going live:** in **Billing → Settings**, connect your own Stripe account
-(stripe.com). See section 11.
-
----
-
-## 3. Database — PostgreSQL
+## 2. Database — PostgreSQL
 
 **Platform (hosted):** https://neon.tech or https://supabase.com
 **Platform (local):** your own machine (PostgreSQL 16+)
@@ -153,7 +109,7 @@ DATABASE_URL='<your-connection-string>' pnpm --filter db run push-force
 
 ---
 
-## 4. Cloudflare R2 — video file storage
+## 3. Cloudflare R2 — video file storage
 
 **Platform:** https://dash.cloudflare.com
 
@@ -191,7 +147,7 @@ CF_R2_SECRET_KEY=<secret access key>
 
 ---
 
-## 5. Groq — Story Oracle AI (fast hosted models)
+## 4. Groq — Story Oracle AI (fast hosted models)
 
 **Platform:** https://console.groq.com
 
@@ -207,7 +163,7 @@ GROQ_API_KEY=gsk_...
 
 ---
 
-## 6. OpenRouter — Story Oracle AI (multi-model)
+## 5. OpenRouter — Story Oracle AI (multi-model)
 
 **Platform:** https://openrouter.ai
 
@@ -223,7 +179,7 @@ OPENROUTER_API_KEY=sk-or-v1-...
 
 ---
 
-## 7. Ollama — local AI (no key)
+## 6. Ollama — local AI (no key)
 
 **Platform:** https://ollama.com (download) — runs on your own machine.
 
@@ -237,7 +193,7 @@ OLLAMA_MODEL_ID=llama3.2
 
 ---
 
-## 8. LM Studio — local AI (no key)
+## 7. LM Studio — local AI (no key)
 
 **Platform:** https://lmstudio.ai (download) — runs on your own machine.
 
@@ -251,7 +207,7 @@ LMSTUDIO_MODEL_ID=local-model
 
 ---
 
-## 9. Freebuff — model gateway
+## 8. Freebuff — model gateway
 
 **Platform:** https://freebuff.com (the product you're using).
 
@@ -265,7 +221,7 @@ FREEBUFF_MODEL_ID=deepseek-v4-flash
 
 ---
 
-## 10. Redis — video job queue (optional)
+## 9. Redis — video job queue (optional)
 
 **Platform:** https://upstash.com or https://redis.io (local)
 
@@ -285,23 +241,7 @@ REDIS_URL=redis://localhost:6379
 
 ---
 
-## 11. Stripe — real payments (only when going live)
-
-**Platform:** https://stripe.com
-
-Clerk Billing connects to Stripe to charge cards. In test mode Clerk provides a
-shared test Stripe account, so **no Stripe account is needed to develop**. When
-you're ready to accept real money:
-
-1. Go to https://stripe.com and create an account.
-2. In Clerk: **Billing → Settings** → connect your Stripe account (follow the
-   OAuth connect flow Clerk shows).
-3. Clerk then creates the products/prices in your Stripe account automatically
-   from the plans you defined — you don't build products in Stripe yourself.
-
----
-
-## 12. GitHub — CI secrets & vars (for the desktop-agent installer)
+## 10. GitHub — CI secrets & vars (for the desktop-agent installer)
 
 **Platform:** https://github.com
 
@@ -312,9 +252,9 @@ Actions → New repository secret):
 
 | Name | Value |
 |------|-------|
-| `CF_ACCOUNT_ID` | Your Cloudflare account ID (section 4) |
-| `CF_R2_ACCESS_KEY` | Your R2 Access Key ID (section 4) |
-| `CF_R2_SECRET_KEY` | Your R2 Secret Access Key (section 4) |
+| `CF_ACCOUNT_ID` | Your Cloudflare account ID (section 3) |
+| `CF_R2_ACCESS_KEY` | Your R2 Access Key ID (section 3) |
+| `CF_R2_SECRET_KEY` | Your R2 Secret Access Key (section 3) |
 
 And optionally a **repository variable** (Settings → Secrets and variables →
 Actions → Variables → New repository variable):
@@ -325,7 +265,7 @@ Actions → Variables → New repository variable):
 
 ---
 
-## 13. Paystack — real payments (USD), direct gateway
+## 11. Paystack — real payments (USD), direct gateway
 
 **Platform:** https://dashboard.paystack.com → **Settings → API Keys & Webhooks**
 
@@ -369,7 +309,7 @@ PAYSTACK_PUBLIC_KEY=pk_test_...
 
 ---
 
-## 14. App-defined secrets (you create these — no platform)
+## 12. App-defined secrets (you create these — no platform)
 
 These aren't from any external service; you invent them.
 
@@ -385,7 +325,7 @@ SESSION_SECRET=<generate: openssl rand -hex 32>
 
 ---
 
-## 15. Desktop agent configuration
+## 13. Desktop agent configuration
 
 The desktop agent (`artifacts/desktop-agent`) reads its own config from
 `tandem-agent.json` next to the app, `~/.tandem-agent/config.json`, or env vars:
@@ -424,6 +364,6 @@ VITE_SOCKET_URL=https://<api-host>/
 - [ ] (Optional) R2: `CF_ACCOUNT_ID`, `CF_R2_BUCKET`, `CF_R2_ACCESS_KEY`,
       `CF_R2_SECRET_KEY`
 - [ ] (Optional) AI: `GROQ_API_KEY` / `OPENROUTER_API_KEY` (or Ollama/LM Studio)
-- [ ] (Optional) Payments: Clerk Billing enabled + Stripe connected
+- [ ] (Optional) Payments: `PAYSTACK_SECRET_KEY` set (test or live — section 11)
 - [ ] (Optional) CI: GitHub secrets `CF_ACCOUNT_ID`, `CF_R2_ACCESS_KEY`,
       `CF_R2_SECRET_KEY` (+ variable `R2_BUCKET`)

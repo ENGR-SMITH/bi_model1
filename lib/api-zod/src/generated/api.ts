@@ -1944,7 +1944,7 @@ export const GetAccountQuotaResponse = zod.object({
 
 
 /**
- * Extends the account's storage or project limit by the purchased plan. Payment is applied server-side here (the endpoint a Stripe Checkout confirmation will call once payments are wired); the profile bar reflects the new limit immediately.
+ * Extends the account's storage or project limit by the purchased plan. Real purchases are paid through Paystack (POST /paystack/checkout) and granted server-side; this dev/test endpoint applies the plan without a charge and is disabled in production.
  * @summary Apply a buy-more plan to the account
  */
 export const PurchaseAccountQuotaBody = zod.object({
@@ -2094,7 +2094,7 @@ export const ValidateTicketPromoResponse = zod.object({
 
 
 /**
- * Validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass for the category. Card details are validated in-house today (only the last-4 is kept); a Stripe Checkout session will replace this once keys are added.
+ * Dev/test simulated checkout for a category pass: validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass. Only the card's last-4 is stored and no real charge is made — production purchases run through Paystack hosted checkout, and this endpoint is disabled in production.
  * @summary Buy a category pass with a credit card
  */
 export const PurchaseTicketBody = zod.object({
@@ -2104,7 +2104,7 @@ export const PurchaseTicketBody = zod.object({
   "expiryMonth": zod.number().int(),
   "expiryYear": zod.number().int(),
   "cvc": zod.string()
-}).describe('Credit-card details for the pass checkout. Validated in-house (Luhn, expiry, cvc); only the last-4 is stored.'),
+}).describe('Credit-card details for the dev/test simulated card checkout (Luhn, expiry, cvc); only the last-4 is stored.'),
   "promoCode": zod.string().nullish()
 })
 

@@ -1685,7 +1685,7 @@ paths:
       operationId: purchaseAccountQuota
       tags: [account]
       summary: Apply a buy-more plan to the account
-      description: Extends the account's storage or project limit by the purchased plan. Payment is applied server-side here (the endpoint a Stripe Checkout confirmation will call once payments are wired); the profile bar reflects the new limit immediately.
+      description: Extends the account's storage or project limit by the purchased plan. Real purchases are paid through Paystack (POST /paystack/checkout) and granted server-side; this dev/test endpoint applies the plan without a charge and is disabled in production.
       requestBody:
         required: true
         content:
@@ -1855,7 +1855,7 @@ paths:
       operationId: purchaseTicket
       tags: [tandems]
       summary: Buy a category pass with a credit card
-      description: Validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass for the category. Card details are validated in-house today (only the last-4 is kept); a Stripe Checkout session will replace this once keys are added.
+      description: Dev/test simulated checkout for a category pass: validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass. Only the card's last-4 is stored and no real charge is made — production purchases run through Paystack hosted checkout, and this endpoint is disabled in production.
       requestBody:
         required: true
         content:
@@ -5287,7 +5287,7 @@ components:
       required: [valid, code]
     CardInput:
       type: object
-      description: Credit-card details for the pass checkout. Validated in-house (Luhn, expiry, cvc); only the last-4 is stored.
+      description: Credit-card details for the dev/test simulated card checkout (Luhn, expiry, cvc); only the last-4 is stored.
       properties:
         number: { type: string }
         expiryMonth: { type: integer }

@@ -61,16 +61,24 @@ router.get("/account/quota", async (req: Request, res: Response): Promise<void> 
   );
 });
 
-// POST /account/quota/purchase — apply a buy-more plan to the account.
-// Payment itself is not processed here yet: this is the server-side application
-// of the chosen plan (the endpoint a Stripe Checkout confirmation/webhook will
-// call once payments are wired), so the profile bar updates immediately.
+// POST /account/quota/purchase — dev/test shortcut that applies a buy-more
+// storage/projects plan with no charge. Real purchases are paid through
+// Paystack (/paystack/checkout → confirm) and granted via
+// applySubscriptionPurchase; this handler bypasses payment entirely and is
+// disabled in production.
 router.post(
   "/account/quota/purchase",
   async (req: Request, res: Response): Promise<void> => {
     const userId = getAuth(req).userId;
     if (!userId) {
       res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    // Simulated no-charge grant — only for local dev and tests. All real
+    // purchases run through Paystack, so never allow free grants in production.
+    if (process.env.NODE_ENV === "production") {
+      res.status(403).json({ error: "Payments are processed through Paystack; this simulated grant is disabled in production." });
       return;
     }
 
