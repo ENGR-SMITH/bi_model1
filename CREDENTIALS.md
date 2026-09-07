@@ -56,6 +56,14 @@ under **User & authentication → Email, phone, username → Email**, enable
 new addresses to receive links, also enable **Sign up with email** →
 **Verify at sign-up** → **Email verification link**.
 
+**Then turn OFF “Require the same device and browser”** (it is on by
+default, directly under the email verification link strategy). When it is
+on, the link can only be opened in the exact same browser profile that
+requested it — an incognito window, a different browser, or an in-app mail
+browser is rejected with “Open the link on the same device”. Turning it
+off gives the Slack/Notion-style flow: request the link anywhere, click it
+anywhere, and the browser that clicks the link gets signed in.
+
 **Where they go:**
 
 ```env
@@ -351,7 +359,9 @@ Clerk does the emailing, so **no SMTP/email provider is needed**. Two Clerk
 Dashboard settings make the link flow work:
 
 - **User & authentication → Email, phone, username → Email**: enable
-  **Sign in with email** + **Email verification link** (see section 1).
+  **Sign in with email** + **Email verification link** (see section 1), and
+  turn **OFF “Require the same device and browser”** so the link works from
+  any browser, not just the one that requested it.
 - **User & authentication → Redirect URLs**: allow the admin app's origin and
   its verify route, e.g. `http://localhost:5176` and
   `http://localhost:5176/oracle-admin/verify` in dev (the exact production
