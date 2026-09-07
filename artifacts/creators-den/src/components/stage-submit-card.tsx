@@ -268,6 +268,14 @@ export function StageSubmitCard({
   const submitError = submit.error as { response?: { data?: { error?: string } } } | null;
   const fileError = submitFile.error as Error | null;
   const submitting = submit.isPending || submitFile.isPending;
+  // A FILE hand-in is self-explanatory — the file itself is the work, so no
+  // description is required (the note is optional). A stage (snapshot) hand-in
+  // still needs a short note or resolved review notes, otherwise the Captain
+  // would receive a bare merge with no context. Kept as booleans so the
+  // helper line below can name exactly what is missing.
+  const noFilePicked = !hasSnapshot && !pendingFile;
+  const noNote = !pendingFile && !description.trim() && resolvedNotes.length === 0;
+  const missingForSubmit = noFilePicked || noNote;
 
   return (
     <div
@@ -284,13 +292,7 @@ export function StageSubmitCard({
             type="button"
             className="primary-btn stage-submit-top"
             onClick={onSubmit}
-            disabled={
-              submitting ||
-              !canSubmit ||
-              pendingFileOverCap ||
-              (!hasSnapshot && !pendingFile) ||
-              (!description.trim() && resolvedNotes.length === 0)
-            }
+            disabled={submitting || !canSubmit || pendingFileOverCap || missingForSubmit}
             data-testid="stage-submit-button"
           >
             {submitting ? <Clock3 size={13} className="spin" /> : <Send size={13} />}
@@ -339,7 +341,11 @@ export function StageSubmitCard({
               className="stage-desc-input"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder={`Describe what you did in this ${roleName.toLowerCase()} pass before handing it to the Captain — the cut, the mix, the design, and what you changed since the last review.`}
+              placeholder={
+                pendingFile
+                  ? `Describe this ${roleName.toLowerCase()} pass (optional) — what you changed and why, so the Captain knows what to listen for.`
+                  : `Describe what you did in this ${roleName.toLowerCase()} pass before handing it to the Captain — the cut, the mix, the design, and what you changed since the last review.`
+              }
               rows={4}
               maxLength={2000}
               disabled={!canSubmit}
@@ -347,6 +353,13 @@ export function StageSubmitCard({
             />
             <div className="stage-desc-tools">
               {!canSubmit && <span className="setting-copy">Only the {legLabel(leg)} role (or the Captain) can hand this stage in.</span>}
+              {canSubmit && missingForSubmit && !pendingFile && (
+                <span className="setting-copy" data-testid="stage-submit-needs-note">
+                  {noFilePicked
+                    ? `Save a snapshot of the ${legLabel(leg)} stage (or pick a file above) before handing it in.`
+                    : 'Write a short note about this pass to hand the stage in.'}
+                </span>
+              )}
             </div>
           </div>
 
@@ -374,7 +387,8 @@ export function StageSubmitCard({
 
           {pendingFile && (
             <p className="setting-copy stage-submit-note">
-              Sends the file and your description to the Captain — Accept adds it to the vault, Reject deletes it and sends it back with their note.
+              Sends the file to the Captain — Accept adds it to the vault, Reject deletes it and sends it back with their note.
+              {description.trim() ? '' : ' A short description is optional — the file speaks for itself.'}
             </p>
           )}
           {fileResult && (

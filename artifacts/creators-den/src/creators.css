@@ -3953,6 +3953,33 @@ select optgroup {
   padding: 2px 7px !important;
 }
 
+/* Dubbing-language chips everywhere — white text on a solid teal pill so they
+   read clearly on the dark cinematic theme (the generic .den-tag.teal's dark
+   text is nearly invisible there). Covers the studio canvas, shelf, carousel,
+   timeline snake, Captain's review rail, and the finish desk language list. */
+.den-tag.teal.vs-lang,
+.den-tag.teal.pv-version-lang,
+.den-tag.teal.pv-canvas-lang,
+.den-tag.teal.snake-card-lang,
+.finish-lang-list li .den-tag.teal,
+.den-tag.teal[data-testid="audio-canvas-language"],
+.den-tag.teal[data-testid="review-submission-language"] {
+  color: hsl(0 0% 100%) !important;
+  background: hsl(164 34% 30%) !important;
+  box-shadow: inset 0 0 0 1px hsl(164 55% 62% / .55);
+}
+/* Chips that have no scannable font of their own (the carousel + the
+   Captain's review rail) pick up the same readable word-style as the shelf
+   chip instead of the tiny uppercase mono den-tag. */
+.den-tag.teal.pv-version-lang,
+.den-tag.teal[data-testid="review-submission-language"],
+.den-tag.teal[data-testid="audio-canvas-language"] {
+  font: 700 9px var(--app-font-sans) !important;
+  letter-spacing: .02em !important;
+  text-transform: none !important;
+  padding: 2px 7px !important;
+}
+
 /* ---------------------------------------------------------------------------
    Finish — the export desk (latest-only download cards, grant-aware).
 --------------------------------------------------------------------------- */
@@ -4140,15 +4167,43 @@ select optgroup {
   padding: 2px 7px !important;
 }
 .finish-lang-list li .link-btn { flex: 0 0 auto; }
-.finish-lang-select {
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 6px;
-  background: hsl(var(--card));
-  color: hsl(var(--foreground));
-  font: 600 11px var(--app-font-sans);
+/* Tick-to-download rows: a checkbox in front of each language's chip. The
+   row is a horizontal flex strip inside the language list. */
+.finish-lang-list li input[type="checkbox"],
+.finish-lang-toolbar input[type="checkbox"],
+.finish-tick-all input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: hsl(164 45% 42%);
+  cursor: pointer;
 }
+.finish-tick-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  cursor: pointer;
+}
+.finish-tick-row input { flex: 0 0 auto; }
+.finish-lang-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 2px;
+  border-top: 1px dashed hsl(var(--border) / .7);
+}
+.finish-tick-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 10px var(--app-font-sans);
+  color: hsl(var(--foreground));
+  cursor: pointer;
+}
+.finish-tick-all .mono-label { color: hsl(var(--muted-foreground)); }
 
 /* ---------------------------------------------------------------------------
    Vault — the crew roster (avatars + roles, moved from the chat).

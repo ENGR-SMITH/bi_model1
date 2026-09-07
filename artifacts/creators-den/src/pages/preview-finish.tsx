@@ -212,9 +212,11 @@ export default function FinishPreviewPage() {
 
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Language tag chosen for the script download (named after the dubbing
-  // language the draft accompanies).
-  const [scriptLanguage, setScriptLanguage] = useState('');
+  // Dubbing languages ticked on the export desk: the audio card downloads the
+  // latest version of each ticked language, and the script card writes one
+  // language-named copy of the saved draft per ticked language.
+  const [audioSelection, setAudioSelection] = useState<Set<string>>(new Set());
+  const [scriptSelection, setScriptSelection] = useState<Set<string>>(new Set());
 
   const assets = (project.data?.assets ?? []) as ExportAsset[];
   const released = project.data?.status === 'RELEASED';
@@ -315,25 +317,33 @@ export default function FinishPreviewPage() {
     setBusyId('script');
     setError(null);
     try {
-      // A chosen language tags the file name (e.g. "script-Spanish.html").
-      const name = scriptLanguage
-        ? script.name.replace(/\.html$/i, '') + `-${slugify(scriptLanguage)}.html`
-        : script.name;
-      saveBlob(new Blob([script.html], { type: 'text/html;charset=utf-8' }), name);
+      const langs = allAudioLanguages.filter((lang) => scriptSelection.has(lang));
+      if (langs.length === 0) {
+        // Nothing ticked — download the draft as-is.
+        saveBlob(new Blob([script.html], { type: 'text/html;charset=utf-8' }), script.name);
+        return;
+      }
+      // One copy per ticked language, each named after its dubbing language
+      // (e.g. "script-Spanish.html").
+      for (const lang of langs) {
+        const name = script.name.replace(/\.html$/i, '') + `-${slugify(lang)}.html`;
+        saveBlob(new Blob([script.html], { type: 'text/html;charset=utf-8' }), name);
+      }
     } finally {
       setBusyId(null);
     }
   };
 
-  // Download every available dubbing language's latest audio, one after the
-  // other (each goes through the same Lock/grant gate).
-  const downloadAllAudios = async () => {
-    if (latestAudioPerLanguage.length === 0) return;
-    setBusyId('all-audios');
+  // Download the latest audio of the ticked dubbing languages (or of every
+  // available language when none are ticked), one after the other — each goes
+  // through the same Lock/grant gate.
+  const downloadAudios = async (languages?: Set<string>) => {
+    const targets = latestAudioPerLanguage.filter((entry) => !languages || languages.has(entry.language));
+    if (targets.length === 0) return;
+    setBusyId('audios');
     setError(null);
     try {
-      for (const entry of latestAudioPerLanguage) {
-        setBusyId(`asset-${entry.latest.id}`);
+      for (const entry of targets) {
         const blob = await downloadVideoFile(projectId, entry.latest.id);
         saveBlob(blob, entry.latest.fileName);
       }
@@ -343,6 +353,22 @@ export default function FinishPreviewPage() {
       setBusyId(null);
     }
   };
+
+  const toggleAudioLanguage = (language: string) =>
+    setAudioSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(language)) next.delete(language);
+      else next.add(language);
+      return next;
+    });
+
+  const toggleScriptLanguage = (language: string) =>
+    setScriptSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(language)) next.delete(language);
+      else next.add(language);
+      return next;
+    });
 
   // The FINISH master — the latest video + the latest audio muxed into ONE
   // synced file (built server-side, waveform-synced). This replaces the two
@@ -623,10 +649,19 @@ export default function FinishPreviewPage() {
             </div>
             {latestAudioPerLanguage.length > 0 ? (
               <>
-                <ul className="finish-lang-list" data-testid="finish-audio-languages">
+                <ul className="finish-lang-list finish-lang-tick-list" data-testid="finish-audio-languages">
                   {latestAudioPerLanguage.map((entry) => (
                     <li key={entry.language} data-testid={`finish-audio-language-${entry.language.toLowerCase()}`}>
-                      <span className="den-tag teal">{entry.language}</span>
+                      <label className="finish-tick-row">
+                        <input
+                          type="checkbox"
+                          checked={audioSelection.has(entry.language)}
+                          onChange={() => toggleAudioLanguage(entry.language)}
+                          aria-label={`Select ${entry.language} for download`}
+                          data-testid={`finish-audio-tick-${entry.language.toLowerCase()}`}
+                        />
+                        <span className="den-tag teal">{entry.language}</span>
+                      </label>
                       <span className="finish-zip-file" title={entry.latest.fileName}>{entry.latest.fileName}</span>
                       <span className="mono-label">{formatBytes(entry.latest.sizeBytes)} · {timeAgo(entry.latest.createdAt)}</span>
                       <button
@@ -642,6 +677,21 @@ export default function FinishPreviewPage() {
                     </li>
                   ))}
                 </ul>
+                <div className="finish-lang-toolbar">
+                  <label className="finish-tick-all">
+                    <input
+                      type="checkbox"
+                      checked={allAudioLanguages.length > 0 && audioSelection.size === allAudioLanguages.length}
+                      onChange={(event) => setAudioSelection(event.target.checked ? new Set(allAudioLanguages) : new Set())}
+                      aria-label="Select every language"
+                      data-testid="finish-audio-tick-all"
+                    />
+                    <span>Select all</span>
+                  </label>
+                  <span className="mono-label" data-testid="finish-audio-selected-count">
+                    {audioSelection.size} selected
+                  </span>
+                </div>
                 <AccessStrip
                   members={members}
                   holders={isCaptain ? latestAudioPerLanguage.flatMap((entry) => grantHoldersFor(entry.latest)) : []}
@@ -650,12 +700,16 @@ export default function FinishPreviewPage() {
                 <button
                   type="button"
                   className="primary-btn finish-card-btn"
-                  onClick={() => void downloadAllAudios()}
-                  disabled={busyId === 'all-audios'}
-                  data-testid="finish-download-all-audios"
+                  onClick={() => void downloadAudios(audioSelection.size > 0 ? audioSelection : undefined)}
+                  disabled={busyId === 'audios'}
+                  data-testid="finish-download-selected-audios"
                 >
                   <Download size={13} />
-                  {busyId === 'all-audios' ? 'Downloading languages…' : 'Download all languages'}
+                  {busyId === 'audios'
+                    ? 'Downloading languages…'
+                    : audioSelection.size > 0
+                      ? `Download selected (${audioSelection.size})`
+                      : 'Download all languages'}
                 </button>
               </>
             ) : (
@@ -689,22 +743,44 @@ export default function FinishPreviewPage() {
                 <Sparkles size={11} /> Everyone on the project can view the script — only this browser holds the text.
               </span>
             </div>
-            {/* Language tag for the download — the desk holds one draft, but the
-                downloaded file can be named after the dubbing language it
-                accompanies (same dropdown behaviour as the audio dubs). */}
+            {/* Per-language download ticks — the desk holds one draft, but you
+                can tick the dubbing languages to get a copy of the script
+                named for each (e.g. script-Spanish.html). */}
             {script && allAudioLanguages.length > 0 && (
-              <select
-                value={scriptLanguage}
-                onChange={(event) => setScriptLanguage(event.target.value)}
-                aria-label="Script language"
-                className="finish-lang-select"
-                data-testid="finish-script-language"
-              >
-                <option value="">Language…</option>
-                {allAudioLanguages.map((lang) => (
-                  <option key={lang} value={lang}>{lang}</option>
-                ))}
-              </select>
+              <>
+                <ul className="finish-lang-list finish-lang-tick-list" data-testid="finish-script-languages">
+                  {allAudioLanguages.map((lang) => (
+                    <li key={lang} data-testid={`finish-script-language-${lang.toLowerCase()}`}>
+                      <label className="finish-tick-row">
+                        <input
+                          type="checkbox"
+                          checked={scriptSelection.has(lang)}
+                          onChange={() => toggleScriptLanguage(lang)}
+                          aria-label={`Download the script as ${lang}`}
+                          data-testid={`finish-script-tick-${lang.toLowerCase()}`}
+                        />
+                        <span className="den-tag teal">{lang}</span>
+                      </label>
+                      <span className="finish-zip-file">script copy</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="finish-lang-toolbar">
+                  <label className="finish-tick-all">
+                    <input
+                      type="checkbox"
+                      checked={allAudioLanguages.length > 0 && scriptSelection.size === allAudioLanguages.length}
+                      onChange={(event) => setScriptSelection(event.target.checked ? new Set(allAudioLanguages) : new Set())}
+                      aria-label="Select every language"
+                      data-testid="finish-script-tick-all"
+                    />
+                    <span>Select all</span>
+                  </label>
+                  <span className="mono-label" data-testid="finish-script-selected-count">
+                    {scriptSelection.size} selected
+                  </span>
+                </div>
+              </>
             )}
             <button
               type="button"
@@ -714,7 +790,11 @@ export default function FinishPreviewPage() {
               data-testid="finish-download-script"
             >
               <Download size={13} />
-              {busyId === 'script' ? 'Preparing…' : scriptLanguage ? `Download script (${scriptLanguage})` : 'Download script'}
+              {busyId === 'script'
+                ? 'Preparing…'
+                : scriptSelection.size > 0
+                  ? `Download script (${scriptSelection.size} ${scriptSelection.size === 1 ? 'language' : 'languages'})`
+                  : 'Download script'}
             </button>
           </div>
         </div>
