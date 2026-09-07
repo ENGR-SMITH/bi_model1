@@ -74,7 +74,7 @@ async function paystackRequest<T = PaystackResponse>(
 
 export interface InitializeTransactionInput {
   email: string;
-  /** Amount in USD cents (e.g. 188 for $1.88). */
+  /** Amount in USD cents (e.g. 588 for $5.88). */
   amount: number;
   /** Unique transaction reference minted server-side. */
   reference: string;

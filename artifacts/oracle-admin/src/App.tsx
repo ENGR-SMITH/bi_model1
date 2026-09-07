@@ -418,7 +418,7 @@ function formatDate(value: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Ticket promo codes — the admin surface for the $1.88 category passes.
+// Ticket promo codes — the admin surface for the $5.88 category passes.
 // Codes are created/edited/deleted here; the checkout validates them live.
 // ---------------------------------------------------------------------------
 
@@ -443,7 +443,7 @@ function PromosSection({ session }: { session: boolean }) {
         <PageHeading
           eyebrow="Control room / ticket passes"
           title="Manage the promo codes."
-          description="Create, tune, and retire the codes the $1.88 category-pass checkout accepts. Every code can be shared by many people — each person may redeem it once — and a code that is paused stops working immediately without losing its history."
+          description="Create, tune, and retire the codes the $5.88 category-pass checkout accepts. Every code can be shared by many people — each person may redeem it once — and a code that is paused stops working immediately without losing its history."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
