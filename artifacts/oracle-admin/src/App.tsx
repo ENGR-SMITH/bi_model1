@@ -160,6 +160,7 @@ function OracleAdmin() {
   const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
   const session = useGetAdminSession({
     query: {
+      queryKey: getGetAdminSessionQueryKey(),
       staleTime: 30_000,
       retry: 1,
       refetchOnWindowFocus: false,
@@ -499,6 +500,7 @@ function Brand({ light = false }: { light?: boolean }) {
 function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (value: boolean) => void }) {
   const session = useGetAdminSession({
     query: {
+      queryKey: getGetAdminSessionQueryKey(),
       staleTime: 30_000,
       retry: 1,
       refetchOnWindowFocus: false,
@@ -506,6 +508,7 @@ function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMo
   });
   const providers = useListAdminProviders({
     query: {
+      queryKey: getListAdminProvidersQueryKey(),
       staleTime: 30_000,
       retry: 1,
       refetchOnWindowFocus: false,
@@ -714,20 +717,24 @@ function formatDate(value: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Ticket promo codes — the admin surface for the $5.88 category passes.
-// Codes are created/edited/deleted here; the checkout validates them live.
+// Ticket promo codes — the admin surface for the monthly passes. Only FREE
+// codes are accepted at checkout: every plan bills monthly through Paystack,
+// so percent/dollar-off codes (which would discount the first charge) don't
+// apply. Legacy PERCENT/FLAT rows are still listed for history but are not
+// accepted. Codes are created/edited/deleted here; the checkout validates
+// them live.
 // ---------------------------------------------------------------------------
 
 const PROMO_KIND_META: Record<string, { label: string; tone: string }> = {
-  FREE: { label: 'Free pass', tone: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/25' },
-  PERCENT: { label: '% off', tone: 'text-amber-600 bg-amber-500/10 border-amber-500/25' },
-  FLAT: { label: '$ off', tone: 'text-sky-600 bg-sky-500/10 border-sky-500/25' },
+  FREE: { label: 'Free month', tone: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/25' },
+  PERCENT: { label: '% off · legacy', tone: 'text-amber-600 bg-amber-500/10 border-amber-500/25' },
+  FLAT: { label: '$ off · legacy', tone: 'text-sky-600 bg-sky-500/10 border-sky-500/25' },
 };
 
 function PromoValueLabel(promo: AdminPromo): string {
-  if (promo.kind === 'FREE') return 'Whole pass free';
-  if (promo.kind === 'PERCENT') return `${promo.value}% off`;
-  return `$${(promo.value / 100).toFixed(2)} off`;
+  if (promo.kind === 'FREE') return 'Grants one free month';
+  if (promo.kind === 'PERCENT') return `${promo.value}% off — no longer accepted`;
+  return `$${(promo.value / 100).toFixed(2)} off — no longer accepted`;
 }
 
 function PromosSection({ session }: { session: boolean }) {
@@ -739,7 +746,7 @@ function PromosSection({ session }: { session: boolean }) {
         <PageHeading
           eyebrow="Control room / ticket passes"
           title="Manage the promo codes."
-          description="Create, tune, and retire the codes the $5.88 category-pass checkout accepts. Every code can be shared by many people — each person may redeem it once — and a code that is paused stops working immediately without losing its history."
+          description="Create and retire the codes the monthly checkout accepts. Only FREE codes apply — every plan bills monthly through Paystack, so percent and dollar-off codes can't discount a subscription. A FREE code grants one free month with no card charge; every code can be shared by many people — each person may redeem it once — and a code that is paused stops working immediately without losing its history."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
@@ -758,7 +765,7 @@ function PromosSection({ session }: { session: boolean }) {
           <div data-testid="state-promos-empty" className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
             <div className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-secondary text-muted-foreground"><Ticket className="h-5 w-5" /></div>
             <h3 className="mt-4 text-sm font-semibold">No promo codes yet</h3>
-            <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Create one above — for example a FREE code for early testers or a 50% off launch code.</p>
+            <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-muted-foreground">Create one above — for example a FREE code for early testers or a launch giveaway.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -789,7 +796,6 @@ function CreatePromoForm() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListAdminPromosQueryKey() });
         setCode('');
-        setValue('');
         setUsage('multi-unlimited');
         setCap('10');
         setExpiry('');
@@ -802,8 +808,6 @@ function CreatePromoForm() {
     },
   });
   const [code, setCode] = useState('');
-  const [kind, setKind] = useState<'FREE' | 'PERCENT' | 'FLAT'>('PERCENT');
-  const [value, setValue] = useState('50');
   const [usage, setUsage] = useState<'single' | 'multi-unlimited' | 'multi-capped'>('multi-unlimited');
   const [cap, setCap] = useState('10');
   const [expiry, setExpiry] = useState('');
@@ -819,14 +823,14 @@ function CreatePromoForm() {
     event.preventDefault();
     setNotice('');
     if (!code.trim()) {
-      setNotice('Give the code a name, e.g. LAUNCH50.');
+      setNotice('Give the code a name, e.g. EARLYBIRD.');
       return;
     }
     create.mutate({
       data: {
         code: code.trim(),
-        kind,
-        value: Number(value) || 0,
+        kind: 'FREE',
+        value: 0,
         maxUses: maxUsesOf(),
         expiresAt: expiry ? new Date(expiry).toISOString() : undefined,
       },
@@ -841,25 +845,13 @@ function CreatePromoForm() {
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-foreground"><Plus className="h-4 w-4" /></span>
         <div>
           <h3 className="text-sm font-semibold">New promo code</h3>
-          <p className="text-xs text-muted-foreground">Codes are stored uppercase — the checkout matches them exactly.</p>
+          <p className="text-xs text-muted-foreground">Every code is a FREE code — it grants one free month with no card charge. Codes are stored uppercase and the checkout matches them exactly.</p>
         </div>
       </div>
-      <form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-[1.2fr_.8fr_.8fr_.8fr_1fr_auto]">
+      <form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-[1.2fr_.8fr_1fr_auto]">
         <label className="block">
           <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Code</span>
-          <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="LAUNCH50" className={inputClass} data-testid="input-promo-code" />
-        </label>
-        <label className="block">
-          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Kind</span>
-          <select value={kind} onChange={(event) => setKind(event.target.value as 'FREE' | 'PERCENT' | 'FLAT')} className={inputClass} data-testid="select-promo-kind">
-            <option value="FREE">Free pass</option>
-            <option value="PERCENT">Percent off</option>
-            <option value="FLAT">Cents off</option>
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{kind === 'PERCENT' ? 'Percent' : kind === 'FLAT' ? 'Cents off' : 'Value'}</span>
-          <input type="number" min="0" value={value} onChange={(event) => setValue(event.target.value)} className={inputClass} data-testid="input-promo-value" />
+          <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="EARLYBIRD" className={inputClass} data-testid="input-promo-code" />
         </label>
         <label className="block">
           <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Who can use it</span>
@@ -900,8 +892,6 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
     },
   });
   const [editing, setEditing] = useState(false);
-  const [kind, setKind] = useState<'FREE' | 'PERCENT' | 'FLAT'>(promo.kind as 'FREE' | 'PERCENT' | 'FLAT');
-  const [value, setValue] = useState(String(promo.value));
   const [usage, setUsage] = useState<PromoUsage>(usageForMaxUses(promo.maxUses));
   const [cap, setCap] = useState(String(promo.maxUses > 1 ? promo.maxUses : 10));
   const [expiry, setExpiry] = useState(promo.expiresAt ? new Date(promo.expiresAt).toISOString().slice(0, 10) : '');
@@ -921,8 +911,10 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
     update.mutate({
       code: promo.code,
       data: {
-        kind,
-        value: Number(value) || 0,
+        // Only FREE codes are accepted at checkout — preserve whatever kind
+        // this row carries (legacy PERCENT/FLAT rows keep their history).
+        kind: promo.kind as 'FREE' | 'PERCENT' | 'FLAT',
+        value: promo.value,
         maxUses: maxUsesOf(),
         active: promo.active,
         expiresAt: expiry ? new Date(expiry).toISOString() : undefined,
@@ -947,19 +939,7 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
   return (
     <div data-testid={`promo-${promo.code}`} className="rounded-2xl border border-border bg-card p-5">
       {editing ? (
-        <form onSubmit={save} className="grid gap-4 md:grid-cols-[1fr_.8fr_.8fr_1fr_auto]">
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Kind</span>
-            <select value={kind} onChange={(event) => setKind(event.target.value as 'FREE' | 'PERCENT' | 'FLAT')} className={inputClass}>
-              <option value="FREE">Free pass</option>
-              <option value="PERCENT">Percent off</option>
-              <option value="FLAT">Cents off</option>
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{kind === 'PERCENT' ? 'Percent' : kind === 'FLAT' ? 'Cents off' : 'Value'}</span>
-            <input type="number" min="0" value={value} onChange={(event) => setValue(event.target.value)} className={inputClass} />
-          </label>
+        <form onSubmit={save} className="grid gap-4 md:grid-cols-[.8fr_1fr_auto]">
           <label className="block">
             <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Who can use it</span>
             <select value={usage} onChange={(event) => setUsage(event.target.value as PromoUsage)} className={inputClass}>

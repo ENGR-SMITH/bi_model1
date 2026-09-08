@@ -187,42 +187,61 @@ describe("admin promo codes", () => {
     expect(empty.status).toBe(200);
     expect(empty.body).toEqual([]);
 
-    // Create — the code is normalized to uppercase.
+    // Create — the code is normalized to uppercase and is FREE-only.
     const created = await request(API)
       .post("/api/admin/promos")
       .set("Cookie", cookie)
-      .send({ code: "halfpass", kind: "PERCENT", value: 50, maxUses: 0 });
+      .send({ code: "halfpass", kind: "FREE", value: 0, maxUses: 0 });
     expect(created.status).toBe(201);
     expect(created.body.code).toBe("HALFPASS");
-    expect(created.body.kind).toBe("PERCENT");
+    expect(created.body.kind).toBe("FREE");
     expect(created.body.uses).toBe(0);
     expect(created.body.active).toBe(true);
+
+    // Percent/dollar-off codes are no longer accepted — the checkout rejects
+    // them, so the admin API refuses to create dead codes.
+    const percent = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ code: "SAVE20", kind: "PERCENT", value: 20, maxUses: 0 });
+    expect(percent.status).toBe(400);
+    const flat = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ code: "SAVE2", kind: "FLAT", value: 200, maxUses: 0 });
+    expect(flat.status).toBe(400);
 
     // Duplicate code → 409.
     const dup = await request(API)
       .post("/api/admin/promos")
       .set("Cookie", cookie)
-      .send({ code: "HALFPASS", kind: "FLAT", value: 20, maxUses: 1 });
+      .send({ code: "HALFPASS", kind: "FREE", value: 0, maxUses: 1 });
     expect(dup.status).toBe(409);
 
-    // Update.
+    // Update — max uses and pause/resume still work; kind stays FREE.
     const updated = await request(API)
       .patch("/api/admin/promos/HALFPASS")
       .set("Cookie", cookie)
-      .send({ kind: "FLAT", value: 25, maxUses: 5 });
+      .send({ kind: "FREE", value: 0, maxUses: 5 });
     expect(updated.status).toBe(200);
-    expect(updated.body.kind).toBe("FLAT");
-    expect(updated.body.value).toBe(25);
+    expect(updated.body.kind).toBe("FREE");
     expect(updated.body.maxUses).toBe(5);
 
-    // The checkout sees the updated code (valid + discounted price).
+    // A FREE row can't be converted into a percent/dollar-off code.
+    const converted = await request(API)
+      .patch("/api/admin/promos/HALFPASS")
+      .set("Cookie", cookie)
+      .send({ kind: "PERCENT", value: 25, maxUses: 5 });
+    expect(converted.status).toBe(400);
+
+    // The checkout sees the updated code (valid + free).
     state.userId = "user-1";
     const validated = await request(API)
       .post("/api/tickets/promo/validate")
       .send({ code: "HALFPASS" });
     expect(validated.body.valid).toBe(true);
-    expect(validated.body.kind).toBe("FLAT");
-    expect(validated.body.discountedPriceUsd).toBe(588 - 25);
+    expect(validated.body.kind).toBe("FREE");
+    expect(validated.body.discountedPriceUsd).toBe(0);
 
     // List reflects the row.
     signInAsAdmin();
@@ -234,7 +253,7 @@ describe("admin promo codes", () => {
     const paused = await request(API)
       .patch("/api/admin/promos/HALFPASS")
       .set("Cookie", cookie)
-      .send({ kind: "FLAT", value: 25, maxUses: 5, active: false });
+      .send({ kind: "FREE", value: 0, maxUses: 5, active: false });
     expect(paused.status).toBe(200);
     expect(paused.body.active).toBe(false);
     state.userId = "user-2";
@@ -246,7 +265,7 @@ describe("admin promo codes", () => {
     const resumed = await request(API)
       .patch("/api/admin/promos/HALFPASS")
       .set("Cookie", cookie)
-      .send({ kind: "FLAT", value: 25, maxUses: 5, active: true });
+      .send({ kind: "FREE", value: 0, maxUses: 5, active: true });
     expect(resumed.status).toBe(200);
     expect(resumed.body.active).toBe(true);
     const resumedCheck = await request(API).post("/api/tickets/promo/validate").send({ code: "HALFPASS" });

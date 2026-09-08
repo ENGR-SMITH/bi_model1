@@ -7,6 +7,9 @@
  */
 import type { AdminPromoInputKind } from './adminPromoInputKind';
 
+/**
+ * Create a promo code. New codes must be FREE — percent and dollar-off codes don't apply to monthly subscriptions.
+ */
 export interface AdminPromoInput {
   code: string;
   kind: AdminPromoInputKind;

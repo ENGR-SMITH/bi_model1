@@ -7,6 +7,9 @@
  */
 import type { AdminPromoUpdateKind } from './adminPromoUpdateKind';
 
+/**
+ * Update a promo code. Only FREE is accepted for new kinds; legacy PERCENT/FLAT rows keep theirs.
+ */
 export interface AdminPromoUpdate {
   kind: AdminPromoUpdateKind;
   value: number;

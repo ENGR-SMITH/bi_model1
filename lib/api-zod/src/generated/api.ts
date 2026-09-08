@@ -193,11 +193,11 @@ export const ListAdminPromosResponse = zod.array(ListAdminPromosResponseItem)
  */
 export const CreateAdminPromoBody = zod.object({
   "code": zod.string(),
-  "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
+  "kind": zod.enum(['FREE']),
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
   "expiresAt": zod.coerce.date().nullish()
-})
+}).describe('Create a promo code. New codes must be FREE — percent and dollar-off codes don\'t apply to monthly subscriptions.')
 
 export const CreateAdminPromoResponse = zod.object({
   "code": zod.string(),
@@ -224,7 +224,7 @@ export const UpdateAdminPromoBody = zod.object({
   "maxUses": zod.number().int(),
   "active": zod.boolean().optional(),
   "expiresAt": zod.coerce.date().nullish()
-})
+}).describe('Update a promo code. Only FREE is accepted for new kinds; legacy PERCENT\/FLAT rows keep theirs.')
 
 export const UpdateAdminPromoResponse = zod.object({
   "code": zod.string(),

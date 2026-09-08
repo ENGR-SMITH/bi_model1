@@ -167,8 +167,6 @@ router.post("/admin/providers/:providerId/check", requireAdmin, async (req, res)
 // are managed here (create/update/delete); the checkout validates them live.
 // ---------------------------------------------------------------------------
 
-const PROMO_KINDS = ["FREE", "PERCENT", "FLAT"] as const;
-
 export function normalizePromoCode(raw: string): string {
   return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
@@ -206,8 +204,8 @@ router.post("/admin/promos", requireAdmin, async (req, res): Promise<void> => {
     res.status(400).json({ error: "A promo code is required" });
     return;
   }
-  if (!PROMO_KINDS.includes(body.data.kind as (typeof PROMO_KINDS)[number])) {
-    res.status(400).json({ error: `Kind must be one of: ${PROMO_KINDS.join(", ")}` });
+  if (body.data.kind !== "FREE") {
+    res.status(400).json({ error: "Only FREE promo codes are accepted — percent and dollar-off codes don't apply to monthly subscriptions." });
     return;
   }
 
@@ -246,18 +244,21 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
     res.status(400).json({ error: "A promo code is required" });
     return;
   }
-  if (!PROMO_KINDS.includes(body.data.kind as (typeof PROMO_KINDS)[number])) {
-    res.status(400).json({ error: `Kind must be one of: ${PROMO_KINDS.join(", ")}` });
-    return;
-  }
 
   const [existing] = await db
-    .select({ code: tandemPromoCodesTable.code })
+    .select()
     .from(tandemPromoCodesTable)
     .where(eq(tandemPromoCodesTable.code, code))
     .limit(1);
   if (!existing) {
     res.status(404).json({ error: "Promo code not found" });
+    return;
+  }
+  // Only FREE codes are accepted at checkout. Legacy PERCENT/FLAT rows keep
+  // their kind so they can still be paused/resumed; a FREE row cannot be
+  // converted into a code the checkout would reject.
+  if (body.data.kind !== "FREE" && existing.kind !== body.data.kind) {
+    res.status(400).json({ error: "Only FREE promo codes are accepted — percent and dollar-off codes don't apply to monthly subscriptions." });
     return;
   }
 

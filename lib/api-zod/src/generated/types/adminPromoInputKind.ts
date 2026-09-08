@@ -11,6 +11,4 @@ export type AdminPromoInputKind = typeof AdminPromoInputKind[keyof typeof AdminP
 
 export const AdminPromoInputKind = {
   FREE: 'FREE',
-  PERCENT: 'PERCENT',
-  FLAT: 'FLAT',
 } as const;

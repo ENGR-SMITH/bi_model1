@@ -5416,17 +5416,24 @@ components:
       required: [code, kind, value, maxUses, uses, active, expiresAt, createdAt]
     AdminPromoInput:
       type: object
+      # Only FREE codes are accepted at checkout — every plan bills monthly
+      # through Paystack, so percent/dollar-off codes can't discount a
+      # subscription. New codes must be kind=FREE (the API rejects others).
+      description: Create a promo code. New codes must be FREE — percent and dollar-off codes don't apply to monthly subscriptions.
       properties:
         code: { type: string }
         kind:
           type: string
-          enum: [FREE, PERCENT, FLAT]
+          enum: [FREE]
         value: { type: integer }
         maxUses: { type: integer }
         expiresAt: { type: ["string", "null"], format: date-time }
       required: [code, kind, value, maxUses]
     AdminPromoUpdate:
       type: object
+      # Legacy PERCENT/FLAT rows keep their kind so they can still be paused;
+      # a FREE row can't be converted to a kind the checkout would reject.
+      description: Update a promo code. Only FREE is accepted for new kinds; legacy PERCENT/FLAT rows keep theirs.
       properties:
         kind:
           type: string

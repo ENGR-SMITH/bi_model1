@@ -775,10 +775,11 @@ export type AdminPromoInputKind = typeof AdminPromoInputKind[keyof typeof AdminP
 
 export const AdminPromoInputKind = {
   FREE: 'FREE',
-  PERCENT: 'PERCENT',
-  FLAT: 'FLAT',
 } as const;
 
+/**
+ * Create a promo code. New codes must be FREE — percent and dollar-off codes don't apply to monthly subscriptions.
+ */
 export interface AdminPromoInput {
   code: string;
   kind: AdminPromoInputKind;
@@ -797,6 +798,9 @@ export const AdminPromoUpdateKind = {
   FLAT: 'FLAT',
 } as const;
 
+/**
+ * Update a promo code. Only FREE is accepted for new kinds; legacy PERCENT/FLAT rows keep theirs.
+ */
 export interface AdminPromoUpdate {
   kind: AdminPromoUpdateKind;
   value: number;
