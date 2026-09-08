@@ -158,7 +158,13 @@ function ClerkQueryClientCacheInvalidator() {
 
 function OracleAdmin() {
   const { isLoaded: clerkLoaded, isSignedIn } = useAuth();
-  const session = useGetAdminSession();
+  const session = useGetAdminSession({
+    query: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sessionStalled, setSessionStalled] = useState(false);
   const isAuthenticated = Boolean(session.data?.authenticated);
@@ -491,8 +497,20 @@ function Brand({ light = false }: { light?: boolean }) {
 }
 
 function ControlRoom({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (value: boolean) => void }) {
-  const session = useGetAdminSession();
-  const providers = useListAdminProviders();
+  const session = useGetAdminSession({
+    query: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  });
+  const providers = useListAdminProviders({
+    query: {
+      staleTime: 30_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  });
   const { signOut } = useClerk();
   const [activeSection, setActiveSection] = useState<'overview' | 'providers' | 'promos' | 'plans' | 'subscriptions'>('overview');
   const [signingOut, setSigningOut] = useState(false);
