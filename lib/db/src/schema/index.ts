@@ -28,6 +28,7 @@ export * from "./account";
 export * from "./tickets";
 export * from "./subscriptions";
 export * from "./paystack-intents";
+export * from "./paystack-plans";
 export * from "./channels";
 export * from "./channel-analytics";
 export * from "./arena";

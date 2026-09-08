@@ -63,9 +63,12 @@ describe("subscription plans", () => {
     expect(kinds).toContain("pass");
     expect(kinds).toContain("storage");
     expect(kinds).toContain("projects");
-    // Authors pass is $5.88.
+    // Authors pass is $5.88/month — every plan bills monthly.
     const authorPass = res.body.plans.find((p: any) => p.kind === "pass" && p.planId === "authors");
     expect(authorPass.priceUsd).toBe(588);
+    expect(authorPass.intervalLabel).toBe("1 month");
+    expect(res.body.plans.find((p: any) => p.kind === "storage").intervalLabel).toBe("1 month");
+    expect(res.body.plans.find((p: any) => p.kind === "projects").intervalLabel).toBe("1 month");
     expect(res.body.current).toEqual([]);
   });
 
@@ -178,9 +181,9 @@ describe("auto-renew toggle (admin-only)", () => {
       planLabel: "Author & Writer pass",
       priceUsd: 588,
       status: "ACTIVE",
-      intervalLabel: "3 weeks",
+      intervalLabel: "1 month",
       periodStart: new Date(),
-      periodEnd: new Date(Date.now() + 3 * 7 * 24 * 60 * 60 * 1000),
+      periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       autoRenew: true,
       paystackAuthorizationCode: "auth_123",
     });

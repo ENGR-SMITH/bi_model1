@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
 import { eq } from "drizzle-orm";
-import { PASS_PRICE_USD, PASS_WEEKS } from "./tickets";
+import { PASS_PRICE_USD, PASS_MONTHS } from "./tickets";
+
+// One month, in ms — the pass period (matching SUBSCRIPTION_PERIOD_MS).
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -69,7 +72,7 @@ describe("ticket status", () => {
     const res = await request(API).get("/api/tickets/status");
     expect(res.status).toBe(200);
     expect(res.body.priceUsd).toBe(PASS_PRICE_USD);
-    expect(res.body.weeks).toBe(PASS_WEEKS);
+    expect(res.body.months).toBe(PASS_MONTHS);
     expect(res.body.tickets).toEqual([]);
   });
 
@@ -80,7 +83,7 @@ describe("ticket status", () => {
 });
 
 describe("ticket purchase", () => {
-  it("grants a 3-week pass and reports it in the status", async () => {
+  it("grants a 1-month pass and reports it in the status", async () => {
     state.userId = "user-1";
     const res = await request(API).post("/api/tickets/purchase").send({
       category: "authors",
@@ -94,8 +97,8 @@ describe("ticket purchase", () => {
     expect(res.body.receipt.discount).toBe(0);
 
     const expiresAt = new Date(res.body.ticket.expiresAt).getTime();
-    expect(expiresAt).toBeGreaterThan(Date.now() + PASS_WEEKS * 7 * 24 * 60 * 60 * 1000 - 5000);
-    expect(expiresAt).toBeLessThanOrEqual(Date.now() + PASS_WEEKS * 7 * 24 * 60 * 60 * 1000 + 5000);
+    expect(expiresAt).toBeGreaterThan(Date.now() + MONTH_MS - 5000);
+    expect(expiresAt).toBeLessThanOrEqual(Date.now() + MONTH_MS + 5000);
 
     const status = await request(API).get("/api/tickets/status");
     expect(status.body.tickets).toHaveLength(1);

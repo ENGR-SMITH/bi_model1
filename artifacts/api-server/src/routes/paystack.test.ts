@@ -54,8 +54,10 @@ async function resetDb() {
   const t = state.tables;
   await state.db.delete(t.tandemPaystackIntentsTable);
   await state.db.delete(t.tandemSubscriptionsTable);
+  await state.db.delete(t.tandemPaystackPlansTable);
   await state.db.delete(t.tandemTicketsTable);
   await state.db.delete(t.tandemAccountQuotasTable);
+  await state.db.delete(t.tandemPromoCodesTable);
   await state.db.delete(t.tandemPromoRedemptionsTable);
   await state.db.delete(t.tandemSubscriptionPlanSettingsTable);
   state.userId = null;
@@ -69,7 +71,7 @@ function signWebhook(body: unknown): { raw: string; signature: string } {
   return { raw, signature };
 }
 
-/** Stub the Paystack REST API (initialize + verify). */
+/** Stub the Paystack REST API (plan create + initialize + verify). */
 function stubPaystack(overrides: {
   initialize?: { authorization_url?: string; message?: string; status?: boolean };
   verify?: { status?: string; amount?: number; currency?: string; last4?: string | null };
@@ -79,7 +81,10 @@ function stubPaystack(overrides: {
     const path = String(url).replace("https://api.paystack.co", "");
     let httpStatus = 404;
     let json: any = { status: false, message: "Not found" };
-    if (path.startsWith("/transaction/initialize")) {
+    if (path === "/plan" && init?.method === "POST") {
+      httpStatus = 200;
+      json = { status: true, message: "Plan created", data: { plan_code: "PLN_test" } };
+    } else if (path.startsWith("/transaction/initialize")) {
       const initResp = overrides.initialize ?? {};
       httpStatus = initResp.status === false ? 400 : 200;
       json = {
@@ -145,7 +150,8 @@ describe("POST /api/paystack/checkout", () => {
     const reference: string = res.body.reference;
     expect(reference.startsWith("tan_")).toBe(true);
 
-    // The initialize call carried USD + the full price in cents.
+    // The initialize call carried USD + the full price in cents and the
+    // monthly plan code so Paystack subscribes the customer to it.
     const initCall = state.paystackCalls.find((call) => call.url.endsWith("/transaction/initialize"));
     expect(initCall).toBeTruthy();
     expect(initCall!.body).toMatchObject({
@@ -154,6 +160,7 @@ describe("POST /api/paystack/checkout", () => {
       currency: "USD",
       callback_url: "https://tandem.app/subscriptions",
       reference,
+      plan: "PLN_test",
     });
 
     const [intent] = await state.db
@@ -204,7 +211,36 @@ describe("POST /api/paystack/checkout", () => {
     expect(intent.autoRenew).toBe(false);
   });
 
-  it("grants immediately for a FREE promo (no charge, no checkout)", async () => {
+  it("creates the Paystack plan once and reuses it on later checkouts", async () => {
+    state.userId = "user-1";
+    await request(API).post("/api/paystack/checkout").send({ kind: "pass", planId: "authors" });
+    const planCallsAfterFirst = state.paystackCalls.filter((call) => call.url === "https://api.paystack.co/plan").length;
+    expect(planCallsAfterFirst).toBe(1);
+
+    await request(API).post("/api/paystack/checkout").send({ kind: "pass", planId: "authors" });
+    const planCallsAfterSecond = state.paystackCalls.filter((call) => call.url === "https://api.paystack.co/plan").length;
+    expect(planCallsAfterSecond).toBe(1);
+  });
+
+  it("refuses percentage/dollar-off promos on monthly subscriptions", async () => {
+    state.userId = "user-1";
+    await state.db.insert(state.tables.tandemPromoCodesTable).values({
+      code: "SAVE20",
+      kind: "PERCENT",
+      value: 20,
+      maxUses: 0,
+      uses: 0,
+    });
+
+    const res = await request(API)
+      .post("/api/paystack/checkout")
+      .send({ kind: "pass", planId: "authors", promoCode: "SAVE20" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/don't apply to monthly subscriptions/i);
+    expect(state.paystackCalls.some((call) => call.url.endsWith("/transaction/initialize"))).toBe(false);
+  });
+
+  it("grants immediately for a FREE promo (no charge, no subscription)", async () => {
     state.userId = "user-1";
     await state.db.insert(state.tables.tandemPromoCodesTable).values({
       code: "FREEBIE",
@@ -222,9 +258,13 @@ describe("POST /api/paystack/checkout", () => {
     expect(res.body).toEqual({ granted: true, checkoutUrl: null, reference: null });
     expect(state.paystackCalls.some((call) => call.url.endsWith("/transaction/initialize"))).toBe(false);
 
-    // The pass was granted without a charge.
+    // The pass was granted without a charge and without a Paystack subscription.
     const tickets = await state.db.select().from(state.tables.tandemTicketsTable);
     expect(tickets).toHaveLength(1);
+    const subs = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    expect(subs).toHaveLength(1);
+    expect(subs[0].autoRenew).toBe(false);
+    expect(subs[0].paystackSubscriptionCode).toBeNull();
     const [promo] = await state.db.select().from(state.tables.tandemPromoCodesTable);
     expect(promo.uses).toBe(1);
   });
@@ -309,6 +349,132 @@ describe("POST /api/paystack/webhook", () => {
       .from(state.tables.tandemPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent.status).toBe("FAILED");
+  });
+
+  it("captures the Paystack subscription code on the first charge", async () => {
+    const reference = await createPassIntent();
+    const { raw, signature } = signWebhook({
+      event: "charge.success",
+      data: {
+        reference,
+        amount: 588,
+        currency: "USD",
+        plan: { plan_code: "PLN_test" },
+        subscription: { subscription_code: "SUB_monthly1", email_token: "tok_1" },
+      },
+    });
+
+    const res = await request(API)
+      .post("/api/paystack/webhook")
+      .set("Content-Type", "application/json")
+      .set("x-paystack-signature", signature)
+      .send(raw);
+    expect(res.status).toBe(200);
+
+    const [sub] = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    expect(sub).toMatchObject({
+      autoRenew: true,
+      paystackPlanCode: "PLN_test",
+      paystackSubscriptionCode: "SUB_monthly1",
+      paystackEmailToken: "tok_1",
+      paystackTransactionReference: reference,
+    });
+  });
+
+  it("grants recurring subscription charges from the live subscription row, exactly once", async () => {
+    // Seed a live auto-renewing subscription (as if bought last month).
+    const now = Date.now();
+    await state.db.insert(state.tables.tandemSubscriptionsTable).values({
+      id: "sub-live",
+      userId: "user-1",
+      kind: "pass",
+      planId: "authors",
+      planLabel: "Author & Writer pass",
+      priceUsd: 588,
+      status: "ACTIVE",
+      intervalLabel: "1 month",
+      periodStart: new Date(now - 30 * 24 * 60 * 60 * 1000),
+      periodEnd: new Date(now + 1 * 24 * 60 * 60 * 1000),
+      autoRenew: true,
+      paystackAuthorizationCode: "auth_123",
+      paystackCustomerCode: "CUS_1",
+      paystackEmail: "buyer@example.com",
+      paystackPlanCode: "PLN_test",
+      paystackSubscriptionCode: "SUB_monthly1",
+      paystackEmailToken: "tok_1",
+    });
+
+    // Paystack bills the plan on its own: a NEW reference with no intent.
+    const recurringRef = "9cfbae6e-bbf3-5b41-8aef-d72c1a17650g";
+    const { raw, signature } = signWebhook({
+      event: "charge.success",
+      data: {
+        reference: recurringRef,
+        amount: 588,
+        currency: "USD",
+        plan: { plan_code: "PLN_test" },
+        subscription: { subscription_code: "SUB_monthly1", email_token: "tok_1" },
+      },
+    });
+    const post = () =>
+      request(API)
+        .post("/api/paystack/webhook")
+        .set("Content-Type", "application/json")
+        .set("x-paystack-signature", signature)
+        .send(raw);
+
+    expect((await post()).status).toBe(200);
+    // The old row stopped being the live record; the new row extends it and
+    // carries the same Paystack subscription.
+    const subs = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    expect(subs).toHaveLength(2);
+    const old = subs.find((s: any) => s.id === "sub-live");
+    expect(old.autoRenew).toBe(false);
+    const fresh = subs.find((s: any) => s.id !== "sub-live");
+    expect(fresh).toMatchObject({
+      autoRenew: true,
+      paystackSubscriptionCode: "SUB_monthly1",
+      paystackTransactionReference: recurringRef,
+      priceUsd: 588,
+    });
+    const tickets = await state.db.select().from(state.tables.tandemTicketsTable);
+    expect(tickets).toHaveLength(1);
+
+    // Replaying the same charge must not grant again.
+    expect((await post()).status).toBe(200);
+    const subsAfter = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    expect(subsAfter).toHaveLength(2);
+  });
+
+  it("records a declined monthly charge on the live subscription", async () => {
+    await state.db.insert(state.tables.tandemSubscriptionsTable).values({
+      id: "sub-live",
+      userId: "user-1",
+      kind: "pass",
+      planId: "authors",
+      planLabel: "Author & Writer pass",
+      priceUsd: 588,
+      status: "ACTIVE",
+      intervalLabel: "1 month",
+      periodStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      periodEnd: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+      autoRenew: true,
+      paystackSubscriptionCode: "SUB_monthly1",
+    });
+
+    const { raw, signature } = signWebhook({
+      event: "invoice.payment_failed",
+      data: { subscription: { subscription_code: "SUB_monthly1" } },
+    });
+    const res = await request(API)
+      .post("/api/paystack/webhook")
+      .set("Content-Type", "application/json")
+      .set("x-paystack-signature", signature)
+      .send(raw);
+    expect(res.status).toBe(200);
+
+    const [sub] = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    expect(sub.renewalFailure).toMatch(/declined/i);
   });
 });
 

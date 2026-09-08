@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { clerkClient, getAuth } from "@clerk/express";
-import { db, tandemPaystackIntentsTable, tandemSubscriptionsTable } from "@workspace/db";
+import {
+  db,
+  tandemPaystackIntentsTable,
+  tandemPaystackPlansTable,
+  tandemSubscriptionsTable,
+} from "@workspace/db";
 import {
   applySubscriptionPurchase,
   autoRenewAvailableForPlan,
@@ -12,6 +17,7 @@ import {
 } from "../video/subscriptions";
 import { resolvePromo } from "./tickets";
 import {
+  createPlan,
   initializeTransaction,
   paystackSecretKey,
   paystackSignatureValid,
@@ -24,11 +30,15 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 
 // ---------------------------------------------------------------------------
-// Paystack — hosted checkout for subscriptions, USD only. The buy buttons no
-// longer collect card details: the server opens a Paystack checkout session
-// (POST /paystack/checkout), the customer pays on Paystack's page, and the
-// entitlement is granted exactly once from either the charge.success webhook
-// or the post-redirect verify call (POST /paystack/confirm). Grants funnel
+// Paystack — hosted checkout for subscriptions, USD only, billed monthly by
+// Paystack's own recurring plans. The buy buttons no longer collect card
+// details: the server mirrors each catalog plan as a Paystack plan (POST
+// /plan), opens a checkout (POST /paystack/checkout) that subscribes the
+// customer to it, and Paystack charges the plan amount every month on its own.
+// The entitlement is granted exactly once from either the charge.success
+// webhook or the post-redirect verify call (POST /paystack/confirm). Recurring
+// charges arrive as charge.success events with a subscription code but no
+// intent, and are granted from the live subscription row. Grants funnel
 // through applySubscriptionPurchase, the same path the card checkout uses.
 // ---------------------------------------------------------------------------
 
@@ -71,6 +81,43 @@ async function markIntent(reference: string, status: "PENDING" | "SUCCESS" | "FA
 }
 
 /**
+ * The Paystack plan code for a catalog plan, creating the Paystack plan once
+ * and caching it in tandem_paystack_plans so later checkouts reuse it.
+ */
+async function getOrCreatePlan(
+  kind: SubscriptionKind,
+  planId: string,
+  amountUsd: number,
+  planLabel: string,
+): Promise<string> {
+  const [existing] = await db
+    .select({ planCode: tandemPaystackPlansTable.planCode })
+    .from(tandemPaystackPlansTable)
+    .where(and(eq(tandemPaystackPlansTable.kind, kind), eq(tandemPaystackPlansTable.planId, planId)))
+    .limit(1);
+  if (existing) return existing.planCode;
+
+  const { planCode } = await createPlan({
+    name: `${planLabel} (Monthly)`,
+    amount: amountUsd,
+    interval: "monthly",
+  });
+  await db
+    .insert(tandemPaystackPlansTable)
+    .values({ kind, planId, planCode, amountUsd, interval: "monthly" })
+    .onConflictDoNothing();
+  return planCode;
+}
+
+/**
+ * The monthly price a subscription's plan charges, in USD cents — what a
+ * recurring charge must match before it is granted.
+ */
+function planAmountUsd(kind: string, planId: string): number | null {
+  return resolveSubscriptionProduct(kind as SubscriptionKind, planId)?.priceUsd ?? null;
+}
+
+/**
  * Grant the entitlement behind a Paystack intent, exactly once. Returns:
  *  - "granted"       — this call applied the purchase
  *  - "already"       — the intent was already SUCCESS (webhook/confirm raced)
@@ -79,16 +126,23 @@ async function markIntent(reference: string, status: "PENDING" | "SUCCESS" | "FA
  * Throws if the grant itself fails (after resetting the intent so a webhook
  * retry can complete it).
  */
+interface ChargeOptions {
+  amount?: number;
+  currency?: string;
+  cardLast4?: string | null;
+  authorizationCode?: string | null;
+  customerCode?: string | null;
+  customerEmail?: string | null;
+  /** Paystack plan this charge billed on (PLN_…). */
+  planCode?: string | null;
+  /** Recurring subscription that produced this charge (SUB_… + email token). */
+  subscriptionCode?: string | null;
+  emailToken?: string | null;
+}
+
 async function grantIntent(
   reference: string,
-  options: {
-    amount?: number;
-    currency?: string;
-    cardLast4?: string | null;
-    authorizationCode?: string | null;
-    customerCode?: string | null;
-    customerEmail?: string | null;
-  } = {},
+  options: ChargeOptions = {},
 ): Promise<"granted" | "already" | "mismatch" | null> {
   const intent = await lookupIntent(reference);
   if (!intent) return null;
@@ -117,6 +171,9 @@ async function grantIntent(
   let authorizationCode = options.authorizationCode ?? null;
   let customerCode = options.customerCode ?? null;
   let customerEmail = options.customerEmail ?? intent.customerEmail ?? null;
+  let planCode = options.planCode ?? null;
+  let subscriptionCode = options.subscriptionCode ?? null;
+  let emailToken = options.emailToken ?? null;
   const renewsSubscriptionId = intent.renewalFor ?? null;
   if (renewsSubscriptionId) {
     const [oldSub] = await db
@@ -129,6 +186,9 @@ async function grantIntent(
       authorizationCode = oldSub.paystackAuthorizationCode ?? authorizationCode;
       customerCode = oldSub.paystackCustomerCode ?? customerCode;
       customerEmail = oldSub.paystackEmail ?? customerEmail;
+      planCode = oldSub.paystackPlanCode ?? planCode;
+      subscriptionCode = oldSub.paystackSubscriptionCode ?? subscriptionCode;
+      emailToken = oldSub.paystackEmailToken ?? emailToken;
     }
   }
 
@@ -147,6 +207,10 @@ async function grantIntent(
       paystackAuthorizationCode: authorizationCode,
       paystackCustomerCode: customerCode,
       paystackEmail: customerEmail,
+      paystackPlanCode: planCode,
+      paystackSubscriptionCode: subscriptionCode,
+      paystackEmailToken: emailToken,
+      paystackTransactionReference: reference,
       renewsSubscriptionId,
     });
   } catch (cause) {
@@ -155,6 +219,87 @@ async function grantIntent(
     throw cause;
   }
   return "granted";
+}
+
+/**
+ * Grant a recurring subscription charge — a charge.success whose reference has
+ * no intent (Paystack billed the plan automatically). The charge is matched to
+ * the live auto-renewing subscription row by its Paystack subscription code,
+ * verified against the plan's monthly price, and granted as the next row in
+ * the chain (the previous row stops being the live record).
+ */
+async function grantSubscriptionCharge(
+  reference: string,
+  options: ChargeOptions,
+): Promise<"granted" | "already" | "mismatch" | null> {
+  if (!options.subscriptionCode) return null;
+  const [sub] = await db
+    .select()
+    .from(tandemSubscriptionsTable)
+    .where(
+      and(
+        eq(tandemSubscriptionsTable.paystackSubscriptionCode, options.subscriptionCode),
+        eq(tandemSubscriptionsTable.autoRenew, true),
+      ),
+    )
+    .orderBy(desc(tandemSubscriptionsTable.createdAt))
+    .limit(1);
+  if (!sub) return null;
+
+  const expected = planAmountUsd(sub.kind, sub.planId);
+  if (expected === null || (options.amount !== undefined && options.amount !== expected)) {
+    logger.warn(
+      { subscriptionCode: options.subscriptionCode, expected, paid: options.amount },
+      "paystack recurring charge amount mismatch — not granted",
+    );
+    return "mismatch";
+  }
+
+  await applySubscriptionPurchase({
+    userId: sub.userId,
+    kind: sub.kind as SubscriptionKind,
+    planId: sub.planId,
+    planLabel: sub.planLabel,
+    priceUsd: expected,
+    intervalLabel: sub.intervalLabel,
+    cardLast4: options.cardLast4 ?? sub.cardLast4,
+    source: "checkout",
+    autoRenew: true,
+    paystackAuthorizationCode: options.authorizationCode ?? sub.paystackAuthorizationCode,
+    paystackCustomerCode: options.customerCode ?? sub.paystackCustomerCode,
+    paystackEmail: options.customerEmail ?? sub.paystackEmail,
+    paystackPlanCode: options.planCode ?? sub.paystackPlanCode,
+    paystackSubscriptionCode: options.subscriptionCode,
+    paystackEmailToken: options.emailToken ?? sub.paystackEmailToken,
+    paystackTransactionReference: reference,
+    renewsSubscriptionId: sub.id,
+  });
+  return "granted";
+}
+
+/**
+ * Route one charge.success: idempotent per Paystack transaction reference,
+ * then the intent path (first purchase) or the subscription path (recurring).
+ */
+async function handleChargeSuccess(
+  reference: string,
+  options: ChargeOptions,
+): Promise<"granted" | "already" | "mismatch" | null> {
+  // A Paystack transaction reference is never granted twice — covers both the
+  // first charge and every recurring cycle.
+  const [alreadyGranted] = await db
+    .select({ id: tandemSubscriptionsTable.id })
+    .from(tandemSubscriptionsTable)
+    .where(eq(tandemSubscriptionsTable.paystackTransactionReference, reference))
+    .limit(1);
+  if (alreadyGranted) return "already";
+
+  const granted = await grantIntent(reference, options);
+  if (granted !== null) return granted;
+
+  // No intent — Paystack billed the plan automatically; grant from the live
+  // subscription instead.
+  return grantSubscriptionCharge(reference, options);
 }
 
 // POST /paystack/checkout — resolve the plan, mint an intent, and open a
@@ -203,9 +348,19 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
     res.status(400).json({ error: "That promo code is not valid" });
     return;
   }
+  // Paystack plans charge the full monthly plan amount — a percentage or
+  // dollar-off promo cannot be applied to a subscription. Only 100%-off
+  // (FREE) promos still apply, as a free month with no card and no renewal.
+  if (promo && promo.kind !== "FREE") {
+    res.status(400).json({
+      error:
+        "Percentage and dollar-off promo codes don't apply to monthly subscriptions — use a FREE promo, or subscribe without a code.",
+    });
+    return;
+  }
   const total = Math.max(0, product.priceUsd - (promo?.discount ?? 0));
 
-  // A FREE promo (or full discount) needs no charge — grant immediately.
+  // A FREE promo needs no charge — grant a free month with no subscription.
   if (total === 0) {
     await applySubscriptionPurchase({
       userId,
@@ -221,6 +376,10 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
     res.status(201).json({ granted: true, checkoutUrl: null, reference: null });
     return;
   }
+
+  // Mirror the catalog plan as a Paystack plan (once) and subscribe the
+  // customer to it — Paystack then charges the plan amount every month.
+  const planCode = await getOrCreatePlan(kind, planId, total, product.planLabel);
 
   // Paystack requires the customer email; resolve it from Clerk.
   let email: string | null = null;
@@ -259,6 +418,7 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
       amount: total,
       reference,
       callbackUrl,
+      plan: planCode,
       metadata: { userId, kind, planId, promoCode: promo?.code ?? null },
     });
     res.status(201).json({ granted: false, checkoutUrl: authorizationUrl, reference });
@@ -270,9 +430,10 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
   }
 });
 
-// POST /paystack/webhook — Paystack pushes charge.success / charge.failed here.
-// Signature-verified with the secret key over the RAW body (captured by the
-// express.json verify hook in app.ts). Always answers 200 once handled.
+// POST /paystack/webhook — Paystack pushes charge.success / charge.failed and
+// the subscription lifecycle events (invoice.payment_failed, subscription.*)
+// here. Signature-verified with the secret key over the RAW body (captured by
+// the express.json verify hook in app.ts). Always answers 200 once handled.
 router.post("/paystack/webhook", async (req: Request, res: Response): Promise<void> => {
   const rawBody = String((req as Request & { rawBody?: Buffer }).rawBody ?? "");
   const signature = req.headers["x-paystack-signature"];
@@ -289,31 +450,58 @@ router.post("/paystack/webhook", async (req: Request, res: Response): Promise<vo
       currency?: string;
       authorization?: { last4?: string | null; authorization_code?: string | null } | null;
       customer?: { customer_code?: string | null; email?: string | null } | null;
+      plan?: { plan_code?: string | null } | null;
+      subscription?: { subscription_code?: string | null; email_token?: string | null; status?: string | null } | null;
     };
   };
   const event = payload.event ?? "";
   const data = payload.data ?? {};
   const reference = typeof data.reference === "string" ? data.reference : "";
 
-  if (!reference) {
+  if (!reference && !data.subscription?.subscription_code) {
     res.status(200).json({ received: true });
     return;
   }
 
   try {
     if (event === "charge.success") {
-      const result = await grantIntent(reference, {
+      const result = await handleChargeSuccess(reference, {
         amount: typeof data.amount === "number" ? data.amount : undefined,
         currency: typeof data.currency === "string" ? data.currency : undefined,
         cardLast4: data.authorization?.last4 ?? null,
         authorizationCode: data.authorization?.authorization_code ?? null,
         customerCode: data.customer?.customer_code ?? null,
         customerEmail: data.customer?.email ?? null,
+        planCode: data.plan?.plan_code ?? null,
+        subscriptionCode: data.subscription?.subscription_code ?? null,
+        emailToken: data.subscription?.email_token ?? null,
       });
       if (result === null) logger.warn({ reference }, "paystack webhook: unknown reference (ignored)");
     } else if (event === "charge.failed" || event === "charge.void" || event === "charge.abandoned") {
       const intent = await lookupIntent(reference);
       if (intent && intent.status === "PENDING") await markIntent(reference, "FAILED");
+    } else if (event === "invoice.payment_failed") {
+      // A monthly subscription charge was declined — surface it on the live row.
+      const code = data.subscription?.subscription_code;
+      if (code) {
+        await db
+          .update(tandemSubscriptionsTable)
+          .set({
+            renewalFailure:
+              "The monthly charge was declined — update the card on your subscription or contact support.",
+            updatedAt: new Date(),
+          })
+          .where(and(eq(tandemSubscriptionsTable.paystackSubscriptionCode, code), eq(tandemSubscriptionsTable.autoRenew, true)));
+      }
+    } else if (event === "subscription.disable") {
+      // Cancelled or completed — stop treating the chain as auto-renewing.
+      const code = data.subscription?.subscription_code;
+      if (code) {
+        await db
+          .update(tandemSubscriptionsTable)
+          .set({ autoRenew: false, updatedAt: new Date() })
+          .where(eq(tandemSubscriptionsTable.paystackSubscriptionCode, code));
+      }
     }
     res.status(200).json({ received: true });
   } catch (cause) {
@@ -384,13 +572,16 @@ router.post("/paystack/confirm", async (req: Request, res: Response): Promise<vo
 
   // Success (or already granted by the webhook while we verified) — make sure
   // the grant has happened, then hand back the receipt for the success UI.
-  const result = await grantIntent(reference, {
+  const result = await handleChargeSuccess(reference, {
     amount: txn.amount,
     currency: txn.currency,
     cardLast4,
     authorizationCode: txn.authorization?.authorization_code ?? null,
     customerCode: txn.customer?.customer_code ?? null,
     customerEmail: txn.customer?.email ?? null,
+    planCode: txn.plan?.plan_code ?? null,
+    subscriptionCode: txn.subscription?.subscription_code ?? null,
+    emailToken: txn.subscription?.email_token ?? null,
   });
   if (result === "mismatch") {
     res.status(402).json({ error: "The payment amount did not match — contact support." });

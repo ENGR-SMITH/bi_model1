@@ -3,9 +3,9 @@ import { boolean, integer, pgTable, primaryKey, text, timestamp } from "drizzle-
 
 // ---------------------------------------------------------------------------
 // TANDEM category passes — the ticket 🎫 paywall. Each available category
-// (authors, content-creators) requires an active pass: $1.88 for 3 weeks.
-// One pass per (user, category); re-purchasing extends the current pass when
-// it is still active. Promo codes (server-managed) discount or waive the fee.
+// (authors, content-creators) requires an active pass: $5.88 / month (billed
+// monthly by Paystack). One pass per (user, category); renewing extends the
+// current pass when it is still active. FREE promo codes grant a free month.
 // ---------------------------------------------------------------------------
 
 export const tandemTicketsTable = pgTable("tandem_tickets", {

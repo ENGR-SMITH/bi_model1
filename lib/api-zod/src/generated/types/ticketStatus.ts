@@ -9,6 +9,6 @@ import type { TicketPass } from './ticketPass';
 
 export interface TicketStatus {
   priceUsd: number;
-  weeks: number;
+  months: number;
   tickets: TicketPass[];
 }

@@ -22,6 +22,7 @@ import {
   UpdateAdminSubscriptionAutoRenewResponse,
 } from "@workspace/api-zod";
 import { checkProvider, listProviderStatuses, updateProvider, type ProviderId } from "../lib/oracle";
+import { disableSubscription, enableSubscription, PaystackApiError } from "../lib/paystack";
 import { resolveSubscriptionProduct, subscriptionPlans, type SubscriptionKind } from "../video/subscriptions";
 
 const router: IRouter = Router();
@@ -339,9 +340,10 @@ router.patch("/admin/plan-settings/:kind/:planId", requireAdmin, async (req, res
 // ---------------------------------------------------------------------------
 // Subscriptions admin — every purchase across all users, newest first, with
 // the buyer's email resolved from Clerk. The auto-renew toggle here is the
-// per-account override: it switches server-managed renewal on/off for one
-// specific subscription. Every Paystack subscription auto-renews by default;
-// this is the only place (besides the per-plan setting) that can turn it off.
+// per-account override: it switches the Paystack subscription on/off (so
+// Paystack stops or resumes the monthly charges) and mirrors that on the row.
+// Every Paystack subscription auto-renews by default; this is the only place
+// (besides the per-plan setting) that can turn it off.
 // ---------------------------------------------------------------------------
 
 function adminSubscriptionView(row: typeof tandemSubscriptionsTable.$inferSelect) {
@@ -417,11 +419,32 @@ router.patch("/admin/subscriptions/:id/auto-renew", requireAdmin, async (req, re
     res.status(404).json({ error: "Subscription not found" });
     return;
   }
-  if (body.data.enabled && !sub.paystackAuthorizationCode) {
+  if (body.data.enabled && !sub.paystackSubscriptionCode) {
     res.status(400).json({
-      error: "No card is on file for this subscription — automatic renewal cannot be turned on.",
+      error: "No Paystack subscription is linked to this row — automatic renewal cannot be turned on.",
     });
     return;
+  }
+
+  // Turning a Paystack-backed row off must stop Paystack from charging the
+  // card first — otherwise the customer keeps getting billed. Turning it back
+  // on resumes the same subscription.
+  if (sub.paystackSubscriptionCode && sub.paystackEmailToken) {
+    try {
+      if (body.data.enabled) {
+        await enableSubscription(sub.paystackSubscriptionCode, sub.paystackEmailToken);
+      } else {
+        await disableSubscription(sub.paystackSubscriptionCode, sub.paystackEmailToken);
+      }
+    } catch (cause) {
+      res.status(502).json({
+        error:
+          cause instanceof PaystackApiError
+            ? `Paystack could not ${body.data.enabled ? "resume" : "stop"} this subscription: ${cause.message}`
+            : `Paystack could not ${body.data.enabled ? "resume" : "stop"} this subscription.`,
+      });
+      return;
+    }
   }
 
   const [updated] = await db

@@ -584,7 +584,7 @@ export interface TicketPass {
 
 export interface TicketStatus {
   priceUsd: number;
-  weeks: number;
+  months: number;
   tickets: TicketPass[];
 }
 

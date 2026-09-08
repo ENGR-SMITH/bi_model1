@@ -2042,12 +2042,12 @@ export const GetUserCvFileResponse = zod.unknown()
 
 
 /**
- * Returns the pass price ($1.88) and duration (3 weeks) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
+ * Returns the pass price ($5.88) and duration (1 month) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
  * @summary Read the viewer's active category passes and the pass price
  */
 export const GetTicketStatusResponse = zod.object({
   "priceUsd": zod.number().int(),
-  "weeks": zod.number().int(),
+  "months": zod.number().int(),
   "tickets": zod.array(zod.object({
   "category": zod.string(),
   "expiresAt": zod.coerce.date()

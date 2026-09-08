@@ -80,6 +80,10 @@ export interface InitializeTransactionInput {
   reference: string;
   callbackUrl?: string;
   metadata?: Record<string, unknown>;
+  /** Paystack plan code (PLN_…) — when set, the transaction subscribes the
+      customer to the plan and Paystack charges the plan's own amount (the
+      `amount` passed above is then ignored for billing). */
+  plan?: string;
 }
 
 export interface InitializeTransactionResult {
@@ -100,12 +104,64 @@ export async function initializeTransaction(
         amount: input.amount,
         currency: PAYSTACK_CURRENCY,
         reference: input.reference,
+        ...(input.plan ? { plan: input.plan } : {}),
         ...(input.callbackUrl ? { callback_url: input.callbackUrl } : {}),
         ...(input.metadata ? { metadata: input.metadata } : {}),
       }),
     },
   );
   return { authorizationUrl: json.data.authorization_url, reference: json.data.reference };
+}
+
+/**
+ * POST /plan — mirror a catalog plan as a Paystack recurring plan. Returns the
+ * plan code (PLN_…) that checkout passes to initialize to subscribe customers.
+ * Plans are created once per (kind, planId) and cached in tandem_paystack_plans.
+ */
+export interface CreatePlanInput {
+  name: string;
+  /** Amount in USD cents (the monthly price). */
+  amount: number;
+  /** "monthly" for every subscription plan here. */
+  interval: "daily" | "weekly" | "monthly" | "quarterly" | "biannually" | "annually";
+  currency?: string;
+}
+
+export interface CreatePlanResult {
+  planCode: string;
+}
+
+export async function createPlan(input: CreatePlanInput): Promise<CreatePlanResult> {
+  const json = await paystackRequest<{ status: boolean; data: { plan_code: string } }>("/plan", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name,
+      amount: input.amount,
+      interval: input.interval,
+      currency: input.currency ?? PAYSTACK_CURRENCY,
+    }),
+  });
+  return { planCode: json.data.plan_code };
+}
+
+/**
+ * POST /subscription/disable — stop Paystack from charging a subscription
+ * (admin turning auto-renewal off). Requires the subscription code and the
+ * email token captured at checkout.
+ */
+export async function disableSubscription(code: string, token: string): Promise<void> {
+  await paystackRequest("/subscription/disable", {
+    method: "POST",
+    body: JSON.stringify({ code, token }),
+  });
+}
+
+/** POST /subscription/enable — resume charging a disabled subscription. */
+export async function enableSubscription(code: string, token: string): Promise<void> {
+  await paystackRequest("/subscription/enable", {
+    method: "POST",
+    body: JSON.stringify({ code, token }),
+  });
 }
 
 /** What Paystack reports for a verified transaction (the `data` object). */
@@ -118,6 +174,14 @@ export interface PaystackTransaction {
   authorization?: PaystackAuthorization | null;
   customer?: { customer_code?: string | null; email?: string | null } | null;
   metadata?: Record<string, unknown> | null;
+  /** Present on plan-based transactions — which plan the charge was for. */
+  plan?: { plan_code?: string | null } | null;
+  /** Present on subscription charges — which recurring subscription billed. */
+  subscription?: {
+    subscription_code?: string | null;
+    email_token?: string | null;
+    status?: string | null;
+  } | null;
 }
 
 export interface PaystackAuthorization {

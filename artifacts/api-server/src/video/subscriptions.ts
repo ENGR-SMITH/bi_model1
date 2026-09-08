@@ -10,7 +10,7 @@ import {
   tandemTicketsTable,
 } from "@workspace/db";
 import { STORAGE_PLANS, PROJECT_PLANS, getOrCreateQuota } from "./quota";
-import { PASS_PRICE_USD, PASS_WEEKS, TICKET_CATEGORIES, type TicketCategory } from "../routes/tickets";
+import { PASS_PRICE_USD, TICKET_CATEGORIES, type TicketCategory } from "../routes/tickets";
 
 // ---------------------------------------------------------------------------
 // Subscriptions — a unified view of the three purchase products across the
@@ -22,6 +22,11 @@ import { PASS_PRICE_USD, PASS_WEEKS, TICKET_CATEGORIES, type TicketCategory } fr
 // ---------------------------------------------------------------------------
 
 export type SubscriptionKind = "pass" | "storage" | "projects";
+
+/** One subscription period — a month. Every plan bills monthly via Paystack. */
+export const SUBSCRIPTION_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+/** The billing rhythm every plan shares. */
+export const SUBSCRIPTION_INTERVAL_LABEL = "1 month";
 
 /** One purchasable subscription product shown on the payments page. */
 export interface SubscriptionPlan {
@@ -70,26 +75,24 @@ export async function subscriptionPlans(): Promise<SubscriptionPlan[]> {
     return row ? row.autoRenewAvailable : defaultAutoRenewAvailable(kind);
   };
 
+  // Every plan bills monthly through a Paystack subscription plan — the pass
+  // and the storage/project extensions all share the same one-month rhythm.
   const passes: SubscriptionPlan[] = TICKET_CATEGORIES.map((category) => ({
     kind: "pass",
     planId: category,
     planLabel: category === "authors" ? "Author & Writer pass" : "Content Creators pass",
     priceUsd: PASS_PRICE_USD,
-    intervalLabel: `${PASS_WEEKS} weeks`,
-    detail: `A ticket into the ${category === "authors" ? "Author&pos;s Atrium" : "Content Creators room"} for ${PASS_WEEKS} weeks`,
+    intervalLabel: SUBSCRIPTION_INTERVAL_LABEL,
+    detail: `A ticket into the ${category === "authors" ? "Author&pos;s Atrium" : "Content Creators room"} for ${SUBSCRIPTION_INTERVAL_LABEL}`,
     autoRenewAvailable: availableFor("pass", category),
   }));
 
-  // Storage and project plans auto-renew like passes: each purchase extends
-  // the account for a year (periodEnd = +365 days), then the renewal scheduler
-  // re-charges the card. "1 year" is the honest billing rhythm, matching the
-  // pass's "3 weeks".
   const storage: SubscriptionPlan[] = STORAGE_PLANS.map((plan) => ({
     kind: "storage",
     planId: plan.id,
     planLabel: plan.label,
     priceUsd: plan.priceUsd,
-    intervalLabel: "1 year",
+    intervalLabel: SUBSCRIPTION_INTERVAL_LABEL,
     detail: `Extend your workspace storage with another ${plan.label}`,
     autoRenewAvailable: availableFor("storage", plan.id),
   }));
@@ -99,7 +102,7 @@ export async function subscriptionPlans(): Promise<SubscriptionPlan[]> {
     planId: plan.id,
     planLabel: `+${plan.count} projects`,
     priceUsd: plan.priceUsd,
-    intervalLabel: "1 year",
+    intervalLabel: SUBSCRIPTION_INTERVAL_LABEL,
     detail: plan.label,
     autoRenewAvailable: availableFor("projects", plan.id),
   }));
@@ -131,7 +134,7 @@ export function resolveSubscriptionProduct(
     return {
       priceUsd: PASS_PRICE_USD,
       planLabel: planId === "authors" ? "Author & Writer pass" : "Content Creators pass",
-      intervalLabel: `${PASS_WEEKS} weeks`,
+      intervalLabel: SUBSCRIPTION_INTERVAL_LABEL,
     };
   }
   if (kind === "storage") {
@@ -140,7 +143,7 @@ export function resolveSubscriptionProduct(
     return {
       priceUsd: plan.priceUsd,
       planLabel: `${formatBytes(plan.bytes)} more space`,
-      intervalLabel: "1 year",
+      intervalLabel: SUBSCRIPTION_INTERVAL_LABEL,
     };
   }
   const plan = PROJECT_PLANS.find((item) => item.id === planId);
@@ -148,7 +151,7 @@ export function resolveSubscriptionProduct(
   return {
     priceUsd: plan.priceUsd,
     planLabel: `+${plan.count} projects`,
-    intervalLabel: "1 year",
+    intervalLabel: SUBSCRIPTION_INTERVAL_LABEL,
   };
 }
 
@@ -179,6 +182,10 @@ export interface RecordSubscriptionInput {
   paystackAuthorizationCode?: string | null;
   paystackCustomerCode?: string | null;
   paystackEmail?: string | null;
+  paystackPlanCode?: string | null;
+  paystackSubscriptionCode?: string | null;
+  paystackEmailToken?: string | null;
+  paystackTransactionReference?: string | null;
 }
 
 /** Inserts a subscription record for an entitlement that was just granted. */
@@ -203,6 +210,10 @@ export async function recordSubscription(input: RecordSubscriptionInput): Promis
     paystackAuthorizationCode: input.paystackAuthorizationCode ?? null,
     paystackCustomerCode: input.paystackCustomerCode ?? null,
     paystackEmail: input.paystackEmail ?? null,
+    paystackPlanCode: input.paystackPlanCode ?? null,
+    paystackSubscriptionCode: input.paystackSubscriptionCode ?? null,
+    paystackEmailToken: input.paystackEmailToken ?? null,
+    paystackTransactionReference: input.paystackTransactionReference ?? null,
   });
   return id;
 }
@@ -233,6 +244,12 @@ export interface ApplySubscriptionPurchaseInput {
   paystackAuthorizationCode?: string | null;
   paystackCustomerCode?: string | null;
   paystackEmail?: string | null;
+  /** The Paystack plan + recurring subscription this row bills on. */
+  paystackPlanCode?: string | null;
+  paystackSubscriptionCode?: string | null;
+  paystackEmailToken?: string | null;
+  /** The Paystack charge that granted this row (idempotency for webhooks). */
+  paystackTransactionReference?: string | null;
   /** When this purchase is an auto-renewal of an existing row, the id of the
       row being renewed — cleared of auto-renew so only the newest record is
       the live renewal (one charge chain per pass). */
@@ -254,10 +271,12 @@ export interface AppliedSubscription {
  * paid plan always lands the same way.
  */
 /**
- * True when a granted subscription should carry the auto-renewal flag: signed
- * up at checkout and confirmed with a stored Paystack card authorization, or
- * a scheduled renewal charge of an existing auto-renewing row. Applies to
- * every kind — passes, storage, and projects.
+ * True when a granted subscription should carry the auto-renewal flag: the
+ * checkout signed the customer up for a Paystack plan (autoRenew is on unless
+ * an admin turned it off for the plan), or this row is the renewal of an
+ * existing auto-renewing chain. Paystack holds the card and bills the plan on
+ * its own, so no local authorization code is required. Applies to every kind
+ * — passes, storage, and projects.
  */
 function shouldAutoRenew(input: {
   kind: SubscriptionKind;
@@ -266,7 +285,7 @@ function shouldAutoRenew(input: {
   renewsSubscriptionId?: string | null;
 }): boolean {
   if (input.renewsSubscriptionId) return true; // a renewal of an auto-renew row
-  return Boolean(input.autoRenew && input.paystackAuthorizationCode);
+  return input.autoRenew === true;
 }
 
 export async function applySubscriptionPurchase(
@@ -278,7 +297,7 @@ export async function applySubscriptionPurchase(
 
   if (input.kind === "pass") {
     const category = input.planId as TicketCategory;
-    // Renewing while the pass is still live extends it; otherwise 3 weeks from now.
+    // Renewing while the pass is still live extends it; otherwise 1 month from now.
     const [existing] = await db
       .select()
       .from(tandemTicketsTable)
@@ -293,7 +312,7 @@ export async function applySubscriptionPurchase(
       .limit(1);
     const base = existing && existing.expiresAt.getTime() > Date.now() ? existing.expiresAt : now;
     periodStart = base;
-    periodEnd = new Date(base.getTime() + PASS_WEEKS * 7 * 24 * 60 * 60 * 1000);
+    periodEnd = new Date(base.getTime() + SUBSCRIPTION_PERIOD_MS);
     await db.insert(tandemTicketsTable).values({
       id: randomUUID(),
       userId: input.userId,
@@ -305,7 +324,7 @@ export async function applySubscriptionPurchase(
     });
   } else {
     const quota = await getOrCreateQuota(input.userId);
-    periodEnd = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+    periodEnd = new Date(now.getTime() + SUBSCRIPTION_PERIOD_MS);
     await db
       .update(tandemAccountQuotasTable)
       .set(
@@ -347,6 +366,10 @@ export async function applySubscriptionPurchase(
     paystackAuthorizationCode: input.paystackAuthorizationCode ?? null,
     paystackCustomerCode: input.paystackCustomerCode ?? null,
     paystackEmail: input.paystackEmail ?? null,
+    paystackPlanCode: input.paystackPlanCode ?? null,
+    paystackSubscriptionCode: input.paystackSubscriptionCode ?? null,
+    paystackEmailToken: input.paystackEmailToken ?? null,
+    paystackTransactionReference: input.paystackTransactionReference ?? null,
   });
 
   // The row this renewal extended stops being the live auto-renew record —

@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   db: null as any,
   tables: null as any,
   emails: {} as Record<string, string>,
+  paystackCalls: [] as Array<{ method: string; url: string; body?: any }>,
 }));
 
 vi.mock("@clerk/express", () => ({
@@ -79,16 +80,34 @@ async function resetDb() {
   await state.db.delete(t.oracleProvidersTable);
   state.emails = {};
   state.userId = null;
+  state.paystackCalls = [];
+}
+
+/** Stub the Paystack subscription enable/disable endpoints. */
+function stubPaystackSubscriptions() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: any) => {
+      state.paystackCalls.push({ method: init?.method ?? "GET", url: String(url), body: init?.body ? JSON.parse(init.body) : undefined });
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ status: true, message: "ok" }),
+      };
+    }),
+  );
 }
 
 beforeEach(async () => {
   process.env.ADMIN_EMAIL = "admin@example.com";
+  process.env.PAYSTACK_SECRET_KEY = "sk_test_secret_key";
   await resetDb();
 });
 
 afterEach(() => {
-  delete process.env.ADMIN_EMAIL;
   vi.unstubAllGlobals();
+  delete process.env.ADMIN_EMAIL;
+  delete process.env.PAYSTACK_SECRET_KEY;
 });
 
 describe("admin access", () => {
@@ -376,9 +395,9 @@ describe("admin subscriptions", () => {
       planLabel: "Author & Writer pass",
       priceUsd: 588,
       status: "ACTIVE",
-      intervalLabel: "4 weeks",
+      intervalLabel: "1 month",
       periodStart: new Date(now),
-      periodEnd: new Date(now + 4 * 7 * 24 * 60 * 60 * 1000),
+      periodEnd: new Date(now + 30 * 24 * 60 * 60 * 1000),
       ...overrides,
     });
   }
@@ -393,7 +412,7 @@ describe("admin subscriptions", () => {
       planId: "g200",
       planLabel: "200 GB more space",
       priceUsd: 2000,
-      intervalLabel: "recurring",
+      intervalLabel: "1 month",
       createdAt: new Date(1000),
     });
     await seedSubscription({
@@ -429,23 +448,37 @@ describe("admin subscriptions", () => {
     expect(res.body[0].userEmail).toBeNull();
   });
 
-  it("toggles auto-renew on and off for one subscription (any kind)", async () => {
+  it("toggles auto-renew on and off for one subscription (any kind), telling Paystack", async () => {
     const cookie = await login();
-    await seedSubscription({ id: "sub-1", paystackAuthorizationCode: "auth_123" });
+    stubPaystackSubscriptions();
+    await seedSubscription({
+      id: "sub-1",
+      paystackSubscriptionCode: "SUB_abc123",
+      paystackEmailToken: "tok_abc",
+      paystackAuthorizationCode: "auth_123",
+    });
 
-    const on = await request(API)
-      .patch("/api/admin/subscriptions/sub-1/auto-renew")
-      .set("Cookie", cookie)
-      .send({ enabled: true });
-    expect(on.status).toBe(200);
-    expect(on.body.autoRenew).toBe(true);
-
+    // Turning it off disables the Paystack subscription so charges stop.
     const off = await request(API)
       .patch("/api/admin/subscriptions/sub-1/auto-renew")
       .set("Cookie", cookie)
       .send({ enabled: false });
     expect(off.status).toBe(200);
     expect(off.body.autoRenew).toBe(false);
+    expect(state.paystackCalls).toContainEqual(
+      expect.objectContaining({ url: "https://api.paystack.co/subscription/disable", body: { code: "SUB_abc123", token: "tok_abc" } }),
+    );
+
+    // Turning it back on resumes the same subscription.
+    const on = await request(API)
+      .patch("/api/admin/subscriptions/sub-1/auto-renew")
+      .set("Cookie", cookie)
+      .send({ enabled: true });
+    expect(on.status).toBe(200);
+    expect(on.body.autoRenew).toBe(true);
+    expect(state.paystackCalls).toContainEqual(
+      expect.objectContaining({ url: "https://api.paystack.co/subscription/enable", body: { code: "SUB_abc123", token: "tok_abc" } }),
+    );
 
     // Storage subscriptions can be toggled by the admin too.
     await seedSubscription({
@@ -454,8 +487,9 @@ describe("admin subscriptions", () => {
       planId: "g200",
       planLabel: "200 GB more space",
       priceUsd: 2000,
-      intervalLabel: "recurring",
-      paystackAuthorizationCode: "auth_123",
+      intervalLabel: "1 month",
+      paystackSubscriptionCode: "SUB_storage",
+      paystackEmailToken: "tok_storage",
     });
     const storageOff = await request(API)
       .patch("/api/admin/subscriptions/sub-storage/auto-renew")
@@ -465,19 +499,19 @@ describe("admin subscriptions", () => {
     expect(storageOff.body.autoRenew).toBe(false);
   });
 
-  it("refuses to enable auto-renew without a card on file", async () => {
+  it("refuses to enable auto-renew without a linked Paystack subscription", async () => {
     const cookie = await login();
-    await seedSubscription({ id: "sub-nocard" });
+    await seedSubscription({ id: "sub-nolink" });
 
     const res = await request(API)
-      .patch("/api/admin/subscriptions/sub-nocard/auto-renew")
+      .patch("/api/admin/subscriptions/sub-nolink/auto-renew")
       .set("Cookie", cookie)
       .send({ enabled: true });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/card is on file/i);
+    expect(res.body.error).toMatch(/Paystack subscription is linked/i);
   });
 
-  it("rejects non-pass subscriptions, unknown ids, and unauthenticated callers", async () => {
+  it("rejects unknown ids, unlinked rows, and unauthenticated callers", async () => {
     const cookie = await login();
     await seedSubscription({
       id: "sub-storage",
@@ -485,9 +519,10 @@ describe("admin subscriptions", () => {
       planId: "g200",
       planLabel: "200 GB more space",
       priceUsd: 2000,
-      intervalLabel: "recurring",
+      intervalLabel: "1 month",
     });
 
+    // A storage row without a Paystack subscription cannot be turned on.
     const nonPass = await request(API)
       .patch("/api/admin/subscriptions/sub-storage/auto-renew")
       .set("Cookie", cookie)

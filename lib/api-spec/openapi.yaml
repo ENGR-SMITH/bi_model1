@@ -1784,7 +1784,7 @@ paths:
       operationId: getTicketStatus
       tags: [tandems]
       summary: Read the viewer's active category passes and the pass price
-      description: Returns the pass price ($1.88) and duration (3 weeks) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
+      description: Returns the pass price ($5.88) and duration (1 month) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
       responses:
         "200":
           description: Ticket status and active passes
@@ -5232,11 +5232,11 @@ components:
       type: object
       properties:
         priceUsd: { type: integer }
-        weeks: { type: integer }
+        months: { type: integer }
         tickets:
           type: array
           items: { $ref: "#/components/schemas/TicketPass" }
-      required: [priceUsd, weeks, tickets]
+      required: [priceUsd, months, tickets]
     TicketPromoValidateInput:
       type: object
       properties:

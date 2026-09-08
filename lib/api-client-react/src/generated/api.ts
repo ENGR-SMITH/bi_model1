@@ -6026,7 +6026,7 @@ export const getGetTicketStatusUrl = () => {
 }
 
 /**
- * Returns the pass price ($1.88) and duration (3 weeks) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
+ * Returns the pass price ($5.88) and duration (1 month) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
  * @summary Read the viewer's active category passes and the pass price
  */
 export const getTicketStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<TicketStatus> => {

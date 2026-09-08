@@ -764,10 +764,28 @@ export const tandemSubscriptionsTable = sqliteTable("tandem_subscriptions", {
   paystackAuthorizationCode: text("paystack_authorization_code"),
   paystackCustomerCode: text("paystack_customer_code"),
   paystackEmail: text("paystack_email"),
+  paystackPlanCode: text("paystack_plan_code"),
+  paystackSubscriptionCode: text("paystack_subscription_code"),
+  paystackEmailToken: text("paystack_email_token"),
+  paystackTransactionReference: text("paystack_transaction_reference"),
   renewalFailure: text("renewal_failure"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
+
+export const tandemPaystackPlansTable = sqliteTable(
+  "tandem_paystack_plans",
+  {
+    kind: text("kind").notNull(),
+    planId: text("plan_id").notNull(),
+    planCode: text("plan_code").notNull(),
+    amountUsd: integer("amount_usd").notNull(),
+    interval: text("interval").notNull().default("monthly"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => [primaryKey({ columns: [table.kind, table.planId] })],
+);
 
 export const tandemSubscriptionPlanSettingsTable = sqliteTable(
   "tandem_subscription_plan_settings",
@@ -1209,8 +1227,17 @@ export async function buildInMemoryDb() {
       clerk_subscription_id TEXT, promo_code TEXT, card_last_4 TEXT,
       auto_renew INTEGER NOT NULL DEFAULT 0,
       paystack_authorization_code TEXT, paystack_customer_code TEXT,
-      paystack_email TEXT, renewal_failure TEXT,
+      paystack_email TEXT, paystack_plan_code TEXT,
+      paystack_subscription_code TEXT, paystack_email_token TEXT,
+      paystack_transaction_reference TEXT, renewal_failure TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE tandem_paystack_plans (
+      kind TEXT NOT NULL, plan_id TEXT NOT NULL,
+      plan_code TEXT NOT NULL, amount_usd INTEGER NOT NULL,
+      interval TEXT NOT NULL DEFAULT 'monthly',
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      PRIMARY KEY (kind, plan_id)
     );
     CREATE TABLE tandem_subscription_plan_settings (
       kind TEXT NOT NULL, plan_id TEXT NOT NULL,
@@ -1377,6 +1404,7 @@ export async function buildInMemoryDb() {
     tandemPromoRedemptionsTable,
     tandemSubscriptionsTable,
     tandemSubscriptionPlanSettingsTable,
+    tandemPaystackPlansTable,
     tandemPaystackIntentsTable,
     tandemVideoStorageSnapshotsTable,
     tandemArenaPostsTable,

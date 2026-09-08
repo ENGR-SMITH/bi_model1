@@ -14,10 +14,11 @@ import {
 
 const router: IRouter = Router();
 
-// The category pass: $5.88 for 3 weeks, per category. One active pass opens
-// the whole category (Author-Writer room / Content-Creators room).
+// The category pass: $5.88 per month, per category. One active pass opens the
+// whole category (Author-Writer room / Content-Creators room). Billed monthly
+// through a Paystack subscription plan.
 export const PASS_PRICE_USD = 588; // $5.88 in cents
-export const PASS_WEEKS = 3;
+export const PASS_MONTHS = 1;
 // A visitor without a pass gets ONE 10-minute preview tour per den (a row in
 // tandem_tours). Each den tours independently, matching its own pass.
 export const TOUR_MINUTES = 10;
@@ -256,7 +257,7 @@ router.get("/tickets/status", async (req: Request, res: Response): Promise<void>
   res.json(
     GetTicketStatusResponse.parse({
       priceUsd: PASS_PRICE_USD,
-      weeks: PASS_WEEKS,
+      months: PASS_MONTHS,
       tickets: [...latestByCategory.values()].map((ticket) => ({
         category: ticket.category,
         expiresAt: ticket.expiresAt.toISOString(),
@@ -364,7 +365,7 @@ router.post("/tickets/purchase", async (req: Request, res: Response): Promise<vo
     planId: category,
     planLabel: category === "authors" ? "Author & Writer pass" : "Content Creators pass",
     priceUsd: total,
-    intervalLabel: `${PASS_WEEKS} weeks`,
+    intervalLabel: "1 month",
     promoCode: promo?.code ?? null,
     cardLast4,
     source: "checkout",

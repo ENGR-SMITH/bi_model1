@@ -33,8 +33,8 @@ export default function CategoryUnavailable() {
   }, [category, mutation.isSuccess, toast]);
 
   if (!category) return <CategoryNotFound />;
-  // The paywall: authors and content-creators need an active pass ($5.88 / 3
-  // weeks) before the room opens — the coupon-card popup handles the purchase.
+  // The paywall: authors and content-creators need an active pass ($5.88 /
+  // month) before the room opens — the coupon-card popup handles the purchase.
   if (category.slug === 'authors') {
     return (
       <TicketGate slug="authors" name={category.name}>

@@ -12,7 +12,7 @@ import {
 
 // ---------------------------------------------------------------------------
 // Ticket gate — the TANDEM category paywall. Each available category
-// (Author-Writer, Content-Creators) requires an active pass ($5.88 / 3 weeks)
+// (Author-Writer, Content-Creators) requires an active pass ($5.88 / month)
 // before the room opens. Without a pass the page renders dimmed behind a
 // coupon-style popup. Payment runs through Paystack's hosted checkout (USD):
 // the popup opens a Paystack page, and when the customer returns the gate
@@ -57,7 +57,7 @@ export function TicketGate({
           setReturnStamp({
             expiresAt:
               ticket?.expiresAt ??
-              new Date(Date.now() + (refreshed.data?.weeks ?? 3) * 7 * 24 * 60 * 60 * 1000).toISOString(),
+              new Date(Date.now() + (refreshed.data?.months ?? 1) * 30 * 24 * 60 * 60 * 1000).toISOString(),
             total: res.receipt?.total ?? 0,
             cardLast4: res.receipt?.cardLast4 ?? null,
             promoCode: res.receipt?.promoCode ?? null,
@@ -107,7 +107,7 @@ export function TicketGate({
       {returnStamp && (
         <PassStamp
           name={name}
-          weeks={status.data?.weeks ?? 3}
+          months={status.data?.months ?? 1}
           expiresAt={returnStamp.expiresAt}
           total={returnStamp.total}
           cardLast4={returnStamp.cardLast4}
@@ -125,7 +125,7 @@ export function TicketGate({
 // checkout.
 function PassStamp({
   name,
-  weeks,
+  months,
   expiresAt,
   total,
   cardLast4,
@@ -134,7 +134,7 @@ function PassStamp({
   onDone,
 }: {
   name: string;
-  weeks: number;
+  months: number;
   expiresAt: string;
   total: number;
   cardLast4: string | null;
@@ -243,7 +243,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
   const queryClient = useQueryClient();
   const status = useGetTicketStatus();
   const priceUsd = status.data?.priceUsd ?? 588;
-  const weeks = status.data?.weeks ?? 3;
+  const months = status.data?.months ?? 1;
 
   const [promoInput, setPromoInput] = useState('');
   const [stamp, setStamp] = useState<{ expiresAt: string; total: number; cardLast4: string | null; promoCode: string | null } | null>(null);
@@ -256,7 +256,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
         if (res.granted) {
           // A FREE promo (full discount) is granted server-side — no redirect.
           setStamp({
-            expiresAt: new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000).toISOString(),
+            expiresAt: new Date(Date.now() + months * 30 * 24 * 60 * 60 * 1000).toISOString(),
             total: 0,
             cardLast4: null,
             promoCode: promoInput.trim() || null,
@@ -297,7 +297,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
     return (
       <PassStamp
         name={name}
-        weeks={weeks}
+        months={months}
         expiresAt={stamp.expiresAt}
         total={stamp.total}
         cardLast4={stamp.cardLast4}
@@ -332,7 +332,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           {/* Price — its own row under the title. */}
           <div className="mt-6 flex items-baseline gap-1.5">
             <span className="font-display text-[2.5rem] font-extrabold leading-none tracking-[-0.05em] text-[#34d399] drop-shadow-[0_0_18px_rgba(52,211,153,.35)]">${(priceUsd / 100).toFixed(2)}</span>
-            <span className="font-mono-ui text-[13px] uppercase tracking-[0.16em] text-white">/ {weeks} weeks</span>
+            <span className="font-mono-ui text-[13px] uppercase tracking-[0.16em] text-white">/ {months} {months === 1 ? 'month' : 'months'}</span>
           </div>
 
           <p className="mt-4 text-[13px] leading-relaxed text-zinc-400">
@@ -389,7 +389,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             {busy ? (
               <><PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> {opening ? 'Opening secure checkout…' : 'Starting checkout…'}</>
             ) : (
-              <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay ${(priceUsd / 100).toFixed(2)} · {weeks} weeks</>
+              <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay ${(priceUsd / 100).toFixed(2)} · {months} {months === 1 ? 'month' : 'months'}</>
             )}
           </button>
         </div>
@@ -398,7 +398,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
         <div className="relative grid grid-cols-3 gap-3 border-t-2 border-dashed border-white/25 bg-white/[.02] px-7 py-4">
           <div>
             <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Pass length</p>
-            <p className="mt-1 text-sm font-bold text-white">{weeks} weeks</p>
+            <p className="mt-1 text-sm font-bold text-white">{months} {months === 1 ? 'month' : 'months'}</p>
           </div>
           <div className="border-l border-white/10 pl-3">
             <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Unlocks</p>
