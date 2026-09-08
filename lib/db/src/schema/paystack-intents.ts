@@ -34,7 +34,8 @@ export const tandemPaystackIntentsTable = pgTable("tandem_paystack_intents", {
   // the charge succeeds.
   cardLast4: text("card_last_4"),
   // True when this checkout signed the subscription up for server-managed
-  // auto-renewal (a category pass); renewal intents re-charge the saved card.
+  // auto-renewal — on for every Paystack purchase unless an admin turned it
+  // off for the plan; renewal intents re-charge the saved card.
   autoRenew: boolean("auto_renew").notNull().default(false),
   // For renewal charges: the subscription row being renewed, so the grant can
   // hand the extension to the right record and no two cycles ever double-charge.

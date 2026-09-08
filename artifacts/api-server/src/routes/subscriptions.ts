@@ -1,7 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { and, eq } from "drizzle-orm";
 import { getAuth } from "@clerk/express";
-import { db, tandemSubscriptionsTable } from "@workspace/db";
 import { accountUsage } from "../video/quota";
 import {
   applySubscriptionPurchase,
@@ -168,52 +166,20 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
   });
 });
 
-// PATCH /subscriptions/:id/auto-renew — turn server-managed renewal for one of
-// the caller's category passes on or off. Turning it off (cancel) simply stops
-// future charges — the pass keeps running until it expires. Turning it on
-// requires a card authorization already on file from when the pass was bought
-// with automatic renewal enabled; otherwise the user resubscribes with the
-// auto-renew box checked.
+// PATCH /subscriptions/:id/auto-renew — reserved for the admin. Every Paystack
+// subscription auto-renews by default and customers cannot switch it off;
+// only the admin (via /admin/subscriptions/:id/auto-renew or the per-plan
+// setting) can stop renewals. The route exists so a stale client call fails
+// loudly instead of silently doing nothing.
 router.patch("/subscriptions/:id/auto-renew", async (req: Request, res: Response): Promise<void> => {
   const userId = getAuth(req).userId;
   if (!userId) {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
-
-  const id = String(req.params.id ?? "");
-  const enabled = (req.body ?? {}).enabled === true;
-  const [sub] = await db
-    .select()
-    .from(tandemSubscriptionsTable)
-    .where(and(eq(tandemSubscriptionsTable.id, id), eq(tandemSubscriptionsTable.userId, userId)))
-    .limit(1);
-  if (!sub) {
-    res.status(404).json({ error: "Subscription not found" });
-    return;
-  }
-  if (sub.kind !== "pass") {
-    res.status(400).json({ error: "Only category passes renew automatically" });
-    return;
-  }
-  if (enabled && !sub.paystackAuthorizationCode) {
-    res.status(400).json({
-      error: "No card is on file for automatic renewal — resubscribe with automatic renewal enabled.",
-    });
-    return;
-  }
-
-  await db
-    .update(tandemSubscriptionsTable)
-    .set({
-      autoRenew: enabled,
-      renewalFailure: enabled ? null : sub.renewalFailure,
-      updatedAt: new Date(),
-    })
-    .where(eq(tandemSubscriptionsTable.id, id));
-
-  const view = await listUserSubscriptions(userId);
-  res.json(view.find((item) => item.id === id) ?? null);
+  res.status(403).json({
+    error: "Automatic renewal is always on for Paystack subscriptions — only an administrator can turn it off.",
+  });
 });
 
 export default router;

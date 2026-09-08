@@ -8,7 +8,6 @@ import {
   confirmPaystackCheckout,
   getSubscriptionPlansQueryKey,
   useCreatePaystackCheckout,
-  useSetSubscriptionAutoRenew,
   useSubscriptionPlans,
   type SubscriptionPlan,
   type SubscriptionRecord,
@@ -63,6 +62,7 @@ function formatDate(iso: string): string {
 // Resend-style feature checklist for a plan card. Built from the real plan
 // data (label, interval, detail) so no feature that isn't true gets promised.
 function planFeatures(plan: SubscriptionPlan): string[] {
+  const autoRenewFeature = 'Auto-renews automatically with the card you use today';
   if (plan.kind === 'pass') {
     return [
       'Collaboration — every role, studio, and room in the category',
@@ -72,7 +72,7 @@ function planFeatures(plan: SubscriptionPlan): string[] {
       'Partnerships on shared projects',
       'Community — creators, reviews, and follows',
       'Analytics tracking on how your work performs',
-      ...(plan.autoRenewAvailable ? ['Optional auto-renew with the card you use today'] : []),
+      ...(plan.autoRenewAvailable ? [autoRenewFeature] : []),
     ];
   }
   if (plan.kind === 'storage') {
@@ -80,12 +80,13 @@ function planFeatures(plan: SubscriptionPlan): string[] {
       `Adds ${plan.planLabel} of vault space`,
       'Counts toward every project you own',
       'Your quota bar updates immediately',
+      ...(plan.autoRenewAvailable ? [autoRenewFeature] : []),
     ];
   }
   return [
     `Adds ${plan.planLabel.replace('+', '')} of capacity`,
     'Applied instantly after payment',
-    'One-time purchase — no renewal',
+    ...(plan.autoRenewAvailable ? [autoRenewFeature] : ['One-time purchase — no renewal']),
   ];
 }
 
@@ -96,68 +97,27 @@ type ResultOverlay =
   | { kind: 'success'; total?: number; cardLast4?: string | null; promoCode?: string | null }
   | { kind: 'error'; message: string };
 
-// Manage automatic renewal for one active category pass: turn it on/off in
-// place. Turning it off (cancel) stops future charges but keeps the pass until
-// its current expiry; turning it back on requires a card already on file.
-function AutoRenewControl({ sub, onChanged }: { sub: SubscriptionRecord; onChanged: () => void }) {
-  const mutation = useSetSubscriptionAutoRenew({
-    mutation: {
-      onSuccess: onChanged,
-    },
-  });
-  const [error, setError] = useState('');
-
-  const toggle = (enabled: boolean) => {
-    setError('');
-    mutation.mutate(
-      { data: { id: sub.id, enabled } },
-      {
-        onError: (e: unknown) => setError(apiErrorMessage(e)),
-      },
-    );
-  };
-
+// Automatic renewal is always on for Paystack subscriptions — shown as a
+// read-only note on an active plan. Customers cannot switch it off; only an
+// administrator can (per plan or per subscription).
+function AutoRenewNote({ sub }: { sub: SubscriptionRecord }) {
+  if (!sub.autoRenew) return null;
   return (
     <div className="mt-3 space-y-2 border-t border-white/5 pt-3">
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono-ui text-[10px] uppercase tracking-[.12em] text-zinc-500">Automatic renewal</span>
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono-ui text-[10px] uppercase tracking-[.1em] ${sub.autoRenew ? 'bg-[#34d399]/10 text-[#34d399]' : 'bg-white/5 text-zinc-500'}`}>
-          {sub.autoRenew ? 'On' : 'Off'}
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#34d399]/10 px-2.5 py-1 font-mono-ui text-[10px] uppercase tracking-[.1em] text-[#34d399]">
+          On
         </span>
       </div>
-      {sub.autoRenew ? (
-        <>
-          <p className="text-[11px] leading-relaxed text-zinc-500">Renews your pass on its own with the card on file — next charge around {formatDate(sub.periodEnd)}.</p>
-          <button
-            type="button"
-            disabled={mutation.isPending}
-            onClick={() => toggle(false)}
-            className="w-full rounded-lg border border-red-400/25 px-3 py-2 text-[11px] font-bold text-red-400 transition hover:bg-red-400/10 disabled:opacity-50"
-            data-testid={`auto-renew-off-${sub.id}`}
-          >
-            Turn off auto-renew
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="text-[11px] leading-relaxed text-zinc-500">You'll renew manually each cycle, or switch it on to charge the card already on file.</p>
-          {sub.renewalFailure && (
-            <p className="rounded-lg border border-amber-400/25 bg-amber-400/5 p-2.5 text-[11px] leading-relaxed text-amber-300" data-testid={`auto-renew-failed-${sub.id}`}>
-              Last renewal didn't go through: {sub.renewalFailure}
-            </p>
-          )}
-          <button
-            type="button"
-            disabled={mutation.isPending}
-            onClick={() => toggle(true)}
-            className="w-full rounded-lg border border-[#34d399]/30 px-3 py-2 text-[11px] font-bold text-[#34d399] transition hover:bg-[#34d399]/10 disabled:opacity-50"
-            data-testid={`auto-renew-on-${sub.id}`}
-          >
-            Turn on auto-renew
-          </button>
-        </>
+      <p className="text-[11px] leading-relaxed text-zinc-500">
+        Renews on its own with the card on file — next charge around {formatDate(sub.periodEnd)}. Automatic renewal is always on and managed by the account administrator.
+      </p>
+      {sub.renewalFailure && (
+        <p className="rounded-lg border border-amber-400/25 bg-amber-400/5 p-2.5 text-[11px] leading-relaxed text-amber-300" data-testid={`auto-renew-failed-${sub.id}`}>
+          Last renewal didn't go through: {sub.renewalFailure}
+        </p>
       )}
-      {error && <p className="text-[11px] leading-relaxed text-red-400" role="alert">{error}</p>}
     </div>
   );
 }
@@ -480,9 +440,7 @@ export default function SubscriptionsPage() {
                               <PiCheckDuotone className="h-3.5 w-3.5" />
                               Active until {formatDate(activeSub.periodEnd)}
                             </span>
-                            {plan.kind === 'pass' && (
-                              <AutoRenewControl sub={activeSub} onChanged={refreshPlans} />
-                            )}
+                            <AutoRenewNote sub={activeSub} />
                           </div>
                         ) : (
                           <button
@@ -578,7 +536,6 @@ function PayModal({
   onGranted: (total: number, cardLast4: string | null, promoCode: string | null) => void;
 }) {
   const [promo, setPromo] = useState('');
-  const [autoRenew, setAutoRenew] = useState(false);
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
 
@@ -613,7 +570,6 @@ function PayModal({
         planId: plan.planId,
         promoCode: promo.trim() || undefined,
         callbackUrl,
-        autoRenew: plan.kind === 'pass' ? autoRenew : false,
       },
     });
   };
@@ -652,21 +608,14 @@ function PayModal({
             </p>
           </div>
 
-          {plan.kind === 'pass' && plan.autoRenewAvailable && (
-            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-white/5 bg-white/[.03] p-3">
-              <input
-                type="checkbox"
-                checked={autoRenew}
-                onChange={(event) => setAutoRenew(event.target.checked)}
-                disabled={opening}
-                className="mt-0.5 h-4 w-4 accent-[#34d399]"
-                data-testid="sub-check-auto-renew"
-              />
+          {plan.autoRenewAvailable && (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-white/5 bg-white/[.03] p-3" data-testid="sub-note-auto-renew">
+              <PiCheckCircleDuotone className="mt-0.5 h-4 w-4 shrink-0 text-[#34d399]" />
               <span className="min-w-0">
-                <span className="block text-xs font-semibold text-zinc-200">Turn on automatic renewal</span>
-                <span className="mt-0.5 block text-[11px] leading-relaxed text-zinc-500">We'll renew this pass automatically every {plan.intervalLabel} with the card you use now. You can turn it off anytime here.</span>
+                <span className="block text-xs font-semibold text-zinc-200">Automatic renewal is on</span>
+                <span className="mt-0.5 block text-[11px] leading-relaxed text-zinc-500">This subscription renews automatically every {plan.intervalLabel} with the card you use now — it can't be turned off from here. Renewals are managed by the account administrator.</span>
               </span>
-            </label>
+            </div>
           )}
 
           <div className="mt-4">

@@ -6,21 +6,24 @@ import {
   tandemSubscriptionsTable,
 } from "@workspace/db";
 import { PASS_PRICE_USD } from "../routes/tickets";
+import { PROJECT_PLANS, STORAGE_PLANS } from "./quota";
+import type { SubscriptionKind } from "./subscriptions";
 import { chargeAuthorization, paystackSecretKey } from "../lib/paystack";
 import { logger } from "../lib/logger";
 
 // ---------------------------------------------------------------------------
-// Server-managed auto-renewal — category passes only. A pass bought with
-// auto-renewal keeps its Paystack card authorization on the subscription row;
-// this runner wakes on an interval and, for every active auto-renewing pass
-// whose period is close to ending (and no renewal charge already in flight),
-// mints a fresh intent and re-charges the saved card. The ordinary
-// charge.success webhook then grants the extension through the same
-// grantIntent path as a fresh purchase, so renewals and new purchases can
-// never behave differently.
+// Server-managed auto-renewal — every subscription kind (category passes,
+// workspace storage, project plans). A purchase made through Paystack keeps
+// its card authorization on the subscription row and auto-renews by default;
+// this runner wakes on an interval and, for every active auto-renewing
+// subscription whose period is close to ending (and no renewal charge already
+// in flight), mints a fresh intent and re-charges the saved card at the plan's
+// own price. The ordinary charge.success webhook then grants the extension
+// through the same grantIntent path as a fresh purchase, so renewals and new
+// purchases can never behave differently.
 // ---------------------------------------------------------------------------
 
-/** Start charging when this close to the pass expiring (2 days ahead). */
+/** Start charging when this close to the subscription expiring (2 days ahead). */
 export const RENEW_LEAD_MS = 2 * 24 * 60 * 60 * 1000;
 /** Still charge if a cycle is a little late (12h grace) — never after the
     entitlement is long gone. */
@@ -33,7 +36,20 @@ export interface RenewalCycleResult {
 
 function failureMessage(cause: unknown): string {
   if (cause instanceof Error && cause.message) return cause.message.slice(0, 300);
-  return "The automatic renewal charge was declined. Turn auto-renewal off or resubscribe to keep your pass.";
+  return "The automatic renewal charge was declined. Contact support to keep your subscription renewing.";
+}
+
+/**
+ * The price to re-charge for a subscription's plan, in USD cents. Passes use
+ * the fixed pass price; storage and project plans charge their catalog price.
+ * Null when the plan id is unknown (shouldn't happen — the row came from a
+ * real checkout).
+ */
+function renewalAmountUsd(kind: SubscriptionKind, planId: string): number | null {
+  if (kind === "pass") return PASS_PRICE_USD;
+  if (kind === "storage") return STORAGE_PLANS.find((plan) => plan.id === planId)?.priceUsd ?? null;
+  if (kind === "projects") return PROJECT_PLANS.find((plan) => plan.id === planId)?.priceUsd ?? null;
+  return null;
 }
 
 /**
@@ -51,7 +67,6 @@ export async function runSubscriptionRenewals(now: Date = new Date()): Promise<R
     .from(tandemSubscriptionsTable)
     .where(
       and(
-        eq(tandemSubscriptionsTable.kind, "pass"),
         eq(tandemSubscriptionsTable.autoRenew, true),
         eq(tandemSubscriptionsTable.status, "ACTIVE"),
         gt(tandemSubscriptionsTable.periodEnd, windowStart),
@@ -86,7 +101,22 @@ export async function runSubscriptionRenewals(now: Date = new Date()): Promise<R
         .set({
           autoRenew: false,
           renewalFailure:
-            "No card is on file for this pass — turn automatic renewal back on by resubscribing.",
+            "No card is on file for this subscription — contact support or resubscribe to keep it renewing.",
+        })
+        .where(eq(tandemSubscriptionsTable.id, sub.id));
+      failed += 1;
+      continue;
+    }
+
+    // The plan's own price — a renewal re-charges exactly what the purchase
+    // charged. Unknown plan id (shouldn't happen): stop the chain.
+    const amountUsd = renewalAmountUsd(sub.kind as SubscriptionKind, sub.planId);
+    if (amountUsd === null) {
+      await db
+        .update(tandemSubscriptionsTable)
+        .set({
+          autoRenew: false,
+          renewalFailure: "This plan can no longer be renewed — contact support.",
         })
         .where(eq(tandemSubscriptionsTable.id, sub.id));
       failed += 1;
@@ -97,11 +127,11 @@ export async function runSubscriptionRenewals(now: Date = new Date()): Promise<R
     await db.insert(tandemPaystackIntentsTable).values({
       reference,
       userId: sub.userId,
-      kind: "pass",
+      kind: sub.kind,
       planId: sub.planId,
       planLabel: sub.planLabel,
       intervalLabel: sub.intervalLabel,
-      amountUsd: PASS_PRICE_USD,
+      amountUsd,
       currency: "USD",
       status: "PENDING",
       autoRenew: true,
@@ -112,7 +142,7 @@ export async function runSubscriptionRenewals(now: Date = new Date()): Promise<R
     try {
       await chargeAuthorization({
         email: sub.paystackEmail,
-        amount: PASS_PRICE_USD,
+        amount: amountUsd,
         authorizationCode: sub.paystackAuthorizationCode,
         reference,
         metadata: { userId: sub.userId, subscriptionId: sub.id, renewal: true },

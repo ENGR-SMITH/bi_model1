@@ -992,7 +992,7 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
 // Subscriptions admin — every purchase across all accounts, newest first,
 // with the buyer's email resolved from Clerk. The auto-renew toggle here is
 // the per-account override: switch server-managed renewal on/off for one
-// specific subscription without touching the customer's other passes.
+// specific subscription without touching the customer's other rows.
 // ---------------------------------------------------------------------------
 
 function apiErrorText(error: unknown): string {
@@ -1008,19 +1008,19 @@ const SUBSCRIPTION_PRODUCT_META: Record<SubscriptionKindFilter, { label: string;
   pass: {
     label: 'TANDEM pass',
     title: 'Category passes',
-    description: 'Every pass purchase across both categories, arranged by category and account, with auto-renewal control per pass.',
+    description: 'Every pass purchase across both categories, arranged by category and account, with auto-renewal control per subscription.',
     icon: <Ticket className="h-5 w-5" />,
   },
   storage: {
     label: 'Creator Den',
     title: 'Workspace storage',
-    description: 'Every storage extension (GB/TB) purchased across all Creator Den accounts, arranged by plan and account.',
+    description: 'Every storage extension (GB/TB) purchased across all Creator Den accounts, arranged by plan and account, with auto-renewal control per subscription.',
     icon: <Database className="h-5 w-5" />,
   },
   projects: {
     label: 'Author Den',
     title: 'Project capacity',
-    description: 'Every project-count plan purchased across all Author Den accounts, arranged by plan and account.',
+    description: 'Every project-count plan purchased across all Author Den accounts, arranged by plan and account, with auto-renewal control per subscription.',
     icon: <BookOpen className="h-5 w-5" />,
   },
 };
@@ -1087,7 +1087,7 @@ function SubscriptionsSection({ session }: { session: boolean }) {
         <PageHeading
           eyebrow="Control room / subscriptions"
           title="Every subscription, every account."
-          description="Pick a product to see who is paying for what — arranged by plan and account — and switch server-managed auto-renewal on or off for any individual pass."
+          description="Pick a product to see who is paying for what — arranged by plan and account — and switch server-managed auto-renewal on or off for any individual subscription."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
@@ -1136,11 +1136,9 @@ function SubscriptionsSection({ session }: { session: boolean }) {
                     <StatBox label="Active" value={rows.filter((sub) => sub.active).length} />
                     <StatBox label="Users" value={new Set(rows.map((sub) => sub.userId)).size} />
                   </div>
-                  {productKind === 'pass' && (
-                    <p className="mt-3 text-[11px] text-muted-foreground">
-                      {rows.filter((sub) => sub.autoRenew).length} auto-renewing · {new Set(rows.map((sub) => sub.planId)).size} categories
-                    </p>
-                  )}
+                  <p className="mt-3 text-[11px] text-muted-foreground">
+                    {rows.filter((sub) => sub.autoRenew).length} auto-renewing · {new Set(rows.map((sub) => sub.planId)).size} plans
+                  </p>
                   <span className="mt-5 inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition group-hover:text-primary">
                     Open <ArrowRight className="h-3.5 w-3.5" />
                   </span>
@@ -1431,20 +1429,16 @@ function SubscriptionRow({ sub, updating, onToggle, compact = false }: { sub: Ad
         <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${sub.active ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600' : 'border-border bg-secondary/60 text-muted-foreground'}`}>{sub.active ? 'Active' : sub.status}</span>
         <span className="font-mono text-[10px] text-muted-foreground">until {formatDate(sub.periodEnd)}</span>
         {sub.cardLast4 ? <span className="font-mono text-[10px] text-muted-foreground">•••• {sub.cardLast4}</span> : null}
-        {sub.kind === 'pass' ? (
-          <button
-            type="button"
-            data-testid={`button-admin-auto-renew-${sub.id}`}
-            onClick={onToggle}
-            disabled={updating}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${sub.autoRenew ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15' : 'border-border text-muted-foreground hover:bg-secondary'}`}
-          >
-            {sub.autoRenew ? <CircleCheck className="h-3.5 w-3.5" /> : <CircleDashed className="h-3.5 w-3.5" />}
-            {updating ? 'Saving…' : sub.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
-          </button>
-        ) : (
-          <span className="rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">no auto-renew</span>
-        )}
+        <button
+          type="button"
+          data-testid={`button-admin-auto-renew-${sub.id}`}
+          onClick={onToggle}
+          disabled={updating}
+          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${sub.autoRenew ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15' : 'border-border text-muted-foreground hover:bg-secondary'}`}
+        >
+          {sub.autoRenew ? <CircleCheck className="h-3.5 w-3.5" /> : <CircleDashed className="h-3.5 w-3.5" />}
+          {updating ? 'Saving…' : sub.autoRenew ? 'Auto-renew on' : 'Auto-renew off'}
+        </button>
       </div>
     </div>
   );
@@ -1452,16 +1446,16 @@ function SubscriptionRow({ sub, updating, onToggle, compact = false }: { sub: Ad
 
 // ---------------------------------------------------------------------------
 // Subscription plan settings — the operational knobs on the code-defined plan
-// catalog. Each category pass can have server-managed auto-renewal switched on
-// or off here; the storefront checkbox and the paystack checkout follow this
-// switch. Storage and projects plans stay per-purchase, so their rows read
-// "not applicable".
+// catalog. Every Paystack subscription auto-renews by default; this is where
+// an admin can switch auto-renewal off for a whole plan. New purchases follow
+// this switch, and the per-subscription toggle in the Subscriptions room
+// overrides an individual row.
 // ---------------------------------------------------------------------------
 
 const PLAN_SETTING_GROUPS: Array<{ kind: string; label: string; hint: string }> = [
-  { kind: 'pass', label: 'Category passes', hint: 'Auto-renew re-charges the card each pass cycle. The checkout checkbox follows this switch.' },
-  { kind: 'storage', label: 'Creator Den storage', hint: 'Charged per purchase — auto-renew does not apply here.' },
-  { kind: 'projects', label: 'Author Den projects', hint: 'One-time plans — auto-renew does not apply here.' },
+  { kind: 'pass', label: 'Category passes', hint: 'Every pass auto-renews with the card on file. Switch it off to stop new pass purchases from renewing.' },
+  { kind: 'storage', label: 'Creator Den storage', hint: 'Storage extensions auto-renew each cycle. Switch it off to stop new storage purchases from renewing.' },
+  { kind: 'projects', label: 'Author Den projects', hint: 'Project plans auto-renew each cycle. Switch it off to stop new project purchases from renewing.' },
 ];
 
 function PlanSettingsSection({ session }: { session: boolean }) {
@@ -1481,7 +1475,7 @@ function PlanSettingsSection({ session }: { session: boolean }) {
         <PageHeading
           eyebrow="Control room / subscriptions"
           title="Tune the subscription plans."
-          description="Turn server-managed auto-renewal on or off per category pass. The checkout checkbox and the renewal scheduler follow this switch; storage and projects plans are always charged per purchase."
+          description="Turn server-managed auto-renewal on or off per plan. New purchases follow this switch — every Paystack subscription renews by default unless switched off here (or on an individual subscription in the Subscriptions room)."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
@@ -1531,7 +1525,6 @@ function PlanSettingsSection({ session }: { session: boolean }) {
 }
 
 function PlanSettingRow({ plan, updating, onToggle }: { plan: AdminPlanSetting; updating: boolean; onToggle: () => void }) {
-  const toggleable = plan.kind === 'pass';
   return (
     <div data-testid={`plan-setting-${plan.kind}-${plan.planId}`} className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5">
       <div className="min-w-0">
@@ -1540,20 +1533,16 @@ function PlanSettingRow({ plan, updating, onToggle }: { plan: AdminPlanSetting; 
           {plan.kind} · {plan.planId} · ${(plan.priceUsd / 100).toFixed(2)} / {plan.intervalLabel}
         </p>
       </div>
-      {toggleable ? (
-        <button
-          type="button"
-          data-testid={`button-toggle-auto-renew-${plan.planId}`}
-          onClick={onToggle}
-          disabled={updating}
-          className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${plan.autoRenewAvailable ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15' : 'border-border text-muted-foreground hover:bg-secondary'}`}
-        >
-          {plan.autoRenewAvailable ? <CircleCheck className="h-3.5 w-3.5" /> : <CircleDashed className="h-3.5 w-3.5" />}
-          {updating ? 'Saving…' : plan.autoRenewAvailable ? 'Auto-renew on' : 'Auto-renew off'}
-        </button>
-      ) : (
-        <span className="shrink-0 rounded-full border border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">not applicable</span>
-      )}
+      <button
+        type="button"
+        data-testid={`button-toggle-auto-renew-${plan.planId}`}
+        onClick={onToggle}
+        disabled={updating}
+        className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50 ${plan.autoRenewAvailable ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15' : 'border-border text-muted-foreground hover:bg-secondary'}`}
+      >
+        {plan.autoRenewAvailable ? <CircleCheck className="h-3.5 w-3.5" /> : <CircleDashed className="h-3.5 w-3.5" />}
+        {updating ? 'Saving…' : plan.autoRenewAvailable ? 'Auto-renew on' : 'Auto-renew off'}
+      </button>
     </div>
   );
 }

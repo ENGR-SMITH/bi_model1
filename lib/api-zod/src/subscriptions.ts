@@ -16,7 +16,8 @@ export const SubscriptionPlanSchema = zod.object({
   priceUsd: zod.number().int(),
   intervalLabel: zod.string(),
   detail: zod.string(),
-  // Whether customers may sign this plan up for server-managed auto-renewal.
+  // Whether purchases of this plan auto-renew by default (on for every plan
+  // unless an admin switches it off).
   autoRenewAvailable: zod.boolean(),
 });
 

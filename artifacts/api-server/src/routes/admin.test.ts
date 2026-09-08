@@ -282,7 +282,7 @@ describe("admin plan settings", () => {
     return "session";
   }
 
-  it("lists the catalog with auto-renew defaults (passes on, others off)", async () => {
+  it("lists the catalog with auto-renew on by default for every plan", async () => {
     const cookie = await login();
     const res = await request(API).get("/api/admin/plan-settings").set("Cookie", cookie);
     expect(res.status).toBe(200);
@@ -290,9 +290,9 @@ describe("admin plan settings", () => {
     const authors = res.body.find((plan: any) => plan.kind === "pass" && plan.planId === "authors");
     expect(authors).toMatchObject({ kind: "pass", planId: "authors", autoRenewAvailable: true });
     const g200 = res.body.find((plan: any) => plan.kind === "storage" && plan.planId === "g200");
-    expect(g200.autoRenewAvailable).toBe(false);
+    expect(g200.autoRenewAvailable).toBe(true);
     const p50 = res.body.find((plan: any) => plan.kind === "projects" && plan.planId === "p50");
-    expect(p50.autoRenewAvailable).toBe(false);
+    expect(p50.autoRenewAvailable).toBe(true);
   });
 
   it("toggles auto-renew availability per plan and persists it", async () => {
@@ -317,6 +317,17 @@ describe("admin plan settings", () => {
       .send({ autoRenewAvailable: true });
     expect(on.status).toBe(200);
     expect(on.body.autoRenewAvailable).toBe(true);
+  });
+
+  it("switches auto-renew off for a storage plan too", async () => {
+    const cookie = await login();
+
+    const off = await request(API)
+      .patch("/api/admin/plan-settings/storage/g200")
+      .set("Cookie", cookie)
+      .send({ autoRenewAvailable: false });
+    expect(off.status).toBe(200);
+    expect(off.body).toMatchObject({ kind: "storage", planId: "g200", autoRenewAvailable: false });
   });
 
   it("rejects unknown plans, invalid bodies, and unauthenticated callers", async () => {
@@ -418,7 +429,7 @@ describe("admin subscriptions", () => {
     expect(res.body[0].userEmail).toBeNull();
   });
 
-  it("toggles auto-renew on and off for one pass", async () => {
+  it("toggles auto-renew on and off for one subscription (any kind)", async () => {
     const cookie = await login();
     await seedSubscription({ id: "sub-1", paystackAuthorizationCode: "auth_123" });
 
@@ -435,6 +446,23 @@ describe("admin subscriptions", () => {
       .send({ enabled: false });
     expect(off.status).toBe(200);
     expect(off.body.autoRenew).toBe(false);
+
+    // Storage subscriptions can be toggled by the admin too.
+    await seedSubscription({
+      id: "sub-storage",
+      kind: "storage",
+      planId: "g200",
+      planLabel: "200 GB more space",
+      priceUsd: 2000,
+      intervalLabel: "recurring",
+      paystackAuthorizationCode: "auth_123",
+    });
+    const storageOff = await request(API)
+      .patch("/api/admin/subscriptions/sub-storage/auto-renew")
+      .set("Cookie", cookie)
+      .send({ enabled: false });
+    expect(storageOff.status).toBe(200);
+    expect(storageOff.body.autoRenew).toBe(false);
   });
 
   it("refuses to enable auto-renew without a card on file", async () => {

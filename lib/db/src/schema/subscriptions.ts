@@ -32,8 +32,9 @@ export const tandemSubscriptionsTable = pgTable("tandem_subscriptions", {
   clerkSubscriptionId: text("clerk_subscription_id"),
   promoCode: text("promo_code"),
   cardLast4: text("card_last_4"),
-  // Server-managed auto-renewal (category passes). True keeps the card on file
-  // charging every pass cycle until the user turns it off.
+  // Server-managed auto-renewal. Every Paystack subscription (pass, storage,
+  // projects) is signed up by default and only an administrator can turn it
+  // off. True keeps the card on file, charging every cycle.
   autoRenew: boolean("auto_renew").notNull().default(false),
   // Paystack card authorization + customer captured on first payment — what the
   // renewal scheduler re-charges without a fresh checkout.
@@ -66,7 +67,8 @@ export const tandemSubscriptionPlanSettingsTable = pgTable(
     // pass → the category (authors | content-creators); storage/projects → the
     // plan id (g200 | g500 | tb1 | p10 | p50 | p200).
     planId: text("plan_id").notNull(),
-    // Whether customers may turn on server-managed auto-renewal for this plan.
+    // Whether purchases of this plan auto-renew by default. Every plan is on
+    // unless an admin writes a row switching it off.
     autoRenewAvailable: boolean("auto_renew_available").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

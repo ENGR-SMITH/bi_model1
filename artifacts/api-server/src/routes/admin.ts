@@ -340,8 +340,8 @@ router.patch("/admin/plan-settings/:kind/:planId", requireAdmin, async (req, res
 // Subscriptions admin — every purchase across all users, newest first, with
 // the buyer's email resolved from Clerk. The auto-renew toggle here is the
 // per-account override: it switches server-managed renewal on/off for one
-// specific subscription (the user-facing toggle on the Subscriptions page
-// does the same thing for the account owner).
+// specific subscription. Every Paystack subscription auto-renews by default;
+// this is the only place (besides the per-plan setting) that can turn it off.
 // ---------------------------------------------------------------------------
 
 function adminSubscriptionView(row: typeof tandemSubscriptionsTable.$inferSelect) {
@@ -415,10 +415,6 @@ router.patch("/admin/subscriptions/:id/auto-renew", requireAdmin, async (req, re
     .limit(1);
   if (!sub) {
     res.status(404).json({ error: "Subscription not found" });
-    return;
-  }
-  if (sub.kind !== "pass") {
-    res.status(400).json({ error: "Only category passes renew automatically" });
     return;
   }
   if (body.data.enabled && !sub.paystackAuthorizationCode) {

@@ -326,7 +326,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/AdminSubscription" }
         "400":
-          description: Not a pass or no card on file for renewal
+          description: No card on file for renewal
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -5451,9 +5451,10 @@ components:
         planLabel: { type: string }
         priceUsd: { type: integer }
         intervalLabel: { type: string }
-        # Whether customers may turn on server-managed auto-renewal for this
-        # plan. Defaults on for category passes, off for storage/projects;
-        # only rows in tandem_subscription_plan_settings override the default.
+        # Whether this plan's purchases auto-renew by default. Every Paystack
+        # subscription (pass, storage, projects) renews automatically unless an
+        # admin switches it off here; only rows in
+        # tandem_subscription_plan_settings override the default.
         autoRenewAvailable: { type: boolean }
       required: [kind, planId, planLabel, priceUsd, intervalLabel, autoRenewAvailable]
     AdminPlanSettingUpdate:

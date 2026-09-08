@@ -32,7 +32,7 @@ export type SubscriptionRecord = {
   source: string;
   promoCode: string | null;
   cardLast4: string | null;
-  /** Server-managed auto-renewal is on (category passes). */
+  /** Server-managed auto-renewal is on (passes, storage, and projects alike). */
   autoRenew: boolean;
   /** Why the last auto-renew charge failed, when it did. */
   renewalFailure: string | null;
@@ -46,7 +46,8 @@ export type SubscriptionPlan = {
   priceUsd: number;
   intervalLabel: string;
   detail: string;
-  /** Whether customers may sign this plan up for server-managed auto-renewal. */
+  /** Whether purchases of this plan auto-renew by default (on for every plan
+      unless an admin switches it off). */
   autoRenewAvailable: boolean;
 };
 
@@ -127,10 +128,12 @@ export function useListSubscriptions<
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-// ---- auto-renew (turn server-managed renewal on/off for a pass) ----
+// ---- auto-renew (reserved for the admin — users cannot change it) ----
 
 export const getSubscriptionAutoRenewUrl = (id: string) => `/api/subscriptions/${encodeURIComponent(id)}/auto-renew`;
 
+// Every Paystack subscription auto-renews by default; the server rejects
+// user attempts to change it (403 — only an administrator can turn it off).
 export const setSubscriptionAutoRenew = async (
   body: { id: string; enabled: boolean },
   options?: Parameters<typeof customFetch>[1],

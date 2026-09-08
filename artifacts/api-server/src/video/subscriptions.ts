@@ -31,19 +31,23 @@ export interface SubscriptionPlan {
   priceUsd: number;
   intervalLabel: string;
   detail: string;
-  /** Whether customers may sign this plan up for server-managed auto-renewal. */
+  /** Whether purchases of this plan auto-renew by default (on for every plan
+      unless an admin switches it off). */
   autoRenewAvailable: boolean;
 }
 
 /** Whether a plan kind allows auto-renewal when no admin override exists. */
-function defaultAutoRenewAvailable(kind: SubscriptionKind): boolean {
-  return kind === "pass";
+function defaultAutoRenewAvailable(_kind: SubscriptionKind): boolean {
+  // Every Paystack subscription auto-renews by default — passes, storage, and
+  // project plans alike. Only an admin can turn it off, either here (per
+  // plan) or on an individual subscription row.
+  return true;
 }
 
 /**
  * Resolve whether customers may turn on server-managed auto-renewal for one
  * plan: a row in tandem_subscription_plan_settings (written by an admin) wins,
- * otherwise the code-defined default (on for passes, off for storage/projects).
+ * otherwise the code-defined default (on for every plan kind).
  */
 export async function autoRenewAvailableForPlan(kind: SubscriptionKind, planId: string): Promise<boolean> {
   const [setting] = await db
@@ -76,12 +80,16 @@ export async function subscriptionPlans(): Promise<SubscriptionPlan[]> {
     autoRenewAvailable: availableFor("pass", category),
   }));
 
+  // Storage and project plans auto-renew like passes: each purchase extends
+  // the account for a year (periodEnd = +365 days), then the renewal scheduler
+  // re-charges the card. "1 year" is the honest billing rhythm, matching the
+  // pass's "3 weeks".
   const storage: SubscriptionPlan[] = STORAGE_PLANS.map((plan) => ({
     kind: "storage",
     planId: plan.id,
     planLabel: plan.label,
     priceUsd: plan.priceUsd,
-    intervalLabel: "recurring",
+    intervalLabel: "1 year",
     detail: `Extend your workspace storage with another ${plan.label}`,
     autoRenewAvailable: availableFor("storage", plan.id),
   }));
@@ -91,7 +99,7 @@ export async function subscriptionPlans(): Promise<SubscriptionPlan[]> {
     planId: plan.id,
     planLabel: `+${plan.count} projects`,
     priceUsd: plan.priceUsd,
-    intervalLabel: "one-time",
+    intervalLabel: "1 year",
     detail: plan.label,
     autoRenewAvailable: availableFor("projects", plan.id),
   }));
@@ -132,7 +140,7 @@ export function resolveSubscriptionProduct(
     return {
       priceUsd: plan.priceUsd,
       planLabel: `${formatBytes(plan.bytes)} more space`,
-      intervalLabel: "recurring",
+      intervalLabel: "1 year",
     };
   }
   const plan = PROJECT_PLANS.find((item) => item.id === planId);
@@ -140,7 +148,7 @@ export function resolveSubscriptionProduct(
   return {
     priceUsd: plan.priceUsd,
     planLabel: `+${plan.count} projects`,
-    intervalLabel: "one-time",
+    intervalLabel: "1 year",
   };
 }
 
@@ -246,9 +254,10 @@ export interface AppliedSubscription {
  * paid plan always lands the same way.
  */
 /**
- * True when a granted pass should carry the auto-renewal flag: requested at
- * checkout and confirmed with a stored Paystack card authorization, or a
- * scheduled renewal charge of an existing auto-renewing row.
+ * True when a granted subscription should carry the auto-renewal flag: signed
+ * up at checkout and confirmed with a stored Paystack card authorization, or
+ * a scheduled renewal charge of an existing auto-renewing row. Applies to
+ * every kind — passes, storage, and projects.
  */
 function shouldAutoRenew(input: {
   kind: SubscriptionKind;
@@ -256,7 +265,6 @@ function shouldAutoRenew(input: {
   paystackAuthorizationCode?: string | null;
   renewsSubscriptionId?: string | null;
 }): boolean {
-  if (input.kind !== "pass") return false;
   if (input.renewsSubscriptionId) return true; // a renewal of an auto-renew row
   return Boolean(input.autoRenew && input.paystackAuthorizationCode);
 }

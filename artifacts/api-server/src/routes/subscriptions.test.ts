@@ -72,12 +72,14 @@ describe("subscription plans", () => {
   it("reflects admin auto-renew availability per plan", async () => {
     state.userId = "user-1";
 
-    // Defaults: passes may auto-renew, storage/projects may not.
+    // Defaults: every plan auto-renews — passes, storage, and projects.
     let res = await request(API).get("/api/subscriptions/plans");
     const authorsDefault = res.body.plans.find((p: any) => p.kind === "pass" && p.planId === "authors");
     expect(authorsDefault.autoRenewAvailable).toBe(true);
     const g200Default = res.body.plans.find((p: any) => p.kind === "storage" && p.planId === "g200");
-    expect(g200Default.autoRenewAvailable).toBe(false);
+    expect(g200Default.autoRenewAvailable).toBe(true);
+    const p50Default = res.body.plans.find((p: any) => p.kind === "projects" && p.planId === "p50");
+    expect(p50Default.autoRenewAvailable).toBe(true);
 
     // An admin override (settings row) flips the authors pass off.
     await state.db.insert(state.tables.tandemSubscriptionPlanSettingsTable).values({
@@ -162,6 +164,45 @@ describe("subscription purchase", () => {
       .post("/api/subscriptions/purchase")
       .send({ kind: "singers", planId: "authors", card: VALID_CARD });
     expect(badKind.status).toBe(400);
+  });
+});
+
+describe("auto-renew toggle (admin-only)", () => {
+  it("rejects user attempts to turn auto-renew off", async () => {
+    state.userId = "user-1";
+    await state.db.insert(state.tables.tandemSubscriptionsTable).values({
+      id: "sub-1",
+      userId: "user-1",
+      kind: "pass",
+      planId: "authors",
+      planLabel: "Author & Writer pass",
+      priceUsd: 588,
+      status: "ACTIVE",
+      intervalLabel: "3 weeks",
+      periodStart: new Date(),
+      periodEnd: new Date(Date.now() + 3 * 7 * 24 * 60 * 60 * 1000),
+      autoRenew: true,
+      paystackAuthorizationCode: "auth_123",
+    });
+
+    const off = await request(API)
+      .patch("/api/subscriptions/sub-1/auto-renew")
+      .send({ enabled: false });
+    expect(off.status).toBe(403);
+    expect(off.body.error).toMatch(/administrator/i);
+
+    // The row is untouched — auto-renew stays on.
+    const [sub] = await state.db
+      .select()
+      .from(state.tables.tandemSubscriptionsTable)
+      .where((t: any) => t.id === "sub-1");
+    expect(sub.autoRenew).toBe(true);
+  });
+
+  it("requires authentication before anything else", async () => {
+    state.userId = null;
+    const res = await request(API).patch("/api/subscriptions/sub-1/auto-renew").send({ enabled: false });
+    expect(res.status).toBe(401);
   });
 });
 

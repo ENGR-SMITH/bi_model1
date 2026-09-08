@@ -163,11 +163,9 @@ describe("POST /api/paystack/checkout", () => {
     expect(intent).toMatchObject({ kind: "pass", planId: "authors", amountUsd: 588, currency: "USD", status: "PENDING" });
   });
 
-  it("keeps the auto-renew flag when the plan allows it", async () => {
+  it("signs every plan up for auto-renew by default (no client opt-in needed)", async () => {
     state.userId = "user-1";
-    const res = await request(API)
-      .post("/api/paystack/checkout")
-      .send({ kind: "pass", planId: "authors", autoRenew: true });
+    const res = await request(API).post("/api/paystack/checkout").send({ kind: "pass", planId: "authors" });
     expect(res.status).toBe(201);
 
     const reference: string = res.body.reference;
@@ -176,9 +174,18 @@ describe("POST /api/paystack/checkout", () => {
       .from(state.tables.tandemPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent.autoRenew).toBe(true);
+
+    // Storage plans auto-renew too.
+    const storage = await request(API).post("/api/paystack/checkout").send({ kind: "storage", planId: "g200" });
+    expect(storage.status).toBe(201);
+    const [storageIntent] = await state.db
+      .select()
+      .from(state.tables.tandemPaystackIntentsTable)
+      .where((t: any) => t.reference === storage.body.reference);
+    expect(storageIntent.autoRenew).toBe(true);
   });
 
-  it("ignores the auto-renew flag when an admin turned it off for the plan", async () => {
+  it("turns auto-renew off when an admin switched it off for the plan", async () => {
     state.userId = "user-1";
     await state.db.insert(state.tables.tandemSubscriptionPlanSettingsTable).values({
       kind: "pass",
@@ -186,9 +193,7 @@ describe("POST /api/paystack/checkout", () => {
       autoRenewAvailable: false,
     });
 
-    const res = await request(API)
-      .post("/api/paystack/checkout")
-      .send({ kind: "pass", planId: "authors", autoRenew: true });
+    const res = await request(API).post("/api/paystack/checkout").send({ kind: "pass", planId: "authors" });
     expect(res.status).toBe(201);
 
     const reference: string = res.body.reference;

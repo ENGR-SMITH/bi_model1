@@ -175,12 +175,6 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
   const kind = parseKind(body.kind);
   const planId = typeof body.planId === "string" ? body.planId : "";
   const promoCode = typeof body.promoCode === "string" && body.promoCode.trim() ? body.promoCode.trim() : undefined;
-  // Server-managed renewal only makes sense for category passes — the card
-  // authorization is kept and re-charged each pass cycle. Storage/projects are
-  // one-time purchases regardless. An admin can also turn auto-renewal off for
-  // a plan, which hides the checkout checkbox and refuses the flag here.
-  const autoRenew =
-    kind === "pass" && body.autoRenew === true && (await autoRenewAvailableForPlan("pass", planId));
 
   if (!kind) {
     res.status(400).json({ error: "A subscription kind (pass, storage, or projects) is required" });
@@ -190,6 +184,13 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
     res.status(400).json({ error: "A plan id is required" });
     return;
   }
+
+  // Every Paystack subscription auto-renews by default: the card authorization
+  // is kept and re-charged each cycle. Only an admin can turn it off — per
+  // plan (a tandem_subscription_plan_settings row with autoRenewAvailable
+  // false turns it off here) or per subscription (the admin toggle). Any
+  // client-sent autoRenew flag is ignored.
+  const autoRenew = await autoRenewAvailableForPlan(kind, planId);
 
   const product = resolveSubscriptionProduct(kind, planId);
   if (!product) {

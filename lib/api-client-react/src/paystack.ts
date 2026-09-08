@@ -24,7 +24,8 @@ export type PaystackCheckoutInput = {
   promoCode?: string;
   /** Where Paystack should send the customer after paying (their own page). */
   callbackUrl?: string;
-  /** Sign this subscription up for server-managed auto-renewal (pass only). */
+  /** Deprecated and ignored — every Paystack subscription auto-renews by
+      default and only an administrator can turn it off. */
   autoRenew?: boolean;
 };
 
