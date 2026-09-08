@@ -1,0 +1,29 @@
+# Local installs — keep the build context small (root node_modules alone is ~1.1 GB)
+node_modules
+**/node_modules
+
+# Build output (regenerated inside the image)
+**/dist
+**/.tsbuildinfo
+**/*.tsbuildinfo
+**/.replit-artifact
+
+# Secrets — Clerk keys come in as Docker build args, never from .env files
+**/.env
+**/.env.*
+!**/.env.example
+
+# VCS and tooling
+.git
+.github
+.claude
+.attached_assets
+attached_assets
+
+# Runtime uploads / local media
+.uploads
+**/.uploads
+
+# Repo docs and helper scripts (not needed by the build)
+*.docx
+*.py
