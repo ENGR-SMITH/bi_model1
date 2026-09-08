@@ -29,6 +29,11 @@ if (!basePath) {
 
 export default defineConfig({
   base: basePath,
+  // Build-time Clerk key comes from the Dockerfile ARG/ENV (no per-app .
+  // env file). envPrefix keeps only VITE_* vars plus exactly
+  // CLERK_PUBLISHABLE_KEY visible to client code — CLERK_SECRET_KEY and
+  // other secrets stay out.
+  envPrefix: ['VITE_', 'CLERK_PUBLISHABLE_KEY'],
   plugins: [
     react(),
     tailwindcss(),
