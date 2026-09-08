@@ -139,23 +139,19 @@ function ClerkSetupHint() {
 }
 
 function ClerkQueryClientCacheInvalidator() {
-  const { addListener } = useClerk();
+  const { isLoaded, userId } = useAuth();
   const previousUserId = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    const unsubscribe = addListener(({ user }) => {
-      const userId = user?.id ?? null;
-      if (
-        previousUserId.current !== undefined &&
-        previousUserId.current !== userId
-      ) {
-        queryClient.clear();
-      }
-      previousUserId.current = userId;
-    });
-
-    return unsubscribe;
-  }, [addListener]);
+    if (!isLoaded) return;
+    if (
+      previousUserId.current !== undefined &&
+      previousUserId.current !== userId
+    ) {
+      queryClient.invalidateQueries();
+    }
+    previousUserId.current = userId;
+  }, [isLoaded, userId]);
 
   return null;
 }
