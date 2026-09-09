@@ -3,7 +3,7 @@ import express, { type Express } from "express";
 import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { clearUserNameCache } from "../lib/user-names";
-import { tandemUid } from "../lib/tandem-uid";
+import { nexetUid } from "../lib/nexet-uid";
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -93,10 +93,10 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoFollowsTable);
+  await state.db.delete(t.nexetVideoFollowsTable);
   await state.db.delete(t.collaborationActivityEventsTable);
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
   state.userId = null;
   clearUserNameCache();
   state.clerkEmailToUser = {
@@ -141,7 +141,7 @@ describe("explore — creators", () => {
     state.userId = "captain-1";
     await request(API)
       .post(`/api/video/projects/${owned.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
 
     state.userId = "captain-1";
     const res = await request(API).get("/api/video/explore/creators");

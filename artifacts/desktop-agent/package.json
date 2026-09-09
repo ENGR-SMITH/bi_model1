@@ -2,7 +2,7 @@
   "name": "@workspace/desktop-agent",
   "version": "0.0.2",
   "private": true,
-  "description": "Tandem desktop agent — generate proxies with FFmpeg and push them to Cloudflare R2 via presigned URLs.",
+  "description": "Nexet desktop agent — generate proxies with FFmpeg and push them to Cloudflare R2 via presigned URLs.",
   "main": "dist/main/index.js",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -12,7 +12,7 @@
     "dev": "pnpm run compile && electron .",
     "start": "electron ."
   },
-  "author": "Tandem",
+  "author": "Nexet",
   "license": "MIT",
   "dependencies": {
     "electron-updater": "^6.3.9"
@@ -24,16 +24,16 @@
     "@types/node": "catalog:"
   },
   "build": {
-    "appId": "com.tandem.desktopagent",
-    "productName": "Tandem Desktop Agent",
+    "appId": "com.nexet.desktopagent",
+    "productName": "Nexet Desktop Agent",
     "directories": { "output": "dist-bundle" },
     "files": ["dist/**/*"],
     "compression": "normal",
     "publish": [{ "provider": "generic", "url": "https://{{HOST}}/desktop-agent" }],
     "protocols": [
       {
-        "name": "Tandem Desktop Agent",
-        "schemes": ["tandem-agent"]
+        "name": "Nexet Desktop Agent",
+        "schemes": ["nexet-agent"]
       }
     ],
     "extraResources": [

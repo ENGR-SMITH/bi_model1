@@ -1,12 +1,12 @@
 -- =============================================================================
--- Migration: tandem_video_storage_snapshots
+-- Migration: nexet_video_storage_snapshots
 -- The metering ledger behind the storage bar. R2 does not bill per account; a
 -- nightly job (api-server video/storage-maintenance.ts) records how many
 -- physical bytes each project actually stores — originals + derived artifacts,
 -- split by provider (r2 vs local processing disk).
 --
 -- Source of truth: lib/db/src/schema/account.ts
---   → tandemVideoStorageSnapshotsTable (drizzle-orm/pg-core)
+--   → nexetVideoStorageSnapshotsTable (drizzle-orm/pg-core)
 --
 -- Why this file exists: dev + deploy environments apply schema changes with
 -- `drizzle-kit push --force` (scripts/post-merge.sh), but an already-provisioned
@@ -15,14 +15,14 @@
 --
 -- Apply against the target database (any of):
 --   psql "$DATABASE_URL" -f lib/db/migrations/0001_video_storage_snapshots.sql
---   psql -h <host> -U <user> -d tandem -f lib/db/migrations/0001_video_storage_snapshots.sql
+--   psql -h <host> -U <user> -d nexet -f lib/db/migrations/0001_video_storage_snapshots.sql
 --
 -- NOTE: keep this file in lockstep with the Drizzle definition above. Any
 -- object created here that is NOT in the schema file will be dropped by the
 -- next `drizzle-kit push --force` reconciliation.
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS "tandem_video_storage_snapshots" (
+CREATE TABLE IF NOT EXISTS "nexet_video_storage_snapshots" (
   "project_id"  text                     NOT NULL,
   "owner_id"    text                     NOT NULL,
   "day"         date                     NOT NULL,
@@ -44,14 +44,14 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
-    WHERE conname = 'tandem_video_storage_snapshot_project_day'
-      AND conrelid = 'tandem_video_storage_snapshots'::regclass
+    WHERE conname = 'nexet_video_storage_snapshot_project_day'
+      AND conrelid = 'nexet_video_storage_snapshots'::regclass
   ) THEN
-    ALTER TABLE "tandem_video_storage_snapshots"
-      ADD CONSTRAINT "tandem_video_storage_snapshot_project_day"
+    ALTER TABLE "nexet_video_storage_snapshots"
+      ADD CONSTRAINT "nexet_video_storage_snapshot_project_day"
       UNIQUE ("project_id", "day");
   END IF;
 END $$;
 
 -- Rollback (deliberately not part of the forward migration):
---   DROP TABLE IF EXISTS "tandem_video_storage_snapshots";
+--   DROP TABLE IF EXISTS "nexet_video_storage_snapshots";

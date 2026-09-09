@@ -6,9 +6,9 @@
 // that crashes the page — `exports` is undefined in the browser. All types
 // come from the ambient globals.d.ts in this directory.
 document.getElementById("core")!.addEventListener("click", () => {
-  void window.tandemAgent.widgetOpenApp();
+  void window.nexetAgent.widgetOpenApp();
 });
 
 document.getElementById("close")!.addEventListener("click", () => {
-  void window.tandemAgent.widgetHide();
+  void window.nexetAgent.widgetHide();
 });

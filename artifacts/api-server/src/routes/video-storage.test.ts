@@ -4,11 +4,11 @@ import request from "supertest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { tandemUid } from "../lib/tandem-uid";
+import { nexetUid } from "../lib/nexet-uid";
 import { _setStore, type ObjectStore } from "../video/object-storage";
 
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "video-storage-test-"));
-process.env.TANDEM_MEDIA_DEMO = "1";
+process.env.NEXET_MEDIA_DEMO = "1";
 // Simulate an R2-configured server so the presigned flow activates.
 process.env.CF_ACCOUNT_ID = "test-account";
 process.env.CF_R2_ACCESS_KEY = "test-key";
@@ -104,22 +104,22 @@ const fake = new FakeR2Store();
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoJobsTable);
-  await state.db.delete(t.tandemVideoAssetFilesTable);
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
+  await state.db.delete(t.nexetVideoJobsTable);
+  await state.db.delete(t.nexetVideoAssetFilesTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
 }
 
 async function seedProjectAndMember() {
   const t = state.tables;
   const ownerId = "owner-1";
-  const projectId = tandemUid("p");
+  const projectId = nexetUid("p");
   await state.db
-    .insert(t.tandemVideoProjectsTable)
+    .insert(t.nexetVideoProjectsTable)
     .values({ id: projectId, ownerId, name: "Proj", status: "VAULT" });
   await state.db
-    .insert(t.tandemVideoMembersTable)
-    .values({ id: tandemUid("m"), projectId, userId: ownerId, roles: ["CAPTAIN"] });
+    .insert(t.nexetVideoMembersTable)
+    .values({ id: nexetUid("m"), projectId, userId: ownerId, roles: ["CAPTAIN"] });
   return { ownerId, projectId };
 }
 
@@ -166,9 +166,9 @@ describe("R2 presigned proxy upload (desktop-agent flow)", () => {
 
     // Approve the pending raw asset so a proxy can attach to it.
     await state.db
-      .update(t.tandemVideoAssetsTable)
+      .update(t.nexetVideoAssetsTable)
       .set({ status: "PROCESSING" })
-      .where(eq(t.tandemVideoAssetsTable.id, assetId));
+      .where(eq(t.nexetVideoAssetsTable.id, assetId));
 
     const mint = await request(API)
       .post(`/api/video/projects/${projectId}/assets/${assetId}/proxy-upload-url`)
@@ -185,8 +185,8 @@ describe("R2 presigned proxy upload (desktop-agent flow)", () => {
 
     const rows = (await state.db
       .select()
-      .from(t.tandemVideoAssetFilesTable)
-      .where(eq(t.tandemVideoAssetFilesTable.assetId, assetId))) as Array<{
+      .from(t.nexetVideoAssetFilesTable)
+      .where(eq(t.nexetVideoAssetFilesTable.assetId, assetId))) as Array<{
       id: string;
       kind: string;
       storageProvider: string;

@@ -1,4 +1,4 @@
-// Blueprint §9 — `tandem/worker-finish` (Blender · FFmpeg · ImageMagick):
+// Blueprint §9 — `nexet/worker-finish` (Blender · FFmpeg · ImageMagick):
 // multi-format exports (16:9 / 9:16 / 1:1) and thumbnail extraction + polish.
 // Consumes the EXPORT and THUMBNAIL queues.
 import "../env";

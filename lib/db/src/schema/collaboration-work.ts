@@ -8,7 +8,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 
-// A unit of authored work inside a shared Tandem project. The seed and the
+// A unit of authored work inside a shared Nexet project. The seed and the
 // accepted continuation become the first locked blocks; later passes create
 // new blocks. Submitted/approved blocks are immutable in the manuscript.
 export const collaborationWorkBlocksTable = pgTable(
@@ -36,7 +36,7 @@ export const collaborationWorkBlocksTable = pgTable(
   }),
 );
 
-// Shared and owner-scoped story facts for a Tandem project. OWNER entries are
+// Shared and owner-scoped story facts for a Nexet project. OWNER entries are
 // only visible to the author who created them; SHARED entries are visible to
 // both participants.
 export const collaborationStoryBibleEntriesTable = pgTable(

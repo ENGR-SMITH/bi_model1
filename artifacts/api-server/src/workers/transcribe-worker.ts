@@ -1,4 +1,4 @@
-// Blueprint §9 — `tandem/worker-transcribe` (faster-whisper): auto-transcription
+// Blueprint §9 — `nexet/worker-transcribe` (faster-whisper): auto-transcription
 // of all dialogue → JSON + SRT. Consumes the TRANSCRIBE queue.
 import "../env";
 import { logger } from "../lib/logger";

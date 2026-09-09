@@ -225,16 +225,16 @@ function stubGoogle() {
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoDailyMetricsTable);
-  await state.db.delete(t.tandemChannelDailyMetricsTable);
-  await state.db.delete(t.tandemChannelAlertsTable);
-  await state.db.delete(t.tandemAnalyticsReportsTable);
-  await state.db.delete(t.tandemChannelSyncsTable);
-  await state.db.delete(t.tandemChannelVideosTable);
-  await state.db.delete(t.tandemVideoNotificationsTable);
-  await state.db.delete(t.tandemChannelOauthTable);
-  await state.db.delete(t.tandemChannelMembersTable);
-  await state.db.delete(t.tandemChannelsTable);
+  await state.db.delete(t.nexetVideoDailyMetricsTable);
+  await state.db.delete(t.nexetChannelDailyMetricsTable);
+  await state.db.delete(t.nexetChannelAlertsTable);
+  await state.db.delete(t.nexetAnalyticsReportsTable);
+  await state.db.delete(t.nexetChannelSyncsTable);
+  await state.db.delete(t.nexetChannelVideosTable);
+  await state.db.delete(t.nexetVideoNotificationsTable);
+  await state.db.delete(t.nexetChannelOauthTable);
+  await state.db.delete(t.nexetChannelMembersTable);
+  await state.db.delete(t.nexetChannelsTable);
   state.userId = null;
   state.clerkIdToName = {};
   resetAnalyticsSyncThrottle();
@@ -260,7 +260,7 @@ async function createChannel(name = "Ada Makes Games"): Promise<string> {
 /** Directly mark a channel CONNECTED with an ACTIVE (encrypted) token vault. */
 async function connectChannel(channelId: string) {
   const t = state.tables;
-  await state.db.insert(t.tandemChannelOauthTable).values({
+  await state.db.insert(t.nexetChannelOauthTable).values({
     id: "oauth-1",
     channelId,
     youtubeChannelId: "UC-stubbed-youtube-channel",
@@ -272,13 +272,13 @@ async function connectChannel(channelId: string) {
     linkedByUserId: "user-1",
   });
   await state.db
-    .update(t.tandemChannelsTable)
+    .update(t.nexetChannelsTable)
     .set({ status: "CONNECTED", youtubeChannelId: "UC-stubbed-youtube-channel", youtubeTitle: "Ada Makes Games" })
-    .where(eq(t.tandemChannelsTable.id, channelId));
+    .where(eq(t.nexetChannelsTable.id, channelId));
 }
 
 async function addEditor(channelId: string, userId: string) {
-  await state.db.insert(state.tables.tandemChannelMembersTable).values({ id: `mem-${userId}`, channelId, userId, role: "EDITOR" });
+  await state.db.insert(state.tables.nexetChannelMembersTable).values({ id: `mem-${userId}`, channelId, userId, role: "EDITOR" });
 }
 
 function settle(ms = 80) {
@@ -329,15 +329,15 @@ describe("channel analytics — sync engine", () => {
     expect(res.body.lastMetricsSyncAt).toBeTruthy();
 
     const t = state.tables;
-    const videos = await state.db.select().from(t.tandemChannelVideosTable).where(eq(t.tandemChannelVideosTable.channelId, channelId));
+    const videos = await state.db.select().from(t.nexetChannelVideosTable).where(eq(t.nexetChannelVideosTable.channelId, channelId));
     expect(videos).toHaveLength(2);
     const byId = Object.fromEntries(videos.map((v: any) => [v.youtubeVideoId, v]));
     expect(byId["vid-1"].contentKind).toBe("LONG_FORM");
     expect(byId["vid-2"].contentKind).toBe("SHORT"); // 45s → SHORT
 
-    const channelMetrics = await state.db.select().from(t.tandemChannelDailyMetricsTable).where(eq(t.tandemChannelDailyMetricsTable.channelId, channelId));
+    const channelMetrics = await state.db.select().from(t.nexetChannelDailyMetricsTable).where(eq(t.nexetChannelDailyMetricsTable.channelId, channelId));
     expect(channelMetrics.length).toBeGreaterThan(0);
-    const videoMetrics = await state.db.select().from(t.tandemVideoDailyMetricsTable);
+    const videoMetrics = await state.db.select().from(t.nexetVideoDailyMetricsTable);
     expect(videoMetrics.length).toBeGreaterThan(0);
   });
 
@@ -348,8 +348,8 @@ describe("channel analytics — sync engine", () => {
     await settle();
 
     const t = state.tables;
-    const channelBefore = await state.db.select().from(t.tandemChannelDailyMetricsTable);
-    const videoBefore = await state.db.select().from(t.tandemVideoDailyMetricsTable);
+    const channelBefore = await state.db.select().from(t.nexetChannelDailyMetricsTable);
+    const videoBefore = await state.db.select().from(t.nexetVideoDailyMetricsTable);
 
     // Second run direct (the manual-sync route throttles to 1/min): the engine
     // must be incremental — no duplicate day rows, zero new uploads.
@@ -357,8 +357,8 @@ describe("channel analytics — sync engine", () => {
     expect(result.status).toBe("IDLE");
     expect(result.newVideosSeen).toBe(0);
 
-    const channelAfter = await state.db.select().from(t.tandemChannelDailyMetricsTable);
-    const videoAfter = await state.db.select().from(t.tandemVideoDailyMetricsTable);
+    const channelAfter = await state.db.select().from(t.nexetChannelDailyMetricsTable);
+    const videoAfter = await state.db.select().from(t.nexetVideoDailyMetricsTable);
     expect(channelAfter).toHaveLength(channelBefore.length);
     expect(videoAfter).toHaveLength(videoBefore.length);
     await settle();
@@ -375,7 +375,7 @@ describe("channel analytics — sync engine", () => {
     expect(res.body.error).toBeTruthy();
 
     // Catalog rows were stored before the metrics failure.
-    const videos = await state.db.select().from(state.tables.tandemChannelVideosTable).where(eq(state.tables.tandemChannelVideosTable.channelId, channelId));
+    const videos = await state.db.select().from(state.tables.nexetChannelVideosTable).where(eq(state.tables.nexetChannelVideosTable.channelId, channelId));
     expect(videos).toHaveLength(2);
   });
 
@@ -393,8 +393,8 @@ describe("channel analytics — DB-backed reads", () => {
     const channelId = await createChannel();
     const t = state.tables;
     const day = addDays(todayStr(), -1);
-    await state.db.insert(t.tandemChannelDailyMetricsTable).values({ channelId, day, metrics: { views: 100, watchTimeMinutes: 50, subscribersGained: 5 }, source: "youtube" });
-    await state.db.insert(t.tandemChannelDailyMetricsTable).values({ channelId, day: todayStr(), metrics: { views: 200, watchTimeMinutes: 80, subscribersGained: 7 }, source: "youtube" });
+    await state.db.insert(t.nexetChannelDailyMetricsTable).values({ channelId, day, metrics: { views: 100, watchTimeMinutes: 50, subscribersGained: 5 }, source: "youtube" });
+    await state.db.insert(t.nexetChannelDailyMetricsTable).values({ channelId, day: todayStr(), metrics: { views: 200, watchTimeMinutes: 80, subscribersGained: 7 }, source: "youtube" });
 
     const res = await request(API).get(`/api/channels/${channelId}/analytics/overview`);
     expect(res.status).toBe(200);
@@ -408,16 +408,16 @@ describe("channel analytics — DB-backed reads", () => {
   it("filters and sorts the video table, with cursor pagination", async () => {
     const channelId = await createChannel();
     const t = state.tables;
-    await state.db.insert(t.tandemChannelVideosTable).values({
+    await state.db.insert(t.nexetChannelVideosTable).values({
       id: "chanvid-1", channelId, youtubeVideoId: "vid-1", title: "Alpha video", description: "", thumbnails: { high: { url: "https://img/1.jpg" } },
       publishedAt: new Date("2026-08-20T10:00:00Z"), durationSeconds: 252, contentKind: "LONG_FORM",
     });
-    await state.db.insert(t.tandemChannelVideosTable).values({
+    await state.db.insert(t.nexetChannelVideosTable).values({
       id: "chanvid-2", channelId, youtubeVideoId: "vid-2", title: "Beta video", description: "", thumbnails: null,
       publishedAt: new Date("2026-08-25T10:00:00Z"), durationSeconds: 45, contentKind: "SHORT",
     });
-    await state.db.insert(t.tandemVideoDailyMetricsTable).values({ videoRowId: "chanvid-1", day: todayStr(), metrics: { views: 500, impressions: 1000, impressionsClickThroughRate: 5 } });
-    await state.db.insert(t.tandemVideoDailyMetricsTable).values({ videoRowId: "chanvid-2", day: todayStr(), metrics: { views: 50, impressions: 200, impressionsClickThroughRate: 2 } });
+    await state.db.insert(t.nexetVideoDailyMetricsTable).values({ videoRowId: "chanvid-1", day: todayStr(), metrics: { views: 500, impressions: 1000, impressionsClickThroughRate: 5 } });
+    await state.db.insert(t.nexetVideoDailyMetricsTable).values({ videoRowId: "chanvid-2", day: todayStr(), metrics: { views: 50, impressions: 200, impressionsClickThroughRate: 2 } });
 
     // Search narrows.
     const search = await request(API).get(`/api/channels/${channelId}/analytics/videos?q=alpha`);
@@ -440,18 +440,18 @@ describe("channel analytics — DB-backed reads", () => {
   it("serves video detail with totals, series, and channel medians", async () => {
     const channelId = await createChannel();
     const t = state.tables;
-    await state.db.insert(t.tandemChannelVideosTable).values({
+    await state.db.insert(t.nexetChannelVideosTable).values({
       id: "chanvid-1", channelId, youtubeVideoId: "vid-1", title: "Alpha video", description: "d", thumbnails: null,
       publishedAt: new Date("2026-08-20T10:00:00Z"), durationSeconds: 252, contentKind: "LONG_FORM",
     });
-    await state.db.insert(t.tandemChannelVideosTable).values({
+    await state.db.insert(t.nexetChannelVideosTable).values({
       id: "chanvid-2", channelId, youtubeVideoId: "vid-2", title: "Beta video", description: "d", thumbnails: null,
       publishedAt: new Date("2026-08-25T10:00:00Z"), durationSeconds: 45, contentKind: "SHORT",
     });
     const day = addDays(todayStr(), -1);
-    await state.db.insert(t.tandemVideoDailyMetricsTable).values({ videoRowId: "chanvid-1", day, metrics: { views: 100, impressionsClickThroughRate: 4, averageViewDurationSeconds: 60 } });
-    await state.db.insert(t.tandemVideoDailyMetricsTable).values({ videoRowId: "chanvid-1", day: todayStr(), metrics: { views: 200, impressionsClickThroughRate: 6, averageViewDurationSeconds: 90 } });
-    await state.db.insert(t.tandemVideoDailyMetricsTable).values({ videoRowId: "chanvid-2", day: todayStr(), metrics: { views: 50, impressionsClickThroughRate: 2, averageViewDurationSeconds: 30 } });
+    await state.db.insert(t.nexetVideoDailyMetricsTable).values({ videoRowId: "chanvid-1", day, metrics: { views: 100, impressionsClickThroughRate: 4, averageViewDurationSeconds: 60 } });
+    await state.db.insert(t.nexetVideoDailyMetricsTable).values({ videoRowId: "chanvid-1", day: todayStr(), metrics: { views: 200, impressionsClickThroughRate: 6, averageViewDurationSeconds: 90 } });
+    await state.db.insert(t.nexetVideoDailyMetricsTable).values({ videoRowId: "chanvid-2", day: todayStr(), metrics: { views: 50, impressionsClickThroughRate: 2, averageViewDurationSeconds: 30 } });
 
     const res = await request(API).get(`/api/channels/${channelId}/analytics/videos/chanvid-1`);
     expect(res.status).toBe(200);
@@ -465,7 +465,7 @@ describe("channel analytics — DB-backed reads", () => {
   it("serves a fresh report from the cache and returns stale=true with a kicked sync otherwise", async () => {
     const channelId = await createChannel();
     const t = state.tables;
-    await state.db.insert(t.tandemChannelVideosTable).values({
+    await state.db.insert(t.nexetChannelVideosTable).values({
       id: "chanvid-1", channelId, youtubeVideoId: "vid-1", title: "Alpha video", description: "", thumbnails: null,
       publishedAt: new Date("2026-08-20T10:00:00Z"), durationSeconds: 252, contentKind: "LONG_FORM",
     });
@@ -473,7 +473,7 @@ describe("channel analytics — DB-backed reads", () => {
     // Fresh cache → served without any YouTube call.
     const today = todayStr();
     const periodStart = addDays(today, -27);
-    await state.db.insert(t.tandemAnalyticsReportsTable).values({
+    await state.db.insert(t.nexetAnalyticsReportsTable).values({
       id: "report-1", channelId, videoRowId: "chanvid-1", kind: "RETENTION", periodStart, periodEnd: today,
       payload: [{ elapsedVideoTimeRatio: 0.0, averageViewPercentage: 80 }], fetchedAt: new Date(),
     });
@@ -485,9 +485,9 @@ describe("channel analytics — DB-backed reads", () => {
 
     // Stale cache → stale=true and a sync is kicked.
     await state.db
-      .update(t.tandemAnalyticsReportsTable)
+      .update(t.nexetAnalyticsReportsTable)
       .set({ fetchedAt: new Date(Date.now() - 2 * 360 * 60 * 1000) })
-      .where(eq(t.tandemAnalyticsReportsTable.id, "report-1"));
+      .where(eq(t.nexetAnalyticsReportsTable.id, "report-1"));
     const stale = await request(API).get(`/api/channels/${channelId}/analytics/videos/chanvid-1/report?kind=RETENTION`);
     expect(stale.status).toBe(200);
     expect(stale.body.stale).toBe(true);
@@ -507,17 +507,17 @@ describe("channel analytics — anomaly alerts", () => {
     for (let i = 13; i >= 0; i -= 1) {
       const day = addDays(today, -i);
       const minutes = i >= 7 ? 1000 : 100; // i=13..7 → previous week (high), i=6..0 → current week (low)
-      await state.db.insert(t.tandemChannelDailyMetricsTable).values({ channelId, day, metrics: { watchTimeMinutes: minutes }, source: "youtube" });
+      await state.db.insert(t.nexetChannelDailyMetricsTable).values({ channelId, day, metrics: { watchTimeMinutes: minutes }, source: "youtube" });
     }
 
     const res = await request(API).post(`/api/channels/${channelId}/analytics/sync`);
     expect(res.status).toBe(200);
     await settle();
 
-    const alerts = await state.db.select().from(t.tandemChannelAlertsTable);
+    const alerts = await state.db.select().from(t.nexetChannelAlertsTable);
     expect(alerts.some((a: any) => a.rule === "WATCH_TIME_DROP")).toBe(true);
 
-    const notifications = await state.db.select().from(t.tandemVideoNotificationsTable);
+    const notifications = await state.db.select().from(t.nexetVideoNotificationsTable);
     const alert = alerts.find((a: any) => a.rule === "WATCH_TIME_DROP");
     expect(notifications.some((n: any) => n.deepLink === `/creators-den/channels/${channelId}/analytics`)).toBe(true);
     expect(alert?.periodStart).toBe(addDays(today, -6));
@@ -527,7 +527,7 @@ describe("channel analytics — anomaly alerts", () => {
     const result2 = await runChannelSync(channelId);
     expect(result2.status).toBe("IDLE");
     await settle();
-    const alertsAfter = await state.db.select().from(t.tandemChannelAlertsTable);
+    const alertsAfter = await state.db.select().from(t.nexetChannelAlertsTable);
     expect(alertsAfter.filter((a: any) => a.rule === "WATCH_TIME_DROP")).toHaveLength(1);
   });
 });

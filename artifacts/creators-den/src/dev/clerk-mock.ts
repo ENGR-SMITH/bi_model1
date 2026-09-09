@@ -8,7 +8,7 @@
 // package is used and this file is never referenced.
 //
 // Purpose: render the Creator Den locally for visual/design QA without a live
-// Clerk session or the Tandem sign-in wall. It reports a fixed, signed-in dev
+// Clerk session or the Nexet sign-in wall. It reports a fixed, signed-in dev
 // identity so the app boots straight to the room. It is intentionally JSX-free
 // so it type-checks as a standalone module regardless of the JSX runtime.
 // ---------------------------------------------------------------------------

@@ -16,9 +16,9 @@ export const VIDEO_JOB_TYPES = [
 
 export type VideoJobType = (typeof VIDEO_JOB_TYPES)[number];
 
-/** Queue name for a job type: `tandem-video-<type>` (one queue per type). */
+/** Queue name for a job type: `nexet-video-<type>` (one queue per type). */
 export function queueNameFor(jobType: string): string {
-  return `tandem-video-${jobType.toLowerCase().replaceAll("_", "-")}`;
+  return `nexet-video-${jobType.toLowerCase().replaceAll("_", "-")}`;
 }
 
 /**

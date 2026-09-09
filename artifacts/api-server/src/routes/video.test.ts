@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { runWorkerCycle } from "../video/worker";
 import { backfillContentHashes } from "../video/content-address";
 import { clearUserNameCache } from "../lib/user-names";
-import { tandemUid } from "../lib/tandem-uid";
+import { nexetUid } from "../lib/nexet-uid";
 
 // Uploads land on disk; point multer at a throwaway temp dir for tests.
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "video-test-"));
@@ -39,7 +39,7 @@ vi.mock("@clerk/express", () => ({
             };
           });
           // Emails may map to users with no resolved name — include them too so
-          // the paginated Tandem-ID invite lookup can find them.
+          // the paginated Nexet-ID invite lookup can find them.
           const known = new Set(Object.keys(state.clerkIdToName));
           for (const id of Object.values(state.clerkEmailToUser)) {
             if (id && !known.has(id)) {
@@ -66,7 +66,7 @@ vi.mock("@clerk/express", () => ({
           const id = state.clerkEmailToUser[params.emailAddress[0] ?? ""] ?? null;
           return { data: id ? all().filter((u) => u.id === id) : [] };
         }
-        // Paginated walk used by the Tandem-ID invite lookup.
+        // Paginated walk used by the Nexet-ID invite lookup.
         const users = all();
         const offset = params.offset ?? 0;
         const limit = params.limit ?? users.length;
@@ -103,21 +103,21 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoNotificationsTable);
-  await state.db.delete(t.tandemVideoGrantsTable);
-  await state.db.delete(t.tandemVideoReferencesTable);
-  await state.db.delete(t.tandemVideoSyncsTable);
-  await state.db.delete(t.tandemVideoJobsTable);
-  await state.db.delete(t.tandemVideoCommentsTable);
-  await state.db.delete(t.tandemVideoSubmissionsTable);
-  await state.db.delete(t.tandemVideoTimelineVersionsTable);
-  await state.db.delete(t.tandemVideoTimelinesTable);
-  await state.db.delete(t.tandemVideoTranscriptSegmentsTable);
-  await state.db.delete(t.tandemVideoTranscriptsTable);
-  await state.db.delete(t.tandemVideoAssetFilesTable);
-  await state.db.delete(t.tandemVideoAssetsTable);
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
+  await state.db.delete(t.nexetVideoNotificationsTable);
+  await state.db.delete(t.nexetVideoGrantsTable);
+  await state.db.delete(t.nexetVideoReferencesTable);
+  await state.db.delete(t.nexetVideoSyncsTable);
+  await state.db.delete(t.nexetVideoJobsTable);
+  await state.db.delete(t.nexetVideoCommentsTable);
+  await state.db.delete(t.nexetVideoSubmissionsTable);
+  await state.db.delete(t.nexetVideoTimelineVersionsTable);
+  await state.db.delete(t.nexetVideoTimelinesTable);
+  await state.db.delete(t.nexetVideoTranscriptSegmentsTable);
+  await state.db.delete(t.nexetVideoTranscriptsTable);
+  await state.db.delete(t.nexetVideoAssetFilesTable);
+  await state.db.delete(t.nexetVideoAssetsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
   state.userId = null;
   clearUserNameCache();
   state.clerkEmailToUser = {
@@ -240,7 +240,7 @@ describe("projects", () => {
     state.userId = "captain-1";
     await request(API)
       .post(`/api/video/projects/${owned.id}/members`)
-      .send({ uid: tandemUid("captain-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("captain-2"), role: "VIDEO" });
 
     state.userId = "captain-2";
     const list = await request(API).get("/api/video/projects");
@@ -262,7 +262,7 @@ describe("project deletion", () => {
     state.userId = "captain-1";
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
     await request(API)
       .post(`/api/video/projects/${project.id}/assets`)
       .field("kind", "RAW_VIDEO")
@@ -275,18 +275,18 @@ describe("project deletion", () => {
     // Project + members + assets vanished.
     const [projectRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoProjectsTable)
-      .where(eq(state.tables.tandemVideoProjectsTable.id, project.id));
+      .from(state.tables.nexetVideoProjectsTable)
+      .where(eq(state.tables.nexetVideoProjectsTable.id, project.id));
     expect(projectRow).toBeUndefined();
     const members = await state.db
       .select()
-      .from(state.tables.tandemVideoMembersTable)
-      .where(eq(state.tables.tandemVideoMembersTable.projectId, project.id));
+      .from(state.tables.nexetVideoMembersTable)
+      .where(eq(state.tables.nexetVideoMembersTable.projectId, project.id));
     expect(members).toHaveLength(0);
     const assets = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.projectId, project.id));
     expect(assets).toHaveLength(0);
   });
 
@@ -294,7 +294,7 @@ describe("project deletion", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
 
     state.userId = "user-2";
     expect((await request(API).delete(`/api/video/projects/${project.id}`)).status).toBe(403);
@@ -331,7 +331,7 @@ describe("project visibility (public profile track history)", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
 
     state.userId = "user-2";
     const memberRes = await request(API)
@@ -365,7 +365,7 @@ describe("project visibility (public profile track history)", () => {
     // (participated) even though captain-2 doesn't own it.
     await request(API)
       .post(`/api/video/projects/${owned.id}/members`)
-      .send({ uid: tandemUid("captain-2"), role: "SCRIPT" });
+      .send({ uid: nexetUid("captain-2"), role: "SCRIPT" });
 
     state.userId = "captain-1";
     const captain1Profile = await request(API).get("/api/video/users/captain-1/projects");
@@ -384,12 +384,12 @@ describe("project visibility (public profile track history)", () => {
 });
 
 describe("members", () => {
-  it("adds a member by Tandem ID with one of the four content roles", async () => {
+  it("adds a member by Nexet ID with one of the four content roles", async () => {
     const project = await createProject();
     state.userId = "captain-1";
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
     expect(res.status).toBe(201);
     expect(res.body.userId).toBe("user-2");
     expect(res.body.roles).toEqual(["VIDEO"]);
@@ -400,20 +400,20 @@ describe("members", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
     state.userId = "user-2";
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-3"), role: "AUDIO" });
+      .send({ uid: nexetUid("user-3"), role: "AUDIO" });
     expect(res.status).toBe(403);
   });
 
-  it("rejects unknown Tandem IDs", async () => {
+  it("rejects unknown Nexet IDs", async () => {
     const project = await createProject();
     state.userId = "captain-1";
     const unknown = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: "TANDEMZZZZZ", role: "VIEWER" });
+      .send({ uid: "NEXETZZZZZ", role: "VIEWER" });
     expect(unknown.status).toBe(400);
   });
 
@@ -422,14 +422,14 @@ describe("members", () => {
     state.userId = "captain-1";
     const added = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "SCRIPT" });
+      .send({ uid: nexetUid("user-2"), role: "SCRIPT" });
     expect(added.status).toBe(201);
     expect(added.body.roles).toEqual(["SCRIPT"]);
 
     // Same user invited again with another role — merged, not a conflict.
     const merged = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "THUMBNAIL" });
+      .send({ uid: nexetUid("user-2"), role: "THUMBNAIL" });
     expect(merged.status).toBe(200);
     expect(merged.body.userId).toBe("user-2");
     expect(merged.body.roles).toEqual(["SCRIPT", "THUMBNAIL"]);
@@ -440,7 +440,7 @@ describe("members", () => {
     state.userId = "captain-1";
     const added = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
     expect(added.status).toBe(201);
 
     // Give the member a second role.
@@ -482,7 +482,7 @@ describe("members", () => {
     state.userId = "captain-1";
     const added = await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
     expect(added.status).toBe(201);
 
     // The removed member loses access immediately.
@@ -567,7 +567,7 @@ describe("vault assets", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
     state.userId = "user-2";
     const res = await request(API)
       .post(`/api/video/projects/${project.id}/assets`)
@@ -577,8 +577,8 @@ describe("vault assets", () => {
     expect(res.body.uploaderId).toBe("user-2");
     const [row] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, res.body.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, res.body.id));
     expect(row.storageKey).toBeTruthy();
   });
 
@@ -596,15 +596,15 @@ describe("vault assets", () => {
     // No ffmpeg/whisper jobs — the image needs no proxy encode or transcript.
     const jobs = await state.db
       .select()
-      .from(state.tables.tandemVideoJobsTable)
-      .where(eq(state.tables.tandemVideoJobsTable.assetId, res.body.id));
+      .from(state.tables.nexetVideoJobsTable)
+      .where(eq(state.tables.nexetVideoJobsTable.assetId, res.body.id));
     expect(jobs).toHaveLength(0);
 
     // A PROXY row serves the original file straight to the browser.
     const files = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetFilesTable)
-      .where(eq(state.tables.tandemVideoAssetFilesTable.assetId, res.body.id));
+      .from(state.tables.nexetVideoAssetFilesTable)
+      .where(eq(state.tables.nexetVideoAssetFilesTable.assetId, res.body.id));
     expect(files).toHaveLength(1);
     expect(files[0].kind).toBe("PROXY");
     expect(files[0].mimeType).toBe("image/png");
@@ -620,7 +620,7 @@ describe("vault assets", () => {
     // user-2 holds AUDIO only — footage and images are owned by other roles.
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "AUDIO" });
+      .send({ uid: nexetUid("user-2"), role: "AUDIO" });
     state.userId = "user-2";
 
     const image = await request(API)
@@ -650,7 +650,7 @@ describe("vault assets", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
     // The Captain grants a second role (VIDEO + THUMBNAIL) on the member row.
     state.userId = "captain-1";
     const detail = (await request(API).get(`/api/video/projects/${project.id}`)).body;
@@ -683,7 +683,7 @@ describe("vault assets", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "SCRIPT" });
+      .send({ uid: nexetUid("user-2"), role: "SCRIPT" });
     state.userId = "user-2";
 
     const media = await request(API)
@@ -704,7 +704,7 @@ describe("vault assets", () => {
     // A member added without a content role is a Viewer.
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIEWER" });
+      .send({ uid: nexetUid("user-2"), role: "VIEWER" });
     state.userId = "user-2";
     const viewer = await request(API)
       .post(`/api/video/projects/${project.id}/assets`)
@@ -723,7 +723,7 @@ describe("vault assets", () => {
 
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-3"), role: "UPLOADER" });
+      .send({ uid: nexetUid("user-3"), role: "UPLOADER" });
     state.userId = "user-3";
     const upImage = await request(API)
       .post(`/api/video/projects/${project.id}/assets`)
@@ -760,12 +760,12 @@ describe("content-addressed media (Git LFS)", () => {
 
     const [firstRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, first.body.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, first.body.id));
     const [firstProxy] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetFilesTable)
-      .where(eq(state.tables.tandemVideoAssetFilesTable.assetId, first.body.id));
+      .from(state.tables.nexetVideoAssetFilesTable)
+      .where(eq(state.tables.nexetVideoAssetFilesTable.assetId, first.body.id));
 
     // Re-upload the exact same bytes — this must not write a second file.
     const dirBefore = fs.readdirSync(process.env.VIDEO_UPLOAD_DIR!);
@@ -781,42 +781,42 @@ describe("content-addressed media (Git LFS)", () => {
     // The new asset is a pointer to the existing blob — no second copy.
     const [secondRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, second.body.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, second.body.id));
     expect(secondRow.storageKey).toBe(firstRow.storageKey);
 
     // Derived previews are reused: the same proxy + transcript, no jobs, and
     // the asset is already marked PROCESSED.
     const [secondProxy] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetFilesTable)
-      .where(eq(state.tables.tandemVideoAssetFilesTable.assetId, second.body.id));
+      .from(state.tables.nexetVideoAssetFilesTable)
+      .where(eq(state.tables.nexetVideoAssetFilesTable.assetId, second.body.id));
     expect(secondProxy).toBeTruthy();
     expect(secondProxy.storageKey).toBe(firstProxy.storageKey);
 
     const [firstTranscript] = await state.db
       .select()
-      .from(state.tables.tandemVideoTranscriptsTable)
-      .where(eq(state.tables.tandemVideoTranscriptsTable.assetId, first.body.id));
+      .from(state.tables.nexetVideoTranscriptsTable)
+      .where(eq(state.tables.nexetVideoTranscriptsTable.assetId, first.body.id));
     const [secondTranscript] = await state.db
       .select()
-      .from(state.tables.tandemVideoTranscriptsTable)
-      .where(eq(state.tables.tandemVideoTranscriptsTable.assetId, second.body.id));
+      .from(state.tables.nexetVideoTranscriptsTable)
+      .where(eq(state.tables.nexetVideoTranscriptsTable.assetId, second.body.id));
     expect(secondTranscript).toBeTruthy();
     const firstSegments = await state.db
       .select()
-      .from(state.tables.tandemVideoTranscriptSegmentsTable)
-      .where(eq(state.tables.tandemVideoTranscriptSegmentsTable.transcriptId, firstTranscript.id));
+      .from(state.tables.nexetVideoTranscriptSegmentsTable)
+      .where(eq(state.tables.nexetVideoTranscriptSegmentsTable.transcriptId, firstTranscript.id));
     const secondSegments = await state.db
       .select()
-      .from(state.tables.tandemVideoTranscriptSegmentsTable)
-      .where(eq(state.tables.tandemVideoTranscriptSegmentsTable.transcriptId, secondTranscript.id));
+      .from(state.tables.nexetVideoTranscriptSegmentsTable)
+      .where(eq(state.tables.nexetVideoTranscriptSegmentsTable.transcriptId, secondTranscript.id));
     expect(secondSegments).toHaveLength(firstSegments.length);
 
     const jobs = await state.db
       .select()
-      .from(state.tables.tandemVideoJobsTable)
-      .where(eq(state.tables.tandemVideoJobsTable.assetId, second.body.id));
+      .from(state.tables.nexetVideoJobsTable)
+      .where(eq(state.tables.nexetVideoJobsTable.assetId, second.body.id));
     expect(jobs).toHaveLength(0);
   });
 
@@ -837,12 +837,12 @@ describe("content-addressed media (Git LFS)", () => {
 
     const [a] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.projectId, projectA.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.projectId, projectA.id));
     const [b] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.projectId, projectB.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.projectId, projectB.id));
     expect(b.storageKey).toBe(a.storageKey);
     expect(b.contentHash).toBe(a.contentHash);
   });
@@ -857,7 +857,7 @@ describe("content-addressed media (Git LFS)", () => {
     // bytes — the new asset must point at the legacy blob.
     const key = "legacy-session.mp4";
     fs.writeFileSync(path.join(process.env.VIDEO_UPLOAD_DIR!, key), bytes);
-    await state.db.insert(state.tables.tandemVideoAssetsTable).values({
+    await state.db.insert(state.tables.nexetVideoAssetsTable).values({
       id: "asset-legacy",
       projectId: project.id,
       uploaderId: "captain-1",
@@ -880,12 +880,12 @@ describe("content-addressed media (Git LFS)", () => {
 
     const [legacyRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, "asset-legacy"));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, "asset-legacy"));
     const [newRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, res.body.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, res.body.id));
     expect(newRow.storageKey).toBe(legacyRow.storageKey);
     expect(legacyRow.contentHash).toBeTruthy();
   });
@@ -911,8 +911,8 @@ describe("content-addressed media (Git LFS)", () => {
 
     const jobs = await state.db
       .select()
-      .from(state.tables.tandemVideoJobsTable)
-      .where(eq(state.tables.tandemVideoJobsTable.assetId, second.body.id));
+      .from(state.tables.nexetVideoJobsTable)
+      .where(eq(state.tables.nexetVideoJobsTable.assetId, second.body.id));
     expect(jobs.map((job: any) => job.type).sort()).toEqual(["PROXY", "TRANSCRIBE"]);
   });
 });
@@ -944,7 +944,7 @@ describe("submit-for-review uploads (review = true)", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
 
     const res = await uploadForReview({
       projectId: project.id,
@@ -961,8 +961,8 @@ describe("submit-for-review uploads (review = true)", () => {
     // One staged row, still PENDING_REVIEW — invisible to the vault/project.
     const [pending] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.projectId, project.id));
     expect(pending.status).toBe("PENDING_REVIEW");
     expect(pending.storageKey).toBeTruthy();
 
@@ -986,7 +986,7 @@ describe("submit-for-review uploads (review = true)", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
 
     const upload = await uploadForReview({
       projectId: project.id,
@@ -999,8 +999,8 @@ describe("submit-for-review uploads (review = true)", () => {
     expect(upload.status).toBe(201);
     const [pendingRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.projectId, project.id));
     expect(pendingRow.status).toBe("PENDING_REVIEW");
     expect(pendingRow.language).toBe("Spanish");
     const stagedPath = path.join(process.env.VIDEO_UPLOAD_DIR!, pendingRow.storageKey);
@@ -1037,7 +1037,7 @@ describe("submit-for-review uploads (review = true)", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "VIDEO" });
+      .send({ uid: nexetUid("user-2"), role: "VIDEO" });
 
     const upload = await uploadForReview({
       projectId: project.id,
@@ -1049,8 +1049,8 @@ describe("submit-for-review uploads (review = true)", () => {
     expect(upload.status).toBe(201);
     const [pendingRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.projectId, project.id));
     const stagedPath = path.join(process.env.VIDEO_UPLOAD_DIR!, pendingRow.storageKey);
     expect(fs.existsSync(stagedPath)).toBe(true);
 
@@ -1072,8 +1072,8 @@ describe("submit-for-review uploads (review = true)", () => {
 
     const assets = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.projectId, project.id));
     expect(assets).toHaveLength(1);
     expect(assets[0].id).not.toBe(upload.body.id);
     expect(assets[0].status).not.toBe("PENDING_REVIEW");
@@ -1083,14 +1083,14 @@ describe("submit-for-review uploads (review = true)", () => {
     // RAW_VIDEO enqueues proxy + transcription and keeps the file on disk.
     const jobs = await state.db
       .select()
-      .from(state.tables.tandemVideoJobsTable)
-      .where(eq(state.tables.tandemVideoJobsTable.assetId, assets[0].id));
+      .from(state.tables.nexetVideoJobsTable)
+      .where(eq(state.tables.nexetVideoJobsTable.assetId, assets[0].id));
     expect(jobs.map((job: any) => job.type).sort()).toEqual(["PROXY", "TRANSCRIBE"]);
 
     const [submissionRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoSubmissionsTable)
-      .where(eq(state.tables.tandemVideoSubmissionsTable.id, upload.body.submissionId));
+      .from(state.tables.nexetVideoSubmissionsTable)
+      .where(eq(state.tables.nexetVideoSubmissionsTable.id, upload.body.submissionId));
     expect(submissionRow.status).toBe("APPROVED");
     expect(submissionRow.timelineVersionId).toBe(`ASSET:${assets[0].id}`);
 
@@ -1103,8 +1103,8 @@ describe("submit-for-review uploads (review = true)", () => {
     // No timeline leg was touched — nothing was merged into a stage.
     const timelines = await state.db
       .select()
-      .from(state.tables.tandemVideoTimelinesTable)
-      .where(eq(state.tables.tandemVideoTimelinesTable.projectId, project.id));
+      .from(state.tables.nexetVideoTimelinesTable)
+      .where(eq(state.tables.nexetVideoTimelinesTable.projectId, project.id));
     expect(timelines).toHaveLength(0);
   });
 
@@ -1128,8 +1128,8 @@ describe("submit-for-review uploads (review = true)", () => {
     // No submission was created, and the vault shows the file immediately.
     const subs = await state.db
       .select()
-      .from(state.tables.tandemVideoSubmissionsTable)
-      .where(eq(state.tables.tandemVideoSubmissionsTable.projectId, project.id));
+      .from(state.tables.nexetVideoSubmissionsTable)
+      .where(eq(state.tables.nexetVideoSubmissionsTable.projectId, project.id));
     expect(subs).toHaveLength(0);
     const queue = await request(API).get("/api/video/review/queue");
     expect(queue.body).toHaveLength(0);
@@ -1183,7 +1183,7 @@ describe("submit-for-review uploads (review = true)", () => {
     const project = await createProject();
     await request(API)
       .post(`/api/video/projects/${project.id}/members`)
-      .send({ uid: tandemUid("user-2"), role: "AUDIO" });
+      .send({ uid: nexetUid("user-2"), role: "AUDIO" });
 
     const upload = await uploadForReview({
       projectId: project.id,
@@ -1196,8 +1196,8 @@ describe("submit-for-review uploads (review = true)", () => {
 
     const [pending] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.projectId, project.id));
     const stagedPath = path.join(process.env.VIDEO_UPLOAD_DIR!, pending.storageKey);
     expect(fs.existsSync(stagedPath)).toBe(true);
 
@@ -1211,15 +1211,15 @@ describe("submit-for-review uploads (review = true)", () => {
     // The staged row + its bytes are gone; the submission keeps the note.
     const assets = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.projectId, project.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.projectId, project.id));
     expect(assets).toHaveLength(0);
     expect(fs.existsSync(stagedPath)).toBe(false);
 
     const [submissionRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoSubmissionsTable)
-      .where(eq(state.tables.tandemVideoSubmissionsTable.id, upload.body.submissionId));
+      .from(state.tables.nexetVideoSubmissionsTable)
+      .where(eq(state.tables.nexetVideoSubmissionsTable.id, upload.body.submissionId));
     expect(submissionRow.status).toBe("REJECTED");
     expect(submissionRow.decisionNote).toBe("Too hissy — re-record with the lav closer.");
   });

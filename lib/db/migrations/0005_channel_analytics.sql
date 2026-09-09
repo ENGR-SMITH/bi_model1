@@ -5,13 +5,13 @@
 -- YouTube channel, a background sync engine snapshots the catalog of published
 -- videos and their daily metrics into Postgres so the analytics pages never
 -- proxy live YouTube API responses. This migration adds:
---   tandem_channel_videos        — catalog of published uploads (upserted)
---   tandem_channel_daily_metrics — channel-level daily metric snapshots
---   tandem_video_daily_metrics   — per-video daily metric snapshots
---   tandem_analytics_reports     — on-demand report cache (retention/traffic/
+--   nexet_channel_videos        — catalog of published uploads (upserted)
+--   nexet_channel_daily_metrics — channel-level daily metric snapshots
+--   nexet_video_daily_metrics   — per-video daily metric snapshots
+--   nexet_analytics_reports     — on-demand report cache (retention/traffic/
 --                                  demographics/devices/revenue/subs)
---   tandem_channel_syncs         — per-channel sync state (IDLE/SYNCING/ERROR)
---   tandem_channel_alerts        — v1 anomaly alerts (deduped per rule+window)
+--   nexet_channel_syncs         — per-channel sync state (IDLE/SYNCING/ERROR)
+--   nexet_channel_alerts        — v1 anomaly alerts (deduped per rule+window)
 --
 -- Source of truth: lib/db/src/schema/channel-analytics.ts
 --
@@ -23,9 +23,9 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name = 'tandem_channel_videos'
+      AND table_name = 'nexet_channel_videos'
   ) THEN
-    CREATE TABLE "tandem_channel_videos" (
+    CREATE TABLE "nexet_channel_videos" (
       "id" text PRIMARY KEY NOT NULL,
       "channel_id" text NOT NULL,
       "youtube_video_id" text NOT NULL,
@@ -41,8 +41,8 @@ BEGIN
       "last_synced_at" timestamp with time zone DEFAULT now() NOT NULL,
       UNIQUE ("channel_id", "youtube_video_id")
     );
-    CREATE INDEX IF NOT EXISTS "tandem_channel_videos_channel_idx"
-      ON "tandem_channel_videos" ("channel_id");
+    CREATE INDEX IF NOT EXISTS "nexet_channel_videos_channel_idx"
+      ON "nexet_channel_videos" ("channel_id");
   END IF;
 END $$;
 
@@ -51,9 +51,9 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name = 'tandem_channel_daily_metrics'
+      AND table_name = 'nexet_channel_daily_metrics'
   ) THEN
-    CREATE TABLE "tandem_channel_daily_metrics" (
+    CREATE TABLE "nexet_channel_daily_metrics" (
       "channel_id" text NOT NULL,
       "day" date NOT NULL,
       "metrics" jsonb NOT NULL,
@@ -68,16 +68,16 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name = 'tandem_video_daily_metrics'
+      AND table_name = 'nexet_video_daily_metrics'
   ) THEN
-    CREATE TABLE "tandem_video_daily_metrics" (
+    CREATE TABLE "nexet_video_daily_metrics" (
       "video_row_id" text NOT NULL,
       "day" date NOT NULL,
       "metrics" jsonb NOT NULL,
       UNIQUE ("video_row_id", "day")
     );
-    CREATE INDEX IF NOT EXISTS "tandem_video_daily_metrics_video_idx"
-      ON "tandem_video_daily_metrics" ("video_row_id");
+    CREATE INDEX IF NOT EXISTS "nexet_video_daily_metrics_video_idx"
+      ON "nexet_video_daily_metrics" ("video_row_id");
   END IF;
 END $$;
 
@@ -86,9 +86,9 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name = 'tandem_analytics_reports'
+      AND table_name = 'nexet_analytics_reports'
   ) THEN
-    CREATE TABLE "tandem_analytics_reports" (
+    CREATE TABLE "nexet_analytics_reports" (
       "id" text PRIMARY KEY NOT NULL,
       "channel_id" text NOT NULL,
       "video_row_id" text,
@@ -98,8 +98,8 @@ BEGIN
       "payload" jsonb NOT NULL,
       "fetched_at" timestamp with time zone DEFAULT now() NOT NULL
     );
-    CREATE INDEX IF NOT EXISTS "tandem_analytics_reports_channel_idx"
-      ON "tandem_analytics_reports" ("channel_id");
+    CREATE INDEX IF NOT EXISTS "nexet_analytics_reports_channel_idx"
+      ON "nexet_analytics_reports" ("channel_id");
   END IF;
 END $$;
 
@@ -108,9 +108,9 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name = 'tandem_channel_syncs'
+      AND table_name = 'nexet_channel_syncs'
   ) THEN
-    CREATE TABLE "tandem_channel_syncs" (
+    CREATE TABLE "nexet_channel_syncs" (
       "channel_id" text PRIMARY KEY NOT NULL,
       "last_video_sync_at" timestamp with time zone,
       "last_metrics_sync_at" timestamp with time zone,
@@ -127,9 +127,9 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name = 'tandem_channel_alerts'
+      AND table_name = 'nexet_channel_alerts'
   ) THEN
-    CREATE TABLE "tandem_channel_alerts" (
+    CREATE TABLE "nexet_channel_alerts" (
       "id" text PRIMARY KEY NOT NULL,
       "channel_id" text NOT NULL,
       "rule" text NOT NULL,

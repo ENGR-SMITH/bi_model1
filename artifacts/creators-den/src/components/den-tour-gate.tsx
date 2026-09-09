@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // DenTourGate — the one-time, server-backed preview tour for visitors who do
-// not hold an active Tandem pass for this den.
+// not hold an active Nexet pass for this den.
 //
 //   · active pass            → the den opens normally, nothing is shown
 //   · first visit, no pass   → the 10-minute tour auto-starts with no banner;
@@ -10,11 +10,11 @@
 //   · tour expired           → "Your tour has ended" notice pops up — the only
 //                              moment the ticket appears, since access is now
 //                              actually restricted — then the visitor is
-//                              navigated back to the Tandem category page to
+//                              navigated back to the Nexet category page to
 //                              buy the pass
 //   · tour already used      → no re-entry: navigate straight to the paywall
 //
-// The tour state lives on the server (tandem_tours, one row per user per
+// The tour state lives on the server (nexet_tours, one row per user per
 // category ever), so refreshing or clearing the browser can never re-grant
 // it. Each den tours independently against its own category.
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
     }
     if (data.tourUsed) {
       // The one-time tour has already been spent — only an active pass opens
-      // the den again. Go straight back to the Tandem category paywall.
+      // the den again. Go straight back to the Nexet category paywall.
       window.location.replace(PAYWALL_PATH[category]);
       return;
     }
@@ -119,7 +119,7 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
   const remainingMs = phase === 'tour' && endsAt != null ? Math.max(0, endsAt - nowMs) : 0;
 
   // The countdown hit zero — flip to the "tour over" notice and start the
-  // auto-redirect back to the Tandem category page.
+  // auto-redirect back to the Nexet category page.
   useEffect(() => {
     if (phase !== 'tour' || remainingMs > 0) return;
     setPhase('expired');
@@ -144,7 +144,7 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
     <>
       {children}
 
-      {/* The "tour is over" notice — then straight back to the Tandem paywall. */}
+      {/* The "tour is over" notice — then straight back to the Nexet paywall. */}
       {phase === 'expired' && (
         <div
           role="dialog"
@@ -190,7 +190,7 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
             <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: '#a1a1a1' }}>
               The 10-minute preview of the {TOUR_LABEL[category]} is over. Buy the{' '}
               {category === 'authors' ? 'Authors &amp; Writers' : 'Content Creators'} pass to come back — you&apos;re
-              being returned to Tandem to get it.
+              being returned to Nexet to get it.
             </p>
             <a
               href={PAYWALL_PATH[category]}
@@ -214,7 +214,7 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
               <Ticket size={15} /> Get the pass
             </a>
             <p style={{ margin: '14px 0 0', fontSize: 11.5, color: '#6b6b6f' }} data-testid="den-tour-over-redirect">
-              Redirecting to Tandem in {redirectIn}s…
+              Redirecting to Nexet in {redirectIn}s…
             </p>
           </div>
         </div>

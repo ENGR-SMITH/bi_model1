@@ -1,4 +1,4 @@
-// Blueprint §9 — `tandem/worker-sync` (FFmpeg): waveform multi-cam / dual-system
+// Blueprint §9 — `nexet/worker-sync` (FFmpeg): waveform multi-cam / dual-system
 // audio sync → offset metadata + synced AssetFile. Consumes the SYNC queue.
 import "../env";
 import { logger } from "../lib/logger";

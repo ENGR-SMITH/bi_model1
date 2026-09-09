@@ -137,10 +137,10 @@
 .main-stage { flex: 1; min-width: 0; }
 .topbar { height: 70px; border-bottom: 1px solid hsl(var(--border)); display: flex; align-items: center; justify-content: space-between; padding: 0 42px; background: hsl(var(--background) / .82); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 10; }
 .top-actions { display: flex; align-items: center; gap: 12px; }
-.tandem-back-btn { display: flex; align-items: center; gap: 9px; margin: 0 2px 32px; padding: 9px 12px; border: 1px solid hsl(var(--sidebar-primary) / .35); background: hsl(var(--sidebar-accent)); color: hsl(var(--sidebar-primary)); border-radius: 7px; font: 700 11px var(--app-font-sans); text-decoration: none; transition: border-color .16s, background .16s, transform .16s; white-space: nowrap; overflow: hidden; }
-.tandem-back-btn svg { color: hsl(var(--destructive)); }
-.tandem-back-btn:hover { border-color: hsl(var(--destructive) / .6); background: hsl(var(--sidebar-accent) / .85); transform: translateY(-1px); }
-.tandem-back-btn:hover svg { color: hsl(var(--destructive)); }
+.nexet-back-btn { display: flex; align-items: center; gap: 9px; margin: 0 2px 32px; padding: 9px 12px; border: 1px solid hsl(var(--sidebar-primary) / .35); background: hsl(var(--sidebar-accent)); color: hsl(var(--sidebar-primary)); border-radius: 7px; font: 700 11px var(--app-font-sans); text-decoration: none; transition: border-color .16s, background .16s, transform .16s; white-space: nowrap; overflow: hidden; }
+.nexet-back-btn svg { color: hsl(var(--destructive)); }
+.nexet-back-btn:hover { border-color: hsl(var(--destructive) / .6); background: hsl(var(--sidebar-accent) / .85); transform: translateY(-1px); }
+.nexet-back-btn:hover svg { color: hsl(var(--destructive)); }
 .spin { animation: spin 1.1s linear infinite; }
 .save-indicator { display: inline-flex; align-items: center; gap: 7px; color: hsl(var(--muted-foreground)); font: 10px var(--app-font-mono); }
 .pulse-dot { width: 6px; height: 6px; background: hsl(164 33% 45%); border-radius: 50%; box-shadow: 0 0 0 3px hsl(164 33% 45% / .13); }
@@ -649,13 +649,13 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
   padding-left: 0;
   padding-right: 0;
 }
-.sidebar.sidebar-collapsed .tandem-back-btn {
+.sidebar.sidebar-collapsed .nexet-back-btn {
   justify-content: center;
   padding: 9px;
   margin-left: 2px;
   margin-right: 2px;
 }
-.sidebar.sidebar-collapsed .tandem-back-btn span {
+.sidebar.sidebar-collapsed .nexet-back-btn span {
   display: none;
 }
 .sidebar.sidebar-collapsed .brand-copy,

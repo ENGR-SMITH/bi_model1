@@ -4,9 +4,9 @@ import { and, desc, eq } from "drizzle-orm";
 import { clerkClient, getAuth } from "@clerk/express";
 import {
   db,
-  tandemPaystackIntentsTable,
-  tandemPaystackPlansTable,
-  tandemSubscriptionsTable,
+  nexetPaystackIntentsTable,
+  nexetPaystackPlansTable,
+  nexetSubscriptionsTable,
 } from "@workspace/db";
 import {
   applySubscriptionPurchase,
@@ -56,33 +56,33 @@ function validCallbackUrl(value: unknown): string | null {
 }
 
 function defaultCallbackUrl(): string {
-  const web = process.env.TANDEM_WEB_URL?.replace(/\/+$/, "");
+  const web = process.env.NEXET_WEB_URL?.replace(/\/+$/, "");
   return `${web || "http://localhost:5175"}/subscriptions`;
 }
 
 async function lookupIntent(reference: string) {
   const [intent] = await db
     .select()
-    .from(tandemPaystackIntentsTable)
-    .where(eq(tandemPaystackIntentsTable.reference, reference))
+    .from(nexetPaystackIntentsTable)
+    .where(eq(nexetPaystackIntentsTable.reference, reference))
     .limit(1);
   return intent ?? null;
 }
 
 async function markIntent(reference: string, status: "PENDING" | "SUCCESS" | "FAILED", cardLast4?: string | null) {
   await db
-    .update(tandemPaystackIntentsTable)
+    .update(nexetPaystackIntentsTable)
     .set({
       status,
       updatedAt: new Date(),
       ...(status === "SUCCESS" && cardLast4 ? { cardLast4 } : {}),
     })
-    .where(eq(tandemPaystackIntentsTable.reference, reference));
+    .where(eq(nexetPaystackIntentsTable.reference, reference));
 }
 
 /**
  * The Paystack plan code for a catalog plan, creating the Paystack plan once
- * and caching it in tandem_paystack_plans so later checkouts reuse it.
+ * and caching it in nexet_paystack_plans so later checkouts reuse it.
  */
 async function getOrCreatePlan(
   kind: SubscriptionKind,
@@ -91,9 +91,9 @@ async function getOrCreatePlan(
   planLabel: string,
 ): Promise<string> {
   const [existing] = await db
-    .select({ planCode: tandemPaystackPlansTable.planCode })
-    .from(tandemPaystackPlansTable)
-    .where(and(eq(tandemPaystackPlansTable.kind, kind), eq(tandemPaystackPlansTable.planId, planId)))
+    .select({ planCode: nexetPaystackPlansTable.planCode })
+    .from(nexetPaystackPlansTable)
+    .where(and(eq(nexetPaystackPlansTable.kind, kind), eq(nexetPaystackPlansTable.planId, planId)))
     .limit(1);
   if (existing) return existing.planCode;
 
@@ -103,7 +103,7 @@ async function getOrCreatePlan(
     interval: "monthly",
   });
   await db
-    .insert(tandemPaystackPlansTable)
+    .insert(nexetPaystackPlansTable)
     .values({ kind, planId, planCode, amountUsd, interval: "monthly" })
     .onConflictDoNothing();
   return planCode;
@@ -158,9 +158,9 @@ async function grantIntent(
   }
 
   const claimed = await db
-    .update(tandemPaystackIntentsTable)
+    .update(nexetPaystackIntentsTable)
     .set({ status: "SUCCESS", updatedAt: new Date(), ...(options.cardLast4 ? { cardLast4: options.cardLast4 } : {}) })
-    .where(and(eq(tandemPaystackIntentsTable.reference, reference), eq(tandemPaystackIntentsTable.status, "PENDING")))
+    .where(and(eq(nexetPaystackIntentsTable.reference, reference), eq(nexetPaystackIntentsTable.status, "PENDING")))
     .returning();
   if (claimed.length === 0) return "already";
 
@@ -178,8 +178,8 @@ async function grantIntent(
   if (renewsSubscriptionId) {
     const [oldSub] = await db
       .select()
-      .from(tandemSubscriptionsTable)
-      .where(eq(tandemSubscriptionsTable.id, renewsSubscriptionId))
+      .from(nexetSubscriptionsTable)
+      .where(eq(nexetSubscriptionsTable.id, renewsSubscriptionId))
       .limit(1);
     if (oldSub) {
       autoRenew = true;
@@ -235,14 +235,14 @@ async function grantSubscriptionCharge(
   if (!options.subscriptionCode) return null;
   const [sub] = await db
     .select()
-    .from(tandemSubscriptionsTable)
+    .from(nexetSubscriptionsTable)
     .where(
       and(
-        eq(tandemSubscriptionsTable.paystackSubscriptionCode, options.subscriptionCode),
-        eq(tandemSubscriptionsTable.autoRenew, true),
+        eq(nexetSubscriptionsTable.paystackSubscriptionCode, options.subscriptionCode),
+        eq(nexetSubscriptionsTable.autoRenew, true),
       ),
     )
-    .orderBy(desc(tandemSubscriptionsTable.createdAt))
+    .orderBy(desc(nexetSubscriptionsTable.createdAt))
     .limit(1);
   if (!sub) return null;
 
@@ -288,9 +288,9 @@ async function handleChargeSuccess(
   // A Paystack transaction reference is never granted twice — covers both the
   // first charge and every recurring cycle.
   const [alreadyGranted] = await db
-    .select({ id: tandemSubscriptionsTable.id })
-    .from(tandemSubscriptionsTable)
-    .where(eq(tandemSubscriptionsTable.paystackTransactionReference, reference))
+    .select({ id: nexetSubscriptionsTable.id })
+    .from(nexetSubscriptionsTable)
+    .where(eq(nexetSubscriptionsTable.paystackTransactionReference, reference))
     .limit(1);
   if (alreadyGranted) return "already";
 
@@ -332,7 +332,7 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
 
   // Every Paystack subscription auto-renews by default: the card authorization
   // is kept and re-charged each cycle. Only an admin can turn it off — per
-  // plan (a tandem_subscription_plan_settings row with autoRenewAvailable
+  // plan (a nexet_subscription_plan_settings row with autoRenewAvailable
   // false turns it off here) or per subscription (the admin toggle). Any
   // client-sent autoRenew flag is ignored.
   const autoRenew = await autoRenewAvailableForPlan(kind, planId);
@@ -397,7 +397,7 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
   const reference = `tan_${randomUUID()}`;
   const callbackUrl = validCallbackUrl(body.callbackUrl) ?? defaultCallbackUrl();
 
-  await db.insert(tandemPaystackIntentsTable).values({
+  await db.insert(nexetPaystackIntentsTable).values({
     reference,
     userId,
     kind,
@@ -424,7 +424,7 @@ router.post("/paystack/checkout", async (req: Request, res: Response): Promise<v
     res.status(201).json({ granted: false, checkoutUrl: authorizationUrl, reference });
   } catch (cause) {
     // Roll the intent back so nothing lingers as PENDING.
-    await db.delete(tandemPaystackIntentsTable).where(eq(tandemPaystackIntentsTable.reference, reference)).catch(() => {});
+    await db.delete(nexetPaystackIntentsTable).where(eq(nexetPaystackIntentsTable.reference, reference)).catch(() => {});
     const message = cause instanceof PaystackApiError ? cause.message : "Paystack could not open the checkout session";
     res.status(502).json({ error: message });
   }
@@ -485,22 +485,22 @@ router.post("/paystack/webhook", async (req: Request, res: Response): Promise<vo
       const code = data.subscription?.subscription_code;
       if (code) {
         await db
-          .update(tandemSubscriptionsTable)
+          .update(nexetSubscriptionsTable)
           .set({
             renewalFailure:
               "The monthly charge was declined — update the card on your subscription or contact support.",
             updatedAt: new Date(),
           })
-          .where(and(eq(tandemSubscriptionsTable.paystackSubscriptionCode, code), eq(tandemSubscriptionsTable.autoRenew, true)));
+          .where(and(eq(nexetSubscriptionsTable.paystackSubscriptionCode, code), eq(nexetSubscriptionsTable.autoRenew, true)));
       }
     } else if (event === "subscription.disable") {
       // Cancelled or completed — stop treating the chain as auto-renewing.
       const code = data.subscription?.subscription_code;
       if (code) {
         await db
-          .update(tandemSubscriptionsTable)
+          .update(nexetSubscriptionsTable)
           .set({ autoRenew: false, updatedAt: new Date() })
-          .where(eq(tandemSubscriptionsTable.paystackSubscriptionCode, code));
+          .where(eq(nexetSubscriptionsTable.paystackSubscriptionCode, code));
       }
     }
     res.status(200).json({ received: true });

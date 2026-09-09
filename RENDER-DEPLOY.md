@@ -6,7 +6,7 @@ One Render Web Service, built from `artifacts/api-server/Dockerfile`, that runs 
 
 - nginx on port 8080 serves the four SPAs by base path and proxies `/api` + `/socket.io` to Node.
 - Node on `127.0.0.1:3000` runs the Express/Socket.IO API, the video job worker, storage maintenance, and YouTube channel analytics sync.
-- The four frontends are Tandem (`/`), Author Den (`/authors-den/`), Creator Den (`/creators-den/`), and Oracle Admin (`/oracle-admin/`).
+- The four frontends are Nexet (`/`), Author Den (`/authors-den/`), Creator Den (`/creators-den/`), and Oracle Admin (`/oracle-admin/`).
 
 This is not a plain Node service. The code expects a single origin with path-based routing, and the SPAs call the API with relative `/api/...` paths and open Socket.IO on same-origin `/socket.io`.
 
@@ -26,13 +26,13 @@ Do these first. The container will refuse to boot without some of them, and will
 The app uses Drizzle against Postgres. Create one on Supabase, Neon, or any Postgres Render service, then push the schema from the repo root before the API server starts serving traffic:
 
 ```
-DATABASE_URL='postgresql://user:password@host:5432/tandem' pnpm --filter db run push-force
+DATABASE_URL='postgresql://user:password@host:5432/nexet' pnpm --filter db run push-force
 ```
 
 Or the older form if that is what your workspace exposes:
 
 ```
-DATABASE_URL='postgresql://user:password@host:5432/tandem' pnpm exec drizzle-kit push --force --config ./drizzle.config.ts
+DATABASE_URL='postgresql://user:password@host:5432/nexet' pnpm exec drizzle-kit push --force --config ./drizzle.config.ts
 ```
 
 The API server needs `DATABASE_URL` at runtime. Without it the DB module never loads and the service cannot start serving requests.
@@ -144,7 +144,7 @@ and fails the build if either is empty. Because Render auto-translates service e
 After the database is created and the service can reach it, push the schema:
 
 ```
-DATABASE_URL='postgresql://user:password@host:5432/tandem' pnpm --filter db run push-force
+DATABASE_URL='postgresql://user:password@host:5432/nexet' pnpm --filter db run push-force
 ```
 
 Do this from the repo root. If you run the service before the schema exists, requests that touch the DB will fail.
@@ -166,7 +166,7 @@ A successful local build means the same env on Render should build. A failure me
 If you cannot run Docker here, the next-best check is the four SPA builds individually from the repo root:
 
 ```
-cd artifacts/tandem && PORT=3001 BASE_PATH=/ VITE_CLERK_PUBLISHABLE_KEY=pk_test_... npx vite build
+cd artifacts/nexet && PORT=3001 BASE_PATH=/ VITE_CLERK_PUBLISHABLE_KEY=pk_test_... npx vite build
 cd artifacts/authors-den && PORT=3002 BASE_PATH=/authors-den/ VITE_CLERK_PUBLISHABLE_KEY=pk_test_... npx vite build
 cd artifacts/creators-den && PORT=3003 BASE_PATH=/creators-den/ VITE_CLERK_PUBLISHABLE_KEY=pk_test_... npx vite build
 cd artifacts/oracle-admin && PORT=5176 BASE_PATH=/oracle-admin/ npx vite build

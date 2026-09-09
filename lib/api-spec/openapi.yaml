@@ -18,7 +18,7 @@ tags:
     description: Story Oracle requests
   - name: collaborations
     description: Author-to-author collaboration seeds, applications, and review
-  - name: tandems
+  - name: nexets
     description: Shared collaboration projects and contract state
   - name: users
     description: Public profile lookups for collaborators
@@ -1197,7 +1197,7 @@ paths:
   /collaborations/projects:
     get:
       operationId: listCollaborationProjects
-      tags: [tandems]
+      tags: [nexets]
       summary: List shared projects for the authenticated user
       responses:
         "200":
@@ -1210,7 +1210,7 @@ paths:
   /collaborations/projects/{projectId}:
     get:
       operationId: getCollaborationProject
-      tags: [tandems]
+      tags: [nexets]
       summary: Read a permitted shared project
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1228,7 +1228,7 @@ paths:
   /collaborations/projects/{projectId}/document:
     get:
       operationId: getCollaborationProjectDocument
-      tags: [tandems]
+      tags: [nexets]
       summary: Read the shared Author Den document both participants keep in sync
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1245,7 +1245,7 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
     put:
       operationId: saveCollaborationProjectDocument
-      tags: [tandems]
+      tags: [nexets]
       summary: Push an updated Author Den document into the shared project
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1268,7 +1268,7 @@ paths:
   /collaborations/projects/{projectId}/thread:
     post:
       operationId: getOrCreateProjectThread
-      tags: [tandems]
+      tags: [nexets]
       summary: Get or create the private thread for a shared project (open after a fork is accepted)
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1291,7 +1291,7 @@ paths:
   /collaborations/projects/{projectId}/thread/unread:
     get:
       operationId: getCollaborationProjectThreadUnread
-      tags: [tandems]
+      tags: [nexets]
       summary: Read the viewer's unread message count for a shared project's private thread
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1309,7 +1309,7 @@ paths:
   /collaborations/projects/{projectId}/thread/read:
     post:
       operationId: markCollaborationProjectThreadRead
-      tags: [tandems]
+      tags: [nexets]
       summary: Mark the viewer's unread messages read for a shared project's private thread
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1323,7 +1323,7 @@ paths:
   /collaborations/projects/{projectId}/approve:
     post:
       operationId: approveCollaborationContract
-      tags: [tandems]
+      tags: [nexets]
       summary: Approve the current contract preview
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1341,7 +1341,7 @@ paths:
   /collaborations/projects/{projectId}/blocks:
     get:
       operationId: listCollaborationWorkBlocks
-      tags: [tandems]
+      tags: [nexets]
       summary: List manuscript work blocks visible to a project participant
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1360,7 +1360,7 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
     post:
       operationId: createCollaborationWorkBlock
-      tags: [tandems]
+      tags: [nexets]
       summary: Open a new draft block when it is your turn
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1393,7 +1393,7 @@ paths:
   /collaborations/projects/{projectId}/blocks/{blockId}:
     patch:
       operationId: saveCollaborationWorkBlockDraft
-      tags: [tandems]
+      tags: [nexets]
       summary: Save an owned draft block without submitting it
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1427,7 +1427,7 @@ paths:
   /collaborations/projects/{projectId}/blocks/{blockId}/submit:
     post:
       operationId: submitCollaborationWorkBlock
-      tags: [tandems]
+      tags: [nexets]
       summary: Submit an owned draft block and pass the turn
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1451,7 +1451,7 @@ paths:
   /collaborations/projects/{projectId}/blocks/{blockId}/approve:
     post:
       operationId: approveCollaborationWorkBlock
-      tags: [tandems]
+      tags: [nexets]
       summary: Approve a partner-submitted block into the manuscript
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1475,7 +1475,7 @@ paths:
   /collaborations/projects/{projectId}/story-bible:
     get:
       operationId: listCollaborationStoryBible
-      tags: [tandems]
+      tags: [nexets]
       summary: List story bible entries visible to a project participant
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1494,7 +1494,7 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
     post:
       operationId: createCollaborationStoryBibleEntry
-      tags: [tandems]
+      tags: [nexets]
       summary: Add a shared or owner-scoped story bible entry
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1522,7 +1522,7 @@ paths:
   /collaborations/projects/{projectId}/activity:
     get:
       operationId: listCollaborationActivity
-      tags: [tandems]
+      tags: [nexets]
       summary: List privacy-safe activity for a shared project
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1542,7 +1542,7 @@ paths:
   /collaborations/projects/{projectId}/genealogy:
     get:
       operationId: listCollaborationGenealogy
-      tags: [tandems]
+      tags: [nexets]
       summary: List the immutable contribution genealogy for a shared project
       parameters:
         - { $ref: "#/components/parameters/ProjectId" }
@@ -1782,7 +1782,7 @@ paths:
   /tickets/status:
     get:
       operationId: getTicketStatus
-      tags: [tandems]
+      tags: [nexets]
       summary: Read the viewer's active category passes and the pass price
       description: Returns the pass price ($5.88) and duration (1 month) plus every currently active pass, so the category pages can show the ticket gate or unlock the room.
       responses:
@@ -1799,7 +1799,7 @@ paths:
   /tickets/promo/validate:
     post:
       operationId: validateTicketPromo
-      tags: [tandems]
+      tags: [nexets]
       summary: Validate a promo code for the ticket checkout
       description: Live promo-code check for the coupon card — returns the discount and the discounted pass price (or valid:false for an unknown/expired/used-up code).
       requestBody:
@@ -1821,7 +1821,7 @@ paths:
   /tickets/purchase:
     post:
       operationId: purchaseTicket
-      tags: [tandems]
+      tags: [nexets]
       summary: Buy a category pass with a credit card
       description: "Dev/test simulated checkout for a category pass: validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass. Only the card's last-4 is stored and no real charge is made — production purchases run through Paystack hosted checkout, and this endpoint is disabled in production."
       requestBody:
@@ -3983,7 +3983,7 @@ paths:
     get:
       operationId: listVideoNotifications
       tags: [content-creators]
-      summary: List the signed-in user's Tandem notifications
+      summary: List the signed-in user's Nexet notifications
       responses:
         "200":
           description: Notifications
@@ -4688,7 +4688,7 @@ components:
       name: videoRowId
       in: path
       required: true
-      description: The tandem_channel_videos row id (chanvid_…) of a catalog video
+      description: The nexet_channel_videos row id (chanvid_…) of a catalog video
       schema: { type: string, minLength: 1 }
     VideoActivityLegQuery:
       name: leg
@@ -5461,7 +5461,7 @@ components:
         # Whether this plan's purchases auto-renew by default. Every Paystack
         # subscription (pass, storage, projects) renews automatically unless an
         # admin switches it off here; only rows in
-        # tandem_subscription_plan_settings override the default.
+        # nexet_subscription_plan_settings override the default.
         autoRenewAvailable: { type: boolean }
       required: [kind, planId, planLabel, priceUsd, intervalLabel, autoRenewAvailable]
     AdminPlanSettingUpdate:
@@ -6100,13 +6100,13 @@ components:
       required: [id, projectId, userId, name, imageUrl, roles, status, createdAt]
     VideoMemberInput:
       type: object
-      description: Invite a teammate by their unique Tandem ID (e.g. TANDEM6EUHY) — the handle shown on every user's profile.
+      description: Invite a teammate by their unique Nexet ID (e.g. NEXET6EUHY) — the handle shown on every user's profile.
       properties:
         uid:
           type: string
           minLength: 1
           maxLength: 20
-          description: The invitee's unique Tandem ID, e.g. TANDEM6EUHY.
+          description: The invitee's unique Nexet ID, e.g. NEXET6EUHY.
         role:
           type: string
           enum: [VIDEO, AUDIO, SCRIPT, THUMBNAIL, UPLOADER, VIEWER]

@@ -27,7 +27,7 @@ const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
 if (process.env.NODE_ENV === "production" && allowedOrigins.length === 0) {
   throw new Error(
     "CORS_ORIGINS must list the allowed production origins (comma-separated, e.g. " +
-      "https://app.tandem.com,https://authors.tandem.com) — refusing to boot without an explicit CORS allowlist.",
+      "https://app.nexet.com,https://authors.nexet.com) — refusing to boot without an explicit CORS allowlist.",
   );
 }
 

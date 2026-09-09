@@ -93,7 +93,7 @@ function UserChip() {
       </span>
       <span className="cd-account-meta">
         <span className="cd-account-name" data-testid="text-user-name">{name}</span>
-        <span className="cd-account-email">{user?.primaryEmailAddress?.emailAddress || 'Tandem member'}</span>
+        <span className="cd-account-email">{user?.primaryEmailAddress?.emailAddress || 'Nexet member'}</span>
       </span>
     </Link>
   );
@@ -411,9 +411,9 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
         ? (channelData?.myRole === 'OWNER' ? 'Your channel' : 'You’re an editor')
         : 'video version control';
 
-  // EXIT leaves the den and lands back inside Tandem — the account stays
+  // EXIT leaves the den and lands back inside Nexet — the account stays
   // signed in; the atrium handles the routing, so no Clerk sign-out here.
-  const exitToTandem = () => {
+  const exitToNexet = () => {
     window.location.assign('/');
   };
 
@@ -616,7 +616,7 @@ export function CreatorsShell({ children }: { children: ReactNode }) {
 
           <div className="cd-topnav-signout-col">
             <div className="cd-topnav-chip">
-              <button type="button" className="cd-signout" onClick={exitToTandem} data-testid="button-creators-logout">
+              <button type="button" className="cd-signout" onClick={exitToNexet} data-testid="button-creators-logout">
                 <ArrowLeft size={14} />
                 <span>EXIT</span>
               </button>

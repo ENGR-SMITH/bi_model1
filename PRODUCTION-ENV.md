@@ -72,15 +72,15 @@ provider credentials, everything).
 
 **Where to get it:**
 - **Neon** — https://neon.tech → open your project → **Connect** → copy the
-  connection string (`postgresql://user:password@ep-xxx...neon.tech/tandem?sslmode=require`).
+  connection string (`postgresql://user:password@ep-xxx...neon.tech/nexet?sslmode=require`).
   Prefer the pooled or direct string for the API server.
 - **Supabase** — https://supabase.com → project → **Project Settings →
   Database → Connection string**.
 - **Local** — your own PostgreSQL 16+, e.g.
-  `postgresql://postgres:<your-password>@localhost:5432/tandem`.
+  `postgresql://postgres:<your-password>@localhost:5432/nexet`.
 
 ```env
-DATABASE_URL=postgresql://user:password@host:5432/tandem
+DATABASE_URL=postgresql://user:password@host:5432/nexet
 ```
 
 **After setting it** (first time only): push the schema:
@@ -92,7 +92,7 @@ DATABASE_URL='<your-connection-string>' pnpm --filter db run push-force
 
 ## 4. Clerk keys — authentication (all apps)
 
-**What they are:** Clerk is the identity provider for every app (Tandem,
+**What they are:** Clerk is the identity provider for every app (Nexet,
 Author Den, Creator Den, Oracle Admin) and for the admin magic-link login.
 
 **Where to get them:** https://dashboard.clerk.com → your application →
@@ -112,7 +112,7 @@ CLERK_SECRET_KEY=sk_test_...
 - The **same** publishable key also goes into each frontend app's own `.env`
   at build time (Vite needs it while building):
   ```bash
-  # artifacts/tandem/.env
+  # artifacts/nexet/.env
   VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
   # artifacts/authors-den/.env
   VITE_CLERK_PUBLISHABLE_KEY=pk_test_...

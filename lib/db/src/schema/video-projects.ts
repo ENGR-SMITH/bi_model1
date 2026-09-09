@@ -11,12 +11,12 @@ import {
 import { z } from "zod/v4";
 
 // ---------------------------------------------------------------------------
-// Content Creators — pre-recorded video production (the "Tandem" 4-leg relay).
-// All tables are prefixed `tandem_` so they never collide with the parent
+// Content Creators — pre-recorded video production (the "Nexet" 4-leg relay).
+// All tables are prefixed `nexet_` so they never collide with the parent
 // app's tables in the shared PostgreSQL database.
 // ---------------------------------------------------------------------------
 
-export const tandemVideoProjectsTable = pgTable("tandem_video_projects", {
+export const nexetVideoProjectsTable = pgTable("nexet_video_projects", {
   id: text("id").primaryKey(),
   // The workspace channel this project lives in (multi-channel restructure).
   // Legacy pre-channel projects keep this null until their owner attaches
@@ -38,8 +38,8 @@ export const tandemVideoProjectsTable = pgTable("tandem_video_projects", {
 // to one of the roles below. Identity is the Clerk user id, shared with the
 // rest of the parent app. A member can hold several roles at once (e.g.
 // VIDEO + THUMBNAIL), so `roles` is an array; CAPTAIN is granted at creation.
-export const tandemVideoMembersTable = pgTable(
-  "tandem_video_members",
+export const nexetVideoMembersTable = pgTable(
+  "nexet_video_members",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
@@ -50,7 +50,7 @@ export const tandemVideoMembersTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    projectUserUnique: unique("tandem_video_member_project_user").on(
+    projectUserUnique: unique("nexet_video_member_project_user").on(
       table.projectId,
       table.userId,
     ),
@@ -61,7 +61,7 @@ export const tandemVideoMembersTable = pgTable(
 // object storage later); the row records metadata only. Proxy/transcript
 // artifacts and versioned files (AssetFile) arrive with the processing
 // pipeline milestone.
-export const tandemVideoAssetsTable = pgTable("tandem_video_assets", {
+export const nexetVideoAssetsTable = pgTable("nexet_video_assets", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   uploaderId: text("uploader_id").notNull(),
@@ -93,8 +93,8 @@ export const tandemVideoAssetsTable = pgTable("tandem_video_assets", {
 // A directed follow edge between Creator Den users — the GitHub-style follow
 // model behind profiles and discovery. Uniqueness on (follower, following)
 // keeps the graph simple; no self-follows (enforced in the API layer).
-export const tandemVideoFollowsTable = pgTable(
-  "tandem_video_follows",
+export const nexetVideoFollowsTable = pgTable(
+  "nexet_video_follows",
   {
     id: text("id").primaryKey(),
     followerId: text("follower_id").notNull(),
@@ -102,24 +102,24 @@ export const tandemVideoFollowsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    followerFollowingUnique: unique("tandem_video_follow_follower_following").on(
+    followerFollowingUnique: unique("nexet_video_follow_follower_following").on(
       table.followerId,
       table.followingId,
     ),
   }),
 );
 
-export const insertTandemVideoProjectSchema = createInsertSchema(tandemVideoProjectsTable);
-export const insertTandemVideoMemberSchema = createInsertSchema(tandemVideoMembersTable);
-export const insertTandemVideoAssetSchema = createInsertSchema(tandemVideoAssetsTable);
-export const insertTandemVideoFollowSchema = createInsertSchema(tandemVideoFollowsTable);
+export const insertNexetVideoProjectSchema = createInsertSchema(nexetVideoProjectsTable);
+export const insertNexetVideoMemberSchema = createInsertSchema(nexetVideoMembersTable);
+export const insertNexetVideoAssetSchema = createInsertSchema(nexetVideoAssetsTable);
+export const insertNexetVideoFollowSchema = createInsertSchema(nexetVideoFollowsTable);
 
-export type TandemVideoProject = typeof tandemVideoProjectsTable.$inferSelect;
-export type TandemVideoMember = typeof tandemVideoMembersTable.$inferSelect;
-export type TandemVideoAsset = typeof tandemVideoAssetsTable.$inferSelect;
-export type TandemVideoFollow = typeof tandemVideoFollowsTable.$inferSelect;
-export type TandemVideoRole = "CAPTAIN" | "VIDEO" | "AUDIO" | "SCRIPT" | "THUMBNAIL" | "UPLOADER" | "VIEWER";
-export const tandemVideoRoleSchema = z.enum([
+export type NexetVideoProject = typeof nexetVideoProjectsTable.$inferSelect;
+export type NexetVideoMember = typeof nexetVideoMembersTable.$inferSelect;
+export type NexetVideoAsset = typeof nexetVideoAssetsTable.$inferSelect;
+export type NexetVideoFollow = typeof nexetVideoFollowsTable.$inferSelect;
+export type NexetVideoRole = "CAPTAIN" | "VIDEO" | "AUDIO" | "SCRIPT" | "THUMBNAIL" | "UPLOADER" | "VIEWER";
+export const nexetVideoRoleSchema = z.enum([
   "CAPTAIN",
   "VIDEO",
   "AUDIO",

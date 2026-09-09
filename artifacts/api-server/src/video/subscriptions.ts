@@ -2,21 +2,21 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, gt, sql } from "drizzle-orm";
 import {
   db,
-  tandemAccountQuotasTable,
-  tandemPromoCodesTable,
-  tandemPromoRedemptionsTable,
-  tandemSubscriptionPlanSettingsTable,
-  tandemSubscriptionsTable,
-  tandemTicketsTable,
+  nexetAccountQuotasTable,
+  nexetPromoCodesTable,
+  nexetPromoRedemptionsTable,
+  nexetSubscriptionPlanSettingsTable,
+  nexetSubscriptionsTable,
+  nexetTicketsTable,
 } from "@workspace/db";
 import { STORAGE_PLANS, PROJECT_PLANS, getOrCreateQuota } from "./quota";
 import { PASS_PRICE_USD, TICKET_CATEGORIES, type TicketCategory } from "../routes/tickets";
 
 // ---------------------------------------------------------------------------
 // Subscriptions — a unified view of the three purchase products across the
-// apps: TANDEM category passes, Creator Den workspace storage, and Author Den
+// apps: NEXET category passes, Creator Den workspace storage, and Author Den
 // projects. This module owns the plan catalog and the record of every
-// subscription a user has made, so any surface (the TANDEM Subscriptions page
+// subscription a user has made, so any surface (the NEXET Subscriptions page
 // or the in-app checkout modals) can read it back with type / status / expiry
 // and usage.
 // ---------------------------------------------------------------------------
@@ -51,17 +51,17 @@ function defaultAutoRenewAvailable(_kind: SubscriptionKind): boolean {
 
 /**
  * Resolve whether customers may turn on server-managed auto-renewal for one
- * plan: a row in tandem_subscription_plan_settings (written by an admin) wins,
+ * plan: a row in nexet_subscription_plan_settings (written by an admin) wins,
  * otherwise the code-defined default (on for every plan kind).
  */
 export async function autoRenewAvailableForPlan(kind: SubscriptionKind, planId: string): Promise<boolean> {
   const [setting] = await db
-    .select({ autoRenewAvailable: tandemSubscriptionPlanSettingsTable.autoRenewAvailable })
-    .from(tandemSubscriptionPlanSettingsTable)
+    .select({ autoRenewAvailable: nexetSubscriptionPlanSettingsTable.autoRenewAvailable })
+    .from(nexetSubscriptionPlanSettingsTable)
     .where(
       and(
-        eq(tandemSubscriptionPlanSettingsTable.kind, kind),
-        eq(tandemSubscriptionPlanSettingsTable.planId, planId),
+        eq(nexetSubscriptionPlanSettingsTable.kind, kind),
+        eq(nexetSubscriptionPlanSettingsTable.planId, planId),
       ),
     )
     .limit(1);
@@ -69,7 +69,7 @@ export async function autoRenewAvailableForPlan(kind: SubscriptionKind, planId: 
 }
 
 export async function subscriptionPlans(): Promise<SubscriptionPlan[]> {
-  const overrides = await db.select().from(tandemSubscriptionPlanSettingsTable);
+  const overrides = await db.select().from(nexetSubscriptionPlanSettingsTable);
   const availableFor = (kind: SubscriptionKind, planId: string): boolean => {
     const row = overrides.find((setting) => setting.kind === kind && setting.planId === planId);
     return row ? row.autoRenewAvailable : defaultAutoRenewAvailable(kind);
@@ -191,7 +191,7 @@ export interface RecordSubscriptionInput {
 /** Inserts a subscription record for an entitlement that was just granted. */
 export async function recordSubscription(input: RecordSubscriptionInput): Promise<string> {
   const id = randomUUID();
-  await db.insert(tandemSubscriptionsTable).values({
+  await db.insert(nexetSubscriptionsTable).values({
     id,
     userId: input.userId,
     kind: input.kind,
@@ -300,20 +300,20 @@ export async function applySubscriptionPurchase(
     // Renewing while the pass is still live extends it; otherwise 1 month from now.
     const [existing] = await db
       .select()
-      .from(tandemTicketsTable)
+      .from(nexetTicketsTable)
       .where(
         and(
-          eq(tandemTicketsTable.userId, input.userId),
-          eq(tandemTicketsTable.category, category),
-          gt(tandemTicketsTable.expiresAt, now),
+          eq(nexetTicketsTable.userId, input.userId),
+          eq(nexetTicketsTable.category, category),
+          gt(nexetTicketsTable.expiresAt, now),
         ),
       )
-      .orderBy(tandemTicketsTable.expiresAt)
+      .orderBy(nexetTicketsTable.expiresAt)
       .limit(1);
     const base = existing && existing.expiresAt.getTime() > Date.now() ? existing.expiresAt : now;
     periodStart = base;
     periodEnd = new Date(base.getTime() + SUBSCRIPTION_PERIOD_MS);
-    await db.insert(tandemTicketsTable).values({
+    await db.insert(nexetTicketsTable).values({
       id: randomUUID(),
       userId: input.userId,
       category,
@@ -326,25 +326,25 @@ export async function applySubscriptionPurchase(
     const quota = await getOrCreateQuota(input.userId);
     periodEnd = new Date(now.getTime() + SUBSCRIPTION_PERIOD_MS);
     await db
-      .update(tandemAccountQuotasTable)
+      .update(nexetAccountQuotasTable)
       .set(
         input.kind === "storage"
           ? { storageLimitBytes: quota.storageLimitBytes + storagePlanBytes(input.planId) }
           : { projectLimit: quota.projectLimit + projectPlanCount(input.planId) },
       )
-      .where(eq(tandemAccountQuotasTable.userId, input.userId));
+      .where(eq(nexetAccountQuotasTable.userId, input.userId));
   }
 
   if (input.promoCode) {
     await db
-      .update(tandemPromoCodesTable)
-      .set({ uses: sql`${tandemPromoCodesTable.uses} + 1` })
-      .where(eq(tandemPromoCodesTable.code, input.promoCode));
+      .update(nexetPromoCodesTable)
+      .set({ uses: sql`${nexetPromoCodesTable.uses} + 1` })
+      .where(eq(nexetPromoCodesTable.code, input.promoCode));
     // One redemption per person — this is what makes a shared code safe to
     // hand out to many people. (Validated before checkout; kept authoritative
     // here so racing purchases can never double-redeem.)
     await db
-      .insert(tandemPromoRedemptionsTable)
+      .insert(nexetPromoRedemptionsTable)
       .values({ code: input.promoCode, userId: input.userId })
       .onConflictDoNothing();
   }
@@ -376,9 +376,9 @@ export async function applySubscriptionPurchase(
   // the new row above takes over (keeps exactly one renewal chain per pass).
   if (input.renewsSubscriptionId) {
     await db
-      .update(tandemSubscriptionsTable)
+      .update(nexetSubscriptionsTable)
       .set({ autoRenew: false })
-      .where(eq(tandemSubscriptionsTable.id, input.renewsSubscriptionId));
+      .where(eq(nexetSubscriptionsTable.id, input.renewsSubscriptionId));
   }
 
   return { subscriptionId, periodStart, periodEnd };
@@ -408,9 +408,9 @@ export interface UserSubscriptionView {
 export async function listUserSubscriptions(userId: string): Promise<UserSubscriptionView[]> {
   const rows = await db
     .select()
-    .from(tandemSubscriptionsTable)
-    .where(eq(tandemSubscriptionsTable.userId, userId))
-    .orderBy(desc(tandemSubscriptionsTable.createdAt));
+    .from(nexetSubscriptionsTable)
+    .where(eq(nexetSubscriptionsTable.userId, userId))
+    .orderBy(desc(nexetSubscriptionsTable.createdAt));
   const now = Date.now();
   return rows.map((row) => ({
     id: row.id,

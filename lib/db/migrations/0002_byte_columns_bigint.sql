@@ -9,18 +9,18 @@
 -- footage / derived artifacts exceed 2 GB routinely.
 --
 -- Source of truth: lib/db/src/schema/
---   → tandemAccountQuotasTable.storageLimitBytes        (account.ts)
---   → tandemVideoStorageSnapshotsTable.total/r2/local    (account.ts)
---   → tandemUserCvsTable.sizeBytes                       (account.ts)
---   → tandemVideoAssetsTable.sizeBytes                   (video-projects.ts)
---   → tandemVideoAssetFilesTable.sizeBytes               (video-production.ts)
+--   → nexetAccountQuotasTable.storageLimitBytes        (account.ts)
+--   → nexetVideoStorageSnapshotsTable.total/r2/local    (account.ts)
+--   → nexetUserCvsTable.sizeBytes                       (account.ts)
+--   → nexetVideoAssetsTable.sizeBytes                   (video-projects.ts)
+--   → nexetVideoAssetFilesTable.sizeBytes               (video-production.ts)
 --
 -- Idempotent: every statement is guarded, so re-running is safe. Runs as a
 -- single transaction; if any ALTER fails the whole batch rolls back.
 --
 -- Apply against the target database (any of):
 --   psql "$DATABASE_URL" -f lib/db/migrations/0002_byte_columns_bigint.sql
---   psql -h <host> -U <user> -d tandem -f lib/db/migrations/0002_byte_columns_bigint.sql
+--   psql -h <host> -U <user> -d nexet -f lib/db/migrations/0002_byte_columns_bigint.sql
 --
 -- NOTE: keep this file in lockstep with the Drizzle definitions above. Fresh
 -- databases get these columns as bigint directly via `drizzle-kit push`;
@@ -29,79 +29,79 @@
 
 BEGIN;
 
--- tandem_account_quotas.storage_limit_bytes — the overflow that broke uploads.
+-- nexet_account_quotas.storage_limit_bytes — the overflow that broke uploads.
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_name = 'tandem_account_quotas'
+    WHERE table_name = 'nexet_account_quotas'
       AND column_name = 'storage_limit_bytes'
       AND data_type = 'integer'
   ) THEN
-    ALTER TABLE "tandem_account_quotas"
+    ALTER TABLE "nexet_account_quotas"
       ALTER COLUMN "storage_limit_bytes" TYPE bigint;
   END IF;
 END $$;
 
--- tandem_video_storage_snapshots.total_bytes / r2_bytes / local_bytes
+-- nexet_video_storage_snapshots.total_bytes / r2_bytes / local_bytes
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_name = 'tandem_video_storage_snapshots'
+    WHERE table_name = 'nexet_video_storage_snapshots'
       AND column_name = 'total_bytes'
       AND data_type = 'integer'
   ) THEN
-    ALTER TABLE "tandem_video_storage_snapshots"
+    ALTER TABLE "nexet_video_storage_snapshots"
       ALTER COLUMN "total_bytes" TYPE bigint,
       ALTER COLUMN "r2_bytes"    TYPE bigint,
       ALTER COLUMN "local_bytes" TYPE bigint;
   END IF;
 END $$;
 
--- tandem_user_cvs.size_bytes
+-- nexet_user_cvs.size_bytes
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_name = 'tandem_user_cvs'
+    WHERE table_name = 'nexet_user_cvs'
       AND column_name = 'size_bytes'
       AND data_type = 'integer'
   ) THEN
-    ALTER TABLE "tandem_user_cvs"
+    ALTER TABLE "nexet_user_cvs"
       ALTER COLUMN "size_bytes" TYPE bigint;
   END IF;
 END $$;
 
--- tandem_video_assets.size_bytes
+-- nexet_video_assets.size_bytes
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_name = 'tandem_video_assets'
+    WHERE table_name = 'nexet_video_assets'
       AND column_name = 'size_bytes'
       AND data_type = 'integer'
   ) THEN
-    ALTER TABLE "tandem_video_assets"
+    ALTER TABLE "nexet_video_assets"
       ALTER COLUMN "size_bytes" TYPE bigint;
   END IF;
 END $$;
 
--- tandem_video_asset_files.size_bytes
+-- nexet_video_asset_files.size_bytes
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_name = 'tandem_video_asset_files'
+    WHERE table_name = 'nexet_video_asset_files'
       AND column_name = 'size_bytes'
       AND data_type = 'integer'
   ) THEN
-    ALTER TABLE "tandem_video_asset_files"
+    ALTER TABLE "nexet_video_asset_files"
       ALTER COLUMN "size_bytes" TYPE bigint;
   END IF;
 END $$;
@@ -109,8 +109,8 @@ END $$;
 COMMIT;
 
 -- Rollback (deliberately not part of the forward migration):
---   ALTER TABLE "tandem_account_quotas"          ALTER COLUMN "storage_limit_bytes" TYPE integer;
---   ALTER TABLE "tandem_video_storage_snapshots" ALTER COLUMN "total_bytes" TYPE integer, ALTER COLUMN "r2_bytes" TYPE integer, ALTER COLUMN "local_bytes" TYPE integer;
---   ALTER TABLE "tandem_user_cvs"                ALTER COLUMN "size_bytes" TYPE integer;
---   ALTER TABLE "tandem_video_assets"            ALTER COLUMN "size_bytes" TYPE integer;
---   ALTER TABLE "tandem_video_asset_files"       ALTER COLUMN "size_bytes" TYPE integer;
+--   ALTER TABLE "nexet_account_quotas"          ALTER COLUMN "storage_limit_bytes" TYPE integer;
+--   ALTER TABLE "nexet_video_storage_snapshots" ALTER COLUMN "total_bytes" TYPE integer, ALTER COLUMN "r2_bytes" TYPE integer, ALTER COLUMN "local_bytes" TYPE integer;
+--   ALTER TABLE "nexet_user_cvs"                ALTER COLUMN "size_bytes" TYPE integer;
+--   ALTER TABLE "nexet_video_assets"            ALTER COLUMN "size_bytes" TYPE integer;
+--   ALTER TABLE "nexet_video_asset_files"       ALTER COLUMN "size_bytes" TYPE integer;

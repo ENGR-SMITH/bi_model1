@@ -12459,7 +12459,7 @@ export const getListVideoNotificationsUrl = () => {
 }
 
 /**
- * @summary List the signed-in user's Tandem notifications
+ * @summary List the signed-in user's Nexet notifications
  */
 export const listVideoNotifications = async ( options?: Parameters<typeof customFetch>[1]): Promise<VideoNotification[]> => {
 
@@ -12506,7 +12506,7 @@ export type ListVideoNotificationsQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List the signed-in user's Tandem notifications
+ * @summary List the signed-in user's Nexet notifications
  */
 
 export function useListVideoNotifications<TData = Awaited<ReturnType<typeof listVideoNotifications>>, TError = ErrorType<unknown>>(

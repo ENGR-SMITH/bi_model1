@@ -19,7 +19,7 @@ optional video workers and a desktop agent. Everything you deploy comes from
 | Unit | Source | What it is | Needs at runtime |
 |------|--------|------------|------------------|
 | **API server** | `artifacts/api-server` | Express 5 REST API + Socket.IO realtime + Clerk auth + Paystack webhooks + video job queue + Oracle admin backend | Node 24, Postgres, **ffmpeg/ffprobe** for real video, R2, optional Redis |
-| **Tandem** | `artifacts/tandem` | Main hub SPA, served at `/` | Static files only |
+| **Nexet** | `artifacts/nexet` | Main hub SPA, served at `/` | Static files only |
 | **Author Den** | `artifacts/authors-den` | Writing studio SPA, served at `/authors-den/` | Static files only |
 | **Creator Den** | `artifacts/creators-den` | Video platform SPA, served at `/creators-den/` | Static files only |
 | **Oracle Admin** | `artifacts/oracle-admin` | Private control room SPA, served at `/oracle-admin/` | Static files only |
@@ -47,7 +47,7 @@ else to this app").
                           │  (Render web service — the  │
                           │   one-container router)     │
                           │                              │
-   / ..................→  │  Tandem build (static)       │
+   / ..................→  │  Nexet build (static)       │
    /authors-den/ ......→ │  Author Den build (static)    │
    /creators-den/ .....→ │  Creator Den build (static)   │
    /oracle-admin/ .....→ │  Oracle Admin build (static)  │
@@ -157,7 +157,7 @@ Render services behind the same domain — but only after Redis is in.
 ### Phase 1 — Supabase (the database)
 
 1. **Create a project** at https://supabase.com → New project → name it (e.g.
-   `tandem`), pick a region near your users. Free tier is fine to start.
+   `nexet`), pick a region near your users. Free tier is fine to start.
 2. **Get the connection string:** Project Settings → **Database** → Connection
    string → *URI* (the `postgresql://postgres.<ref>:<password>@aws-...pooler.supabase.com:5432/postgres`
    one). Use the **Session pooler** string for the API server.
@@ -169,8 +169,8 @@ Render services behind the same domain — but only after Redis is in.
    > Alternative (no drizzle-kit on the box): apply the SQL migrations in
    > `lib/db/migrations/*.sql` in order via the Supabase **SQL Editor** or
    > `psql "$DATABASE_URL" -f lib/db/migrations/0012_paystack_plans.sql` etc.
-4. **Verify:** `\dt` shows tables like `tandem_subscriptions`,
-   `tandem_paystack_plans`, `tandem_promo_codes`, `tandem_video_jobs`.
+4. **Verify:** `\dt` shows tables like `nexet_subscriptions`,
+   `nexet_paystack_plans`, `nexet_promo_codes`, `nexet_video_jobs`.
 
 > Note: Supabase's own auth/storage/realtime features are **not** used — you
 > only consume it as a Postgres server. Do not enable RLS or touch its auth
@@ -188,7 +188,7 @@ the build environment must have that root `.env` populated too.
 pnpm --filter @workspace/api-server run build
 
 # The four SPAs (dist/public each)
-PORT=3001 BASE_PATH=/                 pnpm --filter @workspace/tandem build
+PORT=3001 BASE_PATH=/                 pnpm --filter @workspace/nexet build
 PORT=3002 BASE_PATH=/authors-den/     pnpm --filter @workspace/authors-den build
 PORT=3003 BASE_PATH=/creators-den/    pnpm --filter @workspace/creators-den build
 PORT=3004 BASE_PATH=/oracle-admin/    pnpm --filter @workspace/oracle-admin build
@@ -200,7 +200,7 @@ are the Clerk ones:
 
 | Env var | For which build |
 |---------|-----------------|
-| `VITE_CLERK_PUBLISHABLE_KEY` | tandem, authors-den, creators-den (their own `.env` or CI env) |
+| `VITE_CLERK_PUBLISHABLE_KEY` | nexet, authors-den, creators-den (their own `.env` or CI env) |
 | `CLERK_PUBLISHABLE_KEY` (root `.env`) | oracle-admin (reads it via `envDir`) |
 | `BASE_PATH`, `PORT` | all four (hardcoded in the Dockerfile — they shape the build, not the server) |
 
@@ -229,7 +229,7 @@ are the Clerk ones:
 1. **Create the service:** Render dashboard → **New → Web Service** → connect
    the GitHub repo.
 2. **Configure:**
-   - Name: `tandem` (this becomes `<service>.onrender.com`).
+   - Name: `nexet` (this becomes `<service>.onrender.com`).
    - **Dockerfile Path:** `artifacts/api-server/Dockerfile` (leave **Root
      Directory** at the repo root — the repo root is the build context, so
      the `COPY . .` / `COPY artifacts/...` lines in §7 work, and the
@@ -316,7 +316,7 @@ CF_R2_SECRET_KEY=...
 ### Phase 7 — Launch checklist
 
 - [ ] `https://app.yourdomain.com/api/healthz` returns 200
-- [ ] Sign in with Clerk on Tandem works (production keys)
+- [ ] Sign in with Clerk on Nexet works (production keys)
 - [ ] Author Den reachable at `/authors-den/`, Creator Den at `/creators-den/`,
       Oracle Admin at `/oracle-admin/` — and deep links refresh without 404
 - [ ] Socket.IO connects (presence roster / job progress updates live)
@@ -342,7 +342,7 @@ CF_R2_SECRET_KEY=...
 4. **Map the custom domain in Render:** open the service → **Settings →
    Custom Domains** → add `app.yourdomain.com` → Render verifies the CNAME and
    issues a free managed TLS certificate automatically.
-5. **Done:** `https://app.yourdomain.com` is the one origin — Tandem at `/`,
+5. **Done:** `https://app.yourdomain.com` is the one origin — Nexet at `/`,
    Author Den at `/authors-den/`, Creator Den at `/creators-den/`, Oracle
    Admin at `/oracle-admin/`, API at `/api`.
 6. **Remember to update Clerk redirect URLs** (`https://app.yourdomain.com`
@@ -408,17 +408,17 @@ RUN pnpm --filter @workspace/api-server run build
 
 # Build the four SPAs with their base paths baked in (PORT + BASE_PATH are
 # required by each Vite config; the Clerk keys come from the ARG/ENV above).
-RUN PORT=3001 BASE_PATH=/               pnpm --filter @workspace/tandem build \
+RUN PORT=3001 BASE_PATH=/               pnpm --filter @workspace/nexet build \
  && PORT=3002 BASE_PATH=/authors-den/   pnpm --filter @workspace/authors-den build \
  && PORT=3003 BASE_PATH=/creators-den/  pnpm --filter @workspace/creators-den build \
  && PORT=3004 BASE_PATH=/oracle-admin/  pnpm --filter @workspace/oracle-admin build
 
 # Ship the built SPAs into the nginx docroots.
-RUN mkdir -p /srv/tandem/root /srv/tandem/authors-den /srv/tandem/creators-den /srv/tandem/oracle-admin \
- && cp -r artifacts/tandem/dist/public/.        /srv/tandem/root/ \
- && cp -r artifacts/authors-den/dist/public/.   /srv/tandem/authors-den/ \
- && cp -r artifacts/creators-den/dist/public/.  /srv/tandem/creators-den/ \
- && cp -r artifacts/oracle-admin/dist/public/.  /srv/tandem/oracle-admin/
+RUN mkdir -p /srv/nexet/root /srv/nexet/authors-den /srv/nexet/creators-den /srv/nexet/oracle-admin \
+ && cp -r artifacts/nexet/dist/public/.        /srv/nexet/root/ \
+ && cp -r artifacts/authors-den/dist/public/.   /srv/nexet/authors-den/ \
+ && cp -r artifacts/creators-den/dist/public/.  /srv/nexet/creators-den/ \
+ && cp -r artifacts/oracle-admin/dist/public/.  /srv/nexet/oracle-admin/
 
 COPY artifacts/api-server/nginx.conf /etc/nginx/conf.d/default.conf
 COPY artifacts/api-server/entrypoint.sh /entrypoint.sh
@@ -450,7 +450,7 @@ map $http_upgrade $connection_upgrade {
 server {
   listen 8080;
   server_name _;
-  root /srv/tandem/root;   # Tandem build (BASE_PATH=/)
+  root /srv/nexet/root;   # Nexet build (BASE_PATH=/)
   index index.html;
 
   # The three sub-apps must keep their trailing slash (Vite base paths).
@@ -483,11 +483,11 @@ server {
   }
 
   # The three sub-apps, each with SPA fallback to its own index.html.
-  location /authors-den/  { alias /srv/tandem/authors-den/;  try_files $uri $uri/ /authors-den/index.html; }
-  location /creators-den/ { alias /srv/tandem/creators-den/; try_files $uri $uri/ /creators-den/index.html; }
-  location /oracle-admin/ { alias /srv/tandem/oracle-admin/; try_files $uri $uri/ /oracle-admin/index.html; }
+  location /authors-den/  { alias /srv/nexet/authors-den/;  try_files $uri $uri/ /authors-den/index.html; }
+  location /creators-den/ { alias /srv/nexet/creators-den/; try_files $uri $uri/ /creators-den/index.html; }
+  location /oracle-admin/ { alias /srv/nexet/oracle-admin/; try_files $uri $uri/ /oracle-admin/index.html; }
 
-  # Tandem SPA fallback (everything else).
+  # Nexet SPA fallback (everything else).
   location / {
     try_files $uri $uri/ /index.html;
   }

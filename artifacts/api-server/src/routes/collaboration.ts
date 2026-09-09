@@ -151,7 +151,7 @@ async function notify(
     resourceId,
   });
   // Stream the notice to the recipient's personal socket room (`user:{id}`)
-  // so open tabs — the Author Den bell and the Tandem inbox — update the
+  // so open tabs — the Author Den bell and the Nexet inbox — update the
   // moment it is written, no polling needed. Shape matches the inbox REST
   // response (read is false until the recipient marks it). No-ops when the
   // socket server isn't running (isolated route tests).

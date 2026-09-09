@@ -946,7 +946,7 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
 
-  artifacts/tandem:
+  artifacts/nexet:
     dependencies:
       '@clerk/react':
         specifier: ^6.14.1

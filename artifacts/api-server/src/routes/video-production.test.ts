@@ -9,7 +9,7 @@ import path from "node:path";
 // Uploads + proxies land on disk; demo mode keeps processing deterministic
 // (no ffmpeg/faster-whisper required) and off the machine's real tooling.
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "video-prod-test-"));
-process.env.TANDEM_MEDIA_DEMO = "1";
+process.env.NEXET_MEDIA_DEMO = "1";
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -84,7 +84,7 @@ import { formatEdlTimecode, parseEdlTimecode, parseTimelineEdl, resolveEdlEvents
 import { runWorkerCycle } from "../video/worker";
 import { listZipEntries, readZipEntry } from "../video/zip";
 import { clearUserNameCache } from "../lib/user-names";
-import { tandemUid } from "../lib/tandem-uid";
+import { nexetUid } from "../lib/nexet-uid";
 
 function createApp(): Express {
   const app = express();
@@ -102,22 +102,22 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoChatMessagesTable);
-  await state.db.delete(t.tandemVideoNotificationsTable);
-  await state.db.delete(t.tandemVideoGrantsTable);
-  await state.db.delete(t.tandemVideoReferencesTable);
-  await state.db.delete(t.tandemVideoSyncsTable);
-  await state.db.delete(t.tandemVideoJobsTable);
-  await state.db.delete(t.tandemVideoCommentsTable);
-  await state.db.delete(t.tandemVideoSubmissionsTable);
-  await state.db.delete(t.tandemVideoTimelineVersionsTable);
-  await state.db.delete(t.tandemVideoTimelinesTable);
-  await state.db.delete(t.tandemVideoTranscriptSegmentsTable);
-  await state.db.delete(t.tandemVideoTranscriptsTable);
-  await state.db.delete(t.tandemVideoAssetFilesTable);
-  await state.db.delete(t.tandemVideoAssetsTable);
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
+  await state.db.delete(t.nexetVideoChatMessagesTable);
+  await state.db.delete(t.nexetVideoNotificationsTable);
+  await state.db.delete(t.nexetVideoGrantsTable);
+  await state.db.delete(t.nexetVideoReferencesTable);
+  await state.db.delete(t.nexetVideoSyncsTable);
+  await state.db.delete(t.nexetVideoJobsTable);
+  await state.db.delete(t.nexetVideoCommentsTable);
+  await state.db.delete(t.nexetVideoSubmissionsTable);
+  await state.db.delete(t.nexetVideoTimelineVersionsTable);
+  await state.db.delete(t.nexetVideoTimelinesTable);
+  await state.db.delete(t.nexetVideoTranscriptSegmentsTable);
+  await state.db.delete(t.nexetVideoTranscriptsTable);
+  await state.db.delete(t.nexetVideoAssetFilesTable);
+  await state.db.delete(t.nexetVideoAssetsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
   state.userId = null;
   clearUserNameCache();
   state.clerkEmailToUser = {
@@ -145,7 +145,7 @@ async function addMember(projectId: string, email: string, role: string) {
   state.userId = "captain-1";
   const res = await request(API)
     .post(`/api/video/projects/${projectId}/members`)
-    .send({ uid: tandemUid(state.clerkEmailToUser[email] ?? ""), role });
+    .send({ uid: nexetUid(state.clerkEmailToUser[email] ?? ""), role });
   expect(res.status).toBe(201);
 }
 
@@ -635,8 +635,8 @@ FCM: NON-DROP FRAME
     // CUT import also auto-queues a PICTURE_LOCK render.
     const jobs = await state.db
       .select()
-      .from(state.tables.tandemVideoJobsTable)
-      .where(eq(state.tables.tandemVideoJobsTable.assetId, res.body.media[0].id));
+      .from(state.tables.nexetVideoJobsTable)
+      .where(eq(state.tables.nexetVideoJobsTable.assetId, res.body.media[0].id));
     expect(jobs.map((job: any) => job.type).sort()).toEqual(["PROXY", "RENDER", "TRANSCRIBE"]);
   });
 
@@ -665,12 +665,12 @@ FCM: NON-DROP FRAME
     // The new asset is a pointer to the existing blob — no second copy.
     const [existingRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, existing.id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, existing.id));
     const [attachedRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, res.body.media[0].id));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, res.body.media[0].id));
     expect(attachedRow.storageKey).toBe(existingRow.storageKey);
   });
 
@@ -1659,8 +1659,8 @@ describe("captain's review queue + decision notes (M4)", () => {
     // The submitter's notification carries the improvement note verbatim.
     const notes = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.recipientId, "editor-1"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.recipientId, "editor-1"));
     const rejectedNote = notes.find((n: any) => n.category === "video_rejected");
     expect(rejectedNote).toBeTruthy();
     expect(rejectedNote.body).toContain("Add a title card and rebalance the second beat.");
@@ -1672,8 +1672,8 @@ describe("captain's review queue + decision notes (M4)", () => {
 
     const notes = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.recipientId, "editor-1"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.recipientId, "editor-1"));
     const invite = notes.find((n: any) => n.category === "video_invite");
     expect(invite).toBeTruthy();
     expect(invite.body).toContain(project.name);
@@ -1709,8 +1709,8 @@ describe("captain's review queue + decision notes (M4)", () => {
 
     const captainNotes = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.recipientId, "captain-1"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.recipientId, "captain-1"));
     // The crew save stayed quiet; only the pinned note + the editor's own
     // timeline notification (editor-1 is notified of the Captain's save) exist.
     expect(captainNotes.some((n: any) => n.category === "video_comment")).toBe(true);
@@ -1718,8 +1718,8 @@ describe("captain's review queue + decision notes (M4)", () => {
 
     const editorNotes = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.recipientId, "editor-1"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.recipientId, "editor-1"));
     expect(editorNotes.some((n: any) => n.category === "video_timeline_updated")).toBe(true);
   });
 });

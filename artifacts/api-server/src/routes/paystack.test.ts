@@ -52,14 +52,14 @@ const TEST_SECRET = "sk_test_secret_key";
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemPaystackIntentsTable);
-  await state.db.delete(t.tandemSubscriptionsTable);
-  await state.db.delete(t.tandemPaystackPlansTable);
-  await state.db.delete(t.tandemTicketsTable);
-  await state.db.delete(t.tandemAccountQuotasTable);
-  await state.db.delete(t.tandemPromoCodesTable);
-  await state.db.delete(t.tandemPromoRedemptionsTable);
-  await state.db.delete(t.tandemSubscriptionPlanSettingsTable);
+  await state.db.delete(t.nexetPaystackIntentsTable);
+  await state.db.delete(t.nexetSubscriptionsTable);
+  await state.db.delete(t.nexetPaystackPlansTable);
+  await state.db.delete(t.nexetTicketsTable);
+  await state.db.delete(t.nexetAccountQuotasTable);
+  await state.db.delete(t.nexetPromoCodesTable);
+  await state.db.delete(t.nexetPromoRedemptionsTable);
+  await state.db.delete(t.nexetSubscriptionPlanSettingsTable);
   state.userId = null;
   state.clerkEmail = "buyer@example.com";
   state.paystackCalls = [];
@@ -143,7 +143,7 @@ describe("POST /api/paystack/checkout", () => {
     state.userId = "user-1";
     const res = await request(API)
       .post("/api/paystack/checkout")
-      .send({ kind: "pass", planId: "authors", callbackUrl: "https://tandem.app/subscriptions" });
+      .send({ kind: "pass", planId: "authors", callbackUrl: "https://nexet.app/subscriptions" });
 
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ granted: false, checkoutUrl: "https://checkout.paystack.com/abc123" });
@@ -158,14 +158,14 @@ describe("POST /api/paystack/checkout", () => {
       email: "buyer@example.com",
       amount: 588,
       currency: "USD",
-      callback_url: "https://tandem.app/subscriptions",
+      callback_url: "https://nexet.app/subscriptions",
       reference,
       plan: "PLN_test",
     });
 
     const [intent] = await state.db
       .select()
-      .from(state.tables.tandemPaystackIntentsTable)
+      .from(state.tables.nexetPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent).toMatchObject({ kind: "pass", planId: "authors", amountUsd: 588, currency: "USD", status: "PENDING" });
   });
@@ -178,7 +178,7 @@ describe("POST /api/paystack/checkout", () => {
     const reference: string = res.body.reference;
     const [intent] = await state.db
       .select()
-      .from(state.tables.tandemPaystackIntentsTable)
+      .from(state.tables.nexetPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent.autoRenew).toBe(true);
 
@@ -187,14 +187,14 @@ describe("POST /api/paystack/checkout", () => {
     expect(storage.status).toBe(201);
     const [storageIntent] = await state.db
       .select()
-      .from(state.tables.tandemPaystackIntentsTable)
+      .from(state.tables.nexetPaystackIntentsTable)
       .where((t: any) => t.reference === storage.body.reference);
     expect(storageIntent.autoRenew).toBe(true);
   });
 
   it("turns auto-renew off when an admin switched it off for the plan", async () => {
     state.userId = "user-1";
-    await state.db.insert(state.tables.tandemSubscriptionPlanSettingsTable).values({
+    await state.db.insert(state.tables.nexetSubscriptionPlanSettingsTable).values({
       kind: "pass",
       planId: "authors",
       autoRenewAvailable: false,
@@ -206,7 +206,7 @@ describe("POST /api/paystack/checkout", () => {
     const reference: string = res.body.reference;
     const [intent] = await state.db
       .select()
-      .from(state.tables.tandemPaystackIntentsTable)
+      .from(state.tables.nexetPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent.autoRenew).toBe(false);
   });
@@ -224,7 +224,7 @@ describe("POST /api/paystack/checkout", () => {
 
   it("refuses percentage/dollar-off promos on monthly subscriptions", async () => {
     state.userId = "user-1";
-    await state.db.insert(state.tables.tandemPromoCodesTable).values({
+    await state.db.insert(state.tables.nexetPromoCodesTable).values({
       code: "SAVE20",
       kind: "PERCENT",
       value: 20,
@@ -242,7 +242,7 @@ describe("POST /api/paystack/checkout", () => {
 
   it("grants immediately for a FREE promo (no charge, no subscription)", async () => {
     state.userId = "user-1";
-    await state.db.insert(state.tables.tandemPromoCodesTable).values({
+    await state.db.insert(state.tables.nexetPromoCodesTable).values({
       code: "FREEBIE",
       kind: "FREE",
       value: 0,
@@ -259,13 +259,13 @@ describe("POST /api/paystack/checkout", () => {
     expect(state.paystackCalls.some((call) => call.url.endsWith("/transaction/initialize"))).toBe(false);
 
     // The pass was granted without a charge and without a Paystack subscription.
-    const tickets = await state.db.select().from(state.tables.tandemTicketsTable);
+    const tickets = await state.db.select().from(state.tables.nexetTicketsTable);
     expect(tickets).toHaveLength(1);
-    const subs = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    const subs = await state.db.select().from(state.tables.nexetSubscriptionsTable);
     expect(subs).toHaveLength(1);
     expect(subs[0].autoRenew).toBe(false);
     expect(subs[0].paystackSubscriptionCode).toBeNull();
-    const [promo] = await state.db.select().from(state.tables.tandemPromoCodesTable);
+    const [promo] = await state.db.select().from(state.tables.nexetPromoCodesTable);
     expect(promo.uses).toBe(1);
   });
 });
@@ -289,7 +289,7 @@ describe("POST /api/paystack/webhook", () => {
 
     const [intent] = await state.db
       .select()
-      .from(state.tables.tandemPaystackIntentsTable)
+      .from(state.tables.nexetPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent.status).toBe("PENDING");
   });
@@ -306,14 +306,14 @@ describe("POST /api/paystack/webhook", () => {
     expect(first.status).toBe(200);
 
     // The entitlement + subscription landed, the intent flipped to SUCCESS.
-    const tickets = await state.db.select().from(state.tables.tandemTicketsTable);
-    const subs = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    const tickets = await state.db.select().from(state.tables.nexetTicketsTable);
+    const subs = await state.db.select().from(state.tables.nexetSubscriptionsTable);
     expect(tickets).toHaveLength(1);
     expect(subs).toHaveLength(1);
     expect(subs[0].priceUsd).toBe(588);
     const [intent] = await state.db
       .select()
-      .from(state.tables.tandemPaystackIntentsTable)
+      .from(state.tables.nexetPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent.status).toBe("SUCCESS");
     expect(intent.cardLast4).toBe("4081");
@@ -325,8 +325,8 @@ describe("POST /api/paystack/webhook", () => {
       .set("x-paystack-signature", signature)
       .send(raw);
     expect(replay.status).toBe(200);
-    const ticketsAfter = await state.db.select().from(state.tables.tandemTicketsTable);
-    const subsAfter = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    const ticketsAfter = await state.db.select().from(state.tables.nexetTicketsTable);
+    const subsAfter = await state.db.select().from(state.tables.nexetSubscriptionsTable);
     expect(ticketsAfter).toHaveLength(1);
     expect(subsAfter).toHaveLength(1);
   });
@@ -342,11 +342,11 @@ describe("POST /api/paystack/webhook", () => {
       .send(raw);
     expect(res.status).toBe(200);
 
-    const tickets = await state.db.select().from(state.tables.tandemTicketsTable);
+    const tickets = await state.db.select().from(state.tables.nexetTicketsTable);
     expect(tickets).toHaveLength(0);
     const [intent] = await state.db
       .select()
-      .from(state.tables.tandemPaystackIntentsTable)
+      .from(state.tables.nexetPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent.status).toBe("FAILED");
   });
@@ -371,7 +371,7 @@ describe("POST /api/paystack/webhook", () => {
       .send(raw);
     expect(res.status).toBe(200);
 
-    const [sub] = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    const [sub] = await state.db.select().from(state.tables.nexetSubscriptionsTable);
     expect(sub).toMatchObject({
       autoRenew: true,
       paystackPlanCode: "PLN_test",
@@ -384,7 +384,7 @@ describe("POST /api/paystack/webhook", () => {
   it("grants recurring subscription charges from the live subscription row, exactly once", async () => {
     // Seed a live auto-renewing subscription (as if bought last month).
     const now = Date.now();
-    await state.db.insert(state.tables.tandemSubscriptionsTable).values({
+    await state.db.insert(state.tables.nexetSubscriptionsTable).values({
       id: "sub-live",
       userId: "user-1",
       kind: "pass",
@@ -426,7 +426,7 @@ describe("POST /api/paystack/webhook", () => {
     expect((await post()).status).toBe(200);
     // The old row stopped being the live record; the new row extends it and
     // carries the same Paystack subscription.
-    const subs = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    const subs = await state.db.select().from(state.tables.nexetSubscriptionsTable);
     expect(subs).toHaveLength(2);
     const old = subs.find((s: any) => s.id === "sub-live");
     expect(old.autoRenew).toBe(false);
@@ -437,17 +437,17 @@ describe("POST /api/paystack/webhook", () => {
       paystackTransactionReference: recurringRef,
       priceUsd: 588,
     });
-    const tickets = await state.db.select().from(state.tables.tandemTicketsTable);
+    const tickets = await state.db.select().from(state.tables.nexetTicketsTable);
     expect(tickets).toHaveLength(1);
 
     // Replaying the same charge must not grant again.
     expect((await post()).status).toBe(200);
-    const subsAfter = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    const subsAfter = await state.db.select().from(state.tables.nexetSubscriptionsTable);
     expect(subsAfter).toHaveLength(2);
   });
 
   it("records a declined monthly charge on the live subscription", async () => {
-    await state.db.insert(state.tables.tandemSubscriptionsTable).values({
+    await state.db.insert(state.tables.nexetSubscriptionsTable).values({
       id: "sub-live",
       userId: "user-1",
       kind: "pass",
@@ -473,7 +473,7 @@ describe("POST /api/paystack/webhook", () => {
       .send(raw);
     expect(res.status).toBe(200);
 
-    const [sub] = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    const [sub] = await state.db.select().from(state.tables.nexetSubscriptionsTable);
     expect(sub.renewalFailure).toMatch(/declined/i);
   });
 });
@@ -511,13 +511,13 @@ describe("POST /api/paystack/confirm", () => {
     expect(res.body.granted).toBe(true);
     expect(res.body.receipt).toEqual({ total: 588, cardLast4: "4081", promoCode: null });
 
-    const tickets = await state.db.select().from(state.tables.tandemTicketsTable);
-    const subs = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    const tickets = await state.db.select().from(state.tables.nexetTicketsTable);
+    const subs = await state.db.select().from(state.tables.nexetSubscriptionsTable);
     expect(tickets).toHaveLength(1);
     expect(subs).toHaveLength(1);
     const [intent] = await state.db
       .select()
-      .from(state.tables.tandemPaystackIntentsTable)
+      .from(state.tables.nexetPaystackIntentsTable)
       .where((t: any) => t.reference === reference);
     expect(intent.status).toBe("SUCCESS");
   });
@@ -538,8 +538,8 @@ describe("POST /api/paystack/confirm", () => {
     expect(res.status).toBe(200);
     expect(res.body.granted).toBe(true);
 
-    const tickets = await state.db.select().from(state.tables.tandemTicketsTable);
-    const subs = await state.db.select().from(state.tables.tandemSubscriptionsTable);
+    const tickets = await state.db.select().from(state.tables.nexetTicketsTable);
+    const subs = await state.db.select().from(state.tables.nexetSubscriptionsTable);
     expect(tickets).toHaveLength(1);
     expect(subs).toHaveLength(1);
   });

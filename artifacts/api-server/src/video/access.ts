@@ -1,10 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import {
   db,
-  tandemArenaPostsTable,
-  tandemVideoMembersTable,
-  tandemVideoProjectsTable,
-  type TandemVideoMember,
+  nexetArenaPostsTable,
+  nexetVideoMembersTable,
+  nexetVideoProjectsTable,
+  type NexetVideoMember,
 } from "@workspace/db";
 
 // ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export type ProjectAccess =
-  | { kind: "member"; member: TandemVideoMember }
+  | { kind: "member"; member: NexetVideoMember }
   | { kind: "public" }
   | { kind: "applicant" }
   | null;
@@ -40,19 +40,19 @@ export async function resolveProjectAccess(
 ): Promise<ProjectAccess> {
   const [project] = await db
     .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.id, projectId))
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.id, projectId))
     .limit(1);
   if (!project) return null;
 
   const [member] = await db
     .select()
-    .from(tandemVideoMembersTable)
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        eq(tandemVideoMembersTable.projectId, projectId),
-        eq(tandemVideoMembersTable.userId, userId),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        eq(nexetVideoMembersTable.projectId, projectId),
+        eq(nexetVideoMembersTable.userId, userId),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     )
     .limit(1);
@@ -64,12 +64,12 @@ export async function resolveProjectAccess(
   // ...or a project with an OPEN Arena audition (the read-only preview window
   // closes the moment the post is filled or closed).
   const [openPost] = await db
-    .select({ id: tandemArenaPostsTable.id })
-    .from(tandemArenaPostsTable)
+    .select({ id: nexetArenaPostsTable.id })
+    .from(nexetArenaPostsTable)
     .where(
       and(
-        eq(tandemArenaPostsTable.projectId, projectId),
-        eq(tandemArenaPostsTable.status, "OPEN"),
+        eq(nexetArenaPostsTable.projectId, projectId),
+        eq(nexetArenaPostsTable.status, "OPEN"),
       ),
     )
     .limit(1);

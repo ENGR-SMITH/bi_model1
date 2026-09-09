@@ -41,17 +41,17 @@ RUN pnpm --filter @workspace/api-server run build
 
 # Build the four SPAs with their base paths baked in. PORT + BASE_PATH are
 # required by each Vite config; the Clerk keys come from the ARG/ENV above.
-RUN PORT=3001 BASE_PATH=/               pnpm --filter @workspace/tandem build \
+RUN PORT=3001 BASE_PATH=/               pnpm --filter @workspace/nexet build \
  && PORT=3002 BASE_PATH=/authors-den/   pnpm --filter @workspace/authors-den build \
  && PORT=3003 BASE_PATH=/creators-den/  pnpm --filter @workspace/creators-den build \
  && PORT=3004 BASE_PATH=/oracle-admin/  pnpm --filter @workspace/oracle-admin build
 
 # Ship the built SPAs into the nginx docroots.
-RUN mkdir -p /srv/tandem/root /srv/tandem/authors-den /srv/tandem/creators-den /srv/tandem/oracle-admin \
- && cp -r artifacts/tandem/dist/public/.        /srv/tandem/root/ \
- && cp -r artifacts/authors-den/dist/public/.   /srv/tandem/authors-den/ \
- && cp -r artifacts/creators-den/dist/public/.  /srv/tandem/creators-den/ \
- && cp -r artifacts/oracle-admin/dist/public/.  /srv/tandem/oracle-admin/
+RUN mkdir -p /srv/nexet/root /srv/nexet/authors-den /srv/nexet/creators-den /srv/nexet/oracle-admin \
+ && cp -r artifacts/nexet/dist/public/.        /srv/nexet/root/ \
+ && cp -r artifacts/authors-den/dist/public/.   /srv/nexet/authors-den/ \
+ && cp -r artifacts/creators-den/dist/public/.  /srv/nexet/creators-den/ \
+ && cp -r artifacts/oracle-admin/dist/public/.  /srv/nexet/oracle-admin/
 
 COPY artifacts/api-server/nginx.conf /etc/nginx/conf.d/default.conf
 COPY artifacts/api-server/entrypoint.sh /entrypoint.sh

@@ -49,15 +49,15 @@ const VALID_CARD = {
 };
 
 async function seedPromo(code: string, kind: "FREE" | "PERCENT" | "FLAT", value: number, maxUses = 0, active = true) {
-  await state.db.insert(state.tables.tandemPromoCodesTable).values({ code, kind, value, maxUses, uses: 0, active });
+  await state.db.insert(state.tables.nexetPromoCodesTable).values({ code, kind, value, maxUses, uses: 0, active });
 }
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemTicketsTable);
-  await state.db.delete(t.tandemToursTable);
-  await state.db.delete(t.tandemPromoRedemptionsTable);
-  await state.db.delete(t.tandemPromoCodesTable);
+  await state.db.delete(t.nexetTicketsTable);
+  await state.db.delete(t.nexetToursTable);
+  await state.db.delete(t.nexetPromoRedemptionsTable);
+  await state.db.delete(t.nexetPromoCodesTable);
   state.userId = null;
 }
 
@@ -308,9 +308,9 @@ describe("den access tours", () => {
     // Grant a tour, then backdate it so it has clearly expired.
     await request(API).post("/api/tickets/tour/start").send({ category: "content-creators" });
     await state.db
-      .update(state.tables.tandemToursTable)
+      .update(state.tables.nexetToursTable)
       .set({ endsAt: new Date(Date.now() - 60_000) })
-      .where(eq(state.tables.tandemToursTable.userId, "user-1"));
+      .where(eq(state.tables.nexetToursTable.userId, "user-1"));
 
     const access = await request(API).get("/api/tickets/access/content-creators");
     expect(access.body.tourActive).toBe(false);

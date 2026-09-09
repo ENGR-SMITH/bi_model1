@@ -5,7 +5,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import multer from "multer";
 import { eq } from "drizzle-orm";
-import { db, tandemAccountQuotasTable, tandemUserCvsTable } from "@workspace/db";
+import { db, nexetAccountQuotasTable, nexetUserCvsTable } from "@workspace/db";
 import {
   DeleteUserCvResponse,
   GetAccountQuotaResponse,
@@ -97,9 +97,9 @@ router.post(
         return;
       }
       await db
-        .update(tandemAccountQuotasTable)
+        .update(nexetAccountQuotasTable)
         .set({ storageLimitBytes: quota.storageLimitBytes + plan.bytes })
-        .where(eq(tandemAccountQuotasTable.userId, userId));
+        .where(eq(nexetAccountQuotasTable.userId, userId));
       purchased = { kind: "storage", planId: plan.id, label: plan.label, priceUsd: plan.priceUsd };
     } else {
       const plan = PROJECT_PLANS.find((item) => item.id === body.data.planId);
@@ -108,9 +108,9 @@ router.post(
         return;
       }
       await db
-        .update(tandemAccountQuotasTable)
+        .update(nexetAccountQuotasTable)
         .set({ projectLimit: quota.projectLimit + plan.count })
-        .where(eq(tandemAccountQuotasTable.userId, userId));
+        .where(eq(nexetAccountQuotasTable.userId, userId));
       purchased = { kind: "projects", planId: plan.id, label: plan.label, priceUsd: plan.priceUsd };
     }
 
@@ -151,8 +151,8 @@ router.post(
 
     const [existing] = await db
       .select()
-      .from(tandemUserCvsTable)
-      .where(eq(tandemUserCvsTable.userId, targetUserId))
+      .from(nexetUserCvsTable)
+      .where(eq(nexetUserCvsTable.userId, targetUserId))
       .limit(1);
 
     if (existing) {
@@ -164,21 +164,21 @@ router.post(
         // Missing blob — nothing to clean up.
       }
       const [row] = await db
-        .update(tandemUserCvsTable)
+        .update(nexetUserCvsTable)
         .set({
           fileName: req.file.originalname,
           mimeType: req.file.mimetype || "application/pdf",
           sizeBytes: req.file.size,
           storageKey: req.file.filename,
         })
-        .where(eq(tandemUserCvsTable.userId, targetUserId))
+        .where(eq(nexetUserCvsTable.userId, targetUserId))
         .returning();
       res.status(200).json(UploadUserCvResponse.parse(row));
       return;
     }
 
     const [row] = await db
-      .insert(tandemUserCvsTable)
+      .insert(nexetUserCvsTable)
       .values({
         userId: targetUserId,
         fileName: req.file.originalname,
@@ -201,8 +201,8 @@ router.get("/users/:userId/cv", async (req: Request, res: Response): Promise<voi
   }
   const [cv] = await db
     .select()
-    .from(tandemUserCvsTable)
-    .where(eq(tandemUserCvsTable.userId, String(req.params.userId)))
+    .from(nexetUserCvsTable)
+    .where(eq(nexetUserCvsTable.userId, String(req.params.userId)))
     .limit(1);
   if (!cv) {
     res.status(404).json({ error: "No CV uploaded" });
@@ -221,8 +221,8 @@ router.get("/users/:userId/cv/file", async (req: Request, res: Response): Promis
   }
   const [cv] = await db
     .select()
-    .from(tandemUserCvsTable)
-    .where(eq(tandemUserCvsTable.userId, String(req.params.userId)))
+    .from(nexetUserCvsTable)
+    .where(eq(nexetUserCvsTable.userId, String(req.params.userId)))
     .limit(1);
   if (!cv) {
     res.status(404).json({ error: "No CV uploaded" });
@@ -255,8 +255,8 @@ router.delete("/users/:userId/cv", async (req: Request, res: Response): Promise<
   }
   const [existing] = await db
     .select()
-    .from(tandemUserCvsTable)
-    .where(eq(tandemUserCvsTable.userId, targetUserId))
+    .from(nexetUserCvsTable)
+    .where(eq(nexetUserCvsTable.userId, targetUserId))
     .limit(1);
   if (!existing) {
     res.status(404).json({ error: "No CV uploaded" });
@@ -269,8 +269,8 @@ router.delete("/users/:userId/cv", async (req: Request, res: Response): Promise<
     // Missing blob — the row still gets removed.
   }
   await db
-    .delete(tandemUserCvsTable)
-    .where(eq(tandemUserCvsTable.userId, targetUserId));
+    .delete(nexetUserCvsTable)
+    .where(eq(nexetUserCvsTable.userId, targetUserId));
   res.json(DeleteUserCvResponse.parse({ deleted: true }));
 });
 

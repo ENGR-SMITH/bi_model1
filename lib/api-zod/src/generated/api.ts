@@ -2568,7 +2568,7 @@ export const ListChannelAnalyticsVideosResponse = zod.object({
 
 export const GetChannelAnalyticsVideoParams = zod.object({
   "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id'),
-  "videoRowId": zod.coerce.string().min(1).describe('The tandem_channel_videos row id (chanvid_…) of a catalog video')
+  "videoRowId": zod.coerce.string().min(1).describe('The nexet_channel_videos row id (chanvid_…) of a catalog video')
 })
 
 export const GetChannelAnalyticsVideoQueryParams = zod.object({
@@ -2643,7 +2643,7 @@ export const GetChannelAnalyticsVideoResponse = zod.object({
 
 export const GetChannelAnalyticsVideoReportParams = zod.object({
   "channelId": zod.coerce.string().min(1).describe('Creator Den workspace channel id'),
-  "videoRowId": zod.coerce.string().min(1).describe('The tandem_channel_videos row id (chanvid_…) of a catalog video')
+  "videoRowId": zod.coerce.string().min(1).describe('The nexet_channel_videos row id (chanvid_…) of a catalog video')
 })
 
 export const getChannelAnalyticsVideoReportQueryPeriodMax = 90;
@@ -2997,9 +2997,9 @@ export const addVideoProjectMemberBodyUidMax = 20;
 
 
 export const AddVideoProjectMemberBody = zod.object({
-  "uid": zod.string().min(1).max(addVideoProjectMemberBodyUidMax).describe('The invitee\'s unique Tandem ID, e.g. TANDEM6EUHY.'),
+  "uid": zod.string().min(1).max(addVideoProjectMemberBodyUidMax).describe('The invitee\'s unique Nexet ID, e.g. NEXET6EUHY.'),
   "role": zod.enum(['VIDEO', 'AUDIO', 'SCRIPT', 'THUMBNAIL', 'UPLOADER', 'VIEWER']).describe('The role to assign. Inviting a user who is already a member adds the role to their existing set.')
-}).describe('Invite a teammate by their unique Tandem ID (e.g. TANDEM6EUHY) — the handle shown on every user\'s profile.')
+}).describe('Invite a teammate by their unique Nexet ID (e.g. NEXET6EUHY) — the handle shown on every user\'s profile.')
 
 export const AddVideoProjectMemberResponse = zod.object({
   "id": zod.string(),
@@ -4376,7 +4376,7 @@ export const RevokeVideoGrantResponse = zod.object({
 
 
 /**
- * @summary List the signed-in user's Tandem notifications
+ * @summary List the signed-in user's Nexet notifications
  */
 export const ListVideoNotificationsResponseItem = zod.object({
   "id": zod.string(),

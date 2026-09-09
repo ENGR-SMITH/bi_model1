@@ -1,7 +1,7 @@
 kind = "web"
 previewPath = "/authors-den/"
 title = "Authors Den"
-description = "The original Authors Den writing studio, preserved as a separate experience and linked from Tandem's Authors & Writers room."
+description = "The original Authors Den writing studio, preserved as a separate experience and linked from Nexet's Authors & Writers room."
 version = "1.0.0"
 id = "artifacts/authors-den"
 router = "path"

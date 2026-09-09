@@ -1,11 +1,11 @@
 import { and, eq, inArray, sum } from "drizzle-orm";
 import {
   db,
-  tandemAccountQuotasTable,
-  tandemVideoAssetFilesTable,
-  tandemVideoAssetsTable,
-  tandemVideoMembersTable,
-  type TandemAccountQuota,
+  nexetAccountQuotasTable,
+  nexetVideoAssetFilesTable,
+  nexetVideoAssetsTable,
+  nexetVideoMembersTable,
+  type NexetAccountQuota,
 } from "@workspace/db";
 
 // ---------------------------------------------------------------------------
@@ -59,15 +59,15 @@ export function formatBytes(bytes: number): string {
 }
 
 /** Returns the account's quota row, creating the free default on first use. */
-export async function getOrCreateQuota(userId: string): Promise<TandemAccountQuota> {
+export async function getOrCreateQuota(userId: string): Promise<NexetAccountQuota> {
   const [existing] = await db
     .select()
-    .from(tandemAccountQuotasTable)
-    .where(eq(tandemAccountQuotasTable.userId, userId))
+    .from(nexetAccountQuotasTable)
+    .where(eq(nexetAccountQuotasTable.userId, userId))
     .limit(1);
   if (existing) return existing;
   const [row] = await db
-    .insert(tandemAccountQuotasTable)
+    .insert(nexetAccountQuotasTable)
     .values({
       userId,
       storageLimitBytes: DEFAULT_STORAGE_LIMIT_BYTES,
@@ -81,11 +81,11 @@ export async function getOrCreateQuota(userId: string): Promise<TandemAccountQuo
 export async function ownedProjectIds(userId: string): Promise<string[]> {
   const members = await db
     .select()
-    .from(tandemVideoMembersTable)
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        eq(tandemVideoMembersTable.userId, userId),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        eq(nexetVideoMembersTable.userId, userId),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     );
   return members
@@ -113,21 +113,21 @@ export async function storageUsedBytes(projectIds: string[]): Promise<number> {
   // (asset_files rows) that belongs to one of the projects. ORIGINAL-kind
   // rows mirror the asset's own durable copy — excluded to avoid double count.
   const [assetsRow] = await db
-    .select({ total: sum(tandemVideoAssetsTable.sizeBytes) })
-    .from(tandemVideoAssetsTable)
-    .where(inArray(tandemVideoAssetsTable.projectId, projectIds));
+    .select({ total: sum(nexetVideoAssetsTable.sizeBytes) })
+    .from(nexetVideoAssetsTable)
+    .where(inArray(nexetVideoAssetsTable.projectId, projectIds));
   const originals = Number(assetsRow?.total ?? 0);
 
   const fileRows = await db
-    .select({ sizeBytes: tandemVideoAssetFilesTable.sizeBytes, kind: tandemVideoAssetFilesTable.kind })
-    .from(tandemVideoAssetFilesTable)
+    .select({ sizeBytes: nexetVideoAssetFilesTable.sizeBytes, kind: nexetVideoAssetFilesTable.kind })
+    .from(nexetVideoAssetFilesTable)
     .where(
       inArray(
-        tandemVideoAssetFilesTable.assetId,
+        nexetVideoAssetFilesTable.assetId,
         db
-          .select({ id: tandemVideoAssetsTable.id })
-          .from(tandemVideoAssetsTable)
-          .where(inArray(tandemVideoAssetsTable.projectId, projectIds)),
+          .select({ id: nexetVideoAssetsTable.id })
+          .from(nexetVideoAssetsTable)
+          .where(inArray(nexetVideoAssetsTable.projectId, projectIds)),
       ),
     );
   const derived = fileRows
@@ -172,11 +172,11 @@ export async function ensureUploadFits(
 ): Promise<{ ok: true; remainingBytes: number } | { ok: false; remainingBytes: number; error: string }> {
   const members = await db
     .select()
-    .from(tandemVideoMembersTable)
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        eq(tandemVideoMembersTable.projectId, projectId),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        eq(nexetVideoMembersTable.projectId, projectId),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     );
   const owner = members.find((member) => (member.roles ?? []).includes("CAPTAIN"));

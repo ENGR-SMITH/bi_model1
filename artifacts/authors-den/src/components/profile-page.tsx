@@ -55,7 +55,7 @@ export function ProfilePage({ projectCount }: { projectCount: number }) {
         <div className="min-w-0">
           <h2>{displayName}</h2>
           {email && <p>{email}</p>}
-          <small className="profile-page-hint">Signed in on Tandem · your projects stay in this browser</small>
+          <small className="profile-page-hint">Signed in on Nexet · your projects stay in this browser</small>
         </div>
       </section>
 
@@ -181,7 +181,7 @@ export function BuyProjectsModal({ onClose }: { onClose: () => void }) {
         </button>
         <p className="profile-footnote mt-3">
           You can also manage every plan on your{' '}
-          <a href="/subscriptions" className="link-btn" data-testid="link-tandem-subscriptions">TANDEM Subscriptions page</a>.
+          <a href="/subscriptions" className="link-btn" data-testid="link-nexet-subscriptions">NEXET Subscriptions page</a>.
         </p>
       </div>
     </div>

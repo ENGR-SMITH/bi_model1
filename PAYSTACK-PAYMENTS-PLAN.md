@@ -13,7 +13,7 @@ USD amount unit, so there is zero conversion):
 
 | Product | Plans | Current price |
 |---|---|---|
-| TANDEM category passes (`pass`) | `authors`, `content-creators` | 188¢ ($1.88) / 3 weeks |
+| NEXET category passes (`pass`) | `authors`, `content-creators` | 188¢ ($1.88) / 3 weeks |
 | Creator Den storage (`storage`) | `g200`, `g500`, `tb1` | 2000¢ / 5000¢ / 6000¢ |
 | Author Den projects (`projects`) | `p10`, `p50`, `p200` | 500¢ / 2000¢ / 5000¢ |
 
@@ -130,7 +130,7 @@ const res = await fetch("https://api.paystack.co/transaction/initialize", {
     amount: totalUsdCents,   // $1.88 → 188, $20 → 2000  ← already the priceUsd unit
     currency: "USD",
     reference,          // you mint it; never accept a client-supplied reference
-    callback_url: `${TANDEM_WEB_URL}/subscriptions?paystack_ref=${reference}`,
+    callback_url: `${NEXET_WEB_URL}/subscriptions?paystack_ref=${reference}`,
     metadata: { userId, kind, planId, promoCode },
   }),
 });
@@ -196,14 +196,14 @@ res.status(200).json({ received: true });
 
 ---
 
-## 6. Idempotency — new `tandem_paystack_intents` table
+## 6. Idempotency — new `nexet_paystack_intents` table
 
 Webhooks can arrive twice, and the confirm path races the webhook. Add a small
 table `lib/db/src/schema/paystack-intents.ts`, exported from
 `schema/index.ts` like the other tables:
 
 ```
-tandem_paystack_intents:
+nexet_paystack_intents:
   reference   text      PRIMARY KEY   -- tan_<uuid>, minted server-side
   user_id     text      NOT NULL
   kind        text      NOT NULL      -- pass | storage | projects
@@ -248,7 +248,7 @@ frontends migrate.
 
 | File | Today | After |
 |---|---|---|
-| `artifacts/tandem/src/pages/subscriptions.tsx` (PayModal) | card number/expiry/CVC inputs → `usePurchaseSubscription` | one button → `useCreateCheckout` → `window.location.assign(authorizationUrl)`; on mount detect `paystack_ref` → call confirm → refetch |
+| `artifacts/nexet/src/pages/subscriptions.tsx` (PayModal) | card number/expiry/CVC inputs → `usePurchaseSubscription` | one button → `useCreateCheckout` → `window.location.assign(authorizationUrl)`; on mount detect `paystack_ref` → call confirm → refetch |
 | `artifacts/creators-den/src/components/account-panel.tsx` | card form → purchase hook | same redirect, callback back to the den page |
 | `artifacts/authors-den/src/components/profile-page.tsx` | card form → purchase hook | same redirect |
 
@@ -291,7 +291,7 @@ rewriting to the intent → webhook/confirm shape with the Paystack client mocke
 
 **Code:**
 - [ ] `PAYSTACK_SECRET_KEY` in `.env`, `.env.example`, `CREDENTIALS.md`
-- [ ] `tandem_paystack_intents` table + schema export
+- [ ] `nexet_paystack_intents` table + schema export
 - [ ] `routes/paystack.ts` (checkout / webhook / confirm) + mount in `routes/index.ts`
 - [ ] Raw-body capture in `app.ts` (`express.json({ verify })`)
 - [ ] `applyPaidEntitlement` shared grant helper in `video/subscriptions.ts`

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Nexet"
+description = "The Nexet creative collaboration house, with the Authors & Writers room connected to the separate Authors Den writing studio."
+version = "1.0.0"
+id = "artifacts/nexet"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22852
+
+[services.development]
+run = "pnpm --filter @workspace/nexet run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/nexet", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/nexet/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22852"
+BASE_PATH = "/"

@@ -1,7 +1,7 @@
 // Types shared between main, preload and renderer processes (type-only;
 // nothing here is imported at runtime outside of type positions).
 
-/** User-adjustable settings, persisted to ~/.tandem-agent/settings.json. */
+/** User-adjustable settings, persisted to ~/.nexet-agent/settings.json. */
 export interface AgentSettings {
   /** Master switch for the floating widget (bubble + tray + detection). */
   widgetEnabled: boolean;

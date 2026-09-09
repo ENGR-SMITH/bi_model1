@@ -1,4 +1,4 @@
-// Blueprint §9 — `tandem/worker-audio` (FFmpeg · SoX · DeepFilterNet): noise
+// Blueprint §9 — `nexet/worker-audio` (FFmpeg · SoX · DeepFilterNet): noise
 // reduction, EQ/compression, sidechain ducking, mixing, pickup-VO placement.
 // Consumes the AUDIO queue.
 import "../env";

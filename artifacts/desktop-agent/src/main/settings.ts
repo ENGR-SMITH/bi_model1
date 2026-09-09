@@ -6,7 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import type { AgentSettings } from "../shared/types";
 
-const SETTINGS_DIR = path.join(os.homedir(), ".tandem-agent");
+const SETTINGS_DIR = path.join(os.homedir(), ".nexet-agent");
 const SETTINGS_FILE = path.join(SETTINGS_DIR, "settings.json");
 
 const DEFAULTS: AgentSettings = {

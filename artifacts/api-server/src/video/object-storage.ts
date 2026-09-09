@@ -33,7 +33,7 @@ import { uploadDir } from "./worker";
 import { logger } from "../lib/logger";
 import {
   db,
-  tandemVideoAssetFilesTable as tandemAssetFilesTable,
+  nexetVideoAssetFilesTable as nexetAssetFilesTable,
 } from "@workspace/db";
 
 // ---------------------------------------------------------------------------
@@ -405,11 +405,11 @@ export async function ensureOriginalRestored(asset: {
   // Look for a durable R2 copy of this original (an ORIGINAL file row).
   const rows = await db
     .select({
-      storageKey: tandemAssetFilesTable.storageKey,
-      storageProvider: tandemAssetFilesTable.storageProvider,
+      storageKey: nexetAssetFilesTable.storageKey,
+      storageProvider: nexetAssetFilesTable.storageProvider,
     })
-    .from(tandemAssetFilesTable)
-    .where(and(eq(tandemAssetFilesTable.assetId, asset.id), eq(tandemAssetFilesTable.kind, "ORIGINAL")))
+    .from(nexetAssetFilesTable)
+    .where(and(eq(nexetAssetFilesTable.assetId, asset.id), eq(nexetAssetFilesTable.kind, "ORIGINAL")))
     .limit(1);
   const row = rows[0];
   if (!row || row.storageProvider !== "r2") return false;

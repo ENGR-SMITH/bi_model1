@@ -117,11 +117,11 @@ function stubGoogle() {
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
-  await state.db.delete(t.tandemChannelOauthTable);
-  await state.db.delete(t.tandemChannelMembersTable);
-  await state.db.delete(t.tandemChannelsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
+  await state.db.delete(t.nexetChannelOauthTable);
+  await state.db.delete(t.nexetChannelMembersTable);
+  await state.db.delete(t.nexetChannelsTable);
   state.userId = null;
   state.clerkIdToName = {};
 }
@@ -212,8 +212,8 @@ describe("channel YouTube OAuth", () => {
     // The vault row holds ciphertext, never the plaintext token.
     const [oauth] = await state.db
       .select()
-      .from(state.tables.tandemChannelOauthTable)
-      .where(eq(state.tables.tandemChannelOauthTable.channelId, id));
+      .from(state.tables.nexetChannelOauthTable)
+      .where(eq(state.tables.nexetChannelOauthTable.channelId, id));
     expect(oauth).toBeTruthy();
     expect(oauth.status).toBe("ACTIVE");
     expect(oauth.accessTokenCipher).not.toContain("ya29.stubbed-access");
@@ -239,8 +239,8 @@ describe("channel YouTube OAuth", () => {
 
     const [channel] = await state.db
       .select()
-      .from(state.tables.tandemChannelsTable)
-      .where(eq(state.tables.tandemChannelsTable.id, id));
+      .from(state.tables.nexetChannelsTable)
+      .where(eq(state.tables.nexetChannelsTable.id, id));
     expect(channel.status).toBe("CREATED");
   });
 
@@ -256,8 +256,8 @@ describe("channel YouTube OAuth", () => {
 
     const [channelB] = await state.db
       .select()
-      .from(state.tables.tandemChannelsTable)
-      .where(eq(state.tables.tandemChannelsTable.id, b.id));
+      .from(state.tables.nexetChannelsTable)
+      .where(eq(state.tables.nexetChannelsTable.id, b.id));
     expect(channelB.status).toBe("CREATED");
   });
 
@@ -273,8 +273,8 @@ describe("channel YouTube OAuth", () => {
 
     const vault = await state.db
       .select()
-      .from(state.tables.tandemChannelOauthTable)
-      .where(eq(state.tables.tandemChannelOauthTable.channelId, id));
+      .from(state.tables.nexetChannelOauthTable)
+      .where(eq(state.tables.nexetChannelOauthTable.channelId, id));
     expect(vault).toEqual([]);
 
     // Google's revoke endpoint was called with the access token.
@@ -300,16 +300,16 @@ describe("channel YouTube OAuth", () => {
     // back to CREATED so the UI can offer reconnect.
     const [oauth] = await state.db
       .select()
-      .from(state.tables.tandemChannelOauthTable)
-      .where(eq(state.tables.tandemChannelOauthTable.channelId, id));
+      .from(state.tables.nexetChannelOauthTable)
+      .where(eq(state.tables.nexetChannelOauthTable.channelId, id));
     await state.db
-      .update(state.tables.tandemChannelOauthTable)
+      .update(state.tables.nexetChannelOauthTable)
       .set({
         accessTokenCipher: encryptSecret("stale-token"),
         refreshTokenCipher: encryptSecret("expired-refresh"),
         expiresAt: new Date(Date.now() - 1000),
       })
-      .where(eq(state.tables.tandemChannelOauthTable.id, oauth.id));
+      .where(eq(state.tables.nexetChannelOauthTable.id, oauth.id));
 
     const { getChannelAccessToken } = await import("../channels/oauth");
     const token = await getChannelAccessToken(id);
@@ -317,13 +317,13 @@ describe("channel YouTube OAuth", () => {
 
     const [after] = await state.db
       .select()
-      .from(state.tables.tandemChannelOauthTable)
-      .where(eq(state.tables.tandemChannelOauthTable.channelId, id));
+      .from(state.tables.nexetChannelOauthTable)
+      .where(eq(state.tables.nexetChannelOauthTable.channelId, id));
     expect(after.status).toBe("REVOKED");
     const [channel] = await state.db
       .select()
-      .from(state.tables.tandemChannelsTable)
-      .where(eq(state.tables.tandemChannelsTable.id, id));
+      .from(state.tables.nexetChannelsTable)
+      .where(eq(state.tables.nexetChannelsTable.id, id));
     expect(channel.status).toBe("CREATED");
   });
 
@@ -351,22 +351,22 @@ describe("channel YouTube OAuth", () => {
 
     const [channel] = await state.db
       .select()
-      .from(state.tables.tandemChannelsTable)
-      .where(eq(state.tables.tandemChannelsTable.id, provisionalId));
+      .from(state.tables.nexetChannelsTable)
+      .where(eq(state.tables.nexetChannelsTable.id, provisionalId));
     expect(channel).toBeTruthy();
     expect(channel.ownerId).toBe("user-1");
     expect(channel.status).toBe("CONNECTED");
 
     const [member] = await state.db
       .select()
-      .from(state.tables.tandemChannelMembersTable)
-      .where(eq(state.tables.tandemChannelMembersTable.channelId, provisionalId));
+      .from(state.tables.nexetChannelMembersTable)
+      .where(eq(state.tables.nexetChannelMembersTable.channelId, provisionalId));
     expect(member?.role).toBe("OWNER");
 
     const [oauth] = await state.db
       .select()
-      .from(state.tables.tandemChannelOauthTable)
-      .where(eq(state.tables.tandemChannelOauthTable.channelId, provisionalId));
+      .from(state.tables.nexetChannelOauthTable)
+      .where(eq(state.tables.nexetChannelOauthTable.channelId, provisionalId));
     expect(oauth?.status).toBe("ACTIVE");
 
     // The CMS grid (list endpoint) exposes the minted channel with the real
@@ -425,8 +425,8 @@ describe("channel YouTube OAuth", () => {
 
     const [channel] = await state.db
       .select()
-      .from(state.tables.tandemChannelsTable)
-      .where(eq(state.tables.tandemChannelsTable.id, provisionalId));
+      .from(state.tables.nexetChannelsTable)
+      .where(eq(state.tables.nexetChannelsTable.id, provisionalId));
     expect(channel).toBeUndefined();
   });
 
@@ -444,8 +444,8 @@ describe("channel YouTube OAuth", () => {
 
     const [channel] = await state.db
       .select()
-      .from(state.tables.tandemChannelsTable)
-      .where(eq(state.tables.tandemChannelsTable.id, provisionalId));
+      .from(state.tables.nexetChannelsTable)
+      .where(eq(state.tables.nexetChannelsTable.id, provisionalId));
     expect(channel).toBeUndefined();
   });
 });

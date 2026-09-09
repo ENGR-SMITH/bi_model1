@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { matchesCreatorQuery, matchesProjectQuery } from './explore-search';
-import { tandemUid } from './tandem-uid';
+import { nexetUid } from './nexet-uid';
 
 const creator = {
   userId: 'user_2abc123',
@@ -35,9 +35,9 @@ describe('matchesCreatorQuery', () => {
     expect(matchesCreatorQuery(creator, 'user_2abc')).toBe(true);
   });
 
-  it('matches by the derived Tandem ID', () => {
-    const uid = tandemUid(creator.userId);
-    expect(uid).toMatch(/^TANDEM[0-9A-Z]{5}$/);
+  it('matches by the derived Nexet ID', () => {
+    const uid = nexetUid(creator.userId);
+    expect(uid).toMatch(/^NEXET[0-9A-Z]{5}$/);
     expect(matchesCreatorQuery(creator, uid)).toBe(true);
     expect(matchesCreatorQuery(creator, uid.toLowerCase())).toBe(true);
   });
@@ -57,10 +57,10 @@ describe('matchesProjectQuery', () => {
     expect(matchesProjectQuery(project, 'interview')).toBe(true);
   });
 
-  it('matches by owner name, raw owner id, and Tandem ID', () => {
+  it('matches by owner name, raw owner id, and Nexet ID', () => {
     expect(matchesProjectQuery(project, 'ada')).toBe(true);
     expect(matchesProjectQuery(project, 'user_2abc123')).toBe(true);
-    expect(matchesProjectQuery(project, tandemUid(project.ownerId))).toBe(true);
+    expect(matchesProjectQuery(project, nexetUid(project.ownerId))).toBe(true);
   });
 
   it('an empty query matches everything', () => {

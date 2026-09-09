@@ -21,10 +21,10 @@
 import { and, eq, inArray, lt } from "drizzle-orm";
 import {
   db,
-  tandemVideoAssetsTable,
-  tandemVideoAssetFilesTable,
-  tandemVideoProjectsTable,
-  tandemVideoStorageSnapshotsTable,
+  nexetVideoAssetsTable,
+  nexetVideoAssetFilesTable,
+  nexetVideoProjectsTable,
+  nexetVideoStorageSnapshotsTable,
 } from "@workspace/db";
 import fs from "node:fs";
 import { logger } from "../lib/logger";
@@ -61,23 +61,23 @@ export async function projectStorageBytes(projectId: string): Promise<{
 }> {
   const assets = await db
     .select({
-      id: tandemVideoAssetsTable.id,
-      sizeBytes: tandemVideoAssetsTable.sizeBytes,
+      id: nexetVideoAssetsTable.id,
+      sizeBytes: nexetVideoAssetsTable.sizeBytes,
     })
-    .from(tandemVideoAssetsTable)
-    .where(eq(tandemVideoAssetsTable.projectId, projectId));
+    .from(nexetVideoAssetsTable)
+    .where(eq(nexetVideoAssetsTable.projectId, projectId));
 
   const assetIds = assets.map((a) => a.id);
   const files = assetIds.length
     ? await db
         .select({
-          assetId: tandemVideoAssetFilesTable.assetId,
-          sizeBytes: tandemVideoAssetFilesTable.sizeBytes,
-          storageProvider: tandemVideoAssetFilesTable.storageProvider,
-          kind: tandemVideoAssetFilesTable.kind,
+          assetId: nexetVideoAssetFilesTable.assetId,
+          sizeBytes: nexetVideoAssetFilesTable.sizeBytes,
+          storageProvider: nexetVideoAssetFilesTable.storageProvider,
+          kind: nexetVideoAssetFilesTable.kind,
         })
-        .from(tandemVideoAssetFilesTable)
-        .where(inArray(tandemVideoAssetFilesTable.assetId, assetIds))
+        .from(nexetVideoAssetFilesTable)
+        .where(inArray(nexetVideoAssetFilesTable.assetId, assetIds))
     : [];
 
   let totalBytes = 0;
@@ -104,15 +104,15 @@ export async function projectStorageBytes(projectId: string): Promise<{
  */
 export async function runStorageMetering(day = new Date().toISOString().slice(0, 10)): Promise<number> {
   const projects = await db
-    .select({ id: tandemVideoProjectsTable.id, ownerId: tandemVideoProjectsTable.ownerId })
-    .from(tandemVideoProjectsTable);
+    .select({ id: nexetVideoProjectsTable.id, ownerId: nexetVideoProjectsTable.ownerId })
+    .from(nexetVideoProjectsTable);
 
   let recorded = 0;
   for (const project of projects) {
     try {
       const usage = await projectStorageBytes(project.id);
       await db
-        .insert(tandemVideoStorageSnapshotsTable)
+        .insert(nexetVideoStorageSnapshotsTable)
         .values({
           projectId: project.id,
           ownerId: project.ownerId,
@@ -122,7 +122,7 @@ export async function runStorageMetering(day = new Date().toISOString().slice(0,
           localBytes: usage.localBytes,
         })
         .onConflictDoUpdate({
-          target: [tandemVideoStorageSnapshotsTable.projectId, tandemVideoStorageSnapshotsTable.day],
+          target: [nexetVideoStorageSnapshotsTable.projectId, nexetVideoStorageSnapshotsTable.day],
           set: {
             totalBytes: usage.totalBytes,
             r2Bytes: usage.r2Bytes,
@@ -153,15 +153,15 @@ export async function runStorageRetention(): Promise<number> {
 
   const candidateKeys = await db
     .select({
-      id: tandemVideoAssetsTable.id,
-      storageKey: tandemVideoAssetsTable.storageKey,
-      kind: tandemVideoAssetsTable.kind,
+      id: nexetVideoAssetsTable.id,
+      storageKey: nexetVideoAssetsTable.storageKey,
+      kind: nexetVideoAssetsTable.kind,
     })
-    .from(tandemVideoAssetsTable)
+    .from(nexetVideoAssetsTable)
     .where(
       and(
-        eq(tandemVideoAssetsTable.storageProvider, "local"),
-        lt(tandemVideoAssetsTable.createdAt, cutoff),
+        eq(nexetVideoAssetsTable.storageProvider, "local"),
+        lt(nexetVideoAssetsTable.createdAt, cutoff),
       ),
     );
 
@@ -174,12 +174,12 @@ export async function runStorageRetention(): Promise<number> {
     // file that ANOTHER asset row (of any age) still points at — that asset
     // may have no R2 copy of its own yet and would lose its only source.
     const sharers = await db
-      .select({ id: tandemVideoAssetsTable.id })
-      .from(tandemVideoAssetsTable)
+      .select({ id: nexetVideoAssetsTable.id })
+      .from(nexetVideoAssetsTable)
       .where(
         and(
-          eq(tandemVideoAssetsTable.storageKey, asset.storageKey),
-          eq(tandemVideoAssetsTable.storageProvider, "local"),
+          eq(nexetVideoAssetsTable.storageKey, asset.storageKey),
+          eq(nexetVideoAssetsTable.storageProvider, "local"),
         ),
       );
     const shared = sharers.some((row) => row.id !== asset.id);
@@ -187,13 +187,13 @@ export async function runStorageRetention(): Promise<number> {
 
     // Durable R2 copy present?
     const [durable] = await db
-      .select({ id: tandemVideoAssetFilesTable.id })
-      .from(tandemVideoAssetFilesTable)
+      .select({ id: nexetVideoAssetFilesTable.id })
+      .from(nexetVideoAssetFilesTable)
       .where(
         and(
-          eq(tandemVideoAssetFilesTable.assetId, asset.id),
-          eq(tandemVideoAssetFilesTable.kind, "ORIGINAL"),
-          eq(tandemVideoAssetFilesTable.storageProvider, "r2"),
+          eq(nexetVideoAssetFilesTable.assetId, asset.id),
+          eq(nexetVideoAssetFilesTable.kind, "ORIGINAL"),
+          eq(nexetVideoAssetFilesTable.storageProvider, "r2"),
         ),
       )
       .limit(1);
@@ -201,12 +201,12 @@ export async function runStorageRetention(): Promise<number> {
 
     // Proxy ready (the local original's only remaining job is done)?
     const [proxy] = await db
-      .select({ id: tandemVideoAssetFilesTable.id })
-      .from(tandemVideoAssetFilesTable)
+      .select({ id: nexetVideoAssetFilesTable.id })
+      .from(nexetVideoAssetFilesTable)
       .where(
         and(
-          eq(tandemVideoAssetFilesTable.assetId, asset.id),
-          eq(tandemVideoAssetFilesTable.kind, "PROXY"),
+          eq(nexetVideoAssetFilesTable.assetId, asset.id),
+          eq(nexetVideoAssetFilesTable.kind, "PROXY"),
         ),
       )
       .limit(1);

@@ -15,8 +15,8 @@ const router: IRouter = Router();
 
 // ---------------------------------------------------------------------------
 // Subscriptions — a consolidated checkout + history for every purchase across
-// TANDEM (category passes), the Creator Den (storage) and the Author Den
-// (projects). The Subscriptions page on TANDEM and the buy-more modals in both
+// NEXET (category passes), the Creator Den (storage) and the Author Den
+// (projects). The Subscriptions page on NEXET and the buy-more modals in both
 // dens all speak to these endpoints.
 // ---------------------------------------------------------------------------
 

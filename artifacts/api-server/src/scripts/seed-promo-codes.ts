@@ -1,11 +1,11 @@
-// TANDEM ticket-pass promo codes — seeds the server-managed promo codes used
+// NEXET ticket-pass promo codes — seeds the server-managed promo codes used
 // by the checkout form (the "PROMOCODE" field on the coupon card). Idempotent:
 // re-running refreshes the values without duplicating rows.
 //
 //   pnpm --filter @workspace/api-server seed:promos
 import "../env";
 import { eq } from "drizzle-orm";
-import { db, tandemPromoCodesTable } from "@workspace/db";
+import { db, nexetPromoCodesTable } from "@workspace/db";
 
 const PROMOS = [
   // 100% off — the whole pass is free.
@@ -20,17 +20,17 @@ async function main(): Promise<void> {
   let upserted = 0;
   for (const promo of PROMOS) {
     const [existing] = await db
-      .select({ code: tandemPromoCodesTable.code })
-      .from(tandemPromoCodesTable)
-      .where(eq(tandemPromoCodesTable.code, promo.code))
+      .select({ code: nexetPromoCodesTable.code })
+      .from(nexetPromoCodesTable)
+      .where(eq(nexetPromoCodesTable.code, promo.code))
       .limit(1);
     if (existing) {
       await db
-        .update(tandemPromoCodesTable)
+        .update(nexetPromoCodesTable)
         .set({ kind: promo.kind, value: promo.value, maxUses: promo.maxUses })
-        .where(eq(tandemPromoCodesTable.code, promo.code));
+        .where(eq(nexetPromoCodesTable.code, promo.code));
     } else {
-      await db.insert(tandemPromoCodesTable).values({ ...promo, uses: 0 });
+      await db.insert(nexetPromoCodesTable).values({ ...promo, uses: 0 });
     }
     upserted += 1;
   }

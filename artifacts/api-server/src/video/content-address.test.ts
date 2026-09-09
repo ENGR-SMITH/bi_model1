@@ -28,15 +28,15 @@ import {
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoTranscriptSegmentsTable);
-  await state.db.delete(t.tandemVideoTranscriptsTable);
-  await state.db.delete(t.tandemVideoAssetFilesTable);
-  await state.db.delete(t.tandemVideoAssetsTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
+  await state.db.delete(t.nexetVideoTranscriptSegmentsTable);
+  await state.db.delete(t.nexetVideoTranscriptsTable);
+  await state.db.delete(t.nexetVideoAssetFilesTable);
+  await state.db.delete(t.nexetVideoAssetsTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
 }
 
 async function seedProject(projectId = "project-1") {
-  await state.db.insert(state.tables.tandemVideoProjectsTable).values({
+  await state.db.insert(state.tables.nexetVideoProjectsTable).values({
     id: projectId,
     ownerId: "captain-1",
     name: "Legacy Room",
@@ -55,7 +55,7 @@ async function seedLegacyAsset(opts: {
   contentHash?: string | null;
   fileName?: string;
 }) {
-  await state.db.insert(state.tables.tandemVideoAssetsTable).values({
+  await state.db.insert(state.tables.nexetVideoAssetsTable).values({
     id: opts.id,
     projectId: opts.projectId,
     uploaderId: "captain-1",
@@ -86,7 +86,7 @@ describe("content-hash backfill", () => {
     await seedProject();
     await seedLegacyAsset({ id: "asset-legacy", projectId: "project-1", storageKey: key, bytes });
     // A THUMBNAIL_DESIGN-style row referencing the original blob directly.
-    await state.db.insert(state.tables.tandemVideoAssetFilesTable).values({
+    await state.db.insert(state.tables.nexetVideoAssetFilesTable).values({
       id: "file-legacy",
       assetId: "asset-legacy",
       kind: "PROXY",
@@ -103,14 +103,14 @@ describe("content-hash backfill", () => {
     const expected = crypto.createHash("sha256").update(bytes).digest("hex");
     const [row] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, "asset-legacy"));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, "asset-legacy"));
     expect(row.contentHash).toBe(expected);
 
     const [file] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetFilesTable)
-      .where(eq(state.tables.tandemVideoAssetFilesTable.id, "file-legacy"));
+      .from(state.tables.nexetVideoAssetFilesTable)
+      .where(eq(state.tables.nexetVideoAssetFilesTable.id, "file-legacy"));
     expect(file.contentHash).toBe(expected);
 
     // A future upload of the same bytes now resolves to the legacy blob.
@@ -144,8 +144,8 @@ describe("content-hash backfill", () => {
 
     const [row] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, "asset-hashed"));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, "asset-hashed"));
     expect(row.contentHash).toBe(
       crypto.createHash("sha256").update(hashedBytes).digest("hex"),
     );
@@ -167,12 +167,12 @@ describe("content-hash backfill", () => {
     const expected = crypto.createHash("sha256").update(bytes).digest("hex");
     const [a] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, "asset-dup-a.mp4"));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, "asset-dup-a.mp4"));
     const [b] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, "asset-dup-b.mp4"));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, "asset-dup-b.mp4"));
     expect(a.contentHash).toBe(expected);
     expect(b.contentHash).toBe(expected);
     expect((await findAssetByContentHash(expected))?.id).toBe("asset-dup-a.mp4");
@@ -190,11 +190,11 @@ describe("content-hash consolidation", () => {
     fs.writeFileSync(path.join(dir, "v2.mp4"), bytes);
 
     await seedProject();
-    await state.db.insert(state.tables.tandemVideoAssetsTable).values([
+    await state.db.insert(state.tables.nexetVideoAssetsTable).values([
       { id: "asset-1", projectId: "project-1", uploaderId: "captain-1", kind: "RAW_VIDEO", fileName: "v1.mp4", mimeType: "video/mp4", sizeBytes: bytes.length, storageKey: "v1.mp4", contentHash: hash, status: "PROCESSED", version: 0, createdAt: new Date("2026-01-01") },
       { id: "asset-2", projectId: "project-1", uploaderId: "captain-1", kind: "RAW_VIDEO", fileName: "v2.mp4", mimeType: "video/mp4", sizeBytes: bytes.length, storageKey: "v2.mp4", contentHash: hash, status: "PROCESSED", version: 0, createdAt: new Date("2026-01-02") },
     ]);
-    await state.db.insert(state.tables.tandemVideoAssetFilesTable).values([
+    await state.db.insert(state.tables.nexetVideoAssetFilesTable).values([
       { id: "file-1", assetId: "asset-1", kind: "ORIGINAL", storageKey: "v1.mp4", contentHash: hash, mimeType: "video/mp4", sizeBytes: bytes.length, createdAt: new Date("2026-01-01") },
       { id: "file-2", assetId: "asset-2", kind: "ORIGINAL", storageKey: "v2.mp4", contentHash: hash, mimeType: "video/mp4", sizeBytes: bytes.length, createdAt: new Date("2026-01-02") },
       ...extraFileRows.map((id) => ({
@@ -225,8 +225,8 @@ describe("content-hash consolidation", () => {
     expect(fs.existsSync(path.join(dir, "v2.mp4"))).toBe(true);
     const [file2] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetFilesTable)
-      .where(eq(state.tables.tandemVideoAssetFilesTable.id, "file-2"));
+      .from(state.tables.nexetVideoAssetFilesTable)
+      .where(eq(state.tables.nexetVideoAssetFilesTable.id, "file-2"));
     expect(file2.storageKey).toBe("v2.mp4");
   });
 
@@ -246,18 +246,18 @@ describe("content-hash consolidation", () => {
 
     const [file2] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetFilesTable)
-      .where(eq(state.tables.tandemVideoAssetFilesTable.id, "file-2"));
+      .from(state.tables.nexetVideoAssetFilesTable)
+      .where(eq(state.tables.nexetVideoAssetFilesTable.id, "file-2"));
     expect(file2.storageKey).toBe("v1.mp4");
     const [proxy] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetFilesTable)
-      .where(eq(state.tables.tandemVideoAssetFilesTable.id, "file-proxy"));
+      .from(state.tables.nexetVideoAssetFilesTable)
+      .where(eq(state.tables.nexetVideoAssetFilesTable.id, "file-proxy"));
     expect(proxy.storageKey).toBe("v1.mp4");
     const [asset2] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetsTable)
-      .where(eq(state.tables.tandemVideoAssetsTable.id, "asset-2"));
+      .from(state.tables.nexetVideoAssetsTable)
+      .where(eq(state.tables.nexetVideoAssetsTable.id, "asset-2"));
     expect(asset2.storageKey).toBe("v1.mp4");
   });
 
@@ -275,8 +275,8 @@ describe("content-hash consolidation", () => {
     expect(fs.existsSync(path.join(dir, "v2.mp4"))).toBe(true);
     const [file2] = await state.db
       .select()
-      .from(state.tables.tandemVideoAssetFilesTable)
-      .where(eq(state.tables.tandemVideoAssetFilesTable.id, "file-2"));
+      .from(state.tables.nexetVideoAssetFilesTable)
+      .where(eq(state.tables.nexetVideoAssetFilesTable.id, "file-2"));
     expect(file2.storageKey).toBe("v2.mp4");
     expect(file2.contentHash).toBe(hash);
   });

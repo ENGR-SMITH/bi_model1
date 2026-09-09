@@ -1004,7 +1004,7 @@ type SubscriptionKindFilter = 'pass' | 'storage' | 'projects';
 
 const SUBSCRIPTION_PRODUCT_META: Record<SubscriptionKindFilter, { label: string; title: string; description: string; icon: React.ReactNode }> = {
   pass: {
-    label: 'TANDEM pass',
+    label: 'NEXET pass',
     title: 'Category passes',
     description: 'Every pass purchase across both categories, arranged by category and account, with auto-renewal control per subscription.',
     icon: <Ticket className="h-5 w-5" />,
@@ -1331,7 +1331,7 @@ function UserProfilePage({
         <PageHeading
           eyebrow="Control room / account"
           title={email ?? `User ${userId}`}
-          description="Every subscription this account holds across TANDEM pass, Creator Den, and Author Den — the full purchase history on one view."
+          description="Every subscription this account holds across NEXET pass, Creator Den, and Author Den — the full purchase history on one view."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}

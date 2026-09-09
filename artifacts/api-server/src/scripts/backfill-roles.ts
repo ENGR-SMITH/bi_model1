@@ -9,10 +9,10 @@
 //   pnpm --filter @workspace/api-server backfill:roles
 import "../env";
 import { eq } from "drizzle-orm";
-import { db, tandemVideoMembersTable, tandemVideoProjectsTable } from "@workspace/db";
+import { db, nexetVideoMembersTable, nexetVideoProjectsTable } from "@workspace/db";
 
 async function main(): Promise<void> {
-  const projects = await db.select().from(tandemVideoProjectsTable);
+  const projects = await db.select().from(nexetVideoProjectsTable);
 
   let captainsFixed = 0;
   let deduped = 0;
@@ -21,8 +21,8 @@ async function main(): Promise<void> {
   for (const project of projects) {
     const members = await db
       .select()
-      .from(tandemVideoMembersTable)
-      .where(eq(tandemVideoMembersTable.projectId, project.id));
+      .from(nexetVideoMembersTable)
+      .where(eq(nexetVideoMembersTable.projectId, project.id));
 
     if (members.length === 0) {
       missingMembers += 1;
@@ -35,9 +35,9 @@ async function main(): Promise<void> {
       const roles = owner.roles ?? [];
       if (!roles.includes("CAPTAIN")) {
         await db
-          .update(tandemVideoMembersTable)
+          .update(nexetVideoMembersTable)
           .set({ roles: [...roles, "CAPTAIN"] })
-          .where(eq(tandemVideoMembersTable.id, owner.id));
+          .where(eq(nexetVideoMembersTable.id, owner.id));
         captainsFixed += 1;
       }
     }
@@ -47,9 +47,9 @@ async function main(): Promise<void> {
       const roles = [...new Set((row.roles ?? []).filter(Boolean))];
       if (roles.length !== (row.roles ?? []).length) {
         await db
-          .update(tandemVideoMembersTable)
+          .update(nexetVideoMembersTable)
           .set({ roles })
-          .where(eq(tandemVideoMembersTable.id, row.id));
+          .where(eq(nexetVideoMembersTable.id, row.id));
         deduped += 1;
       }
     }

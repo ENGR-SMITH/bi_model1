@@ -27,7 +27,7 @@ function download(url: string, dest: string): Promise<void> {
     const file = fs.createWriteStream(dest);
     const get = url.startsWith("https") ? https.get : http.get;
 
-    get(url, { headers: { "User-Agent": "tandem-agent-build" } }, (res) => {
+    get(url, { headers: { "User-Agent": "nexet-agent-build" } }, (res) => {
       // Follow redirects
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         file.close();

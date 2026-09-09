@@ -4,10 +4,10 @@ import request from "supertest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { tandemUid } from "../lib/tandem-uid";
+import { nexetUid } from "../lib/nexet-uid";
 
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "video-platform-test-"));
-process.env.TANDEM_MEDIA_DEMO = "1";
+process.env.NEXET_MEDIA_DEMO = "1";
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -67,22 +67,22 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoNotificationsTable);
-  await state.db.delete(t.tandemVideoGrantsTable);
-  await state.db.delete(t.tandemVideoReferencesTable);
-  await state.db.delete(t.tandemVideoDownloadsTable);
-  await state.db.delete(t.tandemVideoSyncsTable);
-  await state.db.delete(t.tandemVideoJobsTable);
-  await state.db.delete(t.tandemVideoCommentsTable);
-  await state.db.delete(t.tandemVideoSubmissionsTable);
-  await state.db.delete(t.tandemVideoTimelineVersionsTable);
-  await state.db.delete(t.tandemVideoTimelinesTable);
-  await state.db.delete(t.tandemVideoTranscriptSegmentsTable);
-  await state.db.delete(t.tandemVideoTranscriptsTable);
-  await state.db.delete(t.tandemVideoAssetFilesTable);
-  await state.db.delete(t.tandemVideoAssetsTable);
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
+  await state.db.delete(t.nexetVideoNotificationsTable);
+  await state.db.delete(t.nexetVideoGrantsTable);
+  await state.db.delete(t.nexetVideoReferencesTable);
+  await state.db.delete(t.nexetVideoDownloadsTable);
+  await state.db.delete(t.nexetVideoSyncsTable);
+  await state.db.delete(t.nexetVideoJobsTable);
+  await state.db.delete(t.nexetVideoCommentsTable);
+  await state.db.delete(t.nexetVideoSubmissionsTable);
+  await state.db.delete(t.nexetVideoTimelineVersionsTable);
+  await state.db.delete(t.nexetVideoTimelinesTable);
+  await state.db.delete(t.nexetVideoTranscriptSegmentsTable);
+  await state.db.delete(t.nexetVideoTranscriptsTable);
+  await state.db.delete(t.nexetVideoAssetFilesTable);
+  await state.db.delete(t.nexetVideoAssetsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
   state.userId = null;
   state.clerkEmailToUser = {
     "architect@example.com": "architect-1",
@@ -102,7 +102,7 @@ async function addMember(projectId: string, email: string, role: string) {
   state.userId = "captain-1";
   const res = await request(API)
     .post(`/api/video/projects/${projectId}/members`)
-    .send({ uid: tandemUid(state.clerkEmailToUser[email] ?? ""), role });
+    .send({ uid: nexetUid(state.clerkEmailToUser[email] ?? ""), role });
   expect(res.status).toBe(201);
 }
 

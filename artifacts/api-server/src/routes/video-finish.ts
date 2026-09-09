@@ -1,16 +1,16 @@
 import { getAuth } from "@clerk/express";
 import {
   db,
-  tandemVideoAssetFilesTable,
-  tandemVideoAssetsTable,
-  tandemVideoDownloadsTable,
-  tandemVideoGrantsTable,
-  tandemVideoJobsTable,
-  tandemVideoMembersTable,
-  tandemVideoProjectsTable,
-  tandemVideoSyncsTable,
-  type TandemVideoAsset,
-  type TandemVideoMember,
+  nexetVideoAssetFilesTable,
+  nexetVideoAssetsTable,
+  nexetVideoDownloadsTable,
+  nexetVideoGrantsTable,
+  nexetVideoJobsTable,
+  nexetVideoMembersTable,
+  nexetVideoProjectsTable,
+  nexetVideoSyncsTable,
+  type NexetVideoAsset,
+  type NexetVideoMember,
 } from "@workspace/db";
 import { gt, isNull } from "drizzle-orm";
 import {
@@ -65,15 +65,15 @@ const LEG_ROLES: Record<string, string> = {
 async function requireMember(
   projectId: string,
   userId: string,
-): Promise<TandemVideoMember | null> {
+): Promise<NexetVideoMember | null> {
   const [member] = await db
     .select()
-    .from(tandemVideoMembersTable)
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        eq(tandemVideoMembersTable.projectId, projectId),
-        eq(tandemVideoMembersTable.userId, userId),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        eq(nexetVideoMembersTable.projectId, projectId),
+        eq(nexetVideoMembersTable.userId, userId),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     )
     .limit(1);
@@ -84,7 +84,7 @@ async function requireLegEditor(
   projectId: string,
   leg: string,
   userId: string,
-): Promise<TandemVideoMember | null> {
+): Promise<NexetVideoMember | null> {
   const member = await requireMember(projectId, userId);
   if (!member) return null;
   if ((member.roles ?? []).includes("CAPTAIN")) return member;
@@ -121,9 +121,9 @@ router.post(
     if (!assetId) {
       const [asset] = await db
         .select()
-        .from(tandemVideoAssetsTable)
-        .where(eq(tandemVideoAssetsTable.projectId, params.data.projectId))
-        .orderBy(desc(tandemVideoAssetsTable.createdAt))
+        .from(nexetVideoAssetsTable)
+        .where(eq(nexetVideoAssetsTable.projectId, params.data.projectId))
+        .orderBy(desc(nexetVideoAssetsTable.createdAt))
         .limit(1);
       assetId = asset?.id ?? "";
     }
@@ -133,7 +133,7 @@ router.post(
     }
 
     const [job] = await db
-      .insert(tandemVideoJobsTable)
+      .insert(nexetVideoJobsTable)
       .values({
         id: randomUUID(),
         projectId: params.data.projectId,
@@ -174,9 +174,9 @@ router.post(
 
     const [asset] = await db
       .select()
-      .from(tandemVideoAssetsTable)
-      .where(eq(tandemVideoAssetsTable.projectId, params.data.projectId))
-      .orderBy(desc(tandemVideoAssetsTable.createdAt))
+      .from(nexetVideoAssetsTable)
+      .where(eq(nexetVideoAssetsTable.projectId, params.data.projectId))
+      .orderBy(desc(nexetVideoAssetsTable.createdAt))
       .limit(1);
     if (!asset) {
       res.status(400).json({ error: "No footage in the vault to export" });
@@ -186,7 +186,7 @@ router.post(
     const jobs = [];
     for (const format of body.data.formats) {
       const [job] = await db
-        .insert(tandemVideoJobsTable)
+        .insert(nexetVideoJobsTable)
         .values({
           id: randomUUID(),
           projectId: params.data.projectId,
@@ -228,8 +228,8 @@ router.post(
 
     const [asset] = await db
       .select()
-      .from(tandemVideoAssetsTable)
-      .where(eq(tandemVideoAssetsTable.id, body.data.assetId))
+      .from(nexetVideoAssetsTable)
+      .where(eq(nexetVideoAssetsTable.id, body.data.assetId))
       .limit(1);
     if (!asset || asset.projectId !== params.data.projectId) {
       res.status(400).json({ error: "Thumbnail source must belong to this project" });
@@ -237,7 +237,7 @@ router.post(
     }
 
     const [job] = await db
-      .insert(tandemVideoJobsTable)
+      .insert(nexetVideoJobsTable)
       .values({
         id: randomUUID(),
         projectId: params.data.projectId,
@@ -278,8 +278,8 @@ router.get(
 
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -290,16 +290,16 @@ router.get(
     // know which role's files this download belongs to.
     const [file] = await db
       .select()
-      .from(tandemVideoAssetFilesTable)
-      .where(eq(tandemVideoAssetFilesTable.id, params.data.fileId))
+      .from(nexetVideoAssetFilesTable)
+      .where(eq(nexetVideoAssetFilesTable.id, params.data.fileId))
       .limit(1);
 
     let asset;
     if (file && file.assetId) {
       [asset] = await db
         .select()
-        .from(tandemVideoAssetsTable)
-        .where(eq(tandemVideoAssetsTable.id, file.assetId))
+        .from(nexetVideoAssetsTable)
+        .where(eq(nexetVideoAssetsTable.id, file.assetId))
         .limit(1);
     } else if (file) {
       // Project-scoped artifact (e.g. an INTERCHANGE bundle) — not an asset
@@ -309,8 +309,8 @@ router.get(
     } else {
       [asset] = await db
         .select()
-        .from(tandemVideoAssetsTable)
-        .where(eq(tandemVideoAssetsTable.id, params.data.fileId))
+        .from(nexetVideoAssetsTable)
+        .where(eq(nexetVideoAssetsTable.id, params.data.fileId))
         .limit(1);
     }
 
@@ -326,13 +326,13 @@ router.get(
       const fileRole = roleForKind(asset.kind);
       const grants = await db
         .select()
-        .from(tandemVideoGrantsTable)
+        .from(nexetVideoGrantsTable)
         .where(
           and(
-            eq(tandemVideoGrantsTable.projectId, project.id),
-            eq(tandemVideoGrantsTable.memberId, userId),
-            isNull(tandemVideoGrantsTable.revokedAt),
-            gt(tandemVideoGrantsTable.expiresAt, new Date()),
+            eq(nexetVideoGrantsTable.projectId, project.id),
+            eq(nexetVideoGrantsTable.memberId, userId),
+            isNull(nexetVideoGrantsTable.revokedAt),
+            gt(nexetVideoGrantsTable.expiresAt, new Date()),
           ),
         );
       const allowed = grants.some((grant) => {
@@ -354,7 +354,7 @@ router.get(
 
     // Audit the download — always write the trail, regardless of storage
     // backend, so the Lock/release paper trail stays complete.
-    await db.insert(tandemVideoDownloadsTable).values({
+    await db.insert(nexetVideoDownloadsTable).values({
       id: randomUUID(),
       projectId: project.id,
       fileId: params.data.fileId,
@@ -396,17 +396,17 @@ const AUDIO_KINDS = ["RAW_AUDIO", "VO_PICKUP"];
 async function latestAssetOfKind(
   projectId: string,
   kinds: string[],
-): Promise<TandemVideoAsset | null> {
+): Promise<NexetVideoAsset | null> {
   const [asset] = await db
     .select()
-    .from(tandemVideoAssetsTable)
+    .from(nexetVideoAssetsTable)
     .where(
       and(
-        eq(tandemVideoAssetsTable.projectId, projectId),
-        or(...kinds.map((k) => eq(tandemVideoAssetsTable.kind, k))),
+        eq(nexetVideoAssetsTable.projectId, projectId),
+        or(...kinds.map((k) => eq(nexetVideoAssetsTable.kind, k))),
       ),
     )
-    .orderBy(desc(tandemVideoAssetsTable.createdAt))
+    .orderBy(desc(nexetVideoAssetsTable.createdAt))
     .limit(1);
   return asset ?? null;
 }
@@ -414,20 +414,20 @@ async function latestAssetOfKind(
 /** True when the member is unlocked for every role this master touches. */
 async function memberCanDownloadMaster(
   project: { id: string; status: string },
-  member: TandemVideoMember,
+  member: NexetVideoMember,
   roles: string[],
 ): Promise<boolean> {
   if (project.status === "RELEASED") return true;
   if (roles.length === 0) return true;
   const grants = await db
     .select()
-    .from(tandemVideoGrantsTable)
+    .from(nexetVideoGrantsTable)
     .where(
       and(
-        eq(tandemVideoGrantsTable.projectId, project.id),
-        eq(tandemVideoGrantsTable.memberId, member.userId),
-        isNull(tandemVideoGrantsTable.revokedAt),
-        gt(tandemVideoGrantsTable.expiresAt, new Date()),
+        eq(nexetVideoGrantsTable.projectId, project.id),
+        eq(nexetVideoGrantsTable.memberId, member.userId),
+        isNull(nexetVideoGrantsTable.revokedAt),
+        gt(nexetVideoGrantsTable.expiresAt, new Date()),
       ),
     );
   if (grants.length === 0) return false;
@@ -483,18 +483,18 @@ async function buildFinishMaster(
     // "audio leads video" from whether the audio is the sync's target.
     const [sync] = await db
       .select()
-      .from(tandemVideoSyncsTable)
+      .from(nexetVideoSyncsTable)
       .where(
         and(
-          eq(tandemVideoSyncsTable.projectId, projectId),
+          eq(nexetVideoSyncsTable.projectId, projectId),
           or(
             and(
-              eq(tandemVideoSyncsTable.primaryAssetId, video.id),
-              eq(tandemVideoSyncsTable.targetAssetId, audio.id),
+              eq(nexetVideoSyncsTable.primaryAssetId, video.id),
+              eq(nexetVideoSyncsTable.targetAssetId, audio.id),
             ),
             and(
-              eq(tandemVideoSyncsTable.primaryAssetId, audio.id),
-              eq(tandemVideoSyncsTable.targetAssetId, video.id),
+              eq(nexetVideoSyncsTable.primaryAssetId, audio.id),
+              eq(nexetVideoSyncsTable.targetAssetId, video.id),
             ),
           ),
         ),
@@ -631,8 +631,8 @@ router.get(
 
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -661,7 +661,7 @@ router.get(
     }
 
     // Audit the download so the Captain can see who took the finished master.
-    await db.insert(tandemVideoDownloadsTable).values({
+    await db.insert(nexetVideoDownloadsTable).values({
       id: randomUUID(),
       projectId: project.id,
       fileId: `finish-master-${project.id}`,
@@ -695,8 +695,8 @@ router.get(
 
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -709,9 +709,9 @@ router.get(
 
     const downloads = await db
       .select()
-      .from(tandemVideoDownloadsTable)
-      .where(eq(tandemVideoDownloadsTable.projectId, params.data.projectId))
-      .orderBy(desc(tandemVideoDownloadsTable.createdAt));
+      .from(nexetVideoDownloadsTable)
+      .where(eq(nexetVideoDownloadsTable.projectId, params.data.projectId))
+      .orderBy(desc(nexetVideoDownloadsTable.createdAt));
 
     res.json(ListVideoDownloadsResponse.parse(downloads));
   },

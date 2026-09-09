@@ -21,7 +21,7 @@ import { matchesCreatorQuery, matchesProjectQuery } from '@/lib/explore-search';
 // ---------------------------------------------------------------------------
 // Explore — GitHub-style discovery. Two browse rails (creators / projects)
 // over PUBLIC track history. The search box matches display names AND the
-// unique Tandem / Clerk user IDs shown on profiles; clicking a project opens
+// unique Nexet / Clerk user IDs shown on profiles; clicking a project opens
 // it read-only (PREVIEW + TIMELINE only) for anyone, since it is PUBLIC.
 // ---------------------------------------------------------------------------
 
@@ -182,7 +182,7 @@ export default function ExplorePage() {
           <h3>{query ? 'Nothing matches that search.' : tab === 'creators' ? 'No creators yet.' : 'No public projects yet.'}</h3>
           <p>
             {query
-              ? 'Try a different name, or search by the unique Tandem ID (e.g. TANDEM6EUHY) shown on a profile.'
+              ? 'Try a different name, or search by the unique Nexet ID (e.g. NEXET6EUHY) shown on a profile.'
               : tab === 'creators'
                 ? 'When a Captain marks a project PUBLIC, they appear here.'
                 : 'When a Captain marks a project PUBLIC, it appears here.'}

@@ -1,9 +1,9 @@
 import {
   db,
-  tandemVideoAssetsTable,
-  tandemVideoProjectsTable,
-  tandemVideoTimelineVersionsTable,
-  tandemVideoTimelinesTable,
+  nexetVideoAssetsTable,
+  nexetVideoProjectsTable,
+  nexetVideoTimelineVersionsTable,
+  nexetVideoTimelinesTable,
 } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import {
@@ -40,18 +40,18 @@ export async function buildCheckout(
 ): Promise<CheckoutBundle | null> {
   const [project] = await db
     .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.id, projectId))
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.id, projectId))
     .limit(1);
   if (!project) return null;
 
   const [timeline] = await db
     .select()
-    .from(tandemVideoTimelinesTable)
+    .from(nexetVideoTimelinesTable)
     .where(
       and(
-        eq(tandemVideoTimelinesTable.projectId, projectId),
-        eq(tandemVideoTimelinesTable.leg, leg),
+        eq(nexetVideoTimelinesTable.projectId, projectId),
+        eq(nexetVideoTimelinesTable.leg, leg),
       ),
     )
     .limit(1);
@@ -59,8 +59,8 @@ export async function buildCheckout(
 
   const [version] = await db
     .select()
-    .from(tandemVideoTimelineVersionsTable)
-    .where(eq(tandemVideoTimelineVersionsTable.id, timeline.currentVersionId))
+    .from(nexetVideoTimelineVersionsTable)
+    .where(eq(nexetVideoTimelineVersionsTable.id, timeline.currentVersionId))
     .limit(1);
   if (!version) return null;
 
@@ -71,8 +71,8 @@ export async function buildCheckout(
   const assets = assetIds.length
     ? await db
         .select()
-        .from(tandemVideoAssetsTable)
-        .where(inArray(tandemVideoAssetsTable.id, assetIds))
+        .from(nexetVideoAssetsTable)
+        .where(inArray(nexetVideoAssetsTable.id, assetIds))
     : [];
   const assetById = new Map(
     assets.map((asset) => [asset.id, { fileName: asset.fileName, kind: asset.kind }]),

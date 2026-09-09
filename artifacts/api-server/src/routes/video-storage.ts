@@ -4,8 +4,8 @@ import { getAuth } from "@clerk/express";
 import { eq } from "drizzle-orm";
 import {
   db,
-  tandemVideoAssetsTable,
-  tandemVideoAssetFilesTable,
+  nexetVideoAssetsTable,
+  nexetVideoAssetFilesTable,
 } from "@workspace/db";
 import { getStore, r2Configured } from "../video/object-storage";
 import { resolveProjectAccess } from "../video/access";
@@ -58,8 +58,8 @@ router.post(
 
     const [asset] = await db
       .select()
-      .from(tandemVideoAssetsTable)
-      .where(eq(tandemVideoAssetsTable.id, assetId))
+      .from(nexetVideoAssetsTable)
+      .where(eq(nexetVideoAssetsTable.id, assetId))
       .limit(1);
     if (!asset || asset.projectId !== projectId) {
       res.status(404).json({ error: "Asset not found" });
@@ -81,7 +81,7 @@ router.post(
     }
 
     // Fresh pending row — marks the artifact as in-flight until proxy-ready.
-    await db.insert(tandemVideoAssetFilesTable).values({
+    await db.insert(nexetVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: asset.id,
       kind: "PROXY",
@@ -127,8 +127,8 @@ router.post(
     // Latest pending PROXY row for this asset.
     const proxies = await db
       .select()
-      .from(tandemVideoAssetFilesTable)
-      .where(eq(tandemVideoAssetFilesTable.assetId, assetId));
+      .from(nexetVideoAssetFilesTable)
+      .where(eq(nexetVideoAssetFilesTable.assetId, assetId));
 
     const pendingProxy = proxies.find((p) => p.kind === "PROXY" && p.storageProvider === "r2");
     if (!pendingProxy) {
@@ -149,13 +149,13 @@ router.post(
     const metadata = (pendingProxy.metadata as Record<string, unknown> | null) ?? {};
     delete metadata.pending;
     await db
-      .update(tandemVideoAssetFilesTable)
+      .update(nexetVideoAssetFilesTable)
       .set({ metadata: { ...metadata, uploaded: true } })
-      .where(eq(tandemVideoAssetFilesTable.id, pendingProxy.id));
+      .where(eq(nexetVideoAssetFilesTable.id, pendingProxy.id));
     await db
-      .update(tandemVideoAssetsTable)
+      .update(nexetVideoAssetsTable)
       .set({ status: "PROCESSED" })
-      .where(eq(tandemVideoAssetsTable.id, assetId));
+      .where(eq(nexetVideoAssetsTable.id, assetId));
 
     res.json({ success: true, fileId: pendingProxy.id });
   },

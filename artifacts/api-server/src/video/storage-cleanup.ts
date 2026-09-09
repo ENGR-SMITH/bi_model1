@@ -14,8 +14,8 @@
 
 import {
   db,
-  tandemVideoAssetFilesTable,
-  tandemVideoAssetsTable,
+  nexetVideoAssetFilesTable,
+  nexetVideoAssetsTable,
 } from "@workspace/db";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import fs from "node:fs";
@@ -32,26 +32,26 @@ export async function captureVaultStorage(projectId: string, assetId?: string): 
 }> {
   const [assets, files] = await Promise.all([
     db
-      .select({ id: tandemVideoAssetsTable.id, storageKey: tandemVideoAssetsTable.storageKey })    .from(tandemVideoAssetsTable)
-    .where(assetId ? and(eq(tandemVideoAssetsTable.projectId, projectId), eq(tandemVideoAssetsTable.id, assetId)) : eq(tandemVideoAssetsTable.projectId, projectId)),
+      .select({ id: nexetVideoAssetsTable.id, storageKey: nexetVideoAssetsTable.storageKey })    .from(nexetVideoAssetsTable)
+    .where(assetId ? and(eq(nexetVideoAssetsTable.projectId, projectId), eq(nexetVideoAssetsTable.id, assetId)) : eq(nexetVideoAssetsTable.projectId, projectId)),
     db
       .select({
-        id: tandemVideoAssetFilesTable.id,
-        storageKey: tandemVideoAssetFilesTable.storageKey,
-        storageProvider: tandemVideoAssetFilesTable.storageProvider,
+        id: nexetVideoAssetFilesTable.id,
+        storageKey: nexetVideoAssetFilesTable.storageKey,
+        storageProvider: nexetVideoAssetFilesTable.storageProvider,
       })
-      .from(tandemVideoAssetFilesTable)
+      .from(nexetVideoAssetFilesTable)
       .where(
         assetId
-          ? eq(tandemVideoAssetFilesTable.assetId, assetId)
+          ? eq(nexetVideoAssetFilesTable.assetId, assetId)
           : and(
-              isNotNull(tandemVideoAssetFilesTable.assetId),
+              isNotNull(nexetVideoAssetFilesTable.assetId),
               inArray(
-                tandemVideoAssetFilesTable.assetId,
+                nexetVideoAssetFilesTable.assetId,
                 db
-                  .select({ id: tandemVideoAssetsTable.id })
-                  .from(tandemVideoAssetsTable)
-                  .where(eq(tandemVideoAssetsTable.projectId, projectId)),
+                  .select({ id: nexetVideoAssetsTable.id })
+                  .from(nexetVideoAssetsTable)
+                  .where(eq(nexetVideoAssetsTable.projectId, projectId)),
               ),
             ),
       ),
@@ -82,13 +82,13 @@ async function orphanedKeys(params: {
 
   const [assets, files] = await Promise.all([
     db
-      .select({ id: tandemVideoAssetsTable.id, storageKey: tandemVideoAssetsTable.storageKey })
-      .from(tandemVideoAssetsTable)
-      .where(inArray(tandemVideoAssetsTable.storageKey, params.candidates)),
+      .select({ id: nexetVideoAssetsTable.id, storageKey: nexetVideoAssetsTable.storageKey })
+      .from(nexetVideoAssetsTable)
+      .where(inArray(nexetVideoAssetsTable.storageKey, params.candidates)),
     db
-      .select({ id: tandemVideoAssetFilesTable.id, storageKey: tandemVideoAssetFilesTable.storageKey })
-      .from(tandemVideoAssetFilesTable)
-      .where(inArray(tandemVideoAssetFilesTable.storageKey, params.candidates)),
+      .select({ id: nexetVideoAssetFilesTable.id, storageKey: nexetVideoAssetFilesTable.storageKey })
+      .from(nexetVideoAssetFilesTable)
+      .where(inArray(nexetVideoAssetFilesTable.storageKey, params.candidates)),
   ]);
   for (const row of assets) {
     if (!deletedAssets.has(row.id)) survivorKeys.add(row.storageKey);

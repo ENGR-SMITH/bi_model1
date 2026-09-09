@@ -5,7 +5,7 @@
 One repo, one API server, four SPAs, optional video workers, optional desktop agent.
 
 - **API server** — `artifacts/api-server`. Express 5 + Socket.IO + Clerk proxy/auth + Paystack hosted checkout/webhooks + video job queue + YouTube channel analytics sync + storage metering/retention + Story Oracle AI routing. Built by `build.mjs` (esbuild) into `dist/index.mjs` and `dist/workers/*`.
-- **Four SPAs** — `artifacts/tandem` (main hub, `/`), `artifacts/authors-den` (`/authors-den/`), `artifacts/creators-den` (`/creators-den/`), `artifacts/oracle-admin` (`/oracle-admin/`). All Vite + React + Clerk + TanStack Query.
+- **Four SPAs** — `artifacts/nexet` (main hub, `/`), `artifacts/authors-den` (`/authors-den/`), `artifacts/creators-den` (`/creators-den/`), `artifacts/oracle-admin` (`/oracle-admin/`). All Vite + React + Clerk + TanStack Query.
 - **Desktop agent** — `artifacts/desktop-agent`. Electron app, loopback control server on port 41737, FFmpeg proxy generation, R2 upload via presigned URLs, browser-based Clerk sign-in via the web app's `/creators-den/agent-signin`.
 - **Mockup sandbox** — `artifacts/mockup-sandbox`. Standalone UI scratchpad, not part of the core product.
 
@@ -20,12 +20,12 @@ The production topology the code is written for is a **single origin with path-b
 
 ## What was fixed in this session
 
-### 1. `artifacts/tandem/vite.config.ts`
+### 1. `artifacts/nexet/vite.config.ts`
 Added:
 ```
 envPrefix: ['VITE_', 'CLERK_PUBLISHABLE_KEY']
 ```
-so the Tandem build picks up the Clerk publishable key from the Dockerfile build env instead of a per-app `.env` file.
+so the Nexet build picks up the Clerk publishable key from the Dockerfile build env instead of a per-app `.env` file.
 
 ### 2. `artifacts/authors-den/vite.config.ts`
 Added the same `envPrefix`:
@@ -59,12 +59,12 @@ What is ready versus what is still external.
 - builds the API bundle with `pnpm --filter @workspace/api-server run build`,
 - builds all four SPAs:
   ```
-  PORT=3001 BASE_PATH=/               pnpm --filter @workspace/tandem build
+  PORT=3001 BASE_PATH=/               pnpm --filter @workspace/nexet build
   && PORT=3002 BASE_PATH=/authors-den/   pnpm --filter @workspace/authors-den build
   && PORT=3003 BASE_PATH=/creators-den/  pnpm --filter @workspace/creators-den build
   && PORT=3004 BASE_PATH=/oracle-admin/  pnpm --filter @workspace/oracle-admin build
   ```
-- copies the four built SPAs into `/srv/tandem/{root,authors-den,creators-den,oracle-admin}`,
+- copies the four built SPAs into `/srv/nexet/{root,authors-den,creators-den,oracle-admin}`,
 - drops in `artifacts/api-server/nginx.conf` and `artifacts/api-server/entrypoint.sh`,
 - makes `entrypoint.sh` executable,
 - exposes 8080 and runs `/entrypoint.sh`.
@@ -122,11 +122,11 @@ and fails the build if either is empty. Render auto-translates service env vars 
 ### 1. A real database
 Create one on Supabase, Neon, or any Postgres Render service, then push the schema from the repo root before the API server starts serving traffic:
 ```
-DATABASE_URL='postgresql://user:password@host:5432/tandem' pnpm --filter db run push-force
+DATABASE_URL='postgresql://user:password@host:5432/nexet' pnpm --filter db run push-force
 ```
 or
 ```
-DATABASE_URL='postgresql://user:password@host:5432/tandem' pnpm exec drizzle-kit push --force --config ./drizzle.config.ts
+DATABASE_URL='postgresql://user:password@host:5432/nexet' pnpm exec drizzle-kit push --force --config ./drizzle.config.ts
 ```
 The API server needs `DATABASE_URL` at runtime. Without it the DB module never loads.
 
@@ -150,7 +150,7 @@ A successful local build means the same env on Render should build.
 
 If you cannot run Docker here, the next-best check is the four SPA builds individually from the repo root:
 ```
-cd artifacts/tandem && PORT=3001 BASE_PATH=/ VITE_CLERK_PUBLISHABLE_KEY=pk_test_... npx vite build
+cd artifacts/nexet && PORT=3001 BASE_PATH=/ VITE_CLERK_PUBLISHABLE_KEY=pk_test_... npx vite build
 cd artifacts/authors-den && PORT=3002 BASE_PATH=/authors-den/ VITE_CLERK_PUBLISHABLE_KEY=pk_test_... npx vite build
 cd artifacts/creators-den && PORT=3003 BASE_PATH=/creators-den/ VITE_CLERK_PUBLISHABLE_KEY=pk_test_... npx vite build
 cd artifacts/oracle-admin && PORT=5176 BASE_PATH=/oracle-admin/ npx vite build

@@ -1,4 +1,4 @@
-// Blueprint §9 — `tandem/worker-render` (melt/MLT + FFmpeg): timeline JSON →
+// Blueprint §9 — `nexet/worker-render` (melt/MLT + FFmpeg): timeline JSON →
 // rendered preview / rough cut / picture-lock. Consumes the RENDER queue.
 import "../env";
 import { logger } from "../lib/logger";

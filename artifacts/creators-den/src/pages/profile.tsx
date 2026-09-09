@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useParams } from 'wouter';
 import { useUser } from '@clerk/react';
 import { Activity, ArrowLeft, Check, ChevronRight, Copy, Eye, Film, LockKeyhole, UserRound } from 'lucide-react';
-import { tandemUid } from '@/lib/tandem-uid';
+import { nexetUid } from '@/lib/nexet-uid';
 import {
   getGetUserProfileQueryKey,
   getGetVideoUserContributionsQueryKey,
@@ -300,14 +300,14 @@ export default function ProfilePage() {
               <div className="profile-hero-id">
                 <h1>{displayName}</h1>
                 <p className="profile-sub">{email || `@${profileUserId.slice(0, 12)}`}</p>
-                {/* The unique Tandem ID — invite someone with it, no email needed. */}
+                {/* The unique Nexet ID — invite someone with it, no email needed. */}
                 <div className="profile-uid" data-testid="profile-uid">
-                  <span className="profile-uid-label">{viewingSelf ? 'Your unique Tandem ID' : 'Tandem ID'}</span>
+                  <span className="profile-uid-label">{viewingSelf ? 'Your unique Nexet ID' : 'Nexet ID'}</span>
                   <button
                     type="button"
                     className="profile-uid-value"
                     onClick={() => {
-                      void navigator.clipboard?.writeText(tandemUid(profileUserId)).then(() => {
+                      void navigator.clipboard?.writeText(nexetUid(profileUserId)).then(() => {
                         setCopiedUid(true);
                         window.setTimeout(() => setCopiedUid(false), 1800);
                       });
@@ -315,7 +315,7 @@ export default function ProfilePage() {
                     title="Copy to clipboard"
                     data-testid="profile-uid-copy"
                   >
-                    {tandemUid(profileUserId)}
+                    {nexetUid(profileUserId)}
                     {copiedUid ? <Check size={12} className="profile-uid-copied" /> : <Copy size={12} />}
                   </button>
                   <span className="profile-uid-hint mono-label">{copiedUid ? 'Copied!' : 'share this to be invited'}</span>

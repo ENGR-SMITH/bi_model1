@@ -1,5 +1,5 @@
 -- =============================================================================
--- Migration: tandem_paystack_intents — Paystack hosted-checkout intents
+-- Migration: nexet_paystack_intents — Paystack hosted-checkout intents
 --
 -- Why: subscription purchases now go through Paystack's hosted checkout
 -- (POST /api/paystack/checkout). One row is written per checkout session
@@ -18,9 +18,9 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name = 'tandem_paystack_intents'
+      AND table_name = 'nexet_paystack_intents'
   ) THEN
-    CREATE TABLE "tandem_paystack_intents" (
+    CREATE TABLE "nexet_paystack_intents" (
       "reference" text PRIMARY KEY NOT NULL,
       "user_id" text NOT NULL,
       "kind" text NOT NULL,

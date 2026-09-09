@@ -19,7 +19,7 @@ import { z } from "zod/v4";
 // links their real YouTube channel via Google OAuth (Phase 2), the channel is
 // CONNECTED and mirrors the YouTube title, avatar, and banner so the CMS grid
 // and the den chrome can show real branding.
-export const tandemChannelsTable = pgTable("tandem_channels", {
+export const nexetChannelsTable = pgTable("nexet_channels", {
   id: text("id").primaryKey(),
   ownerId: text("owner_id").notNull(),
   // CREATED (workspace ready, not yet linked) → CONNECTED (YouTube OAuth
@@ -43,8 +43,8 @@ export const tandemChannelsTable = pgTable("tandem_channels", {
 // the last project they hold on the channel — the same row powers the owner's
 // GitHub-style contributor strip AND the editor's own CMS mirror card, so
 // there are no per-user mirror rows.
-export const tandemChannelMembersTable = pgTable(
-  "tandem_channel_members",
+export const nexetChannelMembersTable = pgTable(
+  "nexet_channel_members",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -54,7 +54,7 @@ export const tandemChannelMembersTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    channelUserUnique: unique("tandem_channel_member_channel_user").on(
+    channelUserUnique: unique("nexet_channel_member_channel_user").on(
       table.channelId,
       table.userId,
     ),
@@ -65,8 +65,8 @@ export const tandemChannelMembersTable = pgTable(
 // channel). Ciphertext is produced with the SESSION_SECRET AES helper used
 // for the Story Oracle provider keys (lib/oracle.ts encryptSecret). Tokens
 // never leave the server; editors of the channel never see them.
-export const tandemChannelOauthTable = pgTable(
-  "tandem_channel_oauth",
+export const nexetChannelOauthTable = pgTable(
+  "nexet_channel_oauth",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -83,17 +83,17 @@ export const tandemChannelOauthTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    channelUnique: unique("tandem_channel_oauth_channel_unique").on(table.channelId),
+    channelUnique: unique("nexet_channel_oauth_channel_unique").on(table.channelId),
   }),
 );
 
-export const insertTandemChannelSchema = createInsertSchema(tandemChannelsTable);
-export const insertTandemChannelMemberSchema = createInsertSchema(tandemChannelMembersTable);
-export const insertTandemChannelOauthSchema = createInsertSchema(tandemChannelOauthTable);
+export const insertNexetChannelSchema = createInsertSchema(nexetChannelsTable);
+export const insertNexetChannelMemberSchema = createInsertSchema(nexetChannelMembersTable);
+export const insertNexetChannelOauthSchema = createInsertSchema(nexetChannelOauthTable);
 
-export type TandemChannel = typeof tandemChannelsTable.$inferSelect;
-export type TandemChannelMember = typeof tandemChannelMembersTable.$inferSelect;
-export type TandemChannelOauth = typeof tandemChannelOauthTable.$inferSelect;
+export type NexetChannel = typeof nexetChannelsTable.$inferSelect;
+export type NexetChannelMember = typeof nexetChannelMembersTable.$inferSelect;
+export type NexetChannelOauth = typeof nexetChannelOauthTable.$inferSelect;
 
-export const tandemChannelRoleSchema = z.enum(["OWNER", "EDITOR"]);
-export const tandemChannelStatusSchema = z.enum(["CREATED", "CONNECTED"]);
+export const nexetChannelRoleSchema = z.enum(["OWNER", "EDITOR"]);
+export const nexetChannelStatusSchema = z.enum(["CREATED", "CONNECTED"]);

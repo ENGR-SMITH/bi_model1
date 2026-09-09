@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Generate Tandem Content Creators guide as a .docx (pure OOXML, no deps)."""
+"""Generate Nexet Content Creators guide as a .docx (pure OOXML, no deps)."""
 import zipfile
 import os
 from xml.sax.saxutils import escape
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Tandem_Content_Creators_Guide.docx")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "NEXET_Content_Creators_Guide.docx")
 
 # ---------------------------------------------------------------------------
 # Document model helpers
@@ -106,10 +106,10 @@ def spacer():
 # Cover / title
 # ---------------------------------------------------------------------------
 
-rich_para([("TANDEM", False, True, "E55B4C")], style="Subtitle")
+rich_para([("NEXET", False, True, "E55B4C")], style="Subtitle")
 rich_para([("Content Creators — the video room", True, False, None)], style="Title")
 para(
-    "A complete guide to the pre-recorded content workflow inside Tandem: the four-leg "
+    "A complete guide to the pre-recorded content workflow inside Nexet: the four-leg "
     "production relay, every studio, the vault and its Lock, the processing pipeline, "
     "and the realtime layer — how it works and what each feature does.",
     style="Subtitle",
@@ -122,8 +122,8 @@ spacer()
 
 h1("1. What Content Creators is")
 para(
-    "Content Creators is Tandem's dedicated platform for pre-recorded video production. It lives in its own "
-    "app called Creators Den, served at /creators-den/ and reached from the Tandem atrium through the "
+    "Content Creators is Nexet's dedicated platform for pre-recorded video production. It lives in its own "
+    "app called Creators Den, served at /creators-den/ and reached from the Nexet atrium through the "
     "Content Creators category door — the same pattern that sends the writers category to Author Den."
 )
 para(
@@ -150,7 +150,7 @@ table(
         ["The Vault", "One screen per project: assets, team, jobs, grants, audit", "/creators-den/projects/:id"],
         ["Studios", "Selects, Cut, Sound, Finish — one per relay leg", "/creators-den/projects/:id/<studio>"],
         ["API server", "REST endpoints under /api", "/api/video/…"],
-        ["Database", "PostgreSQL tables prefixed tandem_", "shared DB with the parent app"],
+        ["Database", "PostgreSQL tables prefixed nexet_", "shared DB with the parent app"],
     ],
     widths=[2400, 5200, 2400],
 )
@@ -175,7 +175,7 @@ table(
 
 h1("2. Getting around")
 para(
-    "Sign in on Tandem with your Clerk account. From the atrium (dashboard), open the Content Creators "
+    "Sign in on Nexet with your Clerk account. From the atrium (dashboard), open the Content Creators "
     "category — it presents an \u201cOpen Creators Den\u201d doorway card. Clicking it lands on the Creators Den "
     "home (The Room), which shares the same identity and the same API, so no second sign-in is needed."
 )
@@ -223,7 +223,7 @@ bullet("When an asset finishes processing, an \u201cOpen the selects studio\u201
 bullet("Files are stored server-side; today on local disk, with the data model ready for object storage. The degraded proxy streams to the player — the original never leaves the server.")
 
 h2("4.2 Team & roles")
-bullet("The Captain can invite teammates by email (must be a Tandem account) and assign a role: Architect, Visual Editor, Sound Designer, Motion & Color, or uploader.")
+bullet("The Captain can invite teammates by email (must be a Nexet account) and assign a role: Architect, Visual Editor, Sound Designer, Motion & Color, or uploader.")
 bullet("Members see the roster on the vault; each member card shows the role label.")
 
 h2("4.3 Background jobs")
@@ -311,21 +311,21 @@ para(
 h1("9. How the processing pipeline works")
 para(
     "Every heavy operation — proxy creation, transcription, camera sync, renders, audio passes, exports, "
-    "thumbnails, reference analysis — is a background job. The API writes a row into the tandem_video_jobs "
+    "thumbnails, reference analysis — is a background job. The API writes a row into the nexet_video_jobs "
     "table (the source of truth the UI reads) and claims the work through a Redis-backed BullMQ queue."
 )
 h2("9.1 Job types and queues")
 table(
     [
         ["Job type", "Queue", "What it produces"],
-        ["PROXY", "tandem-video-proxy", "Streamable low-res proxy for the player"],
-        ["TRANSCRIBE", "tandem-video-transcribe", "Transcript + segments for Selects/Captions"],
-        ["SYNC", "tandem-video-sync", "Waveform-based camera sync offset"],
-        ["RENDER", "tandem-video-render", "Preview / picture-lock renders"],
-        ["AUDIO", "tandem-video-audio", "Applied audio passes"],
-        ["EXPORT", "tandem-video-export", "Delivery-format masters"],
-        ["THUMBNAIL", "tandem-video-thumbnail", "Poster frame extraction"],
-        ["REFERENCE_ANALYZE", "tandem-video-reference-analyze", "Reference pacing structure"],
+        ["PROXY", "nexet-video-proxy", "Streamable low-res proxy for the player"],
+        ["TRANSCRIBE", "nexet-video-transcribe", "Transcript + segments for Selects/Captions"],
+        ["SYNC", "nexet-video-sync", "Waveform-based camera sync offset"],
+        ["RENDER", "nexet-video-render", "Preview / picture-lock renders"],
+        ["AUDIO", "nexet-video-audio", "Applied audio passes"],
+        ["EXPORT", "nexet-video-export", "Delivery-format masters"],
+        ["THUMBNAIL", "nexet-video-thumbnail", "Poster frame extraction"],
+        ["REFERENCE_ANALYZE", "nexet-video-reference-analyze", "Reference pacing structure"],
     ],
     widths=[2600, 3300, 4100],
 )
@@ -377,24 +377,24 @@ para(
 # ---------------------------------------------------------------------------
 
 h1("11. The data model")
-para("All tables are prefixed tandem_ so they never collide with the parent app's tables. The core ones:")
+para("All tables are prefixed nexet_ so they never collide with the parent app's tables. The core ones:")
 table(
     [
         ["Table", "Purpose"],
-        ["tandem_video_projects", "One row per room: name, description, status (VAULT → IN_PRODUCTION → LOCK_RELEASED → COMPLETE), owner"],
-        ["tandem_video_members", "Who is in the room and their role; the Captain is the owner"],
-        ["tandem_video_assets", "Raw assets in the vault: kind, file name, size, storage key, status, version"],
-        ["tandem_video_asset_files", "Every physical artifact per asset: ORIGINAL, PROXY, TRANSCRIPT, AUDIO_STEM, THUMBNAIL, RENDER…"],
-        ["tandem_video_transcripts / _segments", "Speech-to-text output with per-line timecodes, speakers, and search"],
-        ["tandem_video_timelines / _versions", "Per-leg working document with Git-style snapshots; every save is a version"],
-        ["tandem_video_submissions", "Leg deliverables: DRAFT → SUBMITTED → APPROVED / REJECTED, with note and decision trail"],
-        ["tandem_video_comments", "Timecode notes pinned to a leg and/or asset, resolvable"],
-        ["tandem_video_syncs", "Camera sync pairs with the computed waveform offset and method"],
-        ["tandem_video_references", "Reference analysis: status and extracted pacing structure"],
-        ["tandem_video_grants", "Temporary download grants: file, member, reason, expiry, revoke timestamp"],
-        ["tandem_video_downloads", "The download audit trail — who took what, when"],
-        ["tandem_video_notifications", "The notices inbox (mirrors the parent's notification conventions)"],
-        ["tandem_video_jobs", "The background job queue rows — the contract between API, worker, and UI"],
+        ["nexet_video_projects", "One row per room: name, description, status (VAULT → IN_PRODUCTION → LOCK_RELEASED → COMPLETE), owner"],
+        ["nexet_video_members", "Who is in the room and their role; the Captain is the owner"],
+        ["nexet_video_assets", "Raw assets in the vault: kind, file name, size, storage key, status, version"],
+        ["nexet_video_asset_files", "Every physical artifact per asset: ORIGINAL, PROXY, TRANSCRIPT, AUDIO_STEM, THUMBNAIL, RENDER…"],
+        ["nexet_video_transcripts / _segments", "Speech-to-text output with per-line timecodes, speakers, and search"],
+        ["nexet_video_timelines / _versions", "Per-leg working document with Git-style snapshots; every save is a version"],
+        ["nexet_video_submissions", "Leg deliverables: DRAFT → SUBMITTED → APPROVED / REJECTED, with note and decision trail"],
+        ["nexet_video_comments", "Timecode notes pinned to a leg and/or asset, resolvable"],
+        ["nexet_video_syncs", "Camera sync pairs with the computed waveform offset and method"],
+        ["nexet_video_references", "Reference analysis: status and extracted pacing structure"],
+        ["nexet_video_grants", "Temporary download grants: file, member, reason, expiry, revoke timestamp"],
+        ["nexet_video_downloads", "The download audit trail — who took what, when"],
+        ["nexet_video_notifications", "The notices inbox (mirrors the parent's notification conventions)"],
+        ["nexet_video_jobs", "The background job queue rows — the contract between API, worker, and UI"],
     ],
     widths=[3600, 6400],
 )
@@ -442,7 +442,7 @@ table(
 # ---------------------------------------------------------------------------
 
 h1("13. Security and permissions")
-bullet("Identity is Clerk — the same accounts as the rest of Tandem; every route and socket handshake verifies the session token.")
+bullet("Identity is Clerk — the same accounts as the rest of Nexet; every route and socket handshake verifies the session token.")
 bullet("Every video route checks membership: you can only read a room you belong to.")
 bullet("Captain-only actions are enforced server-side: inviting members, approving/rejecting submissions, creating and revoking grants.")
 bullet("The Lock is enforced at download time: only files with an active grant (or a released Lock) can be downloaded, and every download is audited.")
@@ -458,7 +458,7 @@ table(
     [
         ["Service", "Command (from parent-app)"],
         ["API server (port 3000)", "cd artifacts/api-server && node dist/index.mjs  (needs .env with DATABASE_URL + Clerk keys)"],
-        ["Tandem app (port 5173)", "cd artifacts/tandem && MSYS_NO_PATHCONV=1 PORT=5173 BASE_PATH=/ npx vite"],
+        ["Nexet app (port 5173)", "cd artifacts/nexet && MSYS_NO_PATHCONV=1 PORT=5173 BASE_PATH=/ npx vite"],
         ["Creators Den (port 5175)", "cd artifacts/creators-den && MSYS_NO_PATHCONV=1 PORT=5175 BASE_PATH=/creators-den/ npx vite"],
         ["BullMQ worker fleet (optional)", "export REDIS_URL=redis://localhost:6379 && pnpm --filter @workspace/api-server run workers"],
     ],
@@ -604,17 +604,17 @@ core = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
                    xmlns:dc="http://purl.org/dc/elements/1.1/"
                    xmlns:dcterms="http://purl.org/dc/terms/"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>Tandem Content Creators — the video room</dc:title>
+  <dc:title>Nexet Content Creators — the video room</dc:title>
   <dc:subject>Content Creators platform guide</dc:subject>
-  <dc:creator>Tandem</dc:creator>
-  <cp:lastModifiedBy>Tandem</cp:lastModifiedBy>
+  <dc:creator>Nexet</dc:creator>
+  <cp:lastModifiedBy>Nexet</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">2026-08-17T00:00:00Z</dcterms:created>
 </cp:coreProperties>"""
 
 app = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
             xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
-  <Application>Tandem</Application>
+  <Application>Nexet</Application>
 </Properties>"""
 
 with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as z:

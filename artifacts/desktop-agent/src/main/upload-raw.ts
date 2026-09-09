@@ -16,7 +16,7 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";
 
-const BOUNDARY = `----tandem-agent-${randomBytes(12).toString("hex")}`;
+const BOUNDARY = `----nexet-agent-${randomBytes(12).toString("hex")}`;
 const CRLF = "\r\n";
 
 const AUDIO_EXTS = new Set([".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".aif", ".aiff", ".opus"]);

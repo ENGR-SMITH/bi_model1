@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import express, { type Express } from "express";
 import request from "supertest";
 import { and, eq } from "drizzle-orm";
-import { tandemUid } from "../lib/tandem-uid";
+import { nexetUid } from "../lib/nexet-uid";
 import { clearUserNameCache } from "../lib/user-names";
 
 const state = vi.hoisted(() => ({
@@ -61,12 +61,12 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
-  await state.db.delete(t.tandemChannelOauthTable);
-  await state.db.delete(t.tandemChannelMembersTable);
-  await state.db.delete(t.tandemChannelsTable);
-  await state.db.delete(t.tandemVideoNotificationsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
+  await state.db.delete(t.nexetChannelOauthTable);
+  await state.db.delete(t.nexetChannelMembersTable);
+  await state.db.delete(t.nexetChannelsTable);
+  await state.db.delete(t.nexetVideoNotificationsTable);
   state.userId = null;
   state.clerkIdToName = {};
   clearUserNameCache();
@@ -98,7 +98,7 @@ async function createProject(channelId: string | undefined, name: string, as = "
 async function addMember(projectId: string, targetId: string, role: string) {
   const res = await request(API)
     .post(`/api/video/projects/${projectId}/members`)
-    .send({ uid: tandemUid(targetId), role });
+    .send({ uid: nexetUid(targetId), role });
   expect(res.status).toBeGreaterThanOrEqual(200);
   expect(res.status).toBeLessThan(300);
 }
@@ -106,8 +106,8 @@ async function addMember(projectId: string, targetId: string, role: string) {
 async function editorRows(userId: string) {
   return state.db
     .select()
-    .from(state.tables.tandemChannelMembersTable)
-    .where(eq(state.tables.tandemChannelMembersTable.userId, userId));
+    .from(state.tables.nexetChannelMembersTable)
+    .where(eq(state.tables.nexetChannelMembersTable.userId, userId));
 }
 
 describe("channel CMS grid", () => {
@@ -188,8 +188,8 @@ describe("channel-scoped projects", () => {
 
     const notes = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.category, "video_invite"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.category, "video_invite"));
     expect(notes).toHaveLength(1);
     expect(notes[0].deepLink).toBe(`/creators-den/channels/${id}/projects/${project.body.id}`);
   });
@@ -329,7 +329,7 @@ describe("channel editor lifecycle (mirror cards)", () => {
     state.userId = "user-1";
     await request(API).delete(`/api/video/projects/${a.body.id}`);
     expect((await request(API).delete(`/api/channels/${id}`)).status).toBe(204);
-    expect(await state.db.select().from(state.tables.tandemChannelMembersTable)).toEqual([]);
+    expect(await state.db.select().from(state.tables.nexetChannelMembersTable)).toEqual([]);
   });
 
   it("never duplicates an OWNER row for the channel owner when re-added", async () => {
@@ -339,11 +339,11 @@ describe("channel editor lifecycle (mirror cards)", () => {
     await addMember(project.body.id, "user-1", "VIDEO");
     const ownerRows = await state.db
       .select()
-      .from(state.tables.tandemChannelMembersTable)
+      .from(state.tables.nexetChannelMembersTable)
       .where(
         and(
-          eq(state.tables.tandemChannelMembersTable.channelId, id),
-          eq(state.tables.tandemChannelMembersTable.userId, "user-1"),
+          eq(state.tables.nexetChannelMembersTable.channelId, id),
+          eq(state.tables.nexetChannelMembersTable.userId, "user-1"),
         ),
       );
     expect(ownerRows).toHaveLength(1);

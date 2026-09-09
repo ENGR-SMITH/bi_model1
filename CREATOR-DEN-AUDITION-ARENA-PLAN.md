@@ -3,7 +3,7 @@
 **Status:** Plan for review — no code changes made yet
 **Last updated:** 2026-09-05
 **Primary source:** product brief pasted 2026-09-05 — "public contribution system for the creator-den on the category page" (integrate the collaboration system into Creators Den so people can post an open role in their channel project and others can audition for it).
-**Target apps:** `artifacts/creators-den` (frontend — CMS card row, Arena pages, read-only project surface, notifications), `artifacts/api-server` (new arena route module + `video/access.ts` widening, notifications, activity/realtime), `lib/db` (schema/migrations), `lib/api-spec` → `lib/api-zod` + `lib/api-client-react` (API contract + codegen), plus the Tandem content-creators category doorway (`artifacts/tandem/src/pages/content-creators.tsx`) and shared notice metadata (`artifacts/tandem/src/lib/notice-meta.ts`).
+**Target apps:** `artifacts/creators-den` (frontend — CMS card row, Arena pages, read-only project surface, notifications), `artifacts/api-server` (new arena route module + `video/access.ts` widening, notifications, activity/realtime), `lib/db` (schema/migrations), `lib/api-spec` → `lib/api-zod` + `lib/api-client-react` (API contract + codegen), plus the Nexet content-creators category doorway (`artifacts/nexet/src/pages/content-creators.tsx`) and shared notice metadata (`artifacts/nexet/src/lib/notice-meta.ts`).
 **Related docs:** `CREATOR-DEN-CHANNELS-ANALYTICS-PLAN.md` (channel/CMS/analytics restructure this builds on), `TADEM_COLLABORATION_IMPLEMENTATION_PLAN.md` (the Author Den collaboration pattern to mirror in spirit), `FEATURES.md`, `START-APP.md`, `replit.md`, `.env.example`.
 
 ---
@@ -14,7 +14,7 @@ Creators Den gets a **public contribution / audition system**: a Captain who run
 
 Beyond the core apply/decide loop, v1 ships the applicant lifecycle (**My Auditions** history + **withdraw**), sharing and discovery (**share links**, board **sort**, a **follow-first feed** over the existing user-follow model), **role watch alerts**, **mutual work reviews** (public, on profiles, after a hire), and **anti-spam** (per-week application cap + per-Captain blocks). See §3.1.
 
-The discovery surface is a new cross-channel den page named the **Collaboration / Audition Arena** (`/creators-den/arena`), entered from a **new card row at the bottom of the MCNs grid page `/creators-den/`** (per product decision 2026-09-05) and advertised from the Content Creators category page in the Tandem hub (`/categories/content-creators`) so the category doorway points into the Arena like it points into the den today.
+The discovery surface is a new cross-channel den page named the **Collaboration / Audition Arena** (`/creators-den/arena`), entered from a **new card row at the bottom of the MCNs grid page `/creators-den/`** (per product decision 2026-09-05) and advertised from the Content Creators category page in the Nexet hub (`/categories/content-creators`) so the category doorway points into the Arena like it points into the den today.
 
 Design intent: reuse every existing Creator Den primitive instead of building a parallel universe — the four content roles and member model, the existing **PUBLIC read-only experience** (non-member viewers already get only the PREVIEW + TIMELINE nav bars), the notification/inbox + realtime system, the profile/track-history/portfolio surface, and the file-upload conventions. We mirror the *pattern* of the Author Den pitch board (post → apply → creator decides), but implement with Creator Den's own tables, roles, and read-gates. We do **not** reuse the author collaboration tables/routes.
 
@@ -23,18 +23,18 @@ Design intent: reuse every existing Creator Den primitive instead of building a 
 | Term | Meaning |
 |---|---|
 | Audition Arena / the Arena | New cross-channel Creator Den page: browse + post open roles. Route `/creators-den/arena` |
-| Role post / open role | `tandem_arena_posts` row: one of the four content roles wanted on one channel project |
-| Audition / application | `tandem_arena_applications` row: a creator's application (message + documents) to one post |
+| Role post / open role | `nexet_arena_posts` row: one of the four content roles wanted on one channel project |
+| Audition / application | `nexet_arena_applications` row: a creator's application (message + documents) to one post |
 | Applicant count | Live number of people currently auditioning for the post's role on that project — `PENDING` applications on the post; shown on the board card and the post itself and kept fresh (see §6.5) |
 | Preview window | The read-only project surface a signed-in creator gets while a post on that project is OPEN — PREVIEW + TIMELINE only (same as today's PUBLIC read-only) |
-| Captain | Project owner (`tandem_video_projects.ownerId`), the only person who can post roles and accept/reject auditions |
+| Captain | Project owner (`nexet_video_projects.ownerId`), the only person who can post roles and accept/reject auditions |
 | Portfolio | The applicant's existing public profile page (`/creators-den/profile/:userId`): public track history, CV, contributions, followers |
 | Content role | `VIDEO` \| `AUDIO` \| `SCRIPT` \| `THUMBNAIL` — the postable roles (`CONTENT_ROLES` in `artifacts/creators-den/src/lib/roles.ts`) |
 | My Auditions | Applicant-side history of their own applications (all statuses) with links back to the posts — `/creators-den/arena/mine` |
 | Withdraw | Applicant retracts a PENDING application → `WITHDRAWN`; the live count drops and the Captain is notified |
-| Role watch | An alert subscription (`tandem_arena_watches`): notify me when a new open role matches a role (+ optional channel) |
+| Role watch | An alert subscription (`nexet_arena_watches`): notify me when a new open role matches a role (+ optional channel) |
 | Work review | Post-hire mutual rating: Captain ↔ hired applicant leave one short public review each (on the hire) |
-| Captain block | Per-Captain blocklist (`tandem_arena_blocks`): a blocked applicant cannot apply to that Captain's posts |
+| Captain block | Per-Captain blocklist (`nexet_arena_blocks`): a blocked applicant cannot apply to that Captain's posts |
 
 ## 3. Scope and release boundaries
 
@@ -52,7 +52,7 @@ Design intent: reuse every existing Creator Den primitive instead of building a 
 10. **My Auditions** — applicant history page listing every application they have made with its status and a link back to the post.
 11. **Withdraw** — an applicant can retract a PENDING application (count drops, Captain notified, `WITHDRAWN`).
 12. **Share links** — copy/share affordance on every post.
-13. **Board sorting + follow-first feed** — sort by newest or most auditions; an option to surface posts from Captains the viewer follows first (existing `tandem_video_follows`).
+13. **Board sorting + follow-first feed** — sort by newest or most auditions; an option to surface posts from Captains the viewer follows first (existing `nexet_video_follows`).
 14. **Role watch alerts** — subscribe to a role (optionally scoped to one channel) and get notified when a matching open role is posted.
 15. **Mutual work reviews** — after a hire, the Captain and the hired applicant each leave one short public review (rating + line) that renders on profiles.
 16. **Anti-spam** — server-enforced per-week application cap (429) and per-Captain applicant blocks (403); no moderator UI in v1.
@@ -88,23 +88,23 @@ Completed during plan review:
 - [x] Confirm the Arena's host page. **Completed: `App.tsx` (creators-den) is a single router under base `/creators-den` with CMS → channel → project nesting plus den-level pages (`/profile`, `/explore`, `/notifications`). The Arena becomes another den-level page set (`/arena`, `/arena/posts/:postId`) rendered inside `CreatorsShell`; route chrome derives from `denRouteInfo` (`lib/den-urls.ts`), which already returns `other` for unknown top-level paths — Arena pages get CMS-like chrome and must not render project tabs.**
 - [x] Confirm the CMS "card row at the bottom" insertion point. **Completed: `CmsPage` renders the channel grid + `UnlinkedProjects` under a `.cms-split`; the Arena doorway card goes in a new "more rooms" card row below that section (§7.2), consistent with the existing `.cms-head`/card vocabulary.**
 - [x] Confirm the read-only preview surface. **Completed: `LegacyProjectGate` + `CreatorsShell` already implement the PUBLIC read-only experience — non-members on the flat `/projects/:projectId` path get only Timeline + Preview tabs (`readOnly` when `myRoles.length === 0`); server-side all reads funnel through `resolveProjectAccess` (member | public | null). This is the exact surface the Arena needs, extended to PRIVATE projects that carry an OPEN post.**
-- [x] Confirm who can post / decide. **Completed: project owner (`CAPTAIN`) is authoritative (`tandem_video_projects.ownerId`); channel projects require the Captain to own the channel (`channels.ts`/`video.ts` rules). Posting requires `project.channelId != null` and channel ownership by the Captain.**
+- [x] Confirm who can post / decide. **Completed: project owner (`CAPTAIN`) is authoritative (`nexet_video_projects.ownerId`); channel projects require the Captain to own the channel (`channels.ts`/`video.ts` rules). Posting requires `project.channelId != null` and channel ownership by the Captain.**
 - [x] Confirm applicant identity/portfolio surface. **Completed: `ProfilePage` at `/creators-den/profile/:userId` already shows public track history (created or participated), CV card, contributions, and follow model — this IS the "view portfolio" destination. Application cards only need a deep link + resolved profile (name/avatar) from `resolveUserProfiles`.**
 - [x] Confirm file upload conventions for application documents. **Completed: multer disk storage + `uploadDir()` exists (`routes/account.ts` CV upload: single file ≤15 MB into `uploads/<dir>/`), and browser uploads go through direct multipart POSTs. Arena docs follow the same shape (per-application folder, allowlist, size/file caps).**
-- [x] Confirm notification plumbing. **Completed: `notify()` writes `tandem_video_notifications` and streams `notification.new` with `source: "creators"`; category metadata lives in `artifacts/creators-den/src/pages/notifications.tsx` (CATEGORY_META) and `artifacts/tandem/src/lib/notice-meta.ts` (CREATORS_META). New Arena categories are added to both maps.**
+- [x] Confirm notification plumbing. **Completed: `notify()` writes `nexet_video_notifications` and streams `notification.new` with `source: "creators"`; category metadata lives in `artifacts/creators-den/src/pages/notifications.tsx` (CATEGORY_META) and `artifacts/nexet/src/lib/notice-meta.ts` (CREATORS_META). New Arena categories are added to both maps.**
 - [x] Confirm test conventions. **Completed: vitest route tests in `artifacts/api-server/src/routes/*.test.ts` run against the in-memory SQLite mirror with mocked Clerk auth; schema mirror lives in `artifacts/api-server/src/test/in-memory-db.ts`.**
 
 ## 6. Domain model and persistence plan
 
-All new tables use the `tandem_` prefix and existing conventions (text PK `arena_…`, snake_case, timestamps).
+All new tables use the `nexet_` prefix and existing conventions (text PK `arena_…`, snake_case, timestamps).
 
-### 6.1 `tandem_arena_posts` — an open role on one channel project (new)
+### 6.1 `nexet_arena_posts` — an open role on one channel project (new)
 
 | Column | Type | Notes |
 |---|---|---|
 | id | text PK | `arena_…` |
-| channel_id | text NOT NULL | → `tandem_channels.id`; role posts exist under a channel |
-| project_id | text NOT NULL | → `tandem_video_projects.id` |
+| channel_id | text NOT NULL | → `nexet_channels.id`; role posts exist under a channel |
+| project_id | text NOT NULL | → `nexet_video_projects.id` |
 | role | text NOT NULL | `VIDEO` \| `AUDIO` \| `SCRIPT` \| `THUMBNAIL` |
 | pitch | text NOT NULL | Captain's description of the role/ask (zod: 10–2000 chars) |
 | status | text NOT NULL default `'OPEN'` | `OPEN` → `FILLED` (hire landed) or `CLOSED` (Captain closed; may reopen) |
@@ -114,12 +114,12 @@ All new tables use the `tandem_` prefix and existing conventions (text PK `arena
 
 On fill, other OPEN posts on the same project for the same role are impossible by the partial index; other roles' posts may remain OPEN.
 
-### 6.2 `tandem_arena_applications` — one audition (new)
+### 6.2 `nexet_arena_applications` — one audition (new)
 
 | Column | Type | Notes |
 |---|---|---|
 | id | text PK | `arenaapp_…` |
-| post_id | text NOT NULL | → `tandem_arena_posts.id` |
+| post_id | text NOT NULL | → `nexet_arena_posts.id` |
 | project_id | text NOT NULL | denormalized from post (read-gate + member add need it) |
 | role | text NOT NULL | denormalized snapshot of the post's role |
 | applicant_id | text NOT NULL | Clerk user id |
@@ -130,12 +130,12 @@ On fill, other OPEN posts on the same project for the same role are impossible b
 | created_at / updated_at | timestamptz | |
 | UNIQUE partial | | `(post_id, applicant_id)` where `status = 'PENDING'` — one pending audition per user per post (409 on dupes) |
 
-### 6.3 `tandem_arena_application_files` — uploaded supporting documents (new)
+### 6.3 `nexet_arena_application_files` — uploaded supporting documents (new)
 
 | Column | Type | Notes |
 |---|---|---|
 | id | text PK | `arenafile_…` |
-| application_id | text NOT NULL | → `tandem_arena_applications.id` |
+| application_id | text NOT NULL | → `nexet_arena_applications.id` |
 | file_name / mime_type / size_bytes | | metadata for the list UI |
 | storage_key | text NOT NULL | multer file name inside `uploadDir()/arena/<application_id>/` |
 | created_at | timestamptz | |
@@ -144,11 +144,11 @@ Caps (v1): up to **3 files per application**, each ≤ **15 MB** (CV precedent),
 
 ### 6.4 Access (no new table)
 
-Arena read access is **derived**: a signed-in creator may open a project in the Arena read-only window while that project has at least one `OPEN` `tandem_arena_posts` row. Implemented in `resolveProjectAccess` (`video/access.ts`) as a new `applicant` kind — it broadens the existing *read* paths for the same endpoints PUBLIC viewers already use (project detail, assets list/proxy, preview/timeline/activity). Writes keep using `requireMember`-style checks, so an Arena viewer can never mutate anything. Membership/ownership semantics are unchanged.
+Arena read access is **derived**: a signed-in creator may open a project in the Arena read-only window while that project has at least one `OPEN` `nexet_arena_posts` row. Implemented in `resolveProjectAccess` (`video/access.ts`) as a new `applicant` kind — it broadens the existing *read* paths for the same endpoints PUBLIC viewers already use (project detail, assets list/proxy, preview/timeline/activity). Writes keep using `requireMember`-style checks, so an Arena viewer can never mutate anything. Membership/ownership semantics are unchanged.
 
 ### 6.5 Live applicant count (derived, no new column)
 
-Every post surfaces how many people have already applied for that role on that project. The count is **derived, never stored**: `COUNT(*)` over `tandem_arena_applications` for the post filtered to `status = 'PENDING'` (the people currently auditioning). Semantics:
+Every post surfaces how many people have already applied for that role on that project. The count is **derived, never stored**: `COUNT(*)` over `nexet_arena_applications` for the post filtered to `status = 'PENDING'` (the people currently auditioning). Semantics:
 
 - While the post is OPEN it shows the number of PENDING auditions — it goes **up the moment a new application lands** and **down when an audition is rejected or withdrawn** (that person is no longer auditioning). It is deliberately not "total applications ever", so the number always means *competing right now*.
 - When the post is FILLED the count is replaced by the accepted hire's name ("Role filled by …"); when it is CLOSED it is not shown as a live figure.
@@ -156,7 +156,7 @@ Every post surfaces how many people have already applied for that role on that p
 
 The list/detail endpoints compute it in the same query (correlated count), so board cards, the post header, and the Captain view never drift. Realtime/refetch keep it fresh (§9.4).
 
-### 6.6 `tandem_arena_watches` — role watch alerts (new)
+### 6.6 `nexet_arena_watches` — role watch alerts (new)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -168,7 +168,7 @@ The list/detail endpoints compute it in the same query (correlated count), so bo
 
 At most one active watch per (user, role, channel-or-global) — enforced in the route (lookup first, 409 on exact duplicate). When an OPEN post is created, matching watchers are notified once per post (excluding the poster and anyone already applied to that post).
 
-### 6.7 `tandem_arena_reviews` — mutual work reviews after a hire (new)
+### 6.7 `nexet_arena_reviews` — mutual work reviews after a hire (new)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -183,7 +183,7 @@ At most one active watch per (user, role, channel-or-global) — enforced in the
 
 Reviews exist only once the application is ACCEPTED (the hire happened); the Captain may review the hired applicant and the applicant may review the Captain. Received reviews are public on the profile page with project + role context.
 
-### 6.8 `tandem_arena_blocks` — per-Captain applicant blocks (new)
+### 6.8 `nexet_arena_blocks` — per-Captain applicant blocks (new)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -213,13 +213,13 @@ Blocking does not change any existing application status — it only stops the b
 
 1. **CMS bottom card row (`/creators-den/`)** — a new section below the channel grid/unlinked projects, e.g. a "More rooms" card row whose first card is **Collaboration / Audition Arena**: "Post an open role on your channel's project, or audition for one. Preview the project, apply with your message and docs — the Captain decides." Opens `/creators-den/arena`.
 2. **Channel project (Vault) "Post an open role" action** — Captain-only card/action on the project (next to Members & roles) that opens the post composer pre-bound to that project/channel, then jumps to the Arena post.
-3. **Tandem category page `/categories/content-creators`** — a second doorway card beside "Open Creators Den" (e.g. "Audition Arena — open roles across Creator Den") linking to `/creators-den/arena`, so the category page surfaces the collaboration system.
+3. **Nexet category page `/categories/content-creators`** — a second doorway card beside "Open Creators Den" (e.g. "Audition Arena — open roles across Creator Den") linking to `/creators-den/arena`, so the category page surfaces the collaboration system.
 
 ### 7.3 Arena UI states
 
-- Board: loading / empty (no open roles) / error; role filter chips (`All`, Video, Audio, Script, Thumbnail) each with a **watch bell** toggle; each card shows channel avatar + name, project name, role tag, Captain name, pitch excerpt, a **live applicant count chip** ("N already applied" — zero-state copy: "Be the first to audition"), posted-ago, and an **already-applied** state (CTA turns into "Application sent · pending" and the count chip reads "You + N"). Controls above the list: **sort** (`Newest`, `Most auditions`) and a **"From people you follow first"** toggle (orders posts whose Captain the viewer follows via `tandem_video_follows`).
+- Board: loading / empty (no open roles) / error; role filter chips (`All`, Video, Audio, Script, Thumbnail) each with a **watch bell** toggle; each card shows channel avatar + name, project name, role tag, Captain name, pitch excerpt, a **live applicant count chip** ("N already applied" — zero-state copy: "Be the first to audition"), posted-ago, and an **already-applied** state (CTA turns into "Application sent · pending" and the count chip reads "You + N"). Controls above the list: **sort** (`Newest`, `Most auditions`) and a **"From people you follow first"** toggle (orders posts whose Captain the viewer follows via `nexet_video_follows`).
 - Post detail (audition view): sticky role header with the **live applicant count** under the role ("N creators have already applied for this role" / "Be the first to audition for this role"), pitch, project + channel summary (read-only info already public on the post), and actions: **Preview project** (opens the read-only window — anyone, while OPEN), **Apply for this role** (opens the modal; hidden/locked once applied, once the user is already a member of that project, or if it's the user's own post), **Share** (copies the post link), and **Watch <role> auditions** (per-role or per-role-on-this-channel bell). The count increments live when a new application lands and after this user's own submit ("You + N"); an applied user sees a **Withdraw** action.
-- Post detail (Captain view): status controls (Close / Reopen), a **stats row** ("N auditioning now · M total applications"), and the application list — each card shows applicant avatar + name + Tandem ID, message, uploaded document chips (open/download), **View portfolio** (→ `/profile/:userId`), and **Accept** / **Reject** with confirm; decided cards show their outcome + timestamp; PENDING cards offer a quiet **Block applicant** action; withdrawn applications render as "Withdrawn"; post fill state banner ("Role filled by <name> — remaining auditions were declined").
+- Post detail (Captain view): status controls (Close / Reopen), a **stats row** ("N auditioning now · M total applications"), and the application list — each card shows applicant avatar + name + Nexet ID, message, uploaded document chips (open/download), **View portfolio** (→ `/profile/:userId`), and **Accept** / **Reject** with confirm; decided cards show their outcome + timestamp; PENDING cards offer a quiet **Block applicant** action; withdrawn applications render as "Withdrawn"; post fill state banner ("Role filled by <name> — remaining auditions were declined").
 - My Auditions (applicant): grouped status tabs (Pending / Accepted / Declined / Withdrawn), each row shows the post, role, project/channel, date, documents, and **Withdraw** for PENDING rows with confirm.
 - Read-only preview window: identical to today's PUBLIC read-only (shell shows Timeline + Preview only, "Read only" tag), plus a slim "Audition preview — apply for the <role> role" banner linking back to the post when the viewer got in through an OPEN post. The shell `readOnly` computation and `LegacyProjectGate` switch on the access kind returned by the project detail endpoint rather than on `visibility` alone (§10).
 
@@ -288,7 +288,7 @@ New module `artifacts/api-server/src/routes/arena.ts` (registered in `routes/ind
 
 ### 9.1 Posts
 
-- `GET /video/arena/posts` — OPEN posts across the platform; zod-validated query: `role?`, `channelId?`, `projectId?`, `sort=newest|most_applied`, `followed=1` (order posts from Captains the caller follows first — JOIN `tandem_video_follows` on `followingId = posted_by`), pagination. Each row: post + role + pitch excerpt + project name/status + channel branding + poster profile + **`applicantCount` (live count of PENDING auditions on the post — §6.5)** + caller's own application state (`myApplication: 'none' | 'pending' | 'accepted' | 'rejected'`). `?mine=1` → the caller's own posts (Captain) with `applicantCount` plus `totalApplications` for the stats row.
+- `GET /video/arena/posts` — OPEN posts across the platform; zod-validated query: `role?`, `channelId?`, `projectId?`, `sort=newest|most_applied`, `followed=1` (order posts from Captains the caller follows first — JOIN `nexet_video_follows` on `followingId = posted_by`), pagination. Each row: post + role + pitch excerpt + project name/status + channel branding + poster profile + **`applicantCount` (live count of PENDING auditions on the post — §6.5)** + caller's own application state (`myApplication: 'none' | 'pending' | 'accepted' | 'rejected'`). `?mine=1` → the caller's own posts (Captain) with `applicantCount` plus `totalApplications` for the stats row.
 - `GET /video/arena/posts/:postId` — full post, including **`applicantCount`** (and, for the Captain, `totalApplications`) computed in the same query. Public fields always; if caller is the Captain, includes the application list payload (§9.2) shape or a flag + the Captain view fetches applications separately.
 - `POST /video/arena/posts` — body `{ projectId, role, pitch }`. Authorization: project exists, `project.channelId != null`, `project.ownerId === caller`, channel `ownerId === caller`; role ∈ CONTENT_ROLES; duplicate OPEN post → 409. Writes an activity event.
 - `PATCH /video/arena/posts/:postId` — Captain only: `{ status: 'CLOSED' | 'OPEN' }` (close/reopen) and/or pitch edits while OPEN.
@@ -298,7 +298,7 @@ New module `artifacts/api-server/src/routes/arena.ts` (registered in `routes/ind
 - `POST /video/arena/posts/:postId/applications` — **multipart** (`multer`): field `message` + up to 3 `files`. Authorization: post OPEN; caller not the Captain of the project; caller not an ACTIVE member of the project; no existing PENDING application (409); caller under the per-week cap (429, §8.8); caller not blocked by this Captain (403). Writes the application + file rows, `notify()`s the Captain (`video_arena_applied`, deep link to the post's Captain view), streams `notification.new`, records activity.
 - `GET /video/arena/posts/:postId/applications` — Captain only; returns applications (any status, newest first) with `resolveUserProfiles` name/avatar, message, file metadata, decision metadata.
 - `GET /video/arena/applications/:applicationId` — the applicant themself or the Captain.
-- `POST /video/arena/applications/:applicationId/accept` — Captain only, PENDING only (409 otherwise). Transaction: application → ACCEPTED (+decidedBy/decidedAt) → post → FILLED → remaining PENDING on the post → REJECTED → insert/merge `tandem_video_members` with `roles: [role]` (ACTIVE) → `ensureChannelEditor(channelId, applicant)` → `recordVideoActivity` → notify applicant (`video_arena_accepted`, deep link to the now-member channel-scoped project) + notify auto-declined applicants (`video_arena_rejected`, "This audition was filled") → realtime. Returns the accepted application + member summary.
+- `POST /video/arena/applications/:applicationId/accept` — Captain only, PENDING only (409 otherwise). Transaction: application → ACCEPTED (+decidedBy/decidedAt) → post → FILLED → remaining PENDING on the post → REJECTED → insert/merge `nexet_video_members` with `roles: [role]` (ACTIVE) → `ensureChannelEditor(channelId, applicant)` → `recordVideoActivity` → notify applicant (`video_arena_accepted`, deep link to the now-member channel-scoped project) + notify auto-declined applicants (`video_arena_rejected`, "This audition was filled") → realtime. Returns the accepted application + member summary.
 - `POST /video/arena/applications/:applicationId/reject` — Captain only, PENDING only → REJECTED + notify applicant (`video_arena_rejected`).
 - `GET /video/arena/applications/:applicationId/files/:fileId` — stream a stored document (applicant or Captain only; mimetype + content-disposition from the row).
 - `GET /video/arena/applications/mine` — the caller's own applications across every post (any status, newest first) for **My Auditions**; never another user's rows.
@@ -306,7 +306,7 @@ New module `artifacts/api-server/src/routes/arena.ts` (registered in `routes/ind
 - `GET /video/arena/watches` · `POST /video/arena/watches` (`{ role, channelId? }`) · `DELETE /video/arena/watches/:watchId` — self-scoped watch management; duplicate watch → 409.
 - `POST /video/arena/posts` additionally fans out: after insert, notify every matching watch owner (`video_arena_watch`) except the poster and anyone who already applied to that post.
 - `POST /video/arena/applications/:applicationId/review` — body `{ rating: 1..5, note }`; only the two participants of an ACCEPTED application, once each per application (409 on duplicates). Reviewer/reviewee derived from actor vs applicant (Captain → hired applicant, or hired applicant → Captain).
-- `POST /video/arena/applications/:applicationId/block` — Captain only: creates a `tandem_arena_blocks` row; application status is untouched; the blocked user gets 403 on future applies to this Captain's posts.
+- `POST /video/arena/applications/:applicationId/block` — Captain only: creates a `nexet_arena_blocks` row; application status is untouched; the blocked user gets 403 on future applies to this Captain's posts.
 
 ### 9.3 Access widening (`video/access.ts`)
 
@@ -316,7 +316,7 @@ New module `artifacts/api-server/src/routes/arena.ts` (registered in `routes/ind
 
 ### 9.4 Events, notifications, realtime
 
-New `tandem_video_notifications` categories (added to `CATEGORY_META` in creators-den and `CREATORS_META` in tandem `notice-meta.ts`):
+New `nexet_video_notifications` categories (added to `CATEGORY_META` in creators-den and `CREATORS_META` in nexet `notice-meta.ts`):
 
 | Category | Recipient | Label / tone | Deep link |
 |---|---|---|---|
@@ -369,7 +369,7 @@ Additional rules:
 ### 11.1 Contract and data layer
 
 - Regenerate `@workspace/api-zod` / `@workspace/api-client-react` after the OpenAPI additions; use the generated hooks (`useListArenaPosts`, `useCreateArenaPost`, `useGetArenaPost`, `useApplyArenaPost` (multipart), `useListArenaApplications`, `useAcceptArenaApplication`, `useRejectArenaApplication`, `useGetArenaApplicationFile`, `useListMyArenaApplications`, `useWithdrawArenaApplication`, `useListArenaWatches`/`useCreateArenaWatch`/`useDeleteArenaWatch`, `useCreateArenaReview`, `useBlockArenaApplicant`, and a `useListArenaReviews(userId)` for profiles). No hand-rolled fetch except where the codebase already does it.
-- Add arena rows to the creators-den notifications `CATEGORY_META` and tandem `CREATORS_META`.
+- Add arena rows to the creators-den notifications `CATEGORY_META` and nexet `CREATORS_META`.
 
 ### 11.2 Pages and components
 
@@ -382,7 +382,7 @@ Additional rules:
 - Share (copy-link) affordance and watch toggle on `pages/arena-post.tsx`; watch bell states on role chips.
 - `components/work-reviews-card.tsx` — renders received reviews (rating, note, project, role, reviewer) on the public profile page (`pages/profile.tsx`), with an empty state.
 - CMS "More rooms" card row on `pages/cms.tsx`; Vault "Post an open role" action on `pages/vault.tsx` (Captain only); Arena notch in the shell when on `/arena…`.
-- `content-creators.tsx` (Tandem) — second doorway card to the Arena.
+- `content-creators.tsx` (Nexet) — second doorway card to the Arena.
 - Read-only window: update `LegacyProjectGate` + `CreatorsShell` to key the read-only/allow path off `project.viewerAccess` (`public` or `applicant`) instead of `visibility === 'PUBLIC'` alone; applicant banner linking back to the post; the flat path already renders the correct read-only tab set.
 - Role/status labels reuse `ROLE_LABELS`/`rolesLabel`; empty states copy follows existing tone.
 
@@ -464,7 +464,7 @@ Loading, empty, error, closed/filled, already-applied, own-post, already-member,
 ### Phase 3 — Frontend: Arena pages + apply modal
 - [x] Arena board + post detail (audition & Captain views) with the apply modal and live applicant-count chips.
 - [x] Post composer modal (`PostArenaRoleModal`) wired to the Vault post action.
-- [x] CMS doorway card row, Vault post action, Tandem category doorway card.
+- [x] CMS doorway card row, Vault post action, Nexet category doorway card.
 - [x] Board "Post an open role" CTA (channel + project picker → composer).
 - [x] My Auditions page (`/arena/mine`) with status tabs and withdraw, linked from the board.
 - [x] Share links (copy-link on the post page), role watch bells (board role chips + post-page two-scope watch menu), Arena notch in the shell on `/arena…`.
@@ -472,7 +472,7 @@ Loading, empty, error, closed/filled, already-applied, own-post, already-member,
 ### Phase 4 — Read-only preview window + notification meta
 - [x] `viewerAccess`-driven gate/shell changes + applicant banner. **Completed: `LegacyProjectGate` admits `viewerAccess` `'public'`/`'applicant'` to the flat read-only pages (PUBLIC visibility as fallback when the field is absent); `CreatorsShell` keys read-only off `viewerAccess !== 'member'` (member-role fallback), renders the accent “Audition preview” tag (vs “Read only”) and a slim `ArenaPreviewBanner` strip inside the window linking back to the open role post (self-hiding once no OPEN post remains); new `components/arena-preview-banner.tsx` + CSS. Server tests for `applicant` access pre-date this (Phases 1/2).**
 - [x] Work-reviews card on the public profile page (`pages/profile.tsx`). **Completed: new `components/work-reviews-card.tsx` renders received reviews (stars, note, role tag, project, reviewer link, date) with an empty state on the own/other profile rail; also implemented the missing `GET /video/arena/reviews` route (spec'd + codegen'd but never server-side) with tests, and fixed a latent 500 in the review POST (its zod response had grown required `reviewerImageUrl`/`projectName` that the route never hydrated). Composer included: `components/arena-review-modal.tsx` (star picker + note modal, `ReviewCta` with already-reviewed state) shown to the Captain on the FILLED post's accepted row and to the hired creator on the post page — mutual reviews are now creatable end-to-end (per §12.2 step 9).**
-- [x] Arena categories (`video_arena_withdrawn/watch/reviewed` included) in both notification metadata maps; activity events; realtime keep-fresh. **Completed: all seven `video_arena_*` categories added to creators-den `CATEGORY_META` and tandem `CREATORS_META` with the §9.4 tones/labels. Activity events (`arena_post_opened/closed/filled`, `arena_application_rejected`) were already recorded server-side (§12.1 covers them). Realtime keep-fresh: `useRealtimeNotifications` now invalidates the board posts list + My Auditions on every `notification.new` (arena events stream as per-user notifications); refetch-on-focus covers non-participant browsers.**
+- [x] Arena categories (`video_arena_withdrawn/watch/reviewed` included) in both notification metadata maps; activity events; realtime keep-fresh. **Completed: all seven `video_arena_*` categories added to creators-den `CATEGORY_META` and nexet `CREATORS_META` with the §9.4 tones/labels. Activity events (`arena_post_opened/closed/filled`, `arena_application_rejected`) were already recorded server-side (§12.1 covers them). Realtime keep-fresh: `useRealtimeNotifications` now invalidates the board posts list + My Auditions on every `notification.new` (arena events stream as per-user notifications); refetch-on-focus covers non-participant browsers.**
 
 ### Phase 5 — Verification and handoff
 - [x] Full route-test pass, workspace typecheck/build, §12.2 two-account walkthrough, checklist updated in this file. **Completed (automated): full api-server suite `pnpm test` → 357/357 across 25 files (arena 54/54); workspace `pnpm run typecheck` clean across libs + all 8 artifacts/scripts packages; workspace `pnpm run build` green (exit 0) for every package — note `mockup-sandbox`'s vite config requires `PORT` + `BASE_PATH` env vars, so run it as `PORT=5199 BASE_PATH=/ pnpm run build` in a bare shell. Still open: the interactive §12.2 two-account walkthrough against a running dev server (steps 1–10 above) — cannot be executed headlessly.**

@@ -1,7 +1,7 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { asc, desc, eq } from "drizzle-orm";
 import { clerkClient, getAuth } from "@clerk/express";
-import { db, tandemPromoCodesTable, tandemSubscriptionPlanSettingsTable, tandemSubscriptionsTable } from "@workspace/db";
+import { db, nexetPromoCodesTable, nexetSubscriptionPlanSettingsTable, nexetSubscriptionsTable } from "@workspace/db";
 import {
   CheckAdminProviderParams,
   CreateAdminPromoBody,
@@ -171,7 +171,7 @@ export function normalizePromoCode(raw: string): string {
   return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
-function promoView(promo: typeof tandemPromoCodesTable.$inferSelect) {
+function promoView(promo: typeof nexetPromoCodesTable.$inferSelect) {
   return {
     code: promo.code,
     kind: promo.kind,
@@ -188,8 +188,8 @@ function promoView(promo: typeof tandemPromoCodesTable.$inferSelect) {
 router.get("/admin/promos", requireAdmin, async (_req, res): Promise<void> => {
   const rows = await db
     .select()
-    .from(tandemPromoCodesTable)
-    .orderBy(asc(tandemPromoCodesTable.createdAt));
+    .from(nexetPromoCodesTable)
+    .orderBy(asc(nexetPromoCodesTable.createdAt));
   res.json(ListAdminPromosResponse.parse(rows.map(promoView)));
 });
 
@@ -210,9 +210,9 @@ router.post("/admin/promos", requireAdmin, async (req, res): Promise<void> => {
   }
 
   const [existing] = await db
-    .select({ code: tandemPromoCodesTable.code })
-    .from(tandemPromoCodesTable)
-    .where(eq(tandemPromoCodesTable.code, code))
+    .select({ code: nexetPromoCodesTable.code })
+    .from(nexetPromoCodesTable)
+    .where(eq(nexetPromoCodesTable.code, code))
     .limit(1);
   if (existing) {
     res.status(409).json({ error: `A promo code named ${code} already exists` });
@@ -220,7 +220,7 @@ router.post("/admin/promos", requireAdmin, async (req, res): Promise<void> => {
   }
 
   const [promo] = await db
-    .insert(tandemPromoCodesTable)
+    .insert(nexetPromoCodesTable)
     .values({
       code,
       kind: body.data.kind,
@@ -247,8 +247,8 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
 
   const [existing] = await db
     .select()
-    .from(tandemPromoCodesTable)
-    .where(eq(tandemPromoCodesTable.code, code))
+    .from(nexetPromoCodesTable)
+    .where(eq(nexetPromoCodesTable.code, code))
     .limit(1);
   if (!existing) {
     res.status(404).json({ error: "Promo code not found" });
@@ -263,7 +263,7 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
   }
 
   const [promo] = await db
-    .update(tandemPromoCodesTable)
+    .update(nexetPromoCodesTable)
     .set({
       kind: body.data.kind,
       value: Math.max(0, body.data.value),
@@ -273,7 +273,7 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
       ...(typeof body.data.active === "boolean" ? { active: body.data.active } : {}),
       expiresAt: body.data.expiresAt ? new Date(body.data.expiresAt) : null,
     })
-    .where(eq(tandemPromoCodesTable.code, code))
+    .where(eq(nexetPromoCodesTable.code, code))
     .returning();
   res.json(UpdateAdminPromoResponse.parse(promoView(promo)));
 });
@@ -281,15 +281,15 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
 router.delete("/admin/promos/:code", requireAdmin, async (req, res): Promise<void> => {
   const code = normalizePromoCode(String(req.params.code ?? ""));
   const [existing] = await db
-    .select({ code: tandemPromoCodesTable.code })
-    .from(tandemPromoCodesTable)
-    .where(eq(tandemPromoCodesTable.code, code))
+    .select({ code: nexetPromoCodesTable.code })
+    .from(nexetPromoCodesTable)
+    .where(eq(nexetPromoCodesTable.code, code))
     .limit(1);
   if (!existing) {
     res.status(404).json({ error: "Promo code not found" });
     return;
   }
-  await db.delete(tandemPromoCodesTable).where(eq(tandemPromoCodesTable.code, code));
+  await db.delete(nexetPromoCodesTable).where(eq(nexetPromoCodesTable.code, code));
   res.json(DeleteAdminPromoResponse.parse({ deleted: true }));
 });
 
@@ -326,10 +326,10 @@ router.patch("/admin/plan-settings/:kind/:planId", requireAdmin, async (req, res
   }
 
   await db
-    .insert(tandemSubscriptionPlanSettingsTable)
+    .insert(nexetSubscriptionPlanSettingsTable)
     .values({ kind, planId, autoRenewAvailable: body.data.autoRenewAvailable })
     .onConflictDoUpdate({
-      target: [tandemSubscriptionPlanSettingsTable.kind, tandemSubscriptionPlanSettingsTable.planId],
+      target: [nexetSubscriptionPlanSettingsTable.kind, nexetSubscriptionPlanSettingsTable.planId],
       set: { autoRenewAvailable: body.data.autoRenewAvailable, updatedAt: new Date() },
     });
 
@@ -347,7 +347,7 @@ router.patch("/admin/plan-settings/:kind/:planId", requireAdmin, async (req, res
 // (besides the per-plan setting) that can turn it off.
 // ---------------------------------------------------------------------------
 
-function adminSubscriptionView(row: typeof tandemSubscriptionsTable.$inferSelect) {
+function adminSubscriptionView(row: typeof nexetSubscriptionsTable.$inferSelect) {
   return {
     id: row.id,
     userId: row.userId,
@@ -393,8 +393,8 @@ async function resolveUserEmails(userIds: string[]): Promise<Map<string, string>
 router.get("/admin/subscriptions", requireAdmin, async (_req, res): Promise<void> => {
   const rows = await db
     .select()
-    .from(tandemSubscriptionsTable)
-    .orderBy(desc(tandemSubscriptionsTable.createdAt));
+    .from(nexetSubscriptionsTable)
+    .orderBy(desc(nexetSubscriptionsTable.createdAt));
   const emails = await resolveUserEmails(rows.map((row) => row.userId));
   res.json(
     ListAdminSubscriptionsResponse.parse(
@@ -413,8 +413,8 @@ router.patch("/admin/subscriptions/:id/auto-renew", requireAdmin, async (req, re
 
   const [sub] = await db
     .select()
-    .from(tandemSubscriptionsTable)
-    .where(eq(tandemSubscriptionsTable.id, params.data.id))
+    .from(nexetSubscriptionsTable)
+    .where(eq(nexetSubscriptionsTable.id, params.data.id))
     .limit(1);
   if (!sub) {
     res.status(404).json({ error: "Subscription not found" });
@@ -449,13 +449,13 @@ router.patch("/admin/subscriptions/:id/auto-renew", requireAdmin, async (req, re
   }
 
   const [updated] = await db
-    .update(tandemSubscriptionsTable)
+    .update(nexetSubscriptionsTable)
     .set({
       autoRenew: body.data.enabled,
       renewalFailure: body.data.enabled ? null : sub.renewalFailure,
       updatedAt: new Date(),
     })
-    .where(eq(tandemSubscriptionsTable.id, params.data.id))
+    .where(eq(nexetSubscriptionsTable.id, params.data.id))
     .returning();
 
   const emails = await resolveUserEmails([updated.userId]);

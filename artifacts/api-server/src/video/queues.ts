@@ -1,14 +1,14 @@
 // ---------------------------------------------------------------------------
 // BullMQ + Redis worker fleet (blueprint §6 / §9).
 //
-// The Postgres `tandem_video_jobs` row stays the source of truth for job state
+// The Postgres `nexet_video_jobs` row stays the source of truth for job state
 // (the API reads it for GET /jobs); BullMQ becomes the claim/dispatch layer
 // with retries, backoff, and progress events — exactly what the worker comment
 // promised: "BullMQ/Redis simply becomes the claim layer and the processors
 // below move into the worker image unchanged."
 //
 //   - One queue per job type (blueprint rule 1: one job type → one queue →
-//     one worker image). Queue names: `tandem-video-<type>`.
+//     one worker image). Queue names: `nexet-video-<type>`.
 //   - Enqueue (API process): insert the row, then `add()` with `jobId` = the
 //     row id, so BullMQ jobs map 1:1 to DB rows and retries re-claim the same
 //     row (idempotent — outputs are written as new AssetFile rows).
@@ -26,8 +26,8 @@ import { Queue, QueueEvents, Worker, type Job } from "bullmq";
 import IORedis from "ioredis";
 import {
   db,
-  tandemVideoJobsTable,
-  type TandemVideoJob,
+  nexetVideoJobsTable,
+  type NexetVideoJob,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
@@ -127,7 +127,7 @@ export function attachQueueEventBridge(): void {
   );
 }
 
-export type JobProcessor = (job: TandemVideoJob) => Promise<void>;
+export type JobProcessor = (job: NexetVideoJob) => Promise<void>;
 
 /**
  * Creates a BullMQ Worker per queue. Each worker claims the DB row by id,
@@ -145,8 +145,8 @@ export function createBullMqWorkers(
       async (bullJob: Job<unknown>) => {
         const [row] = await db
           .select()
-          .from(tandemVideoJobsTable)
-          .where(eq(tandemVideoJobsTable.id, bullJob.id as string))
+          .from(nexetVideoJobsTable)
+          .where(eq(nexetVideoJobsTable.id, bullJob.id as string))
           .limit(1);
         if (!row) {
           throw new Error(`Job row ${String(bullJob.id)} no longer exists`);
