@@ -1,10 +1,10 @@
 import {
   db,
-  tandemChannelsTable,
-  tandemChannelMembersTable,
-  tandemVideoMembersTable,
-  tandemVideoProjectsTable,
-  type TandemChannelMember,
+  nexetChannelsTable,
+  nexetChannelMembersTable,
+  nexetVideoMembersTable,
+  nexetVideoProjectsTable,
+  type NexetChannelMember,
 } from "@workspace/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -25,14 +25,14 @@ import { randomUUID } from "node:crypto";
 export async function channelMembership(
   channelId: string,
   userId: string,
-): Promise<TandemChannelMember | null> {
+): Promise<NexetChannelMember | null> {
   const [row] = await db
     .select()
-    .from(tandemChannelMembersTable)
+    .from(nexetChannelMembersTable)
     .where(
       and(
-        eq(tandemChannelMembersTable.channelId, channelId),
-        eq(tandemChannelMembersTable.userId, userId),
+        eq(nexetChannelMembersTable.channelId, channelId),
+        eq(nexetChannelMembersTable.userId, userId),
       ),
     )
     .limit(1);
@@ -44,8 +44,8 @@ export async function ensureChannelEditor(channelId: string, userId: string): Pr
   if (!channelId || !userId) return;
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, channelId))
     .limit(1);
   if (!channel) return;
   // The channel owner already has their OWNER row — never duplicate it.
@@ -55,7 +55,7 @@ export async function ensureChannelEditor(channelId: string, userId: string): Pr
   if (existing) return;
 
   try {
-    await db.insert(tandemChannelMembersTable).values({
+    await db.insert(nexetChannelMembersTable).values({
       id: randomUUID(),
       channelId,
       userId,
@@ -76,39 +76,39 @@ export async function syncChannelEditors(channelId: string): Promise<void> {
   if (!channelId) return;
   const editors = await db
     .select()
-    .from(tandemChannelMembersTable)
+    .from(nexetChannelMembersTable)
     .where(
       and(
-        eq(tandemChannelMembersTable.channelId, channelId),
-        eq(tandemChannelMembersTable.role, "EDITOR"),
+        eq(nexetChannelMembersTable.channelId, channelId),
+        eq(nexetChannelMembersTable.role, "EDITOR"),
       ),
     );
   if (editors.length === 0) return;
 
   const projects = await db
-    .select({ id: tandemVideoProjectsTable.id })
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.channelId, channelId));
+    .select({ id: nexetVideoProjectsTable.id })
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.channelId, channelId));
   if (projects.length === 0) {
     // No projects left in the channel — every editor loses their card.
     await db
-      .delete(tandemChannelMembersTable)
+      .delete(nexetChannelMembersTable)
       .where(
         and(
-          eq(tandemChannelMembersTable.channelId, channelId),
-          eq(tandemChannelMembersTable.role, "EDITOR"),
+          eq(nexetChannelMembersTable.channelId, channelId),
+          eq(nexetChannelMembersTable.role, "EDITOR"),
         ),
       );
     return;
   }
 
   const activeRows = await db
-    .select({ userId: tandemVideoMembersTable.userId })
-    .from(tandemVideoMembersTable)
+    .select({ userId: nexetVideoMembersTable.userId })
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        inArray(tandemVideoMembersTable.projectId, projects.map((p) => p.id)),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        inArray(nexetVideoMembersTable.projectId, projects.map((p) => p.id)),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     );
   const activeUserIds = new Set(activeRows.map((r) => r.userId));
@@ -116,10 +116,10 @@ export async function syncChannelEditors(channelId: string): Promise<void> {
   if (orphaned.length === 0) return;
 
   await db
-    .delete(tandemChannelMembersTable)
+    .delete(nexetChannelMembersTable)
     .where(
       inArray(
-        tandemChannelMembersTable.id,
+        nexetChannelMembersTable.id,
         orphaned.map((e) => e.id),
       ),
     );

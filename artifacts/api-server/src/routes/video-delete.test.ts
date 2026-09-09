@@ -6,10 +6,10 @@ import os from "node:os";
 import path from "node:path";
 import { eq } from "drizzle-orm";
 import { _setStore, type ObjectStore } from "../video/object-storage";
-import { tandemUid } from "../lib/tandem-uid";
+import { nexetUid } from "../lib/nexet-uid";
 
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "video-delete-test-"));
-process.env.TANDEM_MEDIA_DEMO = "1";
+process.env.NEXET_MEDIA_DEMO = "1";
 
 const state = vi.hoisted(() => ({
   userId: null as string | null,
@@ -97,21 +97,21 @@ const fake = new FakeR2Store();
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoJobsTable);
-  await state.db.delete(t.tandemVideoAssetFilesTable);
-  await state.db.delete(t.tandemVideoAssetsTable);
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
+  await state.db.delete(t.nexetVideoJobsTable);
+  await state.db.delete(t.nexetVideoAssetFilesTable);
+  await state.db.delete(t.nexetVideoAssetsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
   fake.objects.clear();
 }
 
 let seedCounter = 0;
 async function seedProject(owner = "owner-1") {
   const t = state.tables;
-  const projectId = tandemUid(`p${seedCounter}`);
+  const projectId = nexetUid(`p${seedCounter}`);
   seedCounter += 1;
-  await state.db.insert(t.tandemVideoProjectsTable).values({ id: projectId, ownerId: owner, name: "Proj" });
-  await state.db.insert(t.tandemVideoMembersTable).values({ id: tandemUid(`m${seedCounter}`), projectId, userId: owner, roles: ["CAPTAIN"] });
+  await state.db.insert(t.nexetVideoProjectsTable).values({ id: projectId, ownerId: owner, name: "Proj" });
+  await state.db.insert(t.nexetVideoMembersTable).values({ id: nexetUid(`m${seedCounter}`), projectId, userId: owner, roles: ["CAPTAIN"] });
   return projectId;
 }
 
@@ -140,18 +140,18 @@ describe("asset delete reclaims storage", () => {
   it("removes the asset rows and its R2 objects but not a local blob another asset shares", async () => {
     const t = state.tables;
     const projectId = await seedProject();
-    const assetA = tandemUid(`a${seedCounter++}`);
-    const assetB = tandemUid(`b${seedCounter++}`);
+    const assetA = nexetUid(`a${seedCounter++}`);
+    const assetB = nexetUid(`b${seedCounter++}`);
 
     // Asset A owns the R2 original + proxy. Asset B reuses A's LOCAL blob
     // (content-addressed: same storageKey, no own file rows).
-    await state.db.insert(t.tandemVideoAssetsTable).values([
+    await state.db.insert(t.nexetVideoAssetsTable).values([
       { id: assetA, projectId, uploaderId: "owner-1", kind: "RAW_VIDEO", fileName: "a.mp4", mimeType: "video/mp4", sizeBytes: 10, storageKey: "raw/shared.mp4", storageProvider: "local", contentHash: "hash-a", status: "PROCESSED" },
       { id: assetB, projectId, uploaderId: "owner-1", kind: "RAW_VIDEO", fileName: "b.mp4", mimeType: "video/mp4", sizeBytes: 10, storageKey: "raw/shared.mp4", storageProvider: "local", contentHash: "hash-b", status: "PROCESSED" },
     ]);
-    await state.db.insert(t.tandemVideoAssetFilesTable).values([
-      { id: tandemUid("f"), assetId: assetA, kind: "ORIGINAL", storageKey: "originals/a.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 10 },
-      { id: tandemUid("f2"), assetId: assetA, kind: "PROXY", storageKey: "proxies/a.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 4 },
+    await state.db.insert(t.nexetVideoAssetFilesTable).values([
+      { id: nexetUid("f"), assetId: assetA, kind: "ORIGINAL", storageKey: "originals/a.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 10 },
+      { id: nexetUid("f2"), assetId: assetA, kind: "PROXY", storageKey: "proxies/a.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 4 },
     ]);
     writeLocal("raw/shared.mp4");
     seedObject(projectId, "originals/a.mp4");
@@ -161,9 +161,9 @@ describe("asset delete reclaims storage", () => {
     expect(res.status).toBe(204);
 
     // Rows gone.
-    const assets = await state.db.select().from(t.tandemVideoAssetsTable).where(eq(t.tandemVideoAssetsTable.id, assetA));
+    const assets = await state.db.select().from(t.nexetVideoAssetsTable).where(eq(t.nexetVideoAssetsTable.id, assetA));
     expect(assets).toHaveLength(0);
-    const fileRows = await state.db.select().from(t.tandemVideoAssetFilesTable).where(eq(t.tandemVideoAssetFilesTable.assetId, assetA));
+    const fileRows = await state.db.select().from(t.nexetVideoAssetFilesTable).where(eq(t.nexetVideoAssetFilesTable.assetId, assetA));
     expect(fileRows).toHaveLength(0);
 
     // A's R2 objects reclaimed; the shared local blob survives for B.
@@ -175,9 +175,9 @@ describe("asset delete reclaims storage", () => {
   it("denies a non-uploader, non-captain member", async () => {
     const t = state.tables;
     const projectId = await seedProject();
-    await state.db.insert(t.tandemVideoMembersTable).values({ id: tandemUid(`mv${seedCounter++}`), projectId, userId: "viewer-1", roles: ["VIEWER"] });
-    const assetId = tandemUid(`a${seedCounter++}`);
-    await state.db.insert(t.tandemVideoAssetsTable).values({ id: assetId, projectId, uploaderId: "owner-1", kind: "RAW_VIDEO", fileName: "a.mp4", mimeType: "video/mp4", sizeBytes: 1, storageKey: "raw/a.mp4", storageProvider: "local", status: "UPLOADED" });
+    await state.db.insert(t.nexetVideoMembersTable).values({ id: nexetUid(`mv${seedCounter++}`), projectId, userId: "viewer-1", roles: ["VIEWER"] });
+    const assetId = nexetUid(`a${seedCounter++}`);
+    await state.db.insert(t.nexetVideoAssetsTable).values({ id: assetId, projectId, uploaderId: "owner-1", kind: "RAW_VIDEO", fileName: "a.mp4", mimeType: "video/mp4", sizeBytes: 1, storageKey: "raw/a.mp4", storageProvider: "local", status: "UPLOADED" });
 
     state.userId = "viewer-1";
     const res = await request(API).delete(`/api/video/projects/${projectId}/assets/${assetId}`);
@@ -190,9 +190,9 @@ describe("project delete wipes the project's R2 prefix", () => {
     const t = state.tables;
     const projectA = await seedProject("owner-1");
     const projectB = await seedProject("owner-1");
-    const assetA = tandemUid(`a${seedCounter++}`);
-    await state.db.insert(t.tandemVideoAssetsTable).values({ id: assetA, projectId: projectA, uploaderId: "owner-1", kind: "RAW_VIDEO", fileName: "a.mp4", mimeType: "video/mp4", sizeBytes: 10, storageKey: "raw/a.mp4", storageProvider: "local", contentHash: "h", status: "PROCESSED" });
-    await state.db.insert(t.tandemVideoAssetFilesTable).values({ id: tandemUid(`f${seedCounter++}`), assetId: assetA, kind: "PROXY", storageKey: "proxies/a.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 4 });
+    const assetA = nexetUid(`a${seedCounter++}`);
+    await state.db.insert(t.nexetVideoAssetsTable).values({ id: assetA, projectId: projectA, uploaderId: "owner-1", kind: "RAW_VIDEO", fileName: "a.mp4", mimeType: "video/mp4", sizeBytes: 10, storageKey: "raw/a.mp4", storageProvider: "local", contentHash: "h", status: "PROCESSED" });
+    await state.db.insert(t.nexetVideoAssetFilesTable).values({ id: nexetUid(`f${seedCounter++}`), assetId: assetA, kind: "PROXY", storageKey: "proxies/a.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 4 });
     writeLocal("raw/a.mp4");
     seedObject(projectA, "proxies/a.mp4");
     seedObject(projectB, "proxies/b.mp4");

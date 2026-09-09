@@ -1,9 +1,9 @@
 import { getAuth } from "@clerk/express";
 import {
   db,
-  tandemVideoProjectsTable,
-  tandemVideoMembersTable,
-  tandemVideoFollowsTable,
+  nexetVideoProjectsTable,
+  nexetVideoMembersTable,
+  nexetVideoFollowsTable,
   collaborationActivityEventsTable,
 } from "@workspace/db";
 import {
@@ -70,11 +70,11 @@ export async function resolveFollowState(
   if (viewerId === targetId) return null;
   const [row] = await db
     .select()
-    .from(tandemVideoFollowsTable)
+    .from(nexetVideoFollowsTable)
     .where(
       and(
-        eq(tandemVideoFollowsTable.followerId, viewerId),
-        eq(tandemVideoFollowsTable.followingId, targetId),
+        eq(nexetVideoFollowsTable.followerId, viewerId),
+        eq(nexetVideoFollowsTable.followingId, targetId),
       ),
     )
     .limit(1);
@@ -84,12 +84,12 @@ export async function resolveFollowState(
 export async function getFollowCounts(targetId: string) {
   const followers = await db
     .select()
-    .from(tandemVideoFollowsTable)
-    .where(eq(tandemVideoFollowsTable.followingId, targetId));
+    .from(nexetVideoFollowsTable)
+    .where(eq(nexetVideoFollowsTable.followingId, targetId));
   const following = await db
     .select()
-    .from(tandemVideoFollowsTable)
-    .where(eq(tandemVideoFollowsTable.followerId, targetId));
+    .from(nexetVideoFollowsTable)
+    .where(eq(nexetVideoFollowsTable.followerId, targetId));
   return {
     followerCount: followers.length,
     followingCount: following.length,
@@ -110,8 +110,8 @@ router.get("/video/explore/creators", async (req, res): Promise<void> => {
   // All public projects → the owners and the active members are "creators".
   const publicProjects = await db
     .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.visibility, "PUBLIC"));
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.visibility, "PUBLIC"));
 
   const publicProjectIds = publicProjects.map((p) => p.id);
 
@@ -131,12 +131,12 @@ router.get("/video/explore/creators", async (req, res): Promise<void> => {
 
   if (publicProjectIds.length > 0) {
     const memberships = await db
-      .select({ projectId: tandemVideoMembersTable.projectId, userId: tandemVideoMembersTable.userId })
-      .from(tandemVideoMembersTable)
+      .select({ projectId: nexetVideoMembersTable.projectId, userId: nexetVideoMembersTable.userId })
+      .from(nexetVideoMembersTable)
       .where(
         and(
-          inArray(tandemVideoMembersTable.projectId, publicProjectIds),
-          eq(tandemVideoMembersTable.status, "ACTIVE"),
+          inArray(nexetVideoMembersTable.projectId, publicProjectIds),
+          eq(nexetVideoMembersTable.status, "ACTIVE"),
         ),
       );
     for (const m of memberships) {
@@ -188,9 +188,9 @@ router.get("/video/explore/projects", async (req, res): Promise<void> => {
 
   const projects = await db
     .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.visibility, "PUBLIC"))
-    .orderBy(desc(tandemVideoProjectsTable.updatedAt));
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.visibility, "PUBLIC"))
+    .orderBy(desc(nexetVideoProjectsTable.updatedAt));
 
   const ownerIds = [...new Set(projects.map((p) => p.ownerId))];
   const profiles = await resolveUserProfiles(ownerIds);
@@ -270,17 +270,17 @@ router.post(
     // idempotent — if already following, just return state.
     const [existing] = await db
       .select()
-      .from(tandemVideoFollowsTable)
+      .from(nexetVideoFollowsTable)
       .where(
         and(
-          eq(tandemVideoFollowsTable.followerId, viewerId),
-          eq(tandemVideoFollowsTable.followingId, targetId),
+          eq(nexetVideoFollowsTable.followerId, viewerId),
+          eq(nexetVideoFollowsTable.followingId, targetId),
         ),
       )
       .limit(1);
 
     if (!existing) {
-      await db.insert(tandemVideoFollowsTable).values({
+      await db.insert(nexetVideoFollowsTable).values({
         id: randomUUID(),
         followerId: viewerId,
         followingId: targetId,
@@ -320,11 +320,11 @@ router.delete(
     }
 
     await db
-      .delete(tandemVideoFollowsTable)
+      .delete(nexetVideoFollowsTable)
       .where(
         and(
-          eq(tandemVideoFollowsTable.followerId, viewerId),
-          eq(tandemVideoFollowsTable.followingId, targetId),
+          eq(nexetVideoFollowsTable.followerId, viewerId),
+          eq(nexetVideoFollowsTable.followingId, targetId),
         ),
       );
 
@@ -352,12 +352,12 @@ async function listFollowUsers(
     kind === "followers"
       ? await db
           .select()
-          .from(tandemVideoFollowsTable)
-          .where(eq(tandemVideoFollowsTable.followingId, targetId))
+          .from(nexetVideoFollowsTable)
+          .where(eq(nexetVideoFollowsTable.followingId, targetId))
       : await db
           .select()
-          .from(tandemVideoFollowsTable)
-          .where(eq(tandemVideoFollowsTable.followerId, targetId));
+          .from(nexetVideoFollowsTable)
+          .where(eq(nexetVideoFollowsTable.followerId, targetId));
 
   const theirIds = [
     ...new Set(rows.map((r) => (kind === "followers" ? r.followerId : r.followingId))),
@@ -438,9 +438,9 @@ router.get(
 
     // Public project ids the user owns or participates in.
     const publicProjects = await db
-      .select({ id: tandemVideoProjectsTable.id })
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.visibility, "PUBLIC"));
+      .select({ id: nexetVideoProjectsTable.id })
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.visibility, "PUBLIC"));
 
     const publicProjectIds = publicProjects.map((p) => p.id);
     if (publicProjectIds.length === 0) {

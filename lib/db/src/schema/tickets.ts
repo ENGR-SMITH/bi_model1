@@ -2,13 +2,13 @@ import { createInsertSchema } from "drizzle-zod";
 import { boolean, integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
-// TANDEM category passes — the ticket 🎫 paywall. Each available category
+// NEXET category passes — the ticket 🎫 paywall. Each available category
 // (authors, content-creators) requires an active pass: $5.88 / month (billed
 // monthly by Paystack). One pass per (user, category); renewing extends the
 // current pass when it is still active. FREE promo codes grant a free month.
 // ---------------------------------------------------------------------------
 
-export const tandemTicketsTable = pgTable("tandem_tickets", {
+export const nexetTicketsTable = pgTable("nexet_tickets", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   // authors | content-creators
@@ -24,13 +24,13 @@ export const tandemTicketsTable = pgTable("tandem_tickets", {
 });
 
 // ---------------------------------------------------------------------------
-// TANDEM category tours — the one-time 10-minute preview a new visitor gets
+// NEXET category tours — the one-time 10-minute preview a new visitor gets
 // in a den before buying that category's pass. One row per (user, category)
 // ever: granting the tour twice is impossible, so once the 10 minutes are up
 // the only way back in is an active pass.
 // ---------------------------------------------------------------------------
 
-export const tandemToursTable = pgTable("tandem_tours", {
+export const nexetToursTable = pgTable("nexet_tours", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   // authors | content-creators (each den has its own independent tour)
@@ -39,7 +39,7 @@ export const tandemToursTable = pgTable("tandem_tours", {
   endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
 });
 
-export const tandemPromoCodesTable = pgTable("tandem_promo_codes", {
+export const nexetPromoCodesTable = pgTable("nexet_promo_codes", {
   code: text("code").primaryKey(),
   // FREE (waive the fee) | PERCENT (percent off) | FLAT (cents off)
   kind: text("kind").notNull(),
@@ -62,8 +62,8 @@ export const tandemPromoCodesTable = pgTable("tandem_promo_codes", {
 // code the caller has already redeemed.
 // ---------------------------------------------------------------------------
 
-export const tandemPromoRedemptionsTable = pgTable(
-  "tandem_promo_redemptions",
+export const nexetPromoRedemptionsTable = pgTable(
+  "nexet_promo_redemptions",
   {
     code: text("code").notNull(),
     userId: text("user_id").notNull(),
@@ -72,12 +72,12 @@ export const tandemPromoRedemptionsTable = pgTable(
   (table) => [primaryKey({ columns: [table.code, table.userId] })],
 );
 
-export const insertTandemTicketSchema = createInsertSchema(tandemTicketsTable);
-export const insertTandemPromoCodeSchema = createInsertSchema(tandemPromoCodesTable);
-export const insertTandemPromoRedemptionSchema = createInsertSchema(tandemPromoRedemptionsTable);
-export const insertTandemTourSchema = createInsertSchema(tandemToursTable);
+export const insertNexetTicketSchema = createInsertSchema(nexetTicketsTable);
+export const insertNexetPromoCodeSchema = createInsertSchema(nexetPromoCodesTable);
+export const insertNexetPromoRedemptionSchema = createInsertSchema(nexetPromoRedemptionsTable);
+export const insertNexetTourSchema = createInsertSchema(nexetToursTable);
 
-export type TandemTicket = typeof tandemTicketsTable.$inferSelect;
-export type TandemPromoCode = typeof tandemPromoCodesTable.$inferSelect;
-export type TandemPromoRedemption = typeof tandemPromoRedemptionsTable.$inferSelect;
-export type TandemTour = typeof tandemToursTable.$inferSelect;
+export type NexetTicket = typeof nexetTicketsTable.$inferSelect;
+export type NexetPromoCode = typeof nexetPromoCodesTable.$inferSelect;
+export type NexetPromoRedemption = typeof nexetPromoRedemptionsTable.$inferSelect;
+export type NexetTour = typeof nexetToursTable.$inferSelect;

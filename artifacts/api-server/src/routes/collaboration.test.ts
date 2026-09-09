@@ -76,7 +76,7 @@ async function resetDb() {
   await state.db.delete(t.continuationSubmissionsTable);
   await state.db.delete(t.seedApplicationsTable);
   await state.db.delete(t.collaborationSeedsTable);
-  await state.db.delete(t.tandemVideoFollowsTable);
+  await state.db.delete(t.nexetVideoFollowsTable);
   state.userId = null;
 }
 
@@ -258,7 +258,7 @@ describe("authorization", () => {
 });
 
 describe("acceptance and contract transactions", () => {
-  it("declining archives a continuation without creating a Tandem", async () => {
+  it("declining archives a continuation without creating a Nexet", async () => {
     const seed = await publishSeed();
     await applyToSeed(seed.id, "writer-1");
     const application = await applyToSeed(seed.id, "writer-2");

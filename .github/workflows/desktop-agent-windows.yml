@@ -58,5 +58,5 @@ jobs:
       - name: Upload Windows installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tandem-desktop-agent-windows
+          name: nexet-desktop-agent-windows
           path: artifacts/desktop-agent/dist-bundle/*.exe

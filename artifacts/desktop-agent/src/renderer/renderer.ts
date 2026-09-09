@@ -1,7 +1,7 @@
 // NOTE: keep this file free of import/export. It's loaded as a plain <script>
 // tag (no bundler), so module syntax would make tsc emit a CommonJS wrapper
 // that crashes the page — `exports` is undefined in the browser. All types
-// (AgentSettings, JobProgress, window.tandemAgent, …) come from the ambient
+// (AgentSettings, JobProgress, window.nexetAgent, …) come from the ambient
 // globals.d.ts in this directory.
 
 const $ = (id: string): HTMLElement => document.getElementById(id)!;
@@ -47,7 +47,7 @@ function rolesErrorCopy(error?: string): string {
     return "That project no longer exists — pick another one.";
   }
   if (/fetch failed|ECONNREFUSED|ENOTFOUND|getaddrinfo|Failed to fetch/i.test(msg)) {
-    return "Can't reach the Tandem server — check that it's running, then re-pick the project.";
+    return "Can't reach the Nexet server — check that it's running, then re-pick the project.";
   }
   return msg.length > 0
     ? `${msg} — re-pick the project to retry.`
@@ -240,7 +240,7 @@ type WhoAmI = {
 };
 
 async function refreshWho() {
-  const who = (await window.tandemAgent.whoami()) as WhoAmI;
+  const who = (await window.nexetAgent.whoami()) as WhoAmI;
   signedIn = who.signedIn;
   const authCard = $("auth-card");
   const avatar = $("auth-avatar");
@@ -300,7 +300,7 @@ function closeSigninPanel(): void {
 
 async function beginSignIn(): Promise<void> {
   try {
-    const res = await window.tandemAgent.signInBegin();
+    const res = await window.nexetAgent.signInBegin();
     if (!res.ok) {
       setAuthNote(res.error ?? "Could not start sign-in.", "err");
       return;
@@ -317,13 +317,13 @@ async function beginSignIn(): Promise<void> {
 // fresh token without the user doing anything beyond letting the tab open.
 async function beginAutoReSignIn(): Promise<void> {
   try {
-    const res = await window.tandemAgent.signInBegin();
+    const res = await window.nexetAgent.signInBegin();
     if (!res.ok) {
       setAuthNote(res.error ?? "Could not start sign-in.", "err");
       return;
     }
     openSigninPanel(res.url);
-    const opened = await window.tandemAgent.openExternal(res.url);
+    const opened = await window.nexetAgent.openExternal(res.url);
     if (!opened.ok) {
       setAuthNote("Your fresh sign-in link is ready — click Open in browser.", "err");
     }
@@ -346,7 +346,7 @@ async function loadChannels(): Promise<void> {
   all.textContent = "All channels";
   ch.appendChild(all);
   try {
-    const list = (await window.tandemAgent.listChannels()) as Array<{
+    const list = (await window.nexetAgent.listChannels()) as Array<{
       id: string;
       name: string | null;
       youtubeTitle: string | null;
@@ -379,7 +379,7 @@ async function loadProjects(): Promise<void> {
   projectRoles = { status: "idle" };
   chosenFile = null;
   try {
-    const projects = (await window.tandemAgent.listProjects(chId || undefined)) as Array<{
+    const projects = (await window.nexetAgent.listProjects(chId || undefined)) as Array<{
       id: string;
       name: string;
     }>;
@@ -421,7 +421,7 @@ async function preselectProject(projectId: string): Promise<void> {
   if (pendingLaunchProjectId) return; // a previous hand-off is still resolving
   pendingLaunchProjectId = projectId;
   try {
-    const detail = (await window.tandemAgent.projectRoles(projectId)) as { channelId: string | null };
+    const detail = (await window.nexetAgent.projectRoles(projectId)) as { channelId: string | null };
     const wanted = detail?.channelId ?? "";
     const ch = $("channel") as HTMLSelectElement;
     const onAListedChannel = wanted === "" || Boolean(ch.querySelector(`option[value="${wanted}"]`));
@@ -502,7 +502,7 @@ async function loadRolesFor(projectId: string): Promise<void> {
   projectRoles = { status: "loading" };
   renderRoles();
   try {
-    const res = await window.tandemAgent.projectRoles(projectId);
+    const res = await window.nexetAgent.projectRoles(projectId);
     projectRoles = { status: "ready", roles: Array.isArray(res?.myRoles) ? res.myRoles : [] };
   } catch (err) {
     projectRoles = { status: "error", error: (err as Error)?.message ?? "" };
@@ -590,7 +590,7 @@ async function adoptPath(filePath: string | null | undefined): Promise<void> {
     setFileChip();
     return;
   }
-  const info = await window.tandemAgent.fileInfo(filePath);
+  const info = await window.nexetAgent.fileInfo(filePath);
   if (!info) {
     setStatus("That file could not be read — pick another one.", "err");
     return;
@@ -630,7 +630,7 @@ function wireDropzone(): void {
       return;
     }
     // The OS picker only offers the extensions this member's roles allow.
-    void window.tandemAgent.pickFile(allowedExtensions()).then((p) => adoptPath(p));
+    void window.nexetAgent.pickFile(allowedExtensions()).then((p) => adoptPath(p));
   };
   dz.addEventListener("click", openPicker);
   dz.addEventListener("keydown", (e) => {
@@ -652,7 +652,7 @@ function wireDropzone(): void {
     const file = e.dataTransfer?.files?.[0];
     if (!file) return;
     // Electron: resolve the dropped File back to its real absolute path.
-    const filePath = window.tandemAgent.droppedFilePath(file);
+    const filePath = window.nexetAgent.droppedFilePath(file);
     void adoptPath(filePath || null);
   });
 }
@@ -721,7 +721,7 @@ async function runUpload() {
   btn.textContent = "Submitting…";
   const note = ($("upload-note") as HTMLTextAreaElement).value.trim();
   try {
-    const result = await window.tandemAgent.uploadRaw({
+    const result = await window.nexetAgent.uploadRaw({
       projectId,
       localFile: chosenFile.path,
       note,
@@ -777,7 +777,7 @@ function handleUpdate(u: UpdateEvent) {
       status.className = "err";
       status.textContent = `Update check failed: ${u.error ?? "unknown error"}`;
       if (/enotfound|getaddrinfo|404/i.test(u.error ?? "")) {
-        status.textContent += " — point TANDEM_UPDATE_URL at your release feed (see README).";
+        status.textContent += " — point NEXET_UPDATE_URL at your release feed (see README).";
       }
       break;
   }
@@ -803,7 +803,7 @@ async function syncWidgetSettings(s: AgentSettings) {
 
 async function loadWidgetSettings() {
   try {
-    await syncWidgetSettings(await window.tandemAgent.getSettings());
+    await syncWidgetSettings(await window.nexetAgent.getSettings());
   } catch {
     // preload not ready — settings card stays inert
   }
@@ -818,7 +818,7 @@ function initListeners() {
   // Browser sign-in link panel
   $("copy-link").addEventListener("click", async () => {
     if (!pendingSignInUrl) return;
-    const res = await window.tandemAgent.copyText(pendingSignInUrl);
+    const res = await window.nexetAgent.copyText(pendingSignInUrl);
     if (res.ok) {
       const btn = $("copy-link");
       btn.textContent = "Copied ✓";
@@ -830,19 +830,19 @@ function initListeners() {
 
   $("open-browser").addEventListener("click", async () => {
     if (!pendingSignInUrl) return;
-    const res = await window.tandemAgent.openExternal(pendingSignInUrl);
+    const res = await window.nexetAgent.openExternal(pendingSignInUrl);
     if (!res.ok) {
       setAuthNote(res.error ?? "Could not open the browser.", "err");
     }
   });
 
   $("cancel-signin").addEventListener("click", async () => {
-    await window.tandemAgent.signInCancel();
+    await window.nexetAgent.signInCancel();
     closeSigninPanel();
   });
 
   // Main process reports when the browser page finished (or the link expired).
-  window.tandemAgent.onAuthEvent(async (evt) => {
+  window.nexetAgent.onAuthEvent(async (evt) => {
     if (evt.type === "signed-in") {
       closeSigninPanel();
       setAuthNote("Signed in.", "ok");
@@ -870,7 +870,7 @@ function initListeners() {
   });
 
   $("sign-out").addEventListener("click", async () => {
-    await window.tandemAgent.signOut();
+    await window.nexetAgent.signOut();
     chosenFile = null;
     setFileChip();
     setStatus("");
@@ -911,10 +911,10 @@ function initListeners() {
   // Auto-update
   $("update-btn").addEventListener("click", async () => {
     if (updateReady) {
-      await window.tandemAgent.installUpdate();
+      await window.nexetAgent.installUpdate();
       return;
     }
-    const res = await window.tandemAgent.checkUpdate();
+    const res = await window.nexetAgent.checkUpdate();
     if (!res.ok) {
       const status = $("update-status");
       status.className = "status";
@@ -927,7 +927,7 @@ function initListeners() {
   // video auto-show together (the main process keeps them in lockstep).
   ($("widget-enable") as HTMLInputElement).addEventListener("change", async () => {
     const enabled = ($("widget-enable") as HTMLInputElement).checked;
-    const s = await window.tandemAgent.setWidget({ widgetEnabled: enabled });
+    const s = await window.nexetAgent.setWidget({ widgetEnabled: enabled });
     await syncWidgetSettings(s);
   });
 }
@@ -937,11 +937,11 @@ function initListeners() {
 // ---------------------------------------------------------------------------
 async function checkConfig() {
   try {
-    const st = await window.tandemAgent.configStatus();
+    const st = await window.nexetAgent.configStatus();
     if (!st.clerkConfigured) {
       setAuthNote(
-        "Clerk publishable key is not configured. Create tandem-agent.json next to the app " +
-          "with { \"clerkPublishableKey\": \"pk_test_...\" } (or set TANDEM_CLERK_PUBLISHABLE_KEY) " +
+        "Clerk publishable key is not configured. Create nexet-agent.json next to the app " +
+          "with { \"clerkPublishableKey\": \"pk_test_...\" } (or set NEXET_CLERK_PUBLISHABLE_KEY) " +
           "and relaunch before signing in.",
         "err",
       );
@@ -957,10 +957,10 @@ async function checkConfig() {
 async function main() {
   initListeners();
   wireDropzone();
-  window.tandemAgent.onConfigError((msg) => setAuthNote(msg, "err"));
+  window.nexetAgent.onConfigError((msg) => setAuthNote(msg, "err"));
 
   try {
-    appInfo = await window.tandemAgent.appInfo();
+    appInfo = await window.nexetAgent.appInfo();
   } catch {
     // keep defaults
   }
@@ -978,12 +978,12 @@ async function main() {
     }
   }
 
-  window.tandemAgent.onJobProgress(handleProgress);
-  window.tandemAgent.onUpdateEvent(handleUpdate);
+  window.nexetAgent.onJobProgress(handleProgress);
+  window.nexetAgent.onUpdateEvent(handleUpdate);
 
   // Creator Den opened the app for an upload — preselect the project (and its
   // channel) and tell the user the hand-off worked.
-  window.tandemAgent.onLaunchContext((ctx) => {
+  window.nexetAgent.onLaunchContext((ctx) => {
     if (ctx.projectId) {
       void preselectProject(ctx.projectId);
     } else {

@@ -43,12 +43,12 @@ export type ArenaApplicationStatus = z.infer<typeof arenaApplicationStatusSchema
 // One open role on one channel project. A Captain (project owner, who owns the
 // channel) posts it; the partial unique index guarantees a single OPEN post
 // per (project, role) while FILLED/CLOSED rows do not block reopening.
-export const tandemArenaPostsTable = pgTable(
-  "tandem_arena_posts",
+export const nexetArenaPostsTable = pgTable(
+  "nexet_arena_posts",
   {
     id: text("id").primaryKey(), // arena_…
-    channelId: text("channel_id").notNull(), // → tandem_channels.id
-    projectId: text("project_id").notNull(), // → tandem_video_projects.id
+    channelId: text("channel_id").notNull(), // → nexet_channels.id
+    projectId: text("project_id").notNull(), // → nexet_video_projects.id
     role: text("role").notNull(), // VIDEO | AUDIO | SCRIPT | THUMBNAIL
     pitch: text("pitch").notNull(), // Captain's ask (zod: 10–2000 chars)
     // OPEN → FILLED | CLOSED
@@ -58,7 +58,7 @@ export const tandemArenaPostsTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    openProjectRoleUnique: uniqueIndex("tandem_arena_post_open_project_role_unique")
+    openProjectRoleUnique: uniqueIndex("nexet_arena_post_open_project_role_unique")
       .on(table.projectId, table.role)
       .where(sql`${table.status} = 'OPEN'`),
   }),
@@ -68,11 +68,11 @@ export const tandemArenaPostsTable = pgTable(
 // read-gate and the member-add on accept never need to re-join the post. The
 // partial unique index keeps a single PENDING application per (post,
 // applicant); a resolved row does not block the applicant applying again.
-export const tandemArenaApplicationsTable = pgTable(
-  "tandem_arena_applications",
+export const nexetArenaApplicationsTable = pgTable(
+  "nexet_arena_applications",
   {
     id: text("id").primaryKey(), // arenaapp_…
-    postId: text("post_id").notNull(), // → tandem_arena_posts.id
+    postId: text("post_id").notNull(), // → nexet_arena_posts.id
     projectId: text("project_id").notNull(), // denormalized from the post
     role: text("role").notNull(), // denormalized snapshot of the post's role
     applicantId: text("applicant_id").notNull(), // Clerk user id
@@ -86,11 +86,11 @@ export const tandemArenaApplicationsTable = pgTable(
   },
   (table) => ({
     pendingPostApplicantUnique: uniqueIndex(
-      "tandem_arena_application_pending_post_applicant_unique",
+      "nexet_arena_application_pending_post_applicant_unique",
     )
       .on(table.postId, table.applicantId)
       .where(sql`${table.status} = 'PENDING'`),
-    postApplicantIdx: index("tandem_arena_application_post_applicant_idx").on(
+    postApplicantIdx: index("nexet_arena_application_post_applicant_idx").on(
       table.postId,
       table.applicantId,
     ),
@@ -100,11 +100,11 @@ export const tandemArenaApplicationsTable = pgTable(
 // Supporting documents attached to an audition (≤3 files × ≤15 MB, allowlisted
 // MIME types). Metadata only; bytes live in the server upload dir under
 // `arena/<application_id>/` (multer/CV precedent in routes/account.ts).
-export const tandemArenaApplicationFilesTable = pgTable(
-  "tandem_arena_application_files",
+export const nexetArenaApplicationFilesTable = pgTable(
+  "nexet_arena_application_files",
   {
     id: text("id").primaryKey(), // arenafile_…
-    applicationId: text("application_id").notNull(), // → tandem_arena_applications.id
+    applicationId: text("application_id").notNull(), // → nexet_arena_applications.id
     fileName: text("file_name").notNull(),
     mimeType: text("mime_type").notNull().default("application/octet-stream"),
     // bigint for parity with vault assets; the 15 MB cap fits a 64-bit int.
@@ -113,7 +113,7 @@ export const tandemArenaApplicationFilesTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    applicationIdx: index("tandem_arena_application_file_application_idx").on(
+    applicationIdx: index("nexet_arena_application_file_application_idx").on(
       table.applicationId,
     ),
   }),
@@ -124,8 +124,8 @@ export const tandemArenaApplicationFilesTable = pgTable(
 // Postgres/SQLite treat NULLs as distinct in unique constraints, so a global
 // watch (channelId NULL) can repeat under a naive unique — the route enforces
 // at-most-one per (user, role, channel-or-global) before insert.
-export const tandemArenaWatchesTable = pgTable(
-  "tandem_arena_watches",
+export const nexetArenaWatchesTable = pgTable(
+  "nexet_arena_watches",
   {
     id: text("id").primaryKey(), // arenawatch_…
     userId: text("user_id").notNull(), // the watcher
@@ -135,7 +135,7 @@ export const tandemArenaWatchesTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    userIdx: index("tandem_arena_watch_user_idx").on(table.userId),
+    userIdx: index("nexet_arena_watch_user_idx").on(table.userId),
   }),
 );
 
@@ -143,8 +143,8 @@ export const tandemArenaWatchesTable = pgTable(
 // the Captain may review the hired applicant and the applicant may review the
 // Captain, once each per hire (unique per application + reviewer). Reviews are
 // public profile data rendered on the reviewee's Creator Den profile.
-export const tandemArenaReviewsTable = pgTable(
-  "tandem_arena_reviews",
+export const nexetArenaReviewsTable = pgTable(
+  "nexet_arena_reviews",
   {
     id: text("id").primaryKey(), // arenareview_…
     applicationId: text("application_id").notNull(), // → the ACCEPTED application
@@ -158,7 +158,7 @@ export const tandemArenaReviewsTable = pgTable(
   },
   (table) => ({
     applicationReviewerUnique: unique(
-      "tandem_arena_review_application_reviewer_unique",
+      "nexet_arena_review_application_reviewer_unique",
     ).on(table.applicationId, table.reviewerId),
   }),
 );
@@ -166,8 +166,8 @@ export const tandemArenaReviewsTable = pgTable(
 // Per-Captain applicant blocks (anti-spam). Blocking stops the user from
 // applying to any post by that Captain (403 at apply) and never mutates
 // existing application statuses. No global moderation in v1.
-export const tandemArenaBlocksTable = pgTable(
-  "tandem_arena_blocks",
+export const nexetArenaBlocksTable = pgTable(
+  "nexet_arena_blocks",
   {
     id: text("id").primaryKey(), // arenablock_…
     captainId: text("captain_id").notNull(), // the project/post owner who blocks
@@ -175,27 +175,27 @@ export const tandemArenaBlocksTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    captainApplicantUnique: unique("tandem_arena_block_captain_applicant_unique").on(
+    captainApplicantUnique: unique("nexet_arena_block_captain_applicant_unique").on(
       table.captainId,
       table.applicantId,
     ),
   }),
 );
 
-export const insertTandemArenaPostSchema = createInsertSchema(tandemArenaPostsTable);
-export const insertTandemArenaApplicationSchema = createInsertSchema(
-  tandemArenaApplicationsTable,
+export const insertNexetArenaPostSchema = createInsertSchema(nexetArenaPostsTable);
+export const insertNexetArenaApplicationSchema = createInsertSchema(
+  nexetArenaApplicationsTable,
 );
-export const insertTandemArenaApplicationFileSchema = createInsertSchema(
-  tandemArenaApplicationFilesTable,
+export const insertNexetArenaApplicationFileSchema = createInsertSchema(
+  nexetArenaApplicationFilesTable,
 );
-export const insertTandemArenaWatchSchema = createInsertSchema(tandemArenaWatchesTable);
-export const insertTandemArenaReviewSchema = createInsertSchema(tandemArenaReviewsTable);
-export const insertTandemArenaBlockSchema = createInsertSchema(tandemArenaBlocksTable);
+export const insertNexetArenaWatchSchema = createInsertSchema(nexetArenaWatchesTable);
+export const insertNexetArenaReviewSchema = createInsertSchema(nexetArenaReviewsTable);
+export const insertNexetArenaBlockSchema = createInsertSchema(nexetArenaBlocksTable);
 
-export type TandemArenaPost = typeof tandemArenaPostsTable.$inferSelect;
-export type TandemArenaApplication = typeof tandemArenaApplicationsTable.$inferSelect;
-export type TandemArenaApplicationFile = typeof tandemArenaApplicationFilesTable.$inferSelect;
-export type TandemArenaWatch = typeof tandemArenaWatchesTable.$inferSelect;
-export type TandemArenaReview = typeof tandemArenaReviewsTable.$inferSelect;
-export type TandemArenaBlock = typeof tandemArenaBlocksTable.$inferSelect;
+export type NexetArenaPost = typeof nexetArenaPostsTable.$inferSelect;
+export type NexetArenaApplication = typeof nexetArenaApplicationsTable.$inferSelect;
+export type NexetArenaApplicationFile = typeof nexetArenaApplicationFilesTable.$inferSelect;
+export type NexetArenaWatch = typeof nexetArenaWatchesTable.$inferSelect;
+export type NexetArenaReview = typeof nexetArenaReviewsTable.$inferSelect;
+export type NexetArenaBlock = typeof nexetArenaBlocksTable.$inferSelect;

@@ -5,7 +5,7 @@ import path from "node:path";
 import { eq } from "drizzle-orm";
 
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "storage-maint-test-"));
-process.env.TANDEM_MEDIA_DEMO = "1";
+process.env.NEXET_MEDIA_DEMO = "1";
 process.env.ORIGINAL_RETENTION_DAYS = "30";
 
 const state = vi.hoisted(() => ({
@@ -29,15 +29,15 @@ vi.mock("@workspace/db", async () => {
 import { runStorageMetering, runStorageRetention } from "./storage-maintenance";
 import { storageUsedBytes } from "./quota";
 import { localPathFor } from "./object-storage";
-import { tandemUid } from "../lib/tandem-uid";
+import { nexetUid } from "../lib/nexet-uid";
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemVideoAssetFilesTable);
-  await state.db.delete(t.tandemVideoAssetsTable);
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
-  await state.db.delete(t.tandemVideoStorageSnapshotsTable);
+  await state.db.delete(t.nexetVideoAssetFilesTable);
+  await state.db.delete(t.nexetVideoAssetsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
+  await state.db.delete(t.nexetVideoStorageSnapshotsTable);
 }
 
 beforeEach(resetDb);
@@ -52,14 +52,14 @@ function writeLocalFile(key: string, bytes: number): void {
 describe("storage metering snapshots", () => {
   it("records actual bytes per project, split r2 vs local, without double-counting ORIGINAL rows", async () => {
     const t = state.tables;
-    const projectId = tandemUid("p");
-    await state.db.insert(t.tandemVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering" });
+    const projectId = nexetUid("p");
+    await state.db.insert(t.nexetVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering" });
 
     // One asset: 1000-byte original (local disk) + 1000-byte durable R2 copy
     // (ORIGINAL row, should not double count) + 300-byte R2 proxy + 50-byte
     // local demo file.
-    const assetId = tandemUid("a");
-    await state.db.insert(t.tandemVideoAssetsTable).values({
+    const assetId = nexetUid("a");
+    await state.db.insert(t.nexetVideoAssetsTable).values({
       id: assetId,
       projectId,
       uploaderId: "captain-1",
@@ -72,10 +72,10 @@ describe("storage metering snapshots", () => {
       contentHash: "abc",
       status: "PROCESSED",
     });
-    await state.db.insert(t.tandemVideoAssetFilesTable).values([
-      { id: tandemUid("f1"), assetId, kind: "ORIGINAL", storageKey: "originals/durable.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 1000 },
-      { id: tandemUid("f2"), assetId, kind: "PROXY", storageKey: "proxies/p.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 300 },
-      { id: tandemUid("f3"), assetId, kind: "THUMBNAIL", storageKey: "proxies/t.jpg", storageProvider: "local", mimeType: "image/jpeg", sizeBytes: 50 },
+    await state.db.insert(t.nexetVideoAssetFilesTable).values([
+      { id: nexetUid("f1"), assetId, kind: "ORIGINAL", storageKey: "originals/durable.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 1000 },
+      { id: nexetUid("f2"), assetId, kind: "PROXY", storageKey: "proxies/p.mp4", storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 300 },
+      { id: nexetUid("f3"), assetId, kind: "THUMBNAIL", storageKey: "proxies/t.jpg", storageProvider: "local", mimeType: "image/jpeg", sizeBytes: 50 },
     ]);
 
     const recorded = await runStorageMetering("2026-09-03");
@@ -83,8 +83,8 @@ describe("storage metering snapshots", () => {
 
     const [snap] = await state.db
       .select()
-      .from(t.tandemVideoStorageSnapshotsTable)
-      .where(eq(t.tandemVideoStorageSnapshotsTable.projectId, projectId));
+      .from(t.nexetVideoStorageSnapshotsTable)
+      .where(eq(t.nexetVideoStorageSnapshotsTable.projectId, projectId));
     // Original (1000) counted once via the asset row; ORIGINAL row skipped;
     // proxy 300 r2 + thumbnail 50 local on top.
     expect(snap.r2Bytes).toBe(300);
@@ -94,23 +94,23 @@ describe("storage metering snapshots", () => {
 
   it("upserts idempotently for the same project/day", async () => {
     const t = state.tables;
-    const projectId = tandemUid("p");
-    await state.db.insert(t.tandemVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering2" });
+    const projectId = nexetUid("p");
+    await state.db.insert(t.nexetVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering2" });
     await runStorageMetering("2026-09-03");
     await runStorageMetering("2026-09-03");
-    const rows = await state.db.select().from(t.tandemVideoStorageSnapshotsTable).where(eq(t.tandemVideoStorageSnapshotsTable.projectId, projectId));
+    const rows = await state.db.select().from(t.nexetVideoStorageSnapshotsTable).where(eq(t.nexetVideoStorageSnapshotsTable.projectId, projectId));
     expect(rows).toHaveLength(1);
   });
 
   it("storageUsedBytes is LIVE: uploads after the nightly snapshot are counted immediately", async () => {
     const t = state.tables;
-    const projectId = tandemUid("p");
-    await state.db.insert(t.tandemVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering3" });
+    const projectId = nexetUid("p");
+    await state.db.insert(t.nexetVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering3" });
 
     // Night 1: 500 bytes stored → snapshot row says 500.
-    const assetId = tandemUid("a");
+    const assetId = nexetUid("a");
     const insertAsset = async (id: string, sizeBytes: number) => {
-      await state.db.insert(t.tandemVideoAssetsTable).values({
+      await state.db.insert(t.nexetVideoAssetsTable).values({
         id,
         projectId,
         uploaderId: "captain-1",
@@ -129,17 +129,17 @@ describe("storage metering snapshots", () => {
     // During the day the user uploads another 300 bytes. Even though the
     // snapshot still says 500, the gate must see 800 — otherwise they could
     // keep uploading past their quota until the next nightly run.
-    await insertAsset(tandemUid("a2"), 300);
+    await insertAsset(nexetUid("a2"), 300);
     expect(await storageUsedBytes([projectId])).toBe(800);
   });
 
   it("storageUsedBytes counts every owned project live, ignoring snapshots entirely", async () => {
     const t = state.tables;
-    const projectId = tandemUid("p");
-    await state.db.insert(t.tandemVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering4" });
-    const assetId = tandemUid("a");
+    const projectId = nexetUid("p");
+    await state.db.insert(t.nexetVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Metering4" });
+    const assetId = nexetUid("a");
     const insertAsset = async (id: string, sizeBytes: number) => {
-      await state.db.insert(t.tandemVideoAssetsTable).values({
+      await state.db.insert(t.nexetVideoAssetsTable).values({
         id,
         projectId,
         uploaderId: "captain-1",
@@ -153,8 +153,8 @@ describe("storage metering snapshots", () => {
       });
     };
     await insertAsset(assetId, 1000);
-    await state.db.insert(t.tandemVideoAssetFilesTable).values({
-      id: tandemUid("f"),
+    await state.db.insert(t.nexetVideoAssetFilesTable).values({
+      id: nexetUid("f"),
       assetId,
       kind: "ORIGINAL",
       storageKey: "originals/durable.mp4",
@@ -167,8 +167,8 @@ describe("storage metering snapshots", () => {
     // read must reflect the real current state: original 1000 (ORIGINAL row is
     // its mirror — not double counted) + r2 proxy 300 = 1300.
     await runStorageMetering("2026-09-01");
-    await state.db.insert(t.tandemVideoAssetFilesTable).values({
-      id: tandemUid("f2"),
+    await state.db.insert(t.nexetVideoAssetFilesTable).values({
+      id: nexetUid("f2"),
       assetId,
       kind: "PROXY",
       storageKey: "proxies/p.mp4",
@@ -183,11 +183,11 @@ describe("storage metering snapshots", () => {
 describe("storage retention sweep", () => {
   it("reclaims the local original only when a durable R2 copy AND a proxy exist", async () => {
     const t = state.tables;
-    const projectId = tandemUid("p");
-    await state.db.insert(t.tandemVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Retention" });
+    const projectId = nexetUid("p");
+    await state.db.insert(t.nexetVideoProjectsTable).values({ id: projectId, ownerId: "captain-1", name: "Retention" });
 
     const seed = async (assetId: string, daysOld: number, opts: { durable: boolean; proxy: boolean }) => {
-      await state.db.insert(t.tandemVideoAssetsTable).values({
+      await state.db.insert(t.nexetVideoAssetsTable).values({
         id: assetId,
         projectId,
         uploaderId: "captain-1",
@@ -204,20 +204,20 @@ describe("storage retention sweep", () => {
       writeLocalFile(`raw/${assetId}.mp4`, 500);
       const rows: any[] = [];
       if (opts.durable) {
-        rows.push({ id: tandemUid(`fo-${assetId.slice(-6)}`), assetId, kind: "ORIGINAL", storageKey: `originals/${assetId}.mp4`, storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 500 });
+        rows.push({ id: nexetUid(`fo-${assetId.slice(-6)}`), assetId, kind: "ORIGINAL", storageKey: `originals/${assetId}.mp4`, storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 500 });
       }
       if (opts.proxy) {
-        rows.push({ id: tandemUid(`fp-${assetId.slice(-6)}`), assetId, kind: "PROXY", storageKey: `proxies/${assetId}.mp4`, storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 200 });
+        rows.push({ id: nexetUid(`fp-${assetId.slice(-6)}`), assetId, kind: "PROXY", storageKey: `proxies/${assetId}.mp4`, storageProvider: "r2", mimeType: "video/mp4", sizeBytes: 200 });
       }
-      if (rows.length) await state.db.insert(t.tandemVideoAssetFilesTable).values(rows);
+      if (rows.length) await state.db.insert(t.nexetVideoAssetFilesTable).values(rows);
     };
 
-    const oldDurable = tandemUid("oldok");
-    const oldNoProxy = tandemUid("np");
-    const oldNoDurable = tandemUid("nd");
-    const freshDurable = tandemUid("fresh");
-    const oldShared = tandemUid("shared");
-    const sharer = tandemUid("sharer");
+    const oldDurable = nexetUid("oldok");
+    const oldNoProxy = nexetUid("np");
+    const oldNoDurable = nexetUid("nd");
+    const freshDurable = nexetUid("fresh");
+    const oldShared = nexetUid("shared");
+    const sharer = nexetUid("sharer");
     await seed(oldDurable, 40, { durable: true, proxy: true });
     await seed(oldNoProxy, 40, { durable: true, proxy: false });
     await seed(oldNoDurable, 40, { durable: false, proxy: true });
@@ -225,7 +225,7 @@ describe("storage retention sweep", () => {
     // oldShared's local blob is ALSO referenced by `sharer` (dedupe): even
     // though oldShared itself qualifies, the shared file must survive.
     await seed(oldShared, 40, { durable: true, proxy: true });
-    await state.db.insert(t.tandemVideoAssetsTable).values({
+    await state.db.insert(t.nexetVideoAssetsTable).values({
       id: sharer,
       projectId,
       uploaderId: "captain-1",

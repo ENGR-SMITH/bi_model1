@@ -11,16 +11,16 @@
   - fails the build if either Clerk key arg is missing,
   - builds the API bundle with `pnpm --filter @workspace/api-server run build`,
   - builds all four SPAs with the right `PORT` + `BASE_PATH` and the same Clerk key,
-  - copies the four built SPAs into `/srv/tandem/{root,authors-den,creators-den,oracle-admin}`,
+  - copies the four built SPAs into `/srv/nexet/{root,authors-den,creators-den,oracle-admin}`,
   - drops in `nginx.conf` and `entrypoint.sh`.
 - `artifacts/api-server/nginx.conf` + `entrypoint.sh` start Node on `127.0.0.1:3000` and nginx on `8080`; nginx serves the four SPAs by base path and proxies `/api` + `/socket.io` to Node.
 
 ### What changed in this session
 
-- `artifacts/tandem/vite.config.ts` — added `envPrefix: ['VITE_', 'CLERK_PUBLISHABLE_KEY']`.
+- `artifacts/nexet/vite.config.ts` — added `envPrefix: ['VITE_', 'CLERK_PUBLISHABLE_KEY']`.
 - `artifacts/authors-den/vite.config.ts` — added `envPrefix: ['VITE_', 'CLERK_PUBLISHABLE_KEY']`.
 - `artifacts/creators-den/vite.config.ts` — added `envPrefix: ['VITE_', 'CLERK_PUBLISHABLE_KEY']`, and chose `envPrefix` over `define` so `VITE_CREATORS_DEV_NO_AUTH` is never baked into the client bundle.
-- No per-app `.env` files are needed for Tandem / Author Den / Creator Den anymore — the Clerk publishable key now comes from the Dockerfile build arg/env.
+- No per-app `.env` files are needed for Nexet / Author Den / Creator Den anymore — the Clerk publishable key now comes from the Dockerfile build arg/env.
 
 ### What still has to be done before the service boots
 

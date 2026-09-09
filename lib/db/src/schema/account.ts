@@ -3,7 +3,7 @@ import { bigint, date, integer, pgTable, text, timestamp, unique } from "drizzle
 
 // ---------------------------------------------------------------------------
 // Account-level limits — the workspace storage bar (Creator Den) and the
-// project-count bar (Author Den). Each Tandem account starts with a free
+// project-count bar (Author Den). Each Nexet account starts with a free
 // quota (2 GB of project storage / 5 projects) and can extend it by buying a
 // plan; the applied limit lives here and grows as plans are purchased.
 // ---------------------------------------------------------------------------
@@ -14,8 +14,8 @@ import { bigint, date, integer, pgTable, text, timestamp, unique } from "drizzle
 // each project (and thus each owner account) actually stores — originals +
 // derived artifacts, split by storage provider (R2 vs local processing disk).
 // ---------------------------------------------------------------------------
-export const tandemVideoStorageSnapshotsTable = pgTable(
-  "tandem_video_storage_snapshots",
+export const nexetVideoStorageSnapshotsTable = pgTable(
+  "nexet_video_storage_snapshots",
   {
     projectId: text("project_id").notNull(),
     ownerId: text("owner_id").notNull(),
@@ -31,15 +31,15 @@ export const tandemVideoStorageSnapshotsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    projectDayUnique: unique("tandem_video_storage_snapshot_project_day").on(table.projectId, table.day),
+    projectDayUnique: unique("nexet_video_storage_snapshot_project_day").on(table.projectId, table.day),
   }),
 );
 
-export const insertTandemVideoStorageSnapshotSchema = createInsertSchema(tandemVideoStorageSnapshotsTable);
+export const insertNexetVideoStorageSnapshotSchema = createInsertSchema(nexetVideoStorageSnapshotsTable);
 
-export type TandemVideoStorageSnapshot = typeof tandemVideoStorageSnapshotsTable.$inferSelect;
+export type NexetVideoStorageSnapshot = typeof nexetVideoStorageSnapshotsTable.$inferSelect;
 
-export const tandemAccountQuotasTable = pgTable("tandem_account_quotas", {
+export const nexetAccountQuotasTable = pgTable("nexet_account_quotas", {
   userId: text("user_id").primaryKey(),
   // Total storage the account may hold across its owned projects, in bytes.
   // bigint (not integer): the free tier is 2 GB = 2^31, which does not fit in
@@ -52,7 +52,7 @@ export const tandemAccountQuotasTable = pgTable("tandem_account_quotas", {
 
 // A user's uploaded CV, served on their profile so other signed-in users can
 // open it. One CV per account; re-uploading replaces the previous file.
-export const tandemUserCvsTable = pgTable("tandem_user_cvs", {
+export const nexetUserCvsTable = pgTable("nexet_user_cvs", {
   userId: text("user_id").primaryKey(),
   fileName: text("file_name").notNull(),
   mimeType: text("mime_type").notNull().default("application/pdf"),
@@ -63,8 +63,8 @@ export const tandemUserCvsTable = pgTable("tandem_user_cvs", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const insertTandemAccountQuotaSchema = createInsertSchema(tandemAccountQuotasTable);
-export const insertTandemUserCvSchema = createInsertSchema(tandemUserCvsTable);
+export const insertNexetAccountQuotaSchema = createInsertSchema(nexetAccountQuotasTable);
+export const insertNexetUserCvSchema = createInsertSchema(nexetUserCvsTable);
 
-export type TandemAccountQuota = typeof tandemAccountQuotasTable.$inferSelect;
-export type TandemUserCv = typeof tandemUserCvsTable.$inferSelect;
+export type NexetAccountQuota = typeof nexetAccountQuotasTable.$inferSelect;
+export type NexetUserCv = typeof nexetUserCvsTable.$inferSelect;

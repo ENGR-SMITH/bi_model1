@@ -12,13 +12,13 @@ import {
 // ---------------------------------------------------------------------------
 // Content Creators — M1: the processing pipeline (proxies + transcripts), the
 // per-leg timeline with Git-style snapshots, submissions, timecode comments,
-// and the background job queue. All tables are prefixed `tandem_`.
+// and the background job queue. All tables are prefixed `nexet_`.
 // ---------------------------------------------------------------------------
 
 // Every physical artifact produced for an asset: ORIGINAL, PROXY, TRANSCRIPT,
 // AUDIO_STEM, THUMBNAIL, RENDER... The original is recorded at upload; workers
 // add the rest. Versioned like Git — raw upload is v0.
-export const tandemVideoAssetFilesTable = pgTable("tandem_video_asset_files", {
+export const nexetVideoAssetFilesTable = pgTable("nexet_video_asset_files", {
   id: text("id").primaryKey(),
   // Nullable — project-scoped artifacts (e.g. INTERCHANGE checkout bundles)
   // are not anchored to a single asset.
@@ -41,8 +41,8 @@ export const tandemVideoAssetFilesTable = pgTable("tandem_video_asset_files", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const tandemVideoTranscriptsTable = pgTable(
-  "tandem_video_transcripts",
+export const nexetVideoTranscriptsTable = pgTable(
+  "nexet_video_transcripts",
   {
     id: text("id").primaryKey(),
     assetId: text("asset_id").notNull(),
@@ -54,12 +54,12 @@ export const tandemVideoTranscriptsTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    assetUnique: unique("tandem_video_transcript_asset_unique").on(table.assetId),
+    assetUnique: unique("nexet_video_transcript_asset_unique").on(table.assetId),
   }),
 );
 
-export const tandemVideoTranscriptSegmentsTable = pgTable(
-  "tandem_video_transcript_segments",
+export const nexetVideoTranscriptSegmentsTable = pgTable(
+  "nexet_video_transcript_segments",
   {
     id: text("id").primaryKey(),
     transcriptId: text("transcript_id").notNull(),
@@ -73,8 +73,8 @@ export const tandemVideoTranscriptSegmentsTable = pgTable(
 
 // One timeline per leg (SELECTS | CUT | SOUND | FINISH). The working document
 // is the latest snapshot; every save creates a new TimelineVersion (Git-style).
-export const tandemVideoTimelinesTable = pgTable(
-  "tandem_video_timelines",
+export const nexetVideoTimelinesTable = pgTable(
+  "nexet_video_timelines",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
@@ -85,15 +85,15 @@ export const tandemVideoTimelinesTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    projectLegUnique: unique("tandem_video_timeline_project_leg").on(
+    projectLegUnique: unique("nexet_video_timeline_project_leg").on(
       table.projectId,
       table.leg,
     ),
   }),
 );
 
-export const tandemVideoTimelineVersionsTable = pgTable(
-  "tandem_video_timeline_versions",
+export const nexetVideoTimelineVersionsTable = pgTable(
+  "nexet_video_timeline_versions",
   {
     id: text("id").primaryKey(),
     timelineId: text("timeline_id").notNull(),
@@ -108,7 +108,7 @@ export const tandemVideoTimelineVersionsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    timelineVersionUnique: unique("tandem_video_timeline_version_unique").on(
+    timelineVersionUnique: unique("nexet_video_timeline_version_unique").on(
       table.timelineId,
       table.version,
     ),
@@ -117,7 +117,7 @@ export const tandemVideoTimelineVersionsTable = pgTable(
 
 // A leg's deliverable. Submit pins the current snapshot; the Captain approves
 // or rejects. DRAFT → SUBMITTED → APPROVED / REJECTED.
-export const tandemVideoSubmissionsTable = pgTable("tandem_video_submissions", {
+export const nexetVideoSubmissionsTable = pgTable("nexet_video_submissions", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   leg: text("leg").notNull(),
@@ -144,7 +144,7 @@ export const tandemVideoSubmissionsTable = pgTable("tandem_video_submissions", {
 // Project-wide chat: one row per message, visible to every active member of
 // the project (the Captain, the leg owners, and reviewers). Lightweight and
 // intentionally freeform — this is the crew room, not an annotation system.
-export const tandemVideoChatMessagesTable = pgTable("tandem_video_chat_messages", {
+export const nexetVideoChatMessagesTable = pgTable("nexet_video_chat_messages", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   authorId: text("author_id").notNull(),
@@ -158,7 +158,7 @@ export const tandemVideoChatMessagesTable = pgTable("tandem_video_chat_messages"
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const tandemVideoCommentsTable = pgTable("tandem_video_comments", {
+export const nexetVideoCommentsTable = pgTable("nexet_video_comments", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   leg: text("leg"),
@@ -185,8 +185,8 @@ export const tandemVideoCommentsTable = pgTable("tandem_video_comments", {
 // Multi-camera waveform sync pairs (M2). The Visual Editor pairs a primary
 // camera with a secondary angle (or dual-system audio); the sync worker
 // cross-correlates the waveforms and stores the offset in ms here.
-export const tandemVideoSyncsTable = pgTable(
-  "tandem_video_syncs",
+export const nexetVideoSyncsTable = pgTable(
+  "nexet_video_syncs",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
@@ -201,7 +201,7 @@ export const tandemVideoSyncsTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    syncPairUnique: unique("tandem_video_sync_pair_unique").on(
+    syncPairUnique: unique("nexet_video_sync_pair_unique").on(
       table.primaryAssetId,
       table.targetAssetId,
     ),
@@ -211,8 +211,8 @@ export const tandemVideoSyncsTable = pgTable(
 // Viral reference import (M4). A REFERENCE asset is transcribed and its
 // pacing structure extracted (scene changes + transcript section boundaries)
 // so the Architect can see the reference's beats side-by-side while cutting.
-export const tandemVideoReferencesTable = pgTable(
-  "tandem_video_references",
+export const nexetVideoReferencesTable = pgTable(
+  "nexet_video_references",
   {
     id: text("id").primaryKey(),
     assetId: text("asset_id").notNull(),
@@ -225,7 +225,7 @@ export const tandemVideoReferencesTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    referenceAssetUnique: unique("tandem_video_reference_asset_unique").on(table.assetId),
+    referenceAssetUnique: unique("nexet_video_reference_asset_unique").on(table.assetId),
   }),
 );
 
@@ -233,7 +233,7 @@ export const tandemVideoReferencesTable = pgTable(
 // every file version under one or more roles (or ALL roles) with a reason +
 // expiry; the grant bypasses the Lock while it's active. Revoking is instant
 // and logged alongside the download audit trail.
-export const tandemVideoGrantsTable = pgTable("tandem_video_grants", {
+export const nexetVideoGrantsTable = pgTable("nexet_video_grants", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   // JSON array of role strings, e.g. ["VIDEO", "AUDIO"] or ["ALL"].
@@ -246,9 +246,9 @@ export const tandemVideoGrantsTable = pgTable("tandem_video_grants", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// Tandem notifications (M4) — mirrors the parent's collaboration notifications
+// Nexet notifications (M4) — mirrors the parent's collaboration notifications
 // table so the room can reuse the same inbox conventions.
-export const tandemVideoNotificationsTable = pgTable("tandem_video_notifications", {
+export const nexetVideoNotificationsTable = pgTable("nexet_video_notifications", {
   id: text("id").primaryKey(),
   recipientId: text("recipient_id").notNull(),
   category: text("category").notNull(),
@@ -262,7 +262,7 @@ export const tandemVideoNotificationsTable = pgTable("tandem_video_notifications
 
 // The Lock release audit trail (M3). Every time a file is downloaded after
 // the Captain releases the lock, a row is written here — who, what, when.
-export const tandemVideoDownloadsTable = pgTable("tandem_video_downloads", {
+export const nexetVideoDownloadsTable = pgTable("nexet_video_downloads", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   fileId: text("file_id").notNull(),
@@ -276,7 +276,7 @@ export const tandemVideoDownloadsTable = pgTable("tandem_video_downloads", {
 // the row contract stays the same. `params` carries per-job inputs that are
 // not part of the row contract (e.g. { targetAssetId } for SYNC, { format }
 // for RENDER).
-export const tandemVideoJobsTable = pgTable("tandem_video_jobs", {
+export const nexetVideoJobsTable = pgTable("nexet_video_jobs", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   // Nullable — project/leg-scoped jobs (e.g. EXPORT_BUNDLE checkout) have no
@@ -294,35 +294,35 @@ export const tandemVideoJobsTable = pgTable("tandem_video_jobs", {
   finishedAt: timestamp("finished_at", { withTimezone: true }),
 });
 
-export const insertTandemVideoAssetFileSchema = createInsertSchema(tandemVideoAssetFilesTable);
-export const insertTandemVideoTranscriptSchema = createInsertSchema(tandemVideoTranscriptsTable);
-export const insertTandemVideoTranscriptSegmentSchema = createInsertSchema(tandemVideoTranscriptSegmentsTable);
-export const insertTandemVideoTimelineSchema = createInsertSchema(tandemVideoTimelinesTable);
-export const insertTandemVideoTimelineVersionSchema = createInsertSchema(tandemVideoTimelineVersionsTable);
-export const insertTandemVideoSubmissionSchema = createInsertSchema(tandemVideoSubmissionsTable);
-export const insertTandemVideoChatMessageSchema = createInsertSchema(tandemVideoChatMessagesTable);
-export const insertTandemVideoCommentSchema = createInsertSchema(tandemVideoCommentsTable);
-export const insertTandemVideoJobSchema = createInsertSchema(tandemVideoJobsTable);
-export const insertTandemVideoSyncSchema = createInsertSchema(tandemVideoSyncsTable);
-export const insertTandemVideoDownloadSchema = createInsertSchema(tandemVideoDownloadsTable);
-export const insertTandemVideoReferenceSchema = createInsertSchema(tandemVideoReferencesTable);
-export const insertTandemVideoGrantSchema = createInsertSchema(tandemVideoGrantsTable);
-export const insertTandemVideoNotificationSchema = createInsertSchema(tandemVideoNotificationsTable);
+export const insertNexetVideoAssetFileSchema = createInsertSchema(nexetVideoAssetFilesTable);
+export const insertNexetVideoTranscriptSchema = createInsertSchema(nexetVideoTranscriptsTable);
+export const insertNexetVideoTranscriptSegmentSchema = createInsertSchema(nexetVideoTranscriptSegmentsTable);
+export const insertNexetVideoTimelineSchema = createInsertSchema(nexetVideoTimelinesTable);
+export const insertNexetVideoTimelineVersionSchema = createInsertSchema(nexetVideoTimelineVersionsTable);
+export const insertNexetVideoSubmissionSchema = createInsertSchema(nexetVideoSubmissionsTable);
+export const insertNexetVideoChatMessageSchema = createInsertSchema(nexetVideoChatMessagesTable);
+export const insertNexetVideoCommentSchema = createInsertSchema(nexetVideoCommentsTable);
+export const insertNexetVideoJobSchema = createInsertSchema(nexetVideoJobsTable);
+export const insertNexetVideoSyncSchema = createInsertSchema(nexetVideoSyncsTable);
+export const insertNexetVideoDownloadSchema = createInsertSchema(nexetVideoDownloadsTable);
+export const insertNexetVideoReferenceSchema = createInsertSchema(nexetVideoReferencesTable);
+export const insertNexetVideoGrantSchema = createInsertSchema(nexetVideoGrantsTable);
+export const insertNexetVideoNotificationSchema = createInsertSchema(nexetVideoNotificationsTable);
 
-export type TandemVideoAssetFile = typeof tandemVideoAssetFilesTable.$inferSelect;
-export type TandemVideoSync = typeof tandemVideoSyncsTable.$inferSelect;
-export type TandemVideoDownload = typeof tandemVideoDownloadsTable.$inferSelect;
-export type TandemVideoReference = typeof tandemVideoReferencesTable.$inferSelect;
-export type TandemVideoGrant = typeof tandemVideoGrantsTable.$inferSelect;
-export type TandemVideoNotification = typeof tandemVideoNotificationsTable.$inferSelect;
-export type TandemVideoTranscript = typeof tandemVideoTranscriptsTable.$inferSelect;
-export type TandemVideoTranscriptSegment = typeof tandemVideoTranscriptSegmentsTable.$inferSelect;
-export type TandemVideoTimeline = typeof tandemVideoTimelinesTable.$inferSelect;
-export type TandemVideoTimelineVersion = typeof tandemVideoTimelineVersionsTable.$inferSelect;
-export type TandemVideoSubmission = typeof tandemVideoSubmissionsTable.$inferSelect;
-export type TandemVideoChatMessage = typeof tandemVideoChatMessagesTable.$inferSelect;
-export type TandemVideoComment = typeof tandemVideoCommentsTable.$inferSelect;
-export type TandemVideoJob = typeof tandemVideoJobsTable.$inferSelect;
+export type NexetVideoAssetFile = typeof nexetVideoAssetFilesTable.$inferSelect;
+export type NexetVideoSync = typeof nexetVideoSyncsTable.$inferSelect;
+export type NexetVideoDownload = typeof nexetVideoDownloadsTable.$inferSelect;
+export type NexetVideoReference = typeof nexetVideoReferencesTable.$inferSelect;
+export type NexetVideoGrant = typeof nexetVideoGrantsTable.$inferSelect;
+export type NexetVideoNotification = typeof nexetVideoNotificationsTable.$inferSelect;
+export type NexetVideoTranscript = typeof nexetVideoTranscriptsTable.$inferSelect;
+export type NexetVideoTranscriptSegment = typeof nexetVideoTranscriptSegmentsTable.$inferSelect;
+export type NexetVideoTimeline = typeof nexetVideoTimelinesTable.$inferSelect;
+export type NexetVideoTimelineVersion = typeof nexetVideoTimelineVersionsTable.$inferSelect;
+export type NexetVideoSubmission = typeof nexetVideoSubmissionsTable.$inferSelect;
+export type NexetVideoChatMessage = typeof nexetVideoChatMessagesTable.$inferSelect;
+export type NexetVideoComment = typeof nexetVideoCommentsTable.$inferSelect;
+export type NexetVideoJob = typeof nexetVideoJobsTable.$inferSelect;
 
 export const VIDEO_LEGS = ["SELECTS", "CUT", "SOUND", "FINISH", "THUMBNAIL"] as const;
 export type VideoLeg = (typeof VIDEO_LEGS)[number];

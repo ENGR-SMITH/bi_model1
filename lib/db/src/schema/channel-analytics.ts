@@ -55,8 +55,8 @@ export const analyticsReportKindSchema = z.enum([
 
 // Catalog of videos published on the linked YouTube channel, upserted by the
 // catalog sync. One row per (channel, youtube video).
-export const tandemChannelVideosTable = pgTable(
-  "tandem_channel_videos",
+export const nexetChannelVideosTable = pgTable(
+  "nexet_channel_videos",
   {
     id: text("id").primaryKey(), // chanvid_…
     channelId: text("channel_id").notNull(),
@@ -75,7 +75,7 @@ export const tandemChannelVideosTable = pgTable(
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    channelVideoUnique: unique("tandem_channel_video_channel_video").on(
+    channelVideoUnique: unique("nexet_channel_video_channel_video").on(
       table.channelId,
       table.youtubeVideoId,
     ),
@@ -83,8 +83,8 @@ export const tandemChannelVideosTable = pgTable(
 );
 
 // Channel-level daily metric snapshots (upserted, never deleted).
-export const tandemChannelDailyMetricsTable = pgTable(
-  "tandem_channel_daily_metrics",
+export const nexetChannelDailyMetricsTable = pgTable(
+  "nexet_channel_daily_metrics",
   {
     channelId: text("channel_id").notNull(),
     day: date("day").notNull(), // YYYY-MM-DD
@@ -92,7 +92,7 @@ export const tandemChannelDailyMetricsTable = pgTable(
     source: text("source").notNull().default("youtube"),
   },
   (table) => ({
-    channelDayUnique: unique("tandem_channel_daily_metric_channel_day").on(
+    channelDayUnique: unique("nexet_channel_daily_metric_channel_day").on(
       table.channelId,
       table.day,
     ),
@@ -100,15 +100,15 @@ export const tandemChannelDailyMetricsTable = pgTable(
 );
 
 // Per-video daily metric snapshots (upserted, never deleted).
-export const tandemVideoDailyMetricsTable = pgTable(
-  "tandem_video_daily_metrics",
+export const nexetVideoDailyMetricsTable = pgTable(
+  "nexet_video_daily_metrics",
   {
     videoRowId: text("video_row_id").notNull(),
     day: date("day").notNull(), // YYYY-MM-DD
     metrics: jsonb("metrics").$type<VideoMetrics>().notNull(),
   },
   (table) => ({
-    videoDayUnique: unique("tandem_video_daily_metric_video_day").on(
+    videoDayUnique: unique("nexet_video_daily_metric_video_day").on(
       table.videoRowId,
       table.day,
     ),
@@ -120,8 +120,8 @@ export const tandemVideoDailyMetricsTable = pgTable(
 // by the sync loop beyond YT_REPORT_TTL_MINUTES. `videoRowId` is null for
 // channel-level reports (SUBS); the client-normalized row objects live in
 // `payload` (zod-validated arrays, keyed by column name).
-export const tandemAnalyticsReportsTable = pgTable(
-  "tandem_analytics_reports",
+export const nexetAnalyticsReportsTable = pgTable(
+  "nexet_analytics_reports",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -136,7 +136,7 @@ export const tandemAnalyticsReportsTable = pgTable(
     // channel-level rows carry videoRowId = NULL; Postgres treats NULLs as
     // distinct in unique constraints, so the sync engine dedupes those with a
     // select-before-insert (see youtube/sync.ts).
-    reportUnique: unique("tandem_analytics_report_channel_kind_period").on(
+    reportUnique: unique("nexet_analytics_report_channel_kind_period").on(
       table.channelId,
       table.videoRowId,
       table.kind,
@@ -147,7 +147,7 @@ export const tandemAnalyticsReportsTable = pgTable(
 );
 
 // Per-channel sync state. One row per channel; status IDLE | SYNCING | ERROR.
-export const tandemChannelSyncsTable = pgTable("tandem_channel_syncs", {
+export const nexetChannelSyncsTable = pgTable("nexet_channel_syncs", {
   channelId: text("channel_id").primaryKey(),
   lastVideoSyncAt: timestamp("last_video_sync_at", { withTimezone: true }),
   lastMetricsSyncAt: timestamp("last_metrics_sync_at", { withTimezone: true }),
@@ -161,8 +161,8 @@ export const tandemChannelSyncsTable = pgTable("tandem_channel_syncs", {
 
 // v1 anomaly alerts (§14). One row per (channel, rule, window) — the unique
 // constraint is the dedupe: the same alert never fires twice for a window.
-export const tandemChannelAlertsTable = pgTable(
-  "tandem_channel_alerts",
+export const nexetChannelAlertsTable = pgTable(
+  "nexet_channel_alerts",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -173,7 +173,7 @@ export const tandemChannelAlertsTable = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
-    ruleWindowUnique: unique("tandem_channel_alert_rule_window").on(
+    ruleWindowUnique: unique("nexet_channel_alert_rule_window").on(
       table.channelId,
       table.rule,
       table.periodStart,
@@ -181,16 +181,16 @@ export const tandemChannelAlertsTable = pgTable(
   }),
 );
 
-export const insertTandemChannelVideoSchema = createInsertSchema(tandemChannelVideosTable);
-export const insertTandemChannelDailyMetricSchema = createInsertSchema(tandemChannelDailyMetricsTable);
-export const insertTandemVideoDailyMetricSchema = createInsertSchema(tandemVideoDailyMetricsTable);
-export const insertTandemAnalyticsReportSchema = createInsertSchema(tandemAnalyticsReportsTable);
-export const insertTandemChannelSyncSchema = createInsertSchema(tandemChannelSyncsTable);
-export const insertTandemChannelAlertSchema = createInsertSchema(tandemChannelAlertsTable);
+export const insertNexetChannelVideoSchema = createInsertSchema(nexetChannelVideosTable);
+export const insertNexetChannelDailyMetricSchema = createInsertSchema(nexetChannelDailyMetricsTable);
+export const insertNexetVideoDailyMetricSchema = createInsertSchema(nexetVideoDailyMetricsTable);
+export const insertNexetAnalyticsReportSchema = createInsertSchema(nexetAnalyticsReportsTable);
+export const insertNexetChannelSyncSchema = createInsertSchema(nexetChannelSyncsTable);
+export const insertNexetChannelAlertSchema = createInsertSchema(nexetChannelAlertsTable);
 
-export type TandemChannelVideo = typeof tandemChannelVideosTable.$inferSelect;
-export type TandemChannelDailyMetric = typeof tandemChannelDailyMetricsTable.$inferSelect;
-export type TandemVideoDailyMetric = typeof tandemVideoDailyMetricsTable.$inferSelect;
-export type TandemAnalyticsReport = typeof tandemAnalyticsReportsTable.$inferSelect;
-export type TandemChannelSync = typeof tandemChannelSyncsTable.$inferSelect;
-export type TandemChannelAlert = typeof tandemChannelAlertsTable.$inferSelect;
+export type NexetChannelVideo = typeof nexetChannelVideosTable.$inferSelect;
+export type NexetChannelDailyMetric = typeof nexetChannelDailyMetricsTable.$inferSelect;
+export type NexetVideoDailyMetric = typeof nexetVideoDailyMetricsTable.$inferSelect;
+export type NexetAnalyticsReport = typeof nexetAnalyticsReportsTable.$inferSelect;
+export type NexetChannelSync = typeof nexetChannelSyncsTable.$inferSelect;
+export type NexetChannelAlert = typeof nexetChannelAlertsTable.$inferSelect;

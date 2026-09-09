@@ -2,15 +2,15 @@ import { getAuth } from "@clerk/express";
 import { emitJobProgress, emitToProject, emitToUser } from "../realtime";
 import {
   db,
-  tandemVideoAssetsTable,
-  tandemVideoDownloadsTable,
-  tandemVideoGrantsTable,
-  tandemVideoJobsTable,
-  tandemVideoMembersTable,
-  tandemVideoNotificationsTable,
-  tandemVideoProjectsTable,
-  tandemVideoReferencesTable,
-  type TandemVideoMember,
+  nexetVideoAssetsTable,
+  nexetVideoDownloadsTable,
+  nexetVideoGrantsTable,
+  nexetVideoJobsTable,
+  nexetVideoMembersTable,
+  nexetVideoNotificationsTable,
+  nexetVideoProjectsTable,
+  nexetVideoReferencesTable,
+  type NexetVideoMember,
 } from "@workspace/db";
 import {
   AnalyzeVideoReferenceParams,
@@ -37,7 +37,7 @@ const router: IRouter = Router();
 // ---------------------------------------------------------------------------
 // M4 — platform features. Viral reference import (pacing analysis + side-by-
 // side guide), Captain-issued temporary download grants with instant revoke,
-// and the Tandem notifications center (mirrors the parent's inbox pattern).
+// and the Nexet notifications center (mirrors the parent's inbox pattern).
 // ---------------------------------------------------------------------------
 
 /**
@@ -61,15 +61,15 @@ const LEG_ROLES: Record<string, string> = {
 async function requireMember(
   projectId: string,
   userId: string,
-): Promise<TandemVideoMember | null> {
+): Promise<NexetVideoMember | null> {
   const [member] = await db
     .select()
-    .from(tandemVideoMembersTable)
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        eq(tandemVideoMembersTable.projectId, projectId),
-        eq(tandemVideoMembersTable.userId, userId),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        eq(nexetVideoMembersTable.projectId, projectId),
+        eq(nexetVideoMembersTable.userId, userId),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     )
     .limit(1);
@@ -79,13 +79,13 @@ async function requireMember(
 async function isCaptain(projectId: string, userId: string): Promise<boolean> {
   const [project] = await db
     .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.id, projectId))
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.id, projectId))
     .limit(1);
   return project?.ownerId === userId;
 }
 
-/** Writes a Tandem notification and streams it to the recipient's room. */
+/** Writes a Nexet notification and streams it to the recipient's room. */
 async function notify(
   recipientId: string,
   category: string,
@@ -95,7 +95,7 @@ async function notify(
   resourceId?: string,
 ): Promise<void> {
   const [notification] = await db
-    .insert(tandemVideoNotificationsTable)
+    .insert(nexetVideoNotificationsTable)
     .values({
       id: randomUUID(),
       recipientId,
@@ -136,8 +136,8 @@ router.post(
 
     const [asset] = await db
       .select()
-      .from(tandemVideoAssetsTable)
-      .where(eq(tandemVideoAssetsTable.id, params.data.assetId))
+      .from(nexetVideoAssetsTable)
+      .where(eq(nexetVideoAssetsTable.id, params.data.assetId))
       .limit(1);
     if (!asset || asset.projectId !== params.data.projectId) {
       res.status(404).json({ error: "Asset not found" });
@@ -145,7 +145,7 @@ router.post(
     }
 
     const [job] = await db
-      .insert(tandemVideoJobsTable)
+      .insert(nexetVideoJobsTable)
       .values({
         id: randomUUID(),
         projectId: params.data.projectId,
@@ -183,8 +183,8 @@ router.get(
 
     const [reference] = await db
       .select()
-      .from(tandemVideoReferencesTable)
-      .where(eq(tandemVideoReferencesTable.assetId, params.data.assetId))
+      .from(nexetVideoReferencesTable)
+      .where(eq(nexetVideoReferencesTable.assetId, params.data.assetId))
       .limit(1);
     if (!reference) {
       res.status(404).json({ error: "No pacing analysis yet — run the reference analysis first" });
@@ -218,9 +218,9 @@ router.get(
 
     const grants = await db
       .select()
-      .from(tandemVideoGrantsTable)
-      .where(eq(tandemVideoGrantsTable.projectId, params.data.projectId))
-      .orderBy(desc(tandemVideoGrantsTable.createdAt));
+      .from(nexetVideoGrantsTable)
+      .where(eq(nexetVideoGrantsTable.projectId, params.data.projectId))
+      .orderBy(desc(nexetVideoGrantsTable.createdAt));
 
     res.json(
       ListVideoGrantsResponse.parse(
@@ -271,7 +271,7 @@ router.post(
 
     const hours = Math.min(168, Math.max(1, body.data.expiresInHours ?? 24));
     const [grant] = await db
-      .insert(tandemVideoGrantsTable)
+      .insert(nexetVideoGrantsTable)
       .values({
         id: randomUUID(),
         projectId: params.data.projectId,
@@ -285,9 +285,9 @@ router.post(
     emitToProject(params.data.projectId, "grant.created", grant);
 
     const [grantProject] = await db
-      .select({ channelId: tandemVideoProjectsTable.channelId })
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .select({ channelId: nexetVideoProjectsTable.channelId })
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     await notify(
       body.data.memberId,
@@ -325,11 +325,11 @@ router.post(
 
     const [grant] = await db
       .select()
-      .from(tandemVideoGrantsTable)
+      .from(nexetVideoGrantsTable)
       .where(
         and(
-          eq(tandemVideoGrantsTable.id, params.data.grantId),
-          eq(tandemVideoGrantsTable.projectId, params.data.projectId),
+          eq(nexetVideoGrantsTable.id, params.data.grantId),
+          eq(nexetVideoGrantsTable.projectId, params.data.projectId),
         ),
       )
       .limit(1);
@@ -343,16 +343,16 @@ router.post(
     }
 
     const [revoked] = await db
-      .update(tandemVideoGrantsTable)
+      .update(nexetVideoGrantsTable)
       .set({ revokedAt: new Date() })
-      .where(eq(tandemVideoGrantsTable.id, grant.id))
+      .where(eq(nexetVideoGrantsTable.id, grant.id))
       .returning();
     emitToProject(params.data.projectId, "grant.revoked", revoked);
 
     const [revokeProject] = await db
-      .select({ channelId: tandemVideoProjectsTable.channelId })
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .select({ channelId: nexetVideoProjectsTable.channelId })
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     await notify(
       grant.memberId,
@@ -367,7 +367,7 @@ router.post(
   },
 );
 
-// GET /video/notifications — the signed-in user's Tandem notifications.
+// GET /video/notifications — the signed-in user's Nexet notifications.
 router.get("/video/notifications", async (req: Request, res: Response): Promise<void> => {
   const userId = getAuth(req).userId;
   if (!userId) {
@@ -377,9 +377,9 @@ router.get("/video/notifications", async (req: Request, res: Response): Promise<
 
   const notifications = await db
     .select()
-    .from(tandemVideoNotificationsTable)
-    .where(eq(tandemVideoNotificationsTable.recipientId, userId))
-    .orderBy(desc(tandemVideoNotificationsTable.createdAt))
+    .from(nexetVideoNotificationsTable)
+    .where(eq(nexetVideoNotificationsTable.recipientId, userId))
+    .orderBy(desc(nexetVideoNotificationsTable.createdAt))
     .limit(50);
 
   res.json(ListVideoNotificationsResponse.parse(notifications));
@@ -403,8 +403,8 @@ router.post(
 
     const [notification] = await db
       .select()
-      .from(tandemVideoNotificationsTable)
-      .where(eq(tandemVideoNotificationsTable.id, params.data.notificationId))
+      .from(nexetVideoNotificationsTable)
+      .where(eq(nexetVideoNotificationsTable.id, params.data.notificationId))
       .limit(1);
     if (!notification || notification.recipientId !== userId) {
       res.status(404).json({ error: "Notification not found" });
@@ -412,9 +412,9 @@ router.post(
     }
 
     const [updated] = await db
-      .update(tandemVideoNotificationsTable)
+      .update(nexetVideoNotificationsTable)
       .set({ readAt: notification.readAt ?? new Date() })
-      .where(eq(tandemVideoNotificationsTable.id, notification.id))
+      .where(eq(nexetVideoNotificationsTable.id, notification.id))
       .returning();
 
     res.json(MarkVideoNotificationReadResponse.parse(updated));

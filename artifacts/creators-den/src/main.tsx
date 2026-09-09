@@ -62,10 +62,10 @@ function ClerkGate({ children }: { children: React.ReactNode }) {
               marginBottom: 12,
             }}
           >
-            Sign in on Tandem to open your projects.
+            Sign in on Nexet to open your projects.
           </h1>
           <p style={{ lineHeight: 1.7, color: '#a1a1a1' }}>
-            Creator Den shares your Tandem account. Sign in on the Tandem app,
+            Creator Den shares your Nexet account. Sign in on the Nexet app,
             then come back here — your projects, versions, and reviews are tied
             to your identity.
           </p>

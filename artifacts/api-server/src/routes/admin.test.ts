@@ -72,10 +72,10 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemSubscriptionsTable);
-  await state.db.delete(t.tandemPromoCodesTable);
-  await state.db.delete(t.tandemPromoRedemptionsTable);
-  await state.db.delete(t.tandemSubscriptionPlanSettingsTable);
+  await state.db.delete(t.nexetSubscriptionsTable);
+  await state.db.delete(t.nexetPromoCodesTable);
+  await state.db.delete(t.nexetPromoRedemptionsTable);
+  await state.db.delete(t.nexetSubscriptionPlanSettingsTable);
   await state.db.delete(t.oracleHealthEventsTable);
   await state.db.delete(t.oracleProvidersTable);
   state.emails = {};
@@ -406,7 +406,7 @@ describe("admin subscriptions", () => {
 
   async function seedSubscription(overrides: Record<string, unknown> = {}) {
     const now = Date.now();
-    await state.db.insert(state.tables.tandemSubscriptionsTable).values({
+    await state.db.insert(state.tables.nexetSubscriptionsTable).values({
       id: "sub-" + Math.random().toString(36).slice(2, 10),
       userId: "user-1",
       kind: "pass",

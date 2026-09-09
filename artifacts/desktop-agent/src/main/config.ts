@@ -1,16 +1,16 @@
 // Configuration for the desktop agent. Values come from, in order of priority:
 //  1. process.env
-//  2. a JSON config file adjacent to the app (config.json / ~/.tandem-agent.json)
+//  2. a JSON config file adjacent to the app (config.json / ~/.nexet-agent.json)
 //  3. in-code defaults
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 export interface AgentConfig {
-  /** Base URL of the Tandem API server, no trailing slash. */
+  /** Base URL of the Nexet API server, no trailing slash. */
   apiBaseUrl: string;
   /**
-   * Public origin of the Tandem web app (creators-den), no trailing slash.
+   * Public origin of the Nexet web app (creators-den), no trailing slash.
    * The sign-in link points at its hosted /agent-signin page — Clerk only
    * initialises on origins registered for the instance, so the page must run
    * on the web app's domain rather than on a loopback server.
@@ -33,7 +33,7 @@ export interface AgentConfig {
   /**
    * Loopback port of the control server Creator Den talks to (health check,
    * launch hand-off, job status polling). Fixed so the web app always knows
-   * where to look; override per-machine with TANDEM_AGENT_CONTROL_PORT.
+   * where to look; override per-machine with NEXET_AGENT_CONTROL_PORT.
    */
   controlPort: number;
 }
@@ -41,23 +41,23 @@ export interface AgentConfig {
 const DEFAULTS: AgentConfig = {
   apiBaseUrl: "http://localhost:3000",
   // Local dev creators-den (replit.md: PORT=5175, BASE_PATH=/creators-den/).
-  // Production installs must set TANDEM_WEB_URL to the deployed web app.
+  // Production installs must set NEXET_WEB_URL to the deployed web app.
   webAppUrl: "http://localhost:5175",
-  // Clerk publishable key for the shared Tandem Clerk instance (novel-tortoise-61).
+  // Clerk publishable key for the shared Nexet Clerk instance (novel-tortoise-61).
   // Publishable keys are public by design — the web apps embed the same one in
   // their client bundles — so it's safe to ship as the built-in default.
-  // Override per-machine with TANDEM_CLERK_PUBLISHABLE_KEY or a config file.
+  // Override per-machine with NEXET_CLERK_PUBLISHABLE_KEY or a config file.
   clerkPublishableKey: "pk_test_bm92ZWwtdG9ydG9pc2UtNjEuY2xlcmsuYWNjb3VudHMuZGV2JA",
   ffmpegPath: "",
-  workDir: path.join(os.homedir(), ".tandem-agent", "work"),
+  workDir: path.join(os.homedir(), ".nexet-agent", "work"),
   updateUrl: "",
   controlPort: 41737,
 };
 
 function loadFileConfig(): Partial<AgentConfig> {
   const candidates = [
-    path.join(process.cwd(), "tandem-agent.json"),
-    path.join(os.homedir(), ".tandem-agent", "config.json"),
+    path.join(process.cwd(), "nexet-agent.json"),
+    path.join(os.homedir(), ".nexet-agent", "config.json"),
   ];
   for (const file of candidates) {
     try {
@@ -72,17 +72,17 @@ function loadFileConfig(): Partial<AgentConfig> {
 
 export function loadConfig(): AgentConfig {
   const file = loadFileConfig();
-  const apiBaseUrl = (process.env.TANDEM_API_URL || file.apiBaseUrl || DEFAULTS.apiBaseUrl).replace(/\/+$/, "");
+  const apiBaseUrl = (process.env.NEXET_API_URL || file.apiBaseUrl || DEFAULTS.apiBaseUrl).replace(/\/+$/, "");
   return {
     apiBaseUrl,
-    webAppUrl: process.env.TANDEM_WEB_URL || file.webAppUrl || DEFAULTS.webAppUrl,
-    clerkPublishableKey: process.env.TANDEM_CLERK_PUBLISHABLE_KEY || file.clerkPublishableKey || DEFAULTS.clerkPublishableKey,
-    ffmpegPath: process.env.TANDEM_FFMPEG_PATH || file.ffmpegPath || DEFAULTS.ffmpegPath,
-    workDir: process.env.TANDEM_AGENT_WORK_DIR || file.workDir || DEFAULTS.workDir,
+    webAppUrl: process.env.NEXET_WEB_URL || file.webAppUrl || DEFAULTS.webAppUrl,
+    clerkPublishableKey: process.env.NEXET_CLERK_PUBLISHABLE_KEY || file.clerkPublishableKey || DEFAULTS.clerkPublishableKey,
+    ffmpegPath: process.env.NEXET_FFMPEG_PATH || file.ffmpegPath || DEFAULTS.ffmpegPath,
+    workDir: process.env.NEXET_AGENT_WORK_DIR || file.workDir || DEFAULTS.workDir,
     // No per-machine config needed: updates come from the same host as the
     // API (which serves the agent release feed at /desktop-agent). An explicit
-    // TANDEM_UPDATE_URL or config-file entry still wins.
-    updateUrl: process.env.TANDEM_UPDATE_URL || file.updateUrl || `${apiBaseUrl}/desktop-agent`,
-    controlPort: Number(process.env.TANDEM_AGENT_CONTROL_PORT || file.controlPort || DEFAULTS.controlPort),
+    // NEXET_UPDATE_URL or config-file entry still wins.
+    updateUrl: process.env.NEXET_UPDATE_URL || file.updateUrl || `${apiBaseUrl}/desktop-agent`,
+    controlPort: Number(process.env.NEXET_AGENT_CONTROL_PORT || file.controlPort || DEFAULTS.controlPort),
   };
 }

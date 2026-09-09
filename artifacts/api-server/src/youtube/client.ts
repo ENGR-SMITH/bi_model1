@@ -61,7 +61,7 @@ export interface YoutubeReportPayload {
 
 /**
  * Normalize an Analytics API report into an array of row objects keyed by
- * column name (nulls kept) — the shape stored in tandem_analytics_reports.
+ * column name (nulls kept) — the shape stored in nexet_analytics_reports.
  */
 export function normalizeReportRows(payload: YoutubeReportPayload): Array<Record<string, string | number | null>> {
   const headers = (payload.columnHeaders ?? []).map((h) => h.name);

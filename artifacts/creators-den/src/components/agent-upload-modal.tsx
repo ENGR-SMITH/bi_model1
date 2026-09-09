@@ -302,7 +302,7 @@ export function AgentUploadModal({
   };
 
   const instructions = [
-    { icon: MonitorDown, title: 'Download the agent', text: 'Install and open Tandem Desktop Agent on this computer.' },
+    { icon: MonitorDown, title: 'Download the agent', text: 'Install and open Nexet Desktop Agent on this computer.' },
     { icon: Projector, title: 'Pick the project', text: 'Sign in with the same account, then select this project in the Workspace card.' },
     { icon: FolderOpen, title: 'Drop in the file', text: `Drag & drop "${fileName}" into the app and submit it — the Captain's approval moves it into this project's vault.` },
     { icon: UploadCloud, title: 'It uploads itself', text: 'The agent streams the whole file from your PC in the background — no browser tab to babysit.' },
@@ -402,7 +402,7 @@ export function AgentUploadModal({
               </>
             ) : (
               <p className="agent-download-unavailable">
-                Ask your workspace admin for the Tandem Desktop Agent installer, then come back and
+                Ask your workspace admin for the Nexet Desktop Agent installer, then come back and
                 retry this upload from the app.
               </p>
             )}

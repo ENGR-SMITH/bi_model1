@@ -5,12 +5,12 @@ import { randomUUID } from "node:crypto";
 import { and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 import {
   db,
-  tandemVideoAssetsTable,
-  tandemVideoAssetFilesTable,
-  tandemVideoTranscriptsTable,
-  tandemVideoTranscriptSegmentsTable,
+  nexetVideoAssetsTable,
+  nexetVideoAssetFilesTable,
+  nexetVideoTranscriptsTable,
+  nexetVideoTranscriptSegmentsTable,
 } from "@workspace/db";
-import type { TandemVideoAsset } from "@workspace/db";
+import type { NexetVideoAsset } from "@workspace/db";
 import { enqueueAssetJobs, uploadDir } from "./worker";
 import { ensureOriginalRestored, persistArtifact, r2Configured } from "./object-storage";
 import { logger } from "../lib/logger";
@@ -56,12 +56,12 @@ export function hashFile(filePath: string): Promise<string> {
  */
 export async function findAssetByContentHash(
   contentHash: string,
-): Promise<TandemVideoAsset | null> {
+): Promise<NexetVideoAsset | null> {
   const [existing] = await db
     .select()
-    .from(tandemVideoAssetsTable)
-    .where(eq(tandemVideoAssetsTable.contentHash, contentHash))
-    .orderBy(asc(tandemVideoAssetsTable.createdAt))
+    .from(nexetVideoAssetsTable)
+    .where(eq(nexetVideoAssetsTable.contentHash, contentHash))
+    .orderBy(asc(nexetVideoAssetsTable.createdAt))
     .limit(1);
   return existing ?? null;
 }
@@ -77,12 +77,12 @@ export async function findAssetByContentHash(
 async function findSameProjectMatch(
   contentHash: string,
   projectId: string,
-): Promise<TandemVideoAsset | null> {
+): Promise<NexetVideoAsset | null> {
   const [existing] = await db
     .select()
-    .from(tandemVideoAssetsTable)
-    .where(and(eq(tandemVideoAssetsTable.contentHash, contentHash), eq(tandemVideoAssetsTable.projectId, projectId)))
-    .orderBy(asc(tandemVideoAssetsTable.createdAt))
+    .from(nexetVideoAssetsTable)
+    .where(and(eq(nexetVideoAssetsTable.contentHash, contentHash), eq(nexetVideoAssetsTable.projectId, projectId)))
+    .orderBy(asc(nexetVideoAssetsTable.createdAt))
     .limit(1);
   return existing ?? null;
 }
@@ -100,17 +100,17 @@ const REUSABLE_KINDS = new Set(["PROXY", "AUDIO_STEM", "THUMBNAIL"]);
  * reused so the caller can enqueue jobs for the missing ones.
  */
 export async function reuseDerivedArtifacts(
-  source: TandemVideoAsset,
+  source: NexetVideoAsset,
   targetAssetId: string,
 ): Promise<{ proxy: boolean; transcript: boolean }> {
   const files = await db
     .select()
-    .from(tandemVideoAssetFilesTable)
-    .where(eq(tandemVideoAssetFilesTable.assetId, source.id));
+    .from(nexetVideoAssetFilesTable)
+    .where(eq(nexetVideoAssetFilesTable.assetId, source.id));
   const reusable = files.filter((file) => REUSABLE_KINDS.has(file.kind));
 
   for (const file of reusable) {
-    await db.insert(tandemVideoAssetFilesTable).values({
+    await db.insert(nexetVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: targetAssetId,
       kind: file.kind,
@@ -124,18 +124,18 @@ export async function reuseDerivedArtifacts(
 
   const [transcript] = await db
     .select()
-    .from(tandemVideoTranscriptsTable)
-    .where(eq(tandemVideoTranscriptsTable.assetId, source.id))
+    .from(nexetVideoTranscriptsTable)
+    .where(eq(nexetVideoTranscriptsTable.assetId, source.id))
     .limit(1);
 
   if (transcript) {
     const segments = await db
       .select()
-      .from(tandemVideoTranscriptSegmentsTable)
-      .where(eq(tandemVideoTranscriptSegmentsTable.transcriptId, transcript.id));
+      .from(nexetVideoTranscriptSegmentsTable)
+      .where(eq(nexetVideoTranscriptSegmentsTable.transcriptId, transcript.id));
 
     const transcriptId = randomUUID();
-    await db.insert(tandemVideoTranscriptsTable).values({
+    await db.insert(nexetVideoTranscriptsTable).values({
       id: transcriptId,
       assetId: targetAssetId,
       language: transcript.language,
@@ -143,7 +143,7 @@ export async function reuseDerivedArtifacts(
       status: transcript.status,
     });
     if (segments.length > 0) {
-      await db.insert(tandemVideoTranscriptSegmentsTable).values(
+      await db.insert(nexetVideoTranscriptSegmentsTable).values(
         segments.map((segment) => ({
           id: randomUUID(),
           transcriptId,
@@ -163,7 +163,7 @@ export async function reuseDerivedArtifacts(
 }
 
 export interface CreatedAsset {
-  asset: TandemVideoAsset;
+  asset: NexetVideoAsset;
   /** Final status: "UPLOADED" (jobs pending) or "PROCESSED" (previews ready). */
   status: string;
   /** True when the bytes already existed and the stored blob was reused. */
@@ -229,7 +229,7 @@ export async function createAssetFromUpload(opts: {
       : null;
 
   const [asset] = await db
-    .insert(tandemVideoAssetsTable)
+    .insert(nexetVideoAssetsTable)
     .values({
       id: randomUUID(),
       projectId: opts.projectId,
@@ -254,7 +254,7 @@ export async function createAssetFromUpload(opts: {
       // copy, then record the ORIGINAL row that restore/delete can use.
       const provider = await persistArtifact(opts.projectId, r2OriginalKey, opts.filePath, opts.mimeType || "application/octet-stream");
       if (provider === "r2") {
-        await db.insert(tandemVideoAssetFilesTable).values({
+        await db.insert(nexetVideoAssetFilesTable).values({
           id: randomUUID(),
           assetId: asset.id,
           kind: "ORIGINAL",
@@ -278,7 +278,7 @@ export async function createAssetFromUpload(opts: {
   let status = "UPLOADED";
   if (opts.kind === "THUMBNAIL_DESIGN") {
     status = "PROCESSED";
-    await db.insert(tandemVideoAssetFilesTable).values({
+    await db.insert(nexetVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: asset.id,
       kind: "PROXY",
@@ -289,9 +289,9 @@ export async function createAssetFromUpload(opts: {
       metadata: { demo: false, degraded: false, original: true },
     });
     await db
-      .update(tandemVideoAssetsTable)
+      .update(nexetVideoAssetsTable)
       .set({ status: "PROCESSED" })
-      .where(eq(tandemVideoAssetsTable.id, asset.id));
+      .where(eq(nexetVideoAssetsTable.id, asset.id));
   } else if (reuseBlob && sameProject) {
     // Reuse the matched blob's previews instead of re-encoding/re-transcribing
     // unchanged footage; enqueue jobs only for what wasn't reusable. Only the
@@ -303,9 +303,9 @@ export async function createAssetFromUpload(opts: {
     if (missing.length === 0) {
       status = "PROCESSED";
       await db
-        .update(tandemVideoAssetsTable)
+        .update(nexetVideoAssetsTable)
         .set({ status: "PROCESSED" })
-        .where(eq(tandemVideoAssetsTable.id, asset.id));
+        .where(eq(nexetVideoAssetsTable.id, asset.id));
     } else {
       await enqueueAssetJobs(asset, missing);
     }
@@ -342,8 +342,8 @@ export async function backfillContentHashes(
 ): Promise<ContentHashBackfillResult> {
   const legacy = await db
     .select()
-    .from(tandemVideoAssetsTable)
-    .where(isNull(tandemVideoAssetsTable.contentHash));
+    .from(nexetVideoAssetsTable)
+    .where(isNull(nexetVideoAssetsTable.contentHash));
 
   const result: ContentHashBackfillResult = {
     legacy: legacy.length,
@@ -360,17 +360,17 @@ export async function backfillContentHashes(
 
     const contentHash = await hashFile(filePath);
     await db
-      .update(tandemVideoAssetsTable)
+      .update(nexetVideoAssetsTable)
       .set({ contentHash })
-      .where(eq(tandemVideoAssetsTable.id, asset.id));
+      .where(eq(nexetVideoAssetsTable.id, asset.id));
     // Rows that reference the original blob directly share its address.
     await db
-      .update(tandemVideoAssetFilesTable)
+      .update(nexetVideoAssetFilesTable)
       .set({ contentHash })
       .where(
         and(
-          eq(tandemVideoAssetFilesTable.assetId, asset.id),
-          eq(tandemVideoAssetFilesTable.storageKey, asset.storageKey),
+          eq(nexetVideoAssetFilesTable.assetId, asset.id),
+          eq(nexetVideoAssetFilesTable.storageKey, asset.storageKey),
         ),
       );
     result.hashed += 1;
@@ -421,8 +421,8 @@ export async function consolidateContentHashes(
 
   const fileRows = await db
     .select()
-    .from(tandemVideoAssetFilesTable)
-    .where(isNotNull(tandemVideoAssetFilesTable.contentHash));
+    .from(nexetVideoAssetFilesTable)
+    .where(isNotNull(nexetVideoAssetFilesTable.contentHash));
 
   // Group file rows by content hash, remembering the earliest row (the keeper)
   // and how many rows reference each distinct storage key.
@@ -475,12 +475,12 @@ export async function consolidateContentHashes(
       result.rowsRepointed += count;
       if (!dryRun) {
         await db
-          .update(tandemVideoAssetFilesTable)
+          .update(nexetVideoAssetFilesTable)
           .set({ storageKey: keeper })
           .where(
             and(
-              eq(tandemVideoAssetFilesTable.contentHash, hash),
-              eq(tandemVideoAssetFilesTable.storageKey, key),
+              eq(nexetVideoAssetFilesTable.contentHash, hash),
+              eq(nexetVideoAssetFilesTable.storageKey, key),
             ),
           );
       }
@@ -491,8 +491,8 @@ export async function consolidateContentHashes(
   // (hashes that only ever lived on assets use the earliest asset's key).
   const assetRows = await db
     .select()
-    .from(tandemVideoAssetsTable)
-    .where(isNotNull(tandemVideoAssetsTable.contentHash));
+    .from(nexetVideoAssetsTable)
+    .where(isNotNull(nexetVideoAssetsTable.contentHash));
   for (const asset of assetRows) {
     if (!asset.contentHash || canonicalByHash.has(asset.contentHash)) continue;
     canonicalByHash.set(asset.contentHash, asset.storageKey);
@@ -510,19 +510,19 @@ export async function consolidateContentHashes(
     result.assetsRepointed += 1;
     if (!dryRun) {
       await db
-        .update(tandemVideoAssetsTable)
+        .update(nexetVideoAssetsTable)
         .set({ storageKey: canonical })
-        .where(eq(tandemVideoAssetsTable.id, asset.id));
+        .where(eq(nexetVideoAssetsTable.id, asset.id));
       // Unlink the old file only once nothing references it anymore.
       const [stillAsset] = await db
-        .select({ id: tandemVideoAssetsTable.id })
-        .from(tandemVideoAssetsTable)
-        .where(eq(tandemVideoAssetsTable.storageKey, oldKey))
+        .select({ id: nexetVideoAssetsTable.id })
+        .from(nexetVideoAssetsTable)
+        .where(eq(nexetVideoAssetsTable.storageKey, oldKey))
         .limit(1);
       const [stillFile] = await db
-        .select({ id: tandemVideoAssetFilesTable.id })
-        .from(tandemVideoAssetFilesTable)
-        .where(eq(tandemVideoAssetFilesTable.storageKey, oldKey))
+        .select({ id: nexetVideoAssetFilesTable.id })
+        .from(nexetVideoAssetFilesTable)
+        .where(eq(nexetVideoAssetFilesTable.storageKey, oldKey))
         .limit(1);
       const oldPath = path.join(uploadDirPath, oldKey);
       if (!stillAsset && !stillFile && fs.existsSync(oldPath)) {

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // the no-op enqueue test below never runs a query, so a stub is enough.
 vi.mock("@workspace/db", () => ({
   db: {},
-  tandemVideoJobsTable: {},
+  nexetVideoJobsTable: {},
 }));
 
 import {
@@ -37,14 +37,14 @@ describe("bullmq queue wiring", () => {
   it("maps every job type to a distinct queue name", () => {
     const names = VIDEO_JOB_TYPES.map(queueNameFor);
     expect(new Set(names).size).toBe(VIDEO_JOB_TYPES.length);
-    expect(queueNameFor("PROXY")).toBe("tandem-video-proxy");
-    expect(queueNameFor("REFERENCE_ANALYZE")).toBe("tandem-video-reference-analyze");
+    expect(queueNameFor("PROXY")).toBe("nexet-video-proxy");
+    expect(queueNameFor("REFERENCE_ANALYZE")).toBe("nexet-video-reference-analyze");
   });
 
   it("pure config helpers agree with the queue module (no DB import)", () => {
     delete process.env.REDIS_URL;
     expect(configEnabled()).toBe(false);
-    expect(configQueueNameFor("AUDIO")).toBe("tandem-video-audio");
+    expect(configQueueNameFor("AUDIO")).toBe("nexet-video-audio");
     expect(bullmqEnabled()).toBe(configEnabled());
   });
 

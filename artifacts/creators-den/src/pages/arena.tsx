@@ -36,7 +36,7 @@ export default function ArenaBoardPage() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const { user } = useUser();
-  // Deep-linkable role filter: /arena?role=VIDEO (the Tandem category cards)
+  // Deep-linkable role filter: /arena?role=VIDEO (the Nexet category cards)
   // opens the board pre-filtered, and picking a chip keeps the URL in sync.
   const urlRole = new URLSearchParams(search).get('role');
   const [roleFilter, setRoleFilter] = useState<'ALL' | ArenaRole>(

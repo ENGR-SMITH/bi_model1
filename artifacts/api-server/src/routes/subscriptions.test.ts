@@ -43,11 +43,11 @@ const VALID_CARD = {
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemSubscriptionsTable);
-  await state.db.delete(t.tandemTicketsTable);
-  await state.db.delete(t.tandemAccountQuotasTable);
-  await state.db.delete(t.tandemPromoRedemptionsTable);
-  await state.db.delete(t.tandemSubscriptionPlanSettingsTable);
+  await state.db.delete(t.nexetSubscriptionsTable);
+  await state.db.delete(t.nexetTicketsTable);
+  await state.db.delete(t.nexetAccountQuotasTable);
+  await state.db.delete(t.nexetPromoRedemptionsTable);
+  await state.db.delete(t.nexetSubscriptionPlanSettingsTable);
   state.userId = null;
 }
 
@@ -85,7 +85,7 @@ describe("subscription plans", () => {
     expect(p50Default.autoRenewAvailable).toBe(true);
 
     // An admin override (settings row) flips the authors pass off.
-    await state.db.insert(state.tables.tandemSubscriptionPlanSettingsTable).values({
+    await state.db.insert(state.tables.nexetSubscriptionPlanSettingsTable).values({
       kind: "pass",
       planId: "authors",
       autoRenewAvailable: false,
@@ -173,7 +173,7 @@ describe("subscription purchase", () => {
 describe("auto-renew toggle (admin-only)", () => {
   it("rejects user attempts to turn auto-renew off", async () => {
     state.userId = "user-1";
-    await state.db.insert(state.tables.tandemSubscriptionsTable).values({
+    await state.db.insert(state.tables.nexetSubscriptionsTable).values({
       id: "sub-1",
       userId: "user-1",
       kind: "pass",
@@ -197,7 +197,7 @@ describe("auto-renew toggle (admin-only)", () => {
     // The row is untouched — auto-renew stays on.
     const [sub] = await state.db
       .select()
-      .from(state.tables.tandemSubscriptionsTable)
+      .from(state.tables.nexetSubscriptionsTable)
       .where((t: any) => t.id === "sub-1");
     expect(sub.autoRenew).toBe(true);
   });

@@ -36,13 +36,13 @@ import type {
 // notification feed (seeds published, continuations submitted/declined,
 // acceptances, contract locks, your-turn passes, and private messages).
 // Clicking a row marks it read and opens its deep link (the Author Den studio
-// handles ?project= & ?chat=; cross-app links open the Tandem room).
+// handles ?project= & ?chat=; cross-app links open the Nexet room).
 //
-// This page also owns the two surfaces that used to live on the Tandem inbox:
+// This page also owns the two surfaces that used to live on the Nexet inbox:
 //   * Urgent work — contract approvals, your-turn passes, waiting states, and
 //     pending reviews, computed live from the shared rooms.
 //   * Conversations — the private threads with the collaborator, newest first.
-// The Tandem inbox keeps only a brief notice row for each of these events and
+// The Nexet inbox keeps only a brief notice row for each of these events and
 // points here for the full detail.
 // ---------------------------------------------------------------------------
 
@@ -102,7 +102,7 @@ export function NotificationsPage() {
   const continuations = (continuationsQ.data ?? []) as any[];
   const unread = useMemo(() => rows.filter((n) => !n.read), [rows]);
 
-  // Urgent work — the same live room-state cards the Tandem inbox used to
+  // Urgent work — the same live room-state cards the Nexet inbox used to
   // show, now computed here so the studio becomes the home for them.
   const urgent: Array<{ key: string; label: string; body: string; href: string; icon: typeof Bell; tone: string }> = [];
   projects.forEach((p) => {

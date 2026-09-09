@@ -12,7 +12,7 @@ import {
 
 // ---------------------------------------------------------------------------
 // Account panels — the workspace storage card (2 GB free, buy-more on the
-// TANDEM subscriptions desk) and the CV card, both shown on the user profile
+// NEXET subscriptions desk) and the CV card, both shown on the user profile
 // page. The storage card is private to the profile owner (it is their
 // account's limit); the CV is visible to everyone who views the profile.
 // ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ export function formatBytes(bytes: number): string {
 
 // The workspace storage card — total space the account is limited to, the
 // current space used, and the space left. "Buy more space" goes straight to
-// the Creator Den storage row on the TANDEM Subscriptions page, where the
+// the Creator Den storage row on the NEXET Subscriptions page, where the
 // account's plans are listed and payable.
 export function StorageBar() {
   const quota = useGetAccountQuota();

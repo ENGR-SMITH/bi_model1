@@ -3,14 +3,14 @@ import { boolean, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core"
 
 // ---------------------------------------------------------------------------
 // Paystack payment intents — one row per checkout session opened with Paystack
-// for a TANDEM subscription (category pass, workspace storage, or projects).
+// for a NEXET subscription (category pass, workspace storage, or projects).
 // Written as PENDING when the checkout URL is created, then flipped to SUCCESS
 // (entitlement granted) or FAILED by the charge.success/charge.failed webhook
 // or the post-redirect verify call. The unique reference makes granting
 // idempotent: webhook and confirm-verify can race without double-granting.
 // ---------------------------------------------------------------------------
 
-export const tandemPaystackIntentsTable = pgTable("tandem_paystack_intents", {
+export const nexetPaystackIntentsTable = pgTable("nexet_paystack_intents", {
   // Paystack transaction reference — minted server-side (tan_<uuid>) and sent
   // to Paystack at initialize; Paystack echoes it back on webhook/verify.
   reference: text("reference").primaryKey(),
@@ -47,6 +47,6 @@ export const tandemPaystackIntentsTable = pgTable("tandem_paystack_intents", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const insertTandemPaystackIntentSchema = createInsertSchema(tandemPaystackIntentsTable);
+export const insertNexetPaystackIntentSchema = createInsertSchema(nexetPaystackIntentsTable);
 
-export type TandemPaystackIntent = typeof tandemPaystackIntentsTable.$inferSelect;
+export type NexetPaystackIntent = typeof nexetPaystackIntentsTable.$inferSelect;

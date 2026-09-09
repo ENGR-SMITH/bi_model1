@@ -1,8 +1,8 @@
 // ---------------------------------------------------------------------------
 // M1 processing pipeline — Postgres-backed job queue with an in-process worker.
 //
-// Today the queue is a `tandem_video_jobs` table polled by a setInterval loop
-// inside the API server process. When Tandem moves to Docker workers (per the
+// Today the queue is a `nexet_video_jobs` table polled by a setInterval loop
+// inside the API server process. When Nexet moves to Docker workers (per the
 // blueprint) the row contract stays identical: BullMQ/Redis simply becomes the
 // claim layer and the processors below move into the worker image unchanged.
 //
@@ -12,22 +12,22 @@
 //   - demo:  missing tools → a flagged copy of the original as the "proxy" and
 //            a clearly-marked demo transcript, so the whole M1 loop (upload →
 //            proxy → transcribe → studio) runs end-to-end today.
-//   - force demo: TANDEM_MEDIA_DEMO=1 always uses demo mode (tests do this).
+//   - force demo: NEXET_MEDIA_DEMO=1 always uses demo mode (tests do this).
 // ---------------------------------------------------------------------------
 
 import {
   db,
-  tandemVideoAssetFilesTable,
-  tandemVideoAssetsTable,
-  tandemVideoJobsTable,
-  tandemVideoReferencesTable,
-  tandemVideoSyncsTable,
-  tandemVideoTimelinesTable,
-  tandemVideoTimelineVersionsTable,
-  tandemVideoTranscriptsTable,
-  tandemVideoTranscriptSegmentsTable,
-  type TandemVideoAsset,
-  type TandemVideoJob,
+  nexetVideoAssetFilesTable,
+  nexetVideoAssetsTable,
+  nexetVideoJobsTable,
+  nexetVideoReferencesTable,
+  nexetVideoSyncsTable,
+  nexetVideoTimelinesTable,
+  nexetVideoTimelineVersionsTable,
+  nexetVideoTranscriptsTable,
+  nexetVideoTranscriptSegmentsTable,
+  type NexetVideoAsset,
+  type NexetVideoJob,
 } from "@workspace/db";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
@@ -158,7 +158,7 @@ function hasWhisper(): boolean {
 }
 
 export function detectTools(): { ffmpeg: boolean; ffprobe: boolean; whisper: boolean; melt: boolean } {
-  if (process.env.TANDEM_MEDIA_DEMO === "1") {
+  if (process.env.NEXET_MEDIA_DEMO === "1") {
     _tools = { ffmpeg: false, ffprobe: false, whisper: false, melt: false };
     return _tools;
   }
@@ -196,14 +196,14 @@ export function isDemoMode(): boolean {
 // ---------------------------------------------------------------------------
 
 export async function enqueueAssetJobs(
-  asset: TandemVideoAsset,
+  asset: NexetVideoAsset,
   types: ReadonlyArray<"PROXY" | "TRANSCRIBE"> = ["PROXY", "TRANSCRIBE"],
 ): Promise<void> {
   const jobs: Array<{ id: string; projectId: string; assetId: string; type: string }> = [];
   for (const type of types) {
     jobs.push({ id: randomUUID(), projectId: asset.projectId, assetId: asset.id, type });
   }
-  await db.insert(tandemVideoJobsTable).values(jobs);
+  await db.insert(nexetVideoJobsTable).values(jobs);
   for (const job of jobs) {
     emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "QUEUED" });
     await enqueueBullMqJob(job);
@@ -213,7 +213,7 @@ export async function enqueueAssetJobs(
 /** Re-queues a single PROXY job for an asset whose file went missing on disk. */
 export async function requeueProxyJob(projectId: string, assetId: string): Promise<void> {
   const job = { id: randomUUID(), projectId, assetId, type: "PROXY" as const };
-  await db.insert(tandemVideoJobsTable).values(job);
+  await db.insert(nexetVideoJobsTable).values(job);
   emitJobProgress({ projectId, jobId: job.id, type: job.type, status: "QUEUED" });
   await enqueueBullMqJob(job);
 }
@@ -223,9 +223,9 @@ export async function enqueueSyncJob(
   projectId: string,
   assetId: string,
   targetAssetId: string,
-): Promise<TandemVideoJob> {
+): Promise<NexetVideoJob> {
   const [job] = await db
-    .insert(tandemVideoJobsTable)
+    .insert(nexetVideoJobsTable)
     .values({
       id: randomUUID(),
       projectId,
@@ -248,7 +248,7 @@ export async function enqueueRenderJob(
   timelineVersionId: string,
 ): Promise<void> {
   const [job] = await db
-    .insert(tandemVideoJobsTable)
+    .insert(nexetVideoJobsTable)
     .values({
       id: randomUUID(),
       projectId,
@@ -270,9 +270,9 @@ export async function enqueueExportBundleJob(
   projectId: string,
   leg: string,
   includeMedia = false,
-): Promise<TandemVideoJob> {
+): Promise<NexetVideoJob> {
   const [job] = await db
-    .insert(tandemVideoJobsTable)
+    .insert(nexetVideoJobsTable)
     .values({
       id: randomUUID(),
       projectId,
@@ -290,12 +290,12 @@ export async function enqueueExportBundleJob(
 export async function hasActiveExportBundle(projectId: string, leg: string): Promise<boolean> {
   const active = await db
     .select()
-    .from(tandemVideoJobsTable)
+    .from(nexetVideoJobsTable)
     .where(
       and(
-        eq(tandemVideoJobsTable.projectId, projectId),
-        eq(tandemVideoJobsTable.type, "EXPORT_BUNDLE"),
-        inArray(tandemVideoJobsTable.status, ["QUEUED", "RUNNING"]),
+        eq(nexetVideoJobsTable.projectId, projectId),
+        eq(nexetVideoJobsTable.type, "EXPORT_BUNDLE"),
+        inArray(nexetVideoJobsTable.status, ["QUEUED", "RUNNING"]),
       ),
     );
   // A bundle job is leg-scoped via its params; the dedupe is per-leg.
@@ -306,12 +306,12 @@ export async function hasActiveExportBundle(projectId: string, leg: string): Pro
 export async function hasActiveRender(projectId: string, leg: string): Promise<boolean> {
   const active = await db
     .select()
-    .from(tandemVideoJobsTable)
+    .from(nexetVideoJobsTable)
     .where(
       and(
-        eq(tandemVideoJobsTable.projectId, projectId),
-        eq(tandemVideoJobsTable.type, "RENDER"),
-        inArray(tandemVideoJobsTable.status, ["QUEUED", "RUNNING"]),
+        eq(nexetVideoJobsTable.projectId, projectId),
+        eq(nexetVideoJobsTable.type, "RENDER"),
+        inArray(nexetVideoJobsTable.status, ["QUEUED", "RUNNING"]),
       ),
     );
   return active.length > 0;
@@ -330,7 +330,7 @@ interface ProxyResult {
   metadata: Record<string, unknown>;
 }
 
-async function processProxy(asset: TandemVideoAsset): Promise<ProxyResult> {
+async function processProxy(asset: NexetVideoAsset): Promise<ProxyResult> {
   const tools = detectTools();
   const sourcePath = path.join(uploadDir(), asset.storageKey);
 
@@ -409,9 +409,9 @@ async function processProxy(asset: TandemVideoAsset): Promise<ProxyResult> {
 
     if (durationMs !== null) {
       await db
-        .update(tandemVideoAssetsTable)
+        .update(nexetVideoAssetsTable)
         .set({ durationMs })
-        .where(eq(tandemVideoAssetsTable.id, asset.id));
+        .where(eq(nexetVideoAssetsTable.id, asset.id));
     }
     return result;
   }
@@ -428,7 +428,7 @@ async function processProxy(asset: TandemVideoAsset): Promise<ProxyResult> {
   };
 }
 
-async function processTranscribe(asset: TandemVideoAsset): Promise<{
+async function processTranscribe(asset: NexetVideoAsset): Promise<{
   transcriptId: string;
   model: string;
   demo: boolean;
@@ -463,7 +463,7 @@ async function processTranscribe(asset: TandemVideoAsset): Promise<{
     }
 
     const transcriptId = randomUUID();
-    await db.insert(tandemVideoTranscriptsTable).values({
+    await db.insert(nexetVideoTranscriptsTable).values({
       id: transcriptId,
       assetId: asset.id,
       language: payload.language || "en",
@@ -471,7 +471,7 @@ async function processTranscribe(asset: TandemVideoAsset): Promise<{
       status: "READY",
     });
     if (payload.segments.length > 0) {
-      await db.insert(tandemVideoTranscriptSegmentsTable).values(
+      await db.insert(nexetVideoTranscriptSegmentsTable).values(
         payload.segments.map((segment) => ({
           id: randomUUID(),
           transcriptId,
@@ -492,7 +492,7 @@ async function processTranscribe(asset: TandemVideoAsset): Promise<{
     "Demo transcript — install faster-whisper to transcribe this footage for real. " +
     "Every word here is placeholder text so the selects studio stays usable end-to-end.";
   const chunks = demoText.match(/.{1,72}(\s|$)/g) ?? [demoText];
-  await db.insert(tandemVideoTranscriptsTable).values({
+  await db.insert(nexetVideoTranscriptsTable).values({
     id: transcriptId,
     assetId: asset.id,
     language: "en",
@@ -507,7 +507,7 @@ async function processTranscribe(asset: TandemVideoAsset): Promise<{
     text: chunk.trim(),
     speaker: null,
   }));
-  await db.insert(tandemVideoTranscriptSegmentsTable).values(segments);
+  await db.insert(nexetVideoTranscriptSegmentsTable).values(segments);
   return { transcriptId, model: "demo", demo: true, segmentCount: segments.length };
 }
 
@@ -647,7 +647,7 @@ function extractPcm(filePath: string): Int16Array | null {
   return new Int16Array(run.stdout.buffer, run.stdout.byteOffset, run.stdout.length / 2);
 }
 
-async function processSync(asset: TandemVideoAsset, job: TandemVideoJob): Promise<{
+async function processSync(asset: NexetVideoAsset, job: NexetVideoJob): Promise<{
   offsetMs: number;
   method: string;
   demo: boolean;
@@ -659,8 +659,8 @@ async function processSync(asset: TandemVideoAsset, job: TandemVideoJob): Promis
 
   const [target] = await db
     .select()
-    .from(tandemVideoAssetsTable)
-    .where(eq(tandemVideoAssetsTable.id, targetAssetId))
+    .from(nexetVideoAssetsTable)
+    .where(eq(nexetVideoAssetsTable.id, targetAssetId))
     .limit(1);
   if (!target) {
     throw new Error(`Sync target asset ${targetAssetId} no longer exists`);
@@ -690,22 +690,22 @@ async function processSync(asset: TandemVideoAsset, job: TandemVideoJob): Promis
   // Upsert the sync pair (unique on primary + target).
   const [existing] = await db
     .select()
-    .from(tandemVideoSyncsTable)
+    .from(nexetVideoSyncsTable)
     .where(
       and(
-        eq(tandemVideoSyncsTable.primaryAssetId, asset.id),
-        eq(tandemVideoSyncsTable.targetAssetId, targetAssetId),
+        eq(nexetVideoSyncsTable.primaryAssetId, asset.id),
+        eq(nexetVideoSyncsTable.targetAssetId, targetAssetId),
       ),
     )
     .limit(1);
 
   if (existing) {
     await db
-      .update(tandemVideoSyncsTable)
+      .update(nexetVideoSyncsTable)
       .set({ offsetMs, method, status: "SYNCED", updatedAt: new Date() })
-      .where(eq(tandemVideoSyncsTable.id, existing.id));
+      .where(eq(nexetVideoSyncsTable.id, existing.id));
   } else {
-    await db.insert(tandemVideoSyncsTable).values({
+    await db.insert(nexetVideoSyncsTable).values({
       id: randomUUID(),
       projectId: asset.projectId,
       primaryAssetId: asset.id,
@@ -719,7 +719,7 @@ async function processSync(asset: TandemVideoAsset, job: TandemVideoJob): Promis
   return { offsetMs, method, demo: method === "DEMO" };
 }
 
-async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Promise<{
+async function processRender(asset: NexetVideoAsset, job: NexetVideoJob): Promise<{
   format: string;
   leg: string;
   demo: boolean;
@@ -736,11 +736,11 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
   if (!versionId) {
     const [timeline] = await db
       .select()
-      .from(tandemVideoTimelinesTable)
+      .from(nexetVideoTimelinesTable)
       .where(
         and(
-          eq(tandemVideoTimelinesTable.projectId, asset.projectId),
-          eq(tandemVideoTimelinesTable.leg, leg),
+          eq(nexetVideoTimelinesTable.projectId, asset.projectId),
+          eq(nexetVideoTimelinesTable.leg, leg),
         ),
       )
       .limit(1);
@@ -752,8 +752,8 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
 
   const [version] = await db
     .select()
-    .from(tandemVideoTimelineVersionsTable)
-    .where(eq(tandemVideoTimelineVersionsTable.id, versionId))
+    .from(nexetVideoTimelineVersionsTable)
+    .where(eq(nexetVideoTimelineVersionsTable.id, versionId))
     .limit(1);
   if (!version) {
     throw new Error("Timeline head version is missing");
@@ -774,8 +774,8 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
     for (const clip of clips) {
       const [src] = await db
         .select()
-        .from(tandemVideoAssetsTable)
-        .where(eq(tandemVideoAssetsTable.id, clip.assetId ?? ""))
+        .from(nexetVideoAssetsTable)
+        .where(eq(nexetVideoAssetsTable.id, clip.assetId ?? ""))
         .limit(1);
       if (!src) continue;
       // A render reads every referenced clip's original — restore any that
@@ -835,7 +835,7 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
 
     const stat = fs.statSync(outPath);
     const storageProvider = await persistArtifact(asset.projectId, outKey, outPath, "video/mp4");
-    await db.insert(tandemVideoAssetFilesTable).values({
+    await db.insert(nexetVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: asset.id,
       kind: "RENDER",
@@ -862,7 +862,7 @@ async function processRender(asset: TandemVideoAsset, job: TandemVideoJob): Prom
 
 // Applies an ffmpeg audio filter chain for a SOUND-leg pass. Real mode writes
 // an audio stem AssetFile; demo mode returns an honest receipt.
-async function processAudio(asset: TandemVideoAsset, job: TandemVideoJob): Promise<{
+async function processAudio(asset: NexetVideoAsset, job: NexetVideoJob): Promise<{
   action: string;
   demo: boolean;
   storageKey: string | null;
@@ -894,7 +894,7 @@ async function processAudio(asset: TandemVideoAsset, job: TandemVideoJob): Promi
     }
     const stat = fs.statSync(outPath);
     const storageProvider = await persistArtifact(asset.projectId, outKey, outPath, "audio/mp4");
-    await db.insert(tandemVideoAssetFilesTable).values({
+    await db.insert(nexetVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: asset.id,
       kind: "AUDIO_STEM",
@@ -911,7 +911,7 @@ async function processAudio(asset: TandemVideoAsset, job: TandemVideoJob): Promi
 }
 
 // Renders one export format (16:9 / 9:16 / 1:1) with aspect-safe framing.
-async function processExport(asset: TandemVideoAsset, job: TandemVideoJob): Promise<{
+async function processExport(asset: NexetVideoAsset, job: NexetVideoJob): Promise<{
   format: string;
   demo: boolean;
   storageKey: string | null;
@@ -962,7 +962,7 @@ async function processExport(asset: TandemVideoAsset, job: TandemVideoJob): Prom
     }
     const stat = fs.statSync(outPath);
     const storageProvider = await persistArtifact(asset.projectId, outKey, outPath, "video/mp4");
-    await db.insert(tandemVideoAssetFilesTable).values({
+    await db.insert(nexetVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: asset.id,
       kind: "EXPORT",
@@ -990,8 +990,8 @@ async function processExport(asset: TandemVideoAsset, job: TandemVideoJob): Prom
 // ---------------------------------------------------------------------------
 
 async function processExportBundle(
-  _asset: TandemVideoAsset | null,
-  job: TandemVideoJob,
+  _asset: NexetVideoAsset | null,
+  job: NexetVideoJob,
 ): Promise<{
   storageKey: string;
   mimeType: string;
@@ -1048,8 +1048,8 @@ async function processExportBundle(
     const assets = assetIds.length
       ? await db
           .select()
-          .from(tandemVideoAssetsTable)
-          .where(inArray(tandemVideoAssetsTable.id, assetIds))
+          .from(nexetVideoAssetsTable)
+          .where(inArray(nexetVideoAssetsTable.id, assetIds))
       : [];
     for (const asset of assets) {
       const sourcePath = path.join(uploadDir(), asset.storageKey);
@@ -1085,7 +1085,7 @@ async function processExportBundle(
   });
 
   // Record the artifact so the vault can discover it without re-probing.
-  await db.insert(tandemVideoAssetFilesTable).values({
+  await db.insert(nexetVideoAssetFilesTable).values({
     id: randomUUID(),
     // No anchor asset for a project-scoped bundle.
     assetId: null,
@@ -1108,7 +1108,7 @@ async function processExportBundle(
 }
 
 // Extracts + polishes a thumbnail frame (FFmpeg + ImageMagick when present).
-async function processThumbnail(asset: TandemVideoAsset, job: TandemVideoJob): Promise<{
+async function processThumbnail(asset: NexetVideoAsset, job: NexetVideoJob): Promise<{
   timeMs: number;
   demo: boolean;
   storageKey: string | null;
@@ -1124,8 +1124,8 @@ async function processThumbnail(asset: TandemVideoAsset, job: TandemVideoJob): P
       ? [asset]
       : await db
           .select()
-          .from(tandemVideoAssetsTable)
-          .where(eq(tandemVideoAssetsTable.id, sourceId))
+          .from(nexetVideoAssetsTable)
+          .where(eq(nexetVideoAssetsTable.id, sourceId))
           .limit(1);
   if (!source) {
     throw new Error("Thumbnail source asset no longer exists");
@@ -1163,7 +1163,7 @@ async function processThumbnail(asset: TandemVideoAsset, job: TandemVideoJob): P
 
     const stat = fs.statSync(outPath);
     const storageProvider = await persistArtifact(source.projectId, outKey, outPath, "image/jpeg");
-    await db.insert(tandemVideoAssetFilesTable).values({
+    await db.insert(nexetVideoAssetFilesTable).values({
       id: randomUUID(),
       assetId: source.id,
       kind: "THUMBNAIL",
@@ -1182,7 +1182,7 @@ async function processThumbnail(asset: TandemVideoAsset, job: TandemVideoJob): P
 // Viral reference import (M4): transcribe the reference and extract its
 // pacing — scene changes (FFmpeg) + transcript section boundaries — into a
 // beats structure the Architect can compare against while cutting.
-async function processReferenceAnalyze(asset: TandemVideoAsset, _job: TandemVideoJob): Promise<{
+async function processReferenceAnalyze(asset: NexetVideoAsset, _job: NexetVideoJob): Promise<{
   source: string;
   sections: Array<{ label: string; startMs: number; endMs: number }>;
   totalMs: number | null;
@@ -1228,16 +1228,16 @@ async function processReferenceAnalyze(asset: TandemVideoAsset, _job: TandemVide
   if (sceneStarts.length < 2) {
     const [transcript] = await db
       .select()
-      .from(tandemVideoTranscriptsTable)
-      .where(eq(tandemVideoTranscriptsTable.assetId, asset.id))
+      .from(nexetVideoTranscriptsTable)
+      .where(eq(nexetVideoTranscriptsTable.assetId, asset.id))
       .limit(1);
     let endMs = 300000;
     if (transcript) {
       const segments = await db
         .select()
-        .from(tandemVideoTranscriptSegmentsTable)
-        .where(eq(tandemVideoTranscriptSegmentsTable.transcriptId, transcript.id))
-        .orderBy(desc(tandemVideoTranscriptSegmentsTable.endMs))
+        .from(nexetVideoTranscriptSegmentsTable)
+        .where(eq(nexetVideoTranscriptSegmentsTable.transcriptId, transcript.id))
+        .orderBy(desc(nexetVideoTranscriptSegmentsTable.endMs))
         .limit(1);
       if (segments[0]) endMs = Math.max(segments[0].endMs, 30000);
     }
@@ -1258,17 +1258,17 @@ async function processReferenceAnalyze(asset: TandemVideoAsset, _job: TandemVide
   // Upsert the reference row (unique on assetId).
   const [existing] = await db
     .select()
-    .from(tandemVideoReferencesTable)
-    .where(eq(tandemVideoReferencesTable.assetId, asset.id))
+    .from(nexetVideoReferencesTable)
+    .where(eq(nexetVideoReferencesTable.assetId, asset.id))
     .limit(1);
   const pacing = { sections, totalMs, source: tools.ffmpeg ? "WHISPER+FFMPEG" : "DEMO" };
   if (existing) {
     await db
-      .update(tandemVideoReferencesTable)
+      .update(nexetVideoReferencesTable)
       .set({ status: "READY", pacing, error: null, updatedAt: new Date() })
-      .where(eq(tandemVideoReferencesTable.id, existing.id));
+      .where(eq(nexetVideoReferencesTable.id, existing.id));
   } else {
-    await db.insert(tandemVideoReferencesTable).values({
+    await db.insert(nexetVideoReferencesTable).values({
       id: randomUUID(),
       assetId: asset.id,
       status: "READY",
@@ -1281,7 +1281,7 @@ async function processReferenceAnalyze(asset: TandemVideoAsset, _job: TandemVide
 
 const PROCESSORS: Record<
   string,
-  (asset: TandemVideoAsset | null, job: TandemVideoJob) => Promise<unknown>
+  (asset: NexetVideoAsset | null, job: NexetVideoJob) => Promise<unknown>
 > = {
   PROXY: processProxy,
   TRANSCRIBE: processTranscribe,
@@ -1307,28 +1307,28 @@ const PROCESSORS: Record<
  * claimAndRun and swallows. Both paths share this code, so the row contract
  * is identical no matter which claim layer is in use.
  */
-export async function runJob(job: TandemVideoJob): Promise<void> {
+export async function runJob(job: NexetVideoJob): Promise<void> {
   await db
-    .update(tandemVideoJobsTable)
+    .update(nexetVideoJobsTable)
     .set({ status: "RUNNING", startedAt: new Date(), attempts: job.attempts + 1 })
-    .where(eq(tandemVideoJobsTable.id, job.id));
+    .where(eq(nexetVideoJobsTable.id, job.id));
   emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "RUNNING" });
 
   // Project-scoped jobs (EXPORT_BUNDLE checkout) have no anchor asset.
-  let asset: TandemVideoAsset | null = null;
+  let asset: NexetVideoAsset | null = null;
   if (job.assetId) {
     [asset] = await db
       .select()
-      .from(tandemVideoAssetsTable)
-      .where(eq(tandemVideoAssetsTable.id, job.assetId))
+      .from(nexetVideoAssetsTable)
+      .where(eq(nexetVideoAssetsTable.id, job.assetId))
       .limit(1);
 
     if (!asset) {
       const message = "Asset no longer exists";
       await db
-        .update(tandemVideoJobsTable)
+        .update(nexetVideoJobsTable)
         .set({ status: "FAILED", error: message, finishedAt: new Date() })
-        .where(eq(tandemVideoJobsTable.id, job.id));
+        .where(eq(nexetVideoJobsTable.id, job.id));
       emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "FAILED", error: message });
       throw new Error(message);
     }
@@ -1341,9 +1341,9 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
     if (!restored) {
       const message = "Source file is missing locally and no R2 copy could be restored";
       await db
-        .update(tandemVideoJobsTable)
+        .update(nexetVideoJobsTable)
         .set({ status: "FAILED", error: message, finishedAt: new Date() })
-        .where(eq(tandemVideoJobsTable.id, job.id));
+        .where(eq(nexetVideoJobsTable.id, job.id));
       emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "FAILED", error: message });
       throw new Error(message);
     }
@@ -1353,9 +1353,9 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
   if (!processor) {
     const message = `Unknown job type: ${job.type}`;
     await db
-      .update(tandemVideoJobsTable)
+      .update(nexetVideoJobsTable)
       .set({ status: "FAILED", error: message, finishedAt: new Date() })
-      .where(eq(tandemVideoJobsTable.id, job.id));
+      .where(eq(nexetVideoJobsTable.id, job.id));
     emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "FAILED", error: message });
     throw new Error(message);
   }
@@ -1363,9 +1363,9 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
   try {
     const result = await processor(asset, job);
     await db
-      .update(tandemVideoJobsTable)
+      .update(nexetVideoJobsTable)
       .set({ status: "SUCCEEDED", result, finishedAt: new Date() })
-      .where(eq(tandemVideoJobsTable.id, job.id));
+      .where(eq(nexetVideoJobsTable.id, job.id));
     emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "SUCCEEDED" });
 
     // Record the produced artifact (proxy file) as an asset file row so the
@@ -1374,7 +1374,7 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
     // bundle row inside the processor too.
     if (job.type === "PROXY") {
       const proxy = result as ProxyResult;
-      await db.insert(tandemVideoAssetFilesTable).values({
+      await db.insert(nexetVideoAssetFilesTable).values({
         id: randomUUID(),
         assetId: asset!.id,
         kind: "PROXY",
@@ -1390,9 +1390,9 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
     logger.info({ jobId: job.id, type: job.type, assetId: asset?.id ?? null }, "Video job succeeded");
   } catch (error) {
     await db
-      .update(tandemVideoJobsTable)
+      .update(nexetVideoJobsTable)
       .set({ status: "FAILED", error: (error as Error).message, finishedAt: new Date() })
-      .where(eq(tandemVideoJobsTable.id, job.id));
+      .where(eq(nexetVideoJobsTable.id, job.id));
     emitJobProgress({ projectId: job.projectId, jobId: job.id, type: job.type, status: "FAILED", error: (error as Error).message });
     logger.error({ jobId: job.id, type: job.type, err: error }, "Video job failed");
     throw error;
@@ -1400,7 +1400,7 @@ export async function runJob(job: TandemVideoJob): Promise<void> {
 }
 
 /** Polling-loop entry: run a job but never throw (the loop keeps going). */
-async function claimAndRun(job: TandemVideoJob): Promise<void> {
+async function claimAndRun(job: NexetVideoJob): Promise<void> {
   try {
     await runJob(job);
   } catch (error) {
@@ -1411,23 +1411,23 @@ async function claimAndRun(job: TandemVideoJob): Promise<void> {
 async function markAssetProcessedIfDone(assetId: string): Promise<void> {
   const remaining = await db
     .select()
-    .from(tandemVideoJobsTable)
+    .from(nexetVideoJobsTable)
     .where(
       and(
-        eq(tandemVideoJobsTable.assetId, assetId),
-        inArray(tandemVideoJobsTable.status, ["QUEUED", "RUNNING"]),
+        eq(nexetVideoJobsTable.assetId, assetId),
+        inArray(nexetVideoJobsTable.status, ["QUEUED", "RUNNING"]),
       ),
     );
   if (remaining.length === 0) {
     const [asset] = await db
       .select()
-      .from(tandemVideoAssetsTable)
-      .where(eq(tandemVideoAssetsTable.id, assetId))
+      .from(nexetVideoAssetsTable)
+      .where(eq(nexetVideoAssetsTable.id, assetId))
       .limit(1);
     await db
-      .update(tandemVideoAssetsTable)
+      .update(nexetVideoAssetsTable)
       .set({ status: "PROCESSED" })
-      .where(eq(tandemVideoAssetsTable.id, assetId));
+      .where(eq(nexetVideoAssetsTable.id, assetId));
     if (asset) {
       emitToProject(asset.projectId, "asset.processed", {
         projectId: asset.projectId,
@@ -1441,9 +1441,9 @@ async function markAssetProcessedIfDone(assetId: string): Promise<void> {
 export async function runWorkerCycle(): Promise<void> {
   const jobs = await db
     .select()
-    .from(tandemVideoJobsTable)
-    .where(eq(tandemVideoJobsTable.status, "QUEUED"))
-    .orderBy(asc(tandemVideoJobsTable.createdAt))
+    .from(nexetVideoJobsTable)
+    .where(eq(nexetVideoJobsTable.status, "QUEUED"))
+    .orderBy(asc(nexetVideoJobsTable.createdAt))
     .limit(JOB_BATCH_SIZE);
 
   for (const job of jobs) {

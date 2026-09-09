@@ -58,11 +58,11 @@ function ClerkGate({ children }: { children: React.ReactNode }) {
               marginBottom: 12,
             }}
           >
-            Your desk is signed in on Tandem.
+            Your desk is signed in on Nexet.
           </h1>
           <p style={{ lineHeight: 1.7 }}>
-            Authors Den lives inside the same Tandem account — sign in on the
-            Tandem app, then come back here. Seeds you answer and publish are
+            Authors Den lives inside the same Nexet account — sign in on the
+            Nexet app, then come back here. Seeds you answer and publish are
             tied to your identity.
           </p>
           <a

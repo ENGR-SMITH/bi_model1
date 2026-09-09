@@ -1,12 +1,12 @@
 import { getAuth } from "@clerk/express";
 import {
   db,
-  tandemChannelsTable,
-  tandemChannelMembersTable,
-  tandemVideoMembersTable,
-  tandemVideoProjectsTable,
-  type TandemChannel,
-  type TandemChannelMember,
+  nexetChannelsTable,
+  nexetChannelMembersTable,
+  nexetVideoMembersTable,
+  nexetVideoProjectsTable,
+  type NexetChannel,
+  type NexetChannelMember,
 } from "@workspace/db";
 import {
   CreateChannelBody,
@@ -57,14 +57,14 @@ const router: IRouter = Router();
 export async function channelMembership(
   channelId: string,
   userId: string,
-): Promise<TandemChannelMember | null> {
+): Promise<NexetChannelMember | null> {
   const [row] = await db
     .select()
-    .from(tandemChannelMembersTable)
+    .from(nexetChannelMembersTable)
     .where(
       and(
-        eq(tandemChannelMembersTable.channelId, channelId),
-        eq(tandemChannelMembersTable.userId, userId),
+        eq(nexetChannelMembersTable.channelId, channelId),
+        eq(nexetChannelMembersTable.userId, userId),
       ),
     )
     .limit(1);
@@ -80,48 +80,48 @@ export async function visibleChannelProjectRows(
   channelId: string,
   userId: string,
   role: string,
-): Promise<typeof tandemVideoProjectsTable.$inferSelect[]> {
+): Promise<typeof nexetVideoProjectsTable.$inferSelect[]> {
   if (role === "OWNER") {
     return db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.channelId, channelId))
-      .orderBy(desc(tandemVideoProjectsTable.updatedAt));
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.channelId, channelId))
+      .orderBy(desc(nexetVideoProjectsTable.updatedAt));
   }
   const memberships = await db
-    .select({ projectId: tandemVideoMembersTable.projectId })
-    .from(tandemVideoMembersTable)
+    .select({ projectId: nexetVideoMembersTable.projectId })
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        eq(tandemVideoMembersTable.userId, userId),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        eq(nexetVideoMembersTable.userId, userId),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     );
   const memberProjectIds = memberships.map((m) => m.projectId);
   if (memberProjectIds.length === 0) return [];
   return db
     .select()
-    .from(tandemVideoProjectsTable)
+    .from(nexetVideoProjectsTable)
     .where(
       and(
-        eq(tandemVideoProjectsTable.channelId, channelId),
-        inArray(tandemVideoProjectsTable.id, memberProjectIds),
+        eq(nexetVideoProjectsTable.channelId, channelId),
+        inArray(nexetVideoProjectsTable.id, memberProjectIds),
       ),
     )
-    .orderBy(desc(tandemVideoProjectsTable.updatedAt));
+    .orderBy(desc(nexetVideoProjectsTable.updatedAt));
 }
 
 /** One ChannelSummary row (channel + viewer role + the viewer's counts). */
 async function summarizeChannel(
-  channel: TandemChannel,
+  channel: NexetChannel,
   role: string,
   userId: string,
 ): Promise<typeof CreateChannelResponse._type> {
   const visible = await visibleChannelProjectRows(channel.id, userId, role);
   const memberRows = await db
-    .select({ id: tandemChannelMembersTable.id })
-    .from(tandemChannelMembersTable)
-    .where(eq(tandemChannelMembersTable.channelId, channel.id));
+    .select({ id: nexetChannelMembersTable.id })
+    .from(nexetChannelMembersTable)
+    .where(eq(nexetChannelMembersTable.channelId, channel.id));
   return {
     id: channel.id,
     ownerId: channel.ownerId,
@@ -152,17 +152,17 @@ router.get("/channels", async (req, res): Promise<void> => {
 
   const rows = await db
     .select()
-    .from(tandemChannelMembersTable)
-    .where(eq(tandemChannelMembersTable.userId, userId));
+    .from(nexetChannelMembersTable)
+    .where(eq(nexetChannelMembersTable.userId, userId));
 
   const channels =
     rows.length > 0
       ? await db
           .select()
-          .from(tandemChannelsTable)
+          .from(nexetChannelsTable)
           .where(
             inArray(
-              tandemChannelsTable.id,
+              nexetChannelsTable.id,
               rows.map((r) => r.channelId),
             ),
           )
@@ -196,7 +196,7 @@ router.post("/channels", async (req, res): Promise<void> => {
   const channelId = randomUUID();
   const [channel] = await db.transaction(async (tx) => {
     const [created] = await tx
-      .insert(tandemChannelsTable)
+      .insert(nexetChannelsTable)
       .values({
         id: channelId,
         ownerId: userId,
@@ -204,7 +204,7 @@ router.post("/channels", async (req, res): Promise<void> => {
         name: body.data.name.trim(),
       })
       .returning();
-    await tx.insert(tandemChannelMembersTable).values({
+    await tx.insert(nexetChannelMembersTable).values({
       id: randomUUID(),
       channelId,
       userId,
@@ -232,8 +232,8 @@ router.get("/channels/:channelId", async (req: Request, res): Promise<void> => {
 
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, params.data.channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, params.data.channelId))
     .limit(1);
   if (!channel) {
     res.status(404).json({ error: "Channel not found" });
@@ -268,8 +268,8 @@ router.patch("/channels/:channelId", async (req: Request, res): Promise<void> =>
 
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, params.data.channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, params.data.channelId))
     .limit(1);
   if (!channel) {
     res.status(404).json({ error: "Channel not found" });
@@ -281,9 +281,9 @@ router.patch("/channels/:channelId", async (req: Request, res): Promise<void> =>
   }
 
   const [updated] = await db
-    .update(tandemChannelsTable)
+    .update(nexetChannelsTable)
     .set({ name: body.data.name.trim(), updatedAt: new Date() })
-    .where(eq(tandemChannelsTable.id, channel.id))
+    .where(eq(nexetChannelsTable.id, channel.id))
     .returning();
 
   res.json(UpdateChannelResponse.parse(await summarizeChannel(updated, "OWNER", userId)));
@@ -306,8 +306,8 @@ router.delete("/channels/:channelId", async (req: Request, res): Promise<void> =
 
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, params.data.channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, params.data.channelId))
     .limit(1);
   if (!channel) {
     res.status(404).json({ error: "Channel not found" });
@@ -319,9 +319,9 @@ router.delete("/channels/:channelId", async (req: Request, res): Promise<void> =
   }
 
   const [project] = await db
-    .select({ id: tandemVideoProjectsTable.id })
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.channelId, channel.id))
+    .select({ id: nexetVideoProjectsTable.id })
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.channelId, channel.id))
     .limit(1);
   if (project) {
     res.status(409).json({
@@ -332,9 +332,9 @@ router.delete("/channels/:channelId", async (req: Request, res): Promise<void> =
 
   await db.transaction(async (tx) => {
     await tx
-      .delete(tandemChannelMembersTable)
-      .where(eq(tandemChannelMembersTable.channelId, channel.id));
-    await tx.delete(tandemChannelsTable).where(eq(tandemChannelsTable.id, channel.id));
+      .delete(nexetChannelMembersTable)
+      .where(eq(nexetChannelMembersTable.channelId, channel.id));
+    await tx.delete(nexetChannelsTable).where(eq(nexetChannelsTable.id, channel.id));
   });
 
   res.status(204).end();
@@ -357,8 +357,8 @@ router.get("/channels/:channelId/people", async (req: Request, res): Promise<voi
 
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, params.data.channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, params.data.channelId))
     .limit(1);
   if (!channel) {
     res.status(404).json({ error: "Channel not found" });
@@ -372,24 +372,24 @@ router.get("/channels/:channelId/people", async (req: Request, res): Promise<voi
 
   const members = await db
     .select()
-    .from(tandemChannelMembersTable)
-    .where(eq(tandemChannelMembersTable.channelId, channel.id));
+    .from(nexetChannelMembersTable)
+    .where(eq(nexetChannelMembersTable.channelId, channel.id));
 
   // Every project in the channel + its ACTIVE member rows → roles per user.
   const projects = await db
     .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.channelId, channel.id));
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.channelId, channel.id));
   const projectIds = projects.map((p) => p.id);
   const memberRows =
     projectIds.length > 0
       ? await db
           .select()
-          .from(tandemVideoMembersTable)
+          .from(nexetVideoMembersTable)
           .where(
             and(
-              inArray(tandemVideoMembersTable.projectId, projectIds),
-              eq(tandemVideoMembersTable.status, "ACTIVE"),
+              inArray(nexetVideoMembersTable.projectId, projectIds),
+              eq(nexetVideoMembersTable.status, "ACTIVE"),
             ),
           )
       : [];
@@ -483,8 +483,8 @@ router.post(
 
     const [channel] = await db
       .select()
-      .from(tandemChannelsTable)
-      .where(eq(tandemChannelsTable.id, params.data.channelId))
+      .from(nexetChannelsTable)
+      .where(eq(nexetChannelsTable.id, params.data.channelId))
       .limit(1);
     if (!channel) {
       res.status(404).json({ error: "Channel not found" });
@@ -520,8 +520,8 @@ router.post(
 
     const [channel] = await db
       .select()
-      .from(tandemChannelsTable)
-      .where(eq(tandemChannelsTable.id, params.data.channelId))
+      .from(nexetChannelsTable)
+      .where(eq(nexetChannelsTable.id, params.data.channelId))
       .limit(1);
     if (!channel) {
       res.status(404).json({ error: "Channel not found" });
@@ -547,8 +547,8 @@ router.get("/channels/:channelId/projects", async (req: Request, res): Promise<v
 
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, params.data.channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, params.data.channelId))
     .limit(1);
   if (!channel) {
     res.status(404).json({ error: "Channel not found" });

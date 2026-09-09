@@ -11,7 +11,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
-export const tandemChannelsTable = sqliteTable("tandem_channels", {
+export const nexetChannelsTable = sqliteTable("nexet_channels", {
   id: text("id").primaryKey(),
   ownerId: text("owner_id").notNull(),
   status: text("status").notNull().default("CREATED"),
@@ -26,8 +26,8 @@ export const tandemChannelsTable = sqliteTable("tandem_channels", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemChannelMembersTable = sqliteTable(
-  "tandem_channel_members",
+export const nexetChannelMembersTable = sqliteTable(
+  "nexet_channel_members",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -36,12 +36,12 @@ export const tandemChannelMembersTable = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    channelUserUnique: unique("tandem_channel_member_channel_user").on(table.channelId, table.userId),
+    channelUserUnique: unique("nexet_channel_member_channel_user").on(table.channelId, table.userId),
   }),
 );
 
-export const tandemChannelOauthTable = sqliteTable(
-  "tandem_channel_oauth",
+export const nexetChannelOauthTable = sqliteTable(
+  "nexet_channel_oauth",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -57,15 +57,15 @@ export const tandemChannelOauthTable = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    channelUnique: unique("tandem_channel_oauth_channel_unique").on(table.channelId),
+    channelUnique: unique("nexet_channel_oauth_channel_unique").on(table.channelId),
   }),
 );
 
 // ---- Channel analytics (Phase 3) — mirrors lib/db/src/schema/channel-analytics.ts
 // jsonb → TEXT, date → TEXT (YYYY-MM-DD), timestamp → INTEGER mode "timestamp".
 
-export const tandemChannelVideosTable = sqliteTable(
-  "tandem_channel_videos",
+export const nexetChannelVideosTable = sqliteTable(
+  "nexet_channel_videos",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -82,12 +82,12 @@ export const tandemChannelVideosTable = sqliteTable(
     lastSyncedAt: integer("last_synced_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    channelVideoUnique: unique("tandem_channel_video_channel_video").on(table.channelId, table.youtubeVideoId),
+    channelVideoUnique: unique("nexet_channel_video_channel_video").on(table.channelId, table.youtubeVideoId),
   }),
 );
 
-export const tandemChannelDailyMetricsTable = sqliteTable(
-  "tandem_channel_daily_metrics",
+export const nexetChannelDailyMetricsTable = sqliteTable(
+  "nexet_channel_daily_metrics",
   {
     channelId: text("channel_id").notNull(),
     day: text("day").notNull(),
@@ -95,24 +95,24 @@ export const tandemChannelDailyMetricsTable = sqliteTable(
     source: text("source").notNull().default("youtube"),
   },
   (table) => ({
-    channelDayUnique: unique("tandem_channel_daily_metric_channel_day").on(table.channelId, table.day),
+    channelDayUnique: unique("nexet_channel_daily_metric_channel_day").on(table.channelId, table.day),
   }),
 );
 
-export const tandemVideoDailyMetricsTable = sqliteTable(
-  "tandem_video_daily_metrics",
+export const nexetVideoDailyMetricsTable = sqliteTable(
+  "nexet_video_daily_metrics",
   {
     videoRowId: text("video_row_id").notNull(),
     day: text("day").notNull(),
     metrics: text("metrics", { mode: "json" }).notNull(),
   },
   (table) => ({
-    videoDayUnique: unique("tandem_video_daily_metric_video_day").on(table.videoRowId, table.day),
+    videoDayUnique: unique("nexet_video_daily_metric_video_day").on(table.videoRowId, table.day),
   }),
 );
 
-export const tandemAnalyticsReportsTable = sqliteTable(
-  "tandem_analytics_reports",
+export const nexetAnalyticsReportsTable = sqliteTable(
+  "nexet_analytics_reports",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -124,11 +124,11 @@ export const tandemAnalyticsReportsTable = sqliteTable(
     fetchedAt: integer("fetched_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    reportUnique: unique("tandem_analytics_report_channel_kind_period").on(table.channelId, table.videoRowId, table.kind, table.periodStart, table.periodEnd),
+    reportUnique: unique("nexet_analytics_report_channel_kind_period").on(table.channelId, table.videoRowId, table.kind, table.periodStart, table.periodEnd),
   }),
 );
 
-export const tandemChannelSyncsTable = sqliteTable("tandem_channel_syncs", {
+export const nexetChannelSyncsTable = sqliteTable("nexet_channel_syncs", {
   channelId: text("channel_id").primaryKey(),
   lastVideoSyncAt: integer("last_video_sync_at", { mode: "timestamp" }),
   lastMetricsSyncAt: integer("last_metrics_sync_at", { mode: "timestamp" }),
@@ -138,8 +138,8 @@ export const tandemChannelSyncsTable = sqliteTable("tandem_channel_syncs", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemChannelAlertsTable = sqliteTable(
-  "tandem_channel_alerts",
+export const nexetChannelAlertsTable = sqliteTable(
+  "nexet_channel_alerts",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -149,7 +149,7 @@ export const tandemChannelAlertsTable = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    ruleWindowUnique: unique("tandem_channel_alert_rule_window").on(table.channelId, table.rule, table.periodStart),
+    ruleWindowUnique: unique("nexet_channel_alert_rule_window").on(table.channelId, table.rule, table.periodStart),
   }),
 );
 
@@ -158,8 +158,8 @@ export const tandemChannelAlertsTable = sqliteTable(
 // "timestamp"; pg bigint → INTEGER. Partial unique indexes are supported by
 // SQLite (CREATE UNIQUE INDEX … WHERE), same as the seed_applications mirror.
 
-export const tandemArenaPostsTable = sqliteTable(
-  "tandem_arena_posts",
+export const nexetArenaPostsTable = sqliteTable(
+  "nexet_arena_posts",
   {
     id: text("id").primaryKey(),
     channelId: text("channel_id").notNull(),
@@ -173,14 +173,14 @@ export const tandemArenaPostsTable = sqliteTable(
   },
   (table) => ({
     // One OPEN post per (project, role) — mirrors the pg partial unique index.
-    openProjectRoleUnique: uniqueIndex("tandem_arena_post_open_project_role_unique")
+    openProjectRoleUnique: uniqueIndex("nexet_arena_post_open_project_role_unique")
       .on(table.projectId, table.role)
       .where(sql`${table.status} = 'OPEN'`),
   }),
 );
 
-export const tandemArenaApplicationsTable = sqliteTable(
-  "tandem_arena_applications",
+export const nexetArenaApplicationsTable = sqliteTable(
+  "nexet_arena_applications",
   {
     id: text("id").primaryKey(),
     postId: text("post_id").notNull(),
@@ -196,13 +196,13 @@ export const tandemArenaApplicationsTable = sqliteTable(
   },
   (table) => ({
     // One PENDING audition per (post, applicant) — mirrors the pg partial index.
-    pendingPostApplicantUnique: uniqueIndex("tandem_arena_application_pending_post_applicant_unique")
+    pendingPostApplicantUnique: uniqueIndex("nexet_arena_application_pending_post_applicant_unique")
       .on(table.postId, table.applicantId)
       .where(sql`${table.status} = 'PENDING'`),
   }),
 );
 
-export const tandemArenaApplicationFilesTable = sqliteTable("tandem_arena_application_files", {
+export const nexetArenaApplicationFilesTable = sqliteTable("nexet_arena_application_files", {
   id: text("id").primaryKey(),
   applicationId: text("application_id").notNull(),
   fileName: text("file_name").notNull(),
@@ -212,7 +212,7 @@ export const tandemArenaApplicationFilesTable = sqliteTable("tandem_arena_applic
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemArenaWatchesTable = sqliteTable("tandem_arena_watches", {
+export const nexetArenaWatchesTable = sqliteTable("nexet_arena_watches", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   role: text("role").notNull(),
@@ -221,8 +221,8 @@ export const tandemArenaWatchesTable = sqliteTable("tandem_arena_watches", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemArenaReviewsTable = sqliteTable(
-  "tandem_arena_reviews",
+export const nexetArenaReviewsTable = sqliteTable(
+  "nexet_arena_reviews",
   {
     id: text("id").primaryKey(),
     applicationId: text("application_id").notNull(),
@@ -235,15 +235,15 @@ export const tandemArenaReviewsTable = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    applicationReviewerUnique: unique("tandem_arena_review_application_reviewer_unique").on(
+    applicationReviewerUnique: unique("nexet_arena_review_application_reviewer_unique").on(
       table.applicationId,
       table.reviewerId,
     ),
   }),
 );
 
-export const tandemArenaBlocksTable = sqliteTable(
-  "tandem_arena_blocks",
+export const nexetArenaBlocksTable = sqliteTable(
+  "nexet_arena_blocks",
   {
     id: text("id").primaryKey(),
     captainId: text("captain_id").notNull(),
@@ -251,15 +251,15 @@ export const tandemArenaBlocksTable = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    captainApplicantUnique: unique("tandem_arena_block_captain_applicant_unique").on(
+    captainApplicantUnique: unique("nexet_arena_block_captain_applicant_unique").on(
       table.captainId,
       table.applicantId,
     ),
   }),
 );
 
-export const tandemVideoStorageSnapshotsTable = sqliteTable(
-  "tandem_video_storage_snapshots",
+export const nexetVideoStorageSnapshotsTable = sqliteTable(
+  "nexet_video_storage_snapshots",
   {
     projectId: text("project_id").notNull(),
     ownerId: text("owner_id").notNull(),
@@ -270,7 +270,7 @@ export const tandemVideoStorageSnapshotsTable = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    projectDayUnique: unique("tandem_video_storage_snapshot_project_day").on(table.projectId, table.day),
+    projectDayUnique: unique("nexet_video_storage_snapshot_project_day").on(table.projectId, table.day),
   }),
 );
 
@@ -480,7 +480,7 @@ export const collaborationGenealogyTable = sqliteTable("collaboration_genealogy"
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoProjectsTable = sqliteTable("tandem_video_projects", {
+export const nexetVideoProjectsTable = sqliteTable("nexet_video_projects", {
   id: text("id").primaryKey(),
   channelId: text("channel_id"),
   ownerId: text("owner_id").notNull(),
@@ -492,8 +492,8 @@ export const tandemVideoProjectsTable = sqliteTable("tandem_video_projects", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoFollowsTable = sqliteTable(
-  "tandem_video_follows",
+export const nexetVideoFollowsTable = sqliteTable(
+  "nexet_video_follows",
   {
     id: text("id").primaryKey(),
     followerId: text("follower_id").notNull(),
@@ -501,12 +501,12 @@ export const tandemVideoFollowsTable = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    followerFollowingUnique: unique("tandem_video_follow_follower_following").on(table.followerId, table.followingId),
+    followerFollowingUnique: unique("nexet_video_follow_follower_following").on(table.followerId, table.followingId),
   }),
 );
 
-export const tandemVideoMembersTable = sqliteTable(
-  "tandem_video_members",
+export const nexetVideoMembersTable = sqliteTable(
+  "nexet_video_members",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
@@ -517,11 +517,11 @@ export const tandemVideoMembersTable = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    projectUserUnique: unique("tandem_video_member_project_user").on(table.projectId, table.userId),
+    projectUserUnique: unique("nexet_video_member_project_user").on(table.projectId, table.userId),
   }),
 );
 
-export const tandemVideoAssetsTable = sqliteTable("tandem_video_assets", {
+export const nexetVideoAssetsTable = sqliteTable("nexet_video_assets", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   uploaderId: text("uploader_id").notNull(),
@@ -539,7 +539,7 @@ export const tandemVideoAssetsTable = sqliteTable("tandem_video_assets", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoAssetFilesTable = sqliteTable("tandem_video_asset_files", {
+export const nexetVideoAssetFilesTable = sqliteTable("nexet_video_asset_files", {
   id: text("id").primaryKey(),
   assetId: text("asset_id"),
   kind: text("kind").notNull(),
@@ -552,8 +552,8 @@ export const tandemVideoAssetFilesTable = sqliteTable("tandem_video_asset_files"
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoTranscriptsTable = sqliteTable(
-  "tandem_video_transcripts",
+export const nexetVideoTranscriptsTable = sqliteTable(
+  "nexet_video_transcripts",
   {
     id: text("id").primaryKey(),
     assetId: text("asset_id").notNull(),
@@ -564,11 +564,11 @@ export const tandemVideoTranscriptsTable = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    assetUnique: unique("tandem_video_transcript_asset_unique").on(table.assetId),
+    assetUnique: unique("nexet_video_transcript_asset_unique").on(table.assetId),
   }),
 );
 
-export const tandemVideoTranscriptSegmentsTable = sqliteTable("tandem_video_transcript_segments", {
+export const nexetVideoTranscriptSegmentsTable = sqliteTable("nexet_video_transcript_segments", {
   id: text("id").primaryKey(),
   transcriptId: text("transcript_id").notNull(),
   startMs: integer("start_ms").notNull(),
@@ -578,8 +578,8 @@ export const tandemVideoTranscriptSegmentsTable = sqliteTable("tandem_video_tran
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoTimelinesTable = sqliteTable(
-  "tandem_video_timelines",
+export const nexetVideoTimelinesTable = sqliteTable(
+  "nexet_video_timelines",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
@@ -590,12 +590,12 @@ export const tandemVideoTimelinesTable = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    projectLegUnique: unique("tandem_video_timeline_project_leg").on(table.projectId, table.leg),
+    projectLegUnique: unique("nexet_video_timeline_project_leg").on(table.projectId, table.leg),
   }),
 );
 
-export const tandemVideoTimelineVersionsTable = sqliteTable(
-  "tandem_video_timeline_versions",
+export const nexetVideoTimelineVersionsTable = sqliteTable(
+  "nexet_video_timeline_versions",
   {
     id: text("id").primaryKey(),
     timelineId: text("timeline_id").notNull(),
@@ -607,11 +607,11 @@ export const tandemVideoTimelineVersionsTable = sqliteTable(
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    timelineVersionUnique: unique("tandem_video_timeline_version_unique").on(table.timelineId, table.version),
+    timelineVersionUnique: unique("nexet_video_timeline_version_unique").on(table.timelineId, table.version),
   }),
 );
 
-export const tandemVideoSubmissionsTable = sqliteTable("tandem_video_submissions", {
+export const nexetVideoSubmissionsTable = sqliteTable("nexet_video_submissions", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   leg: text("leg").notNull(),
@@ -626,7 +626,7 @@ export const tandemVideoSubmissionsTable = sqliteTable("tandem_video_submissions
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoCommentsTable = sqliteTable("tandem_video_comments", {
+export const nexetVideoCommentsTable = sqliteTable("nexet_video_comments", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   leg: text("leg"),
@@ -645,7 +645,7 @@ export const tandemVideoCommentsTable = sqliteTable("tandem_video_comments", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoChatMessagesTable = sqliteTable("tandem_video_chat_messages", {
+export const nexetVideoChatMessagesTable = sqliteTable("nexet_video_chat_messages", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   authorId: text("author_id").notNull(),
@@ -656,8 +656,8 @@ export const tandemVideoChatMessagesTable = sqliteTable("tandem_video_chat_messa
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoReferencesTable = sqliteTable(
-  "tandem_video_references",
+export const nexetVideoReferencesTable = sqliteTable(
+  "nexet_video_references",
   {
     id: text("id").primaryKey(),
     assetId: text("asset_id").notNull(),
@@ -668,11 +668,11 @@ export const tandemVideoReferencesTable = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    referenceAssetUnique: unique("tandem_video_reference_asset_unique").on(table.assetId),
+    referenceAssetUnique: unique("nexet_video_reference_asset_unique").on(table.assetId),
   }),
 );
 
-export const tandemVideoGrantsTable = sqliteTable("tandem_video_grants", {
+export const nexetVideoGrantsTable = sqliteTable("nexet_video_grants", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   // JSON array of role strings, e.g. ["VIDEO", "AUDIO"] or ["ALL"].
@@ -685,7 +685,7 @@ export const tandemVideoGrantsTable = sqliteTable("tandem_video_grants", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoNotificationsTable = sqliteTable("tandem_video_notifications", {
+export const nexetVideoNotificationsTable = sqliteTable("nexet_video_notifications", {
   id: text("id").primaryKey(),
   recipientId: text("recipient_id").notNull(),
   category: text("category").notNull(),
@@ -697,7 +697,7 @@ export const tandemVideoNotificationsTable = sqliteTable("tandem_video_notificat
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemAccountQuotasTable = sqliteTable("tandem_account_quotas", {
+export const nexetAccountQuotasTable = sqliteTable("nexet_account_quotas", {
   userId: text("user_id").primaryKey(),
   // Mirrors the pg bigint: the 2 GB free tier (2^31) overflows a 32-bit int.
   storageLimitBytes: integer("storage_limit_bytes").notNull(),
@@ -705,7 +705,7 @@ export const tandemAccountQuotasTable = sqliteTable("tandem_account_quotas", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemTicketsTable = sqliteTable("tandem_tickets", {
+export const nexetTicketsTable = sqliteTable("nexet_tickets", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   category: text("category").notNull(),
@@ -716,7 +716,7 @@ export const tandemTicketsTable = sqliteTable("tandem_tickets", {
   expiresAt: integer("expires_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemToursTable = sqliteTable("tandem_tours", {
+export const nexetToursTable = sqliteTable("nexet_tours", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   category: text("category").notNull(),
@@ -724,7 +724,7 @@ export const tandemToursTable = sqliteTable("tandem_tours", {
   endsAt: integer("ends_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemPromoCodesTable = sqliteTable("tandem_promo_codes", {
+export const nexetPromoCodesTable = sqliteTable("nexet_promo_codes", {
   code: text("code").primaryKey(),
   kind: text("kind").notNull(),
   value: integer("value").notNull().default(0),
@@ -735,8 +735,8 @@ export const tandemPromoCodesTable = sqliteTable("tandem_promo_codes", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemPromoRedemptionsTable = sqliteTable(
-  "tandem_promo_redemptions",
+export const nexetPromoRedemptionsTable = sqliteTable(
+  "nexet_promo_redemptions",
   {
     code: text("code").notNull(),
     userId: text("user_id").notNull(),
@@ -745,7 +745,7 @@ export const tandemPromoRedemptionsTable = sqliteTable(
   (table) => [primaryKey({ columns: [table.code, table.userId] })],
 );
 
-export const tandemSubscriptionsTable = sqliteTable("tandem_subscriptions", {
+export const nexetSubscriptionsTable = sqliteTable("nexet_subscriptions", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   kind: text("kind").notNull(),
@@ -773,8 +773,8 @@ export const tandemSubscriptionsTable = sqliteTable("tandem_subscriptions", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemPaystackPlansTable = sqliteTable(
-  "tandem_paystack_plans",
+export const nexetPaystackPlansTable = sqliteTable(
+  "nexet_paystack_plans",
   {
     kind: text("kind").notNull(),
     planId: text("plan_id").notNull(),
@@ -787,8 +787,8 @@ export const tandemPaystackPlansTable = sqliteTable(
   (table) => [primaryKey({ columns: [table.kind, table.planId] })],
 );
 
-export const tandemSubscriptionPlanSettingsTable = sqliteTable(
-  "tandem_subscription_plan_settings",
+export const nexetSubscriptionPlanSettingsTable = sqliteTable(
+  "nexet_subscription_plan_settings",
   {
     kind: text("kind").notNull(),
     planId: text("plan_id").notNull(),
@@ -798,7 +798,7 @@ export const tandemSubscriptionPlanSettingsTable = sqliteTable(
   (table) => [primaryKey({ columns: [table.kind, table.planId] })],
 );
 
-export const tandemPaystackIntentsTable = sqliteTable("tandem_paystack_intents", {
+export const nexetPaystackIntentsTable = sqliteTable("nexet_paystack_intents", {
   reference: text("reference").primaryKey(),
   userId: text("user_id").notNull(),
   kind: text("kind").notNull(),
@@ -817,7 +817,7 @@ export const tandemPaystackIntentsTable = sqliteTable("tandem_paystack_intents",
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemUserCvsTable = sqliteTable("tandem_user_cvs", {
+export const nexetUserCvsTable = sqliteTable("nexet_user_cvs", {
   userId: text("user_id").primaryKey(),
   fileName: text("file_name").notNull(),
   mimeType: text("mime_type").notNull().default("application/pdf"),
@@ -827,7 +827,7 @@ export const tandemUserCvsTable = sqliteTable("tandem_user_cvs", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoDownloadsTable = sqliteTable("tandem_video_downloads", {
+export const nexetVideoDownloadsTable = sqliteTable("nexet_video_downloads", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   fileId: text("file_id").notNull(),
@@ -836,8 +836,8 @@ export const tandemVideoDownloadsTable = sqliteTable("tandem_video_downloads", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const tandemVideoSyncsTable = sqliteTable(
-  "tandem_video_syncs",
+export const nexetVideoSyncsTable = sqliteTable(
+  "nexet_video_syncs",
   {
     id: text("id").primaryKey(),
     projectId: text("project_id").notNull(),
@@ -850,11 +850,11 @@ export const tandemVideoSyncsTable = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
   (table) => ({
-    syncPairUnique: unique("tandem_video_sync_pair_unique").on(table.primaryAssetId, table.targetAssetId),
+    syncPairUnique: unique("nexet_video_sync_pair_unique").on(table.primaryAssetId, table.targetAssetId),
   }),
 );
 
-export const tandemVideoJobsTable = sqliteTable("tandem_video_jobs", {
+export const nexetVideoJobsTable = sqliteTable("nexet_video_jobs", {
   id: text("id").primaryKey(),
   projectId: text("project_id").notNull(),
   assetId: text("asset_id"),
@@ -1012,20 +1012,20 @@ export async function buildInMemoryDb() {
       event_type TEXT NOT NULL, status TEXT NOT NULL, response_status INTEGER,
       created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_channels (
+    CREATE TABLE nexet_channels (
       id TEXT PRIMARY KEY NOT NULL, owner_id TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'CREATED', name TEXT NOT NULL,
       youtube_channel_id TEXT, youtube_title TEXT, youtube_description TEXT,
       youtube_avatar_url TEXT, youtube_banner_url TEXT, youtube_country TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_channel_members (
+    CREATE TABLE nexet_channel_members (
       id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
       user_id TEXT NOT NULL, role TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       UNIQUE (channel_id, user_id)
     );
-    CREATE TABLE tandem_channel_oauth (
+    CREATE TABLE nexet_channel_oauth (
       id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
       youtube_channel_id TEXT NOT NULL,
       access_token_cipher TEXT NOT NULL, refresh_token_cipher TEXT NOT NULL,
@@ -1035,7 +1035,7 @@ export async function buildInMemoryDb() {
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
       UNIQUE (channel_id)
     );
-    CREATE TABLE tandem_channel_videos (
+    CREATE TABLE nexet_channel_videos (
       id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
       youtube_video_id TEXT NOT NULL,
       title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
@@ -1045,36 +1045,36 @@ export async function buildInMemoryDb() {
       last_synced_at INTEGER NOT NULL,
       UNIQUE (channel_id, youtube_video_id)
     );
-    CREATE TABLE tandem_channel_daily_metrics (
+    CREATE TABLE nexet_channel_daily_metrics (
       channel_id TEXT NOT NULL, day TEXT NOT NULL,
       metrics TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'youtube',
       UNIQUE (channel_id, day)
     );
-    CREATE TABLE tandem_video_daily_metrics (
+    CREATE TABLE nexet_video_daily_metrics (
       video_row_id TEXT NOT NULL, day TEXT NOT NULL,
       metrics TEXT NOT NULL,
       UNIQUE (video_row_id, day)
     );
-    CREATE TABLE tandem_analytics_reports (
+    CREATE TABLE nexet_analytics_reports (
       id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
       video_row_id TEXT, kind TEXT NOT NULL,
       period_start TEXT NOT NULL, period_end TEXT NOT NULL,
       payload TEXT NOT NULL, fetched_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_channel_syncs (
+    CREATE TABLE nexet_channel_syncs (
       channel_id TEXT PRIMARY KEY NOT NULL,
       last_video_sync_at INTEGER, last_metrics_sync_at INTEGER,
       status TEXT NOT NULL DEFAULT 'IDLE', error TEXT,
       new_videos_seen INTEGER NOT NULL DEFAULT 0,
       updated_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_channel_alerts (
+    CREATE TABLE nexet_channel_alerts (
       id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
       rule TEXT NOT NULL, message TEXT NOT NULL,
       period_start TEXT NOT NULL, created_at INTEGER NOT NULL,
       UNIQUE (channel_id, rule, period_start)
     );
-    CREATE TABLE tandem_video_projects (
+    CREATE TABLE nexet_video_projects (
       id TEXT PRIMARY KEY NOT NULL, channel_id TEXT,
       owner_id TEXT NOT NULL,
       name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
@@ -1082,18 +1082,18 @@ export async function buildInMemoryDb() {
       visibility TEXT NOT NULL DEFAULT 'PRIVATE',
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_follows (
+    CREATE TABLE nexet_video_follows (
       id TEXT PRIMARY KEY NOT NULL, follower_id TEXT NOT NULL,
       following_id TEXT NOT NULL, created_at INTEGER NOT NULL,
       UNIQUE (follower_id, following_id)
     );
-    CREATE TABLE tandem_video_members (
+    CREATE TABLE nexet_video_members (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       user_id TEXT NOT NULL, roles TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'ACTIVE', created_at INTEGER NOT NULL,
       UNIQUE (project_id, user_id)
     );
-    CREATE TABLE tandem_video_assets (
+    CREATE TABLE nexet_video_assets (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       uploader_id TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'RAW_VIDEO',
       file_name TEXT NOT NULL, mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
@@ -1105,7 +1105,7 @@ export async function buildInMemoryDb() {
       language TEXT NOT NULL DEFAULT 'English',
       created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_asset_files (
+    CREATE TABLE nexet_video_asset_files (
       id TEXT PRIMARY KEY NOT NULL, asset_id TEXT,
       kind TEXT NOT NULL, storage_key TEXT NOT NULL,
       storage_provider TEXT NOT NULL DEFAULT 'local', content_hash TEXT,
@@ -1113,7 +1113,7 @@ export async function buildInMemoryDb() {
       size_bytes INTEGER NOT NULL DEFAULT 0, metadata TEXT,
       created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_transcripts (
+    CREATE TABLE nexet_video_transcripts (
       id TEXT PRIMARY KEY NOT NULL, asset_id TEXT NOT NULL,
       language TEXT NOT NULL DEFAULT 'en',
       model TEXT NOT NULL DEFAULT 'faster-whisper',
@@ -1121,26 +1121,26 @@ export async function buildInMemoryDb() {
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
       UNIQUE (asset_id)
     );
-    CREATE TABLE tandem_video_transcript_segments (
+    CREATE TABLE nexet_video_transcript_segments (
       id TEXT PRIMARY KEY NOT NULL, transcript_id TEXT NOT NULL,
       start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
       text TEXT NOT NULL, speaker TEXT, created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_timelines (
+    CREATE TABLE nexet_video_timelines (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       leg TEXT NOT NULL, current_version_id TEXT,
       status TEXT NOT NULL DEFAULT 'DRAFT',
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
       UNIQUE (project_id, leg)
     );
-    CREATE TABLE tandem_video_timeline_versions (
+    CREATE TABLE nexet_video_timeline_versions (
       id TEXT PRIMARY KEY NOT NULL, timeline_id TEXT NOT NULL,
       version INTEGER NOT NULL, snapshot TEXT NOT NULL,
       message TEXT NOT NULL DEFAULT '', created_by_id TEXT NOT NULL,
       parent_version_id TEXT, created_at INTEGER NOT NULL,
       UNIQUE (timeline_id, version)
     );
-    CREATE TABLE tandem_video_submissions (
+    CREATE TABLE nexet_video_submissions (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       leg TEXT NOT NULL, timeline_version_id TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'DRAFT', note TEXT NOT NULL DEFAULT '',
@@ -1148,7 +1148,7 @@ export async function buildInMemoryDb() {
       decided_at INTEGER, decision_note TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_comments (
+    CREATE TABLE nexet_video_comments (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       leg TEXT, asset_id TEXT, timecode_ms INTEGER, body TEXT NOT NULL,
       author_id TEXT NOT NULL, parent_id TEXT,
@@ -1156,14 +1156,14 @@ export async function buildInMemoryDb() {
       label TEXT, submission_id TEXT, timeline_version_id TEXT,
       resolved_at INTEGER, created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_jobs (
+    CREATE TABLE nexet_video_jobs (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       asset_id TEXT, type TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'QUEUED', attempts INTEGER NOT NULL DEFAULT 0,
       error TEXT, params TEXT, result TEXT,
       created_at INTEGER NOT NULL, started_at INTEGER, finished_at INTEGER
     );
-    CREATE TABLE tandem_video_syncs (
+    CREATE TABLE nexet_video_syncs (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       primary_asset_id TEXT NOT NULL, target_asset_id TEXT NOT NULL,
       offset_ms INTEGER NOT NULL DEFAULT 0,
@@ -1171,53 +1171,53 @@ export async function buildInMemoryDb() {
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
       UNIQUE (primary_asset_id, target_asset_id)
     );
-    CREATE TABLE tandem_video_downloads (
+    CREATE TABLE nexet_video_downloads (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       file_id TEXT NOT NULL, file_name TEXT NOT NULL,
       member_id TEXT NOT NULL, created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_references (
+    CREATE TABLE nexet_video_references (
       id TEXT PRIMARY KEY NOT NULL, asset_id TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'QUEUED', pacing TEXT,
       error TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
       UNIQUE (asset_id)
     );
-    CREATE TABLE tandem_video_grants (
+    CREATE TABLE nexet_video_grants (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       roles TEXT NOT NULL DEFAULT '[]', member_id TEXT NOT NULL,
       reason TEXT NOT NULL DEFAULT '', granted_by_id TEXT NOT NULL,
       expires_at INTEGER NOT NULL, revoked_at INTEGER, created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_notifications (
+    CREATE TABLE nexet_video_notifications (
       id TEXT PRIMARY KEY NOT NULL, recipient_id TEXT NOT NULL,
       category TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
       deep_link TEXT NOT NULL, resource_id TEXT, read_at INTEGER,
       created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_tickets (
+    CREATE TABLE nexet_tickets (
       id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
       category TEXT NOT NULL, price_usd INTEGER NOT NULL,
       promo_code TEXT, card_last_4 TEXT NOT NULL,
       purchased_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_tours (
+    CREATE TABLE nexet_tours (
       id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
       category TEXT NOT NULL,
       started_at INTEGER NOT NULL, ends_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_promo_codes (
+    CREATE TABLE nexet_promo_codes (
       code TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL,
       value INTEGER NOT NULL DEFAULT 0, max_uses INTEGER NOT NULL DEFAULT 0,
       uses INTEGER NOT NULL DEFAULT 0,
       active INTEGER NOT NULL DEFAULT 1,
       expires_at INTEGER, created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_promo_redemptions (
+    CREATE TABLE nexet_promo_redemptions (
       code TEXT NOT NULL, user_id TEXT NOT NULL,
       redeemed_at INTEGER NOT NULL,
       PRIMARY KEY (code, user_id)
     );
-    CREATE TABLE tandem_subscriptions (
+    CREATE TABLE nexet_subscriptions (
       id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
       kind TEXT NOT NULL, plan_id TEXT NOT NULL, plan_label TEXT NOT NULL,
       price_usd INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'ACTIVE',
@@ -1232,27 +1232,27 @@ export async function buildInMemoryDb() {
       paystack_transaction_reference TEXT, renewal_failure TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_paystack_plans (
+    CREATE TABLE nexet_paystack_plans (
       kind TEXT NOT NULL, plan_id TEXT NOT NULL,
       plan_code TEXT NOT NULL, amount_usd INTEGER NOT NULL,
       interval TEXT NOT NULL DEFAULT 'monthly',
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
       PRIMARY KEY (kind, plan_id)
     );
-    CREATE TABLE tandem_subscription_plan_settings (
+    CREATE TABLE nexet_subscription_plan_settings (
       kind TEXT NOT NULL, plan_id TEXT NOT NULL,
       auto_renew_available INTEGER NOT NULL DEFAULT 0,
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (kind, plan_id)
     );
-    CREATE TABLE tandem_video_storage_snapshots (
+    CREATE TABLE nexet_video_storage_snapshots (
       project_id TEXT NOT NULL, owner_id TEXT NOT NULL,
       day TEXT NOT NULL, total_bytes INTEGER NOT NULL DEFAULT 0,
       r2_bytes INTEGER NOT NULL DEFAULT 0, local_bytes INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       UNIQUE (project_id, day)
     );
-    CREATE TABLE tandem_paystack_intents (
+    CREATE TABLE nexet_paystack_intents (
       reference TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
       kind TEXT NOT NULL, plan_id TEXT NOT NULL, plan_label TEXT NOT NULL,
       interval_label TEXT NOT NULL DEFAULT '', amount_usd INTEGER NOT NULL,
@@ -1263,13 +1263,13 @@ export async function buildInMemoryDb() {
       renewal_for TEXT, customer_email TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_account_quotas (
+    CREATE TABLE nexet_account_quotas (
       user_id TEXT PRIMARY KEY NOT NULL,
       storage_limit_bytes INTEGER NOT NULL,
       project_limit INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_user_cvs (
+    CREATE TABLE nexet_user_cvs (
       user_id TEXT PRIMARY KEY NOT NULL,
       file_name TEXT NOT NULL,
       mime_type TEXT NOT NULL DEFAULT 'application/pdf',
@@ -1277,23 +1277,23 @@ export async function buildInMemoryDb() {
       storage_key TEXT NOT NULL,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_video_chat_messages (
+    CREATE TABLE nexet_video_chat_messages (
       id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL,
       author_id TEXT NOT NULL, body TEXT NOT NULL,
       audio_url TEXT, audio_name TEXT, audio_duration_ms INTEGER,
       created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_arena_posts (
+    CREATE TABLE nexet_arena_posts (
       id TEXT PRIMARY KEY NOT NULL, channel_id TEXT NOT NULL,
       project_id TEXT NOT NULL, role TEXT NOT NULL,
       pitch TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'OPEN',
       posted_by TEXT NOT NULL,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE UNIQUE INDEX tandem_arena_post_open_project_role_unique
-      ON tandem_arena_posts (project_id, role)
+    CREATE UNIQUE INDEX nexet_arena_post_open_project_role_unique
+      ON nexet_arena_posts (project_id, role)
       WHERE status = 'OPEN';
-    CREATE TABLE tandem_arena_applications (
+    CREATE TABLE nexet_arena_applications (
       id TEXT PRIMARY KEY NOT NULL, post_id TEXT NOT NULL,
       project_id TEXT NOT NULL, role TEXT NOT NULL,
       applicant_id TEXT NOT NULL, message TEXT NOT NULL,
@@ -1301,22 +1301,22 @@ export async function buildInMemoryDb() {
       decided_by TEXT, decided_at INTEGER,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE UNIQUE INDEX tandem_arena_application_pending_post_applicant_unique
-      ON tandem_arena_applications (post_id, applicant_id)
+    CREATE UNIQUE INDEX nexet_arena_application_pending_post_applicant_unique
+      ON nexet_arena_applications (post_id, applicant_id)
       WHERE status = 'PENDING';
-    CREATE TABLE tandem_arena_application_files (
+    CREATE TABLE nexet_arena_application_files (
       id TEXT PRIMARY KEY NOT NULL, application_id TEXT NOT NULL,
       file_name TEXT NOT NULL,
       mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
       size_bytes INTEGER NOT NULL DEFAULT 0, storage_key TEXT NOT NULL,
       created_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_arena_watches (
+    CREATE TABLE nexet_arena_watches (
       id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
       role TEXT NOT NULL, channel_id TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE TABLE tandem_arena_reviews (
+    CREATE TABLE nexet_arena_reviews (
       id TEXT PRIMARY KEY NOT NULL, application_id TEXT NOT NULL,
       project_id TEXT NOT NULL, role TEXT NOT NULL,
       reviewer_id TEXT NOT NULL, reviewee_id TEXT NOT NULL,
@@ -1324,7 +1324,7 @@ export async function buildInMemoryDb() {
       created_at INTEGER NOT NULL,
       UNIQUE (application_id, reviewer_id)
     );
-    CREATE TABLE tandem_arena_blocks (
+    CREATE TABLE nexet_arena_blocks (
       id TEXT PRIMARY KEY NOT NULL, captain_id TEXT NOT NULL,
       applicant_id TEXT NOT NULL, created_at INTEGER NOT NULL,
       UNIQUE (captain_id, applicant_id)
@@ -1369,50 +1369,50 @@ export async function buildInMemoryDb() {
     collaborationGenealogyTable,
     oracleProvidersTable,
     oracleHealthEventsTable,
-    tandemVideoProjectsTable,
-    tandemChannelsTable,
-    tandemChannelMembersTable,
-    tandemChannelOauthTable,
-    tandemChannelVideosTable,
-    tandemChannelDailyMetricsTable,
-    tandemVideoDailyMetricsTable,
-    tandemAnalyticsReportsTable,
-    tandemChannelSyncsTable,
-    tandemChannelAlertsTable,
-    tandemVideoFollowsTable,
-    tandemVideoMembersTable,
-    tandemVideoAssetsTable,
-    tandemVideoAssetFilesTable,
-    tandemVideoTranscriptsTable,
-    tandemVideoTranscriptSegmentsTable,
-    tandemVideoTimelinesTable,
-    tandemVideoTimelineVersionsTable,
-    tandemVideoSubmissionsTable,
-    tandemVideoCommentsTable,
-    tandemVideoJobsTable,
-    tandemVideoSyncsTable,
-    tandemVideoDownloadsTable,
-    tandemVideoReferencesTable,
-    tandemVideoGrantsTable,
-    tandemVideoNotificationsTable,
-    tandemVideoChatMessagesTable,
-    tandemAccountQuotasTable,
-    tandemUserCvsTable,
-    tandemTicketsTable,
-    tandemToursTable,
-    tandemPromoCodesTable,
-    tandemPromoRedemptionsTable,
-    tandemSubscriptionsTable,
-    tandemSubscriptionPlanSettingsTable,
-    tandemPaystackPlansTable,
-    tandemPaystackIntentsTable,
-    tandemVideoStorageSnapshotsTable,
-    tandemArenaPostsTable,
-    tandemArenaApplicationsTable,
-    tandemArenaApplicationFilesTable,
-    tandemArenaWatchesTable,
-    tandemArenaReviewsTable,
-    tandemArenaBlocksTable,
+    nexetVideoProjectsTable,
+    nexetChannelsTable,
+    nexetChannelMembersTable,
+    nexetChannelOauthTable,
+    nexetChannelVideosTable,
+    nexetChannelDailyMetricsTable,
+    nexetVideoDailyMetricsTable,
+    nexetAnalyticsReportsTable,
+    nexetChannelSyncsTable,
+    nexetChannelAlertsTable,
+    nexetVideoFollowsTable,
+    nexetVideoMembersTable,
+    nexetVideoAssetsTable,
+    nexetVideoAssetFilesTable,
+    nexetVideoTranscriptsTable,
+    nexetVideoTranscriptSegmentsTable,
+    nexetVideoTimelinesTable,
+    nexetVideoTimelineVersionsTable,
+    nexetVideoSubmissionsTable,
+    nexetVideoCommentsTable,
+    nexetVideoJobsTable,
+    nexetVideoSyncsTable,
+    nexetVideoDownloadsTable,
+    nexetVideoReferencesTable,
+    nexetVideoGrantsTable,
+    nexetVideoNotificationsTable,
+    nexetVideoChatMessagesTable,
+    nexetAccountQuotasTable,
+    nexetUserCvsTable,
+    nexetTicketsTable,
+    nexetToursTable,
+    nexetPromoCodesTable,
+    nexetPromoRedemptionsTable,
+    nexetSubscriptionsTable,
+    nexetSubscriptionPlanSettingsTable,
+    nexetPaystackPlansTable,
+    nexetPaystackIntentsTable,
+    nexetVideoStorageSnapshotsTable,
+    nexetArenaPostsTable,
+    nexetArenaApplicationsTable,
+    nexetArenaApplicationFilesTable,
+    nexetArenaWatchesTable,
+    nexetArenaReviewsTable,
+    nexetArenaBlocksTable,
   };
   return { db, tables, exports: { db, ...tables } };
 }

@@ -4447,7 +4447,7 @@ select optgroup {
 .grant-row-end .den-tag { font-size: 8px; }
 
 /* ---------------------------------------------------------------------------
-   Profile — the unique Tandem ID pill with copy.
+   Profile — the unique Nexet ID pill with copy.
 --------------------------------------------------------------------------- */
 .profile-uid {
   display: flex;
@@ -7865,7 +7865,7 @@ a.profile-track-row:hover .ptr-arrow {
 }
 
 /* ============================================================================
-   PROFILE CARDS III — clearer storage figures + a neutral Tandem ID pill.
+   PROFILE CARDS III — clearer storage figures + a neutral Nexet ID pill.
    ============================================================================ */
 
 /* ---- Workspace storage: Used / Total / Left as clear, readable tiles ---- */
@@ -7907,7 +7907,7 @@ a.profile-track-row:hover .ptr-arrow {
   .account-bar-stats { grid-template-columns: 1fr; gap: 8px; }
 }
 
-/* ---- Profile Tandem ID: label and copyable pill on the same row ---- */
+/* ---- Profile Nexet ID: label and copyable pill on the same row ---- */
 .profile-uid {
   display: flex;
   align-items: center;

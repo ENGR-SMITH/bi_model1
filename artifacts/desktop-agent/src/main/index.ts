@@ -30,10 +30,10 @@ let widgetController: WidgetController | null = null;
 let isQuitting = false;
 
 // Custom URL scheme registered at install (and at runtime below) so Creator
-// Den can launch the agent even when it isn't running: `tandem-agent://launch
+// Den can launch the agent even when it isn't running: `nexet-agent://launch
 // ?projectId=…&returnUrl=…` is handed to the OS, which starts the app and
 // passes the URL back in here.
-const AGENT_PROTOCOL = "tandem-agent";
+const AGENT_PROTOCOL = "nexet-agent";
 let pendingStartupLink: string | null = null;
 
 // Only one agent instance at a time — a second launch (e.g. from a leftover
@@ -85,7 +85,7 @@ function createWindow(): void {
     height: 760,
     minWidth: 860,
     minHeight: 600,
-    title: "Tandem Desktop Agent",
+    title: "Nexet Desktop Agent",
     // The agent has no File/Edit/View/Window/Help chrome — those menus belong
     // to document editors, not to this app, and only confuse users.
     autoHideMenuBar: true,
@@ -146,7 +146,7 @@ function sendJobProgress(progress: JobProgress): void {
 // Creator Den hand-off (launch + auto-redirect back)
 // ---------------------------------------------------------------------------
 // Creator Den launches the agent for an upload via the control server's
-// POST /launch or the tandem-agent:// deep link. We remember the project to
+// POST /launch or the nexet-agent:// deep link. We remember the project to
 // preselect + the page to reopen, focus the app, and tell the renderer. When
 // the upload job succeeds we reopen that page (shell.openExternal) — the
 // user lands back on Creator Den with the file in the vault, automatically.

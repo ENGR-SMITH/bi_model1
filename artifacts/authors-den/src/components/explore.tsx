@@ -13,19 +13,19 @@ import {
   useUnfollowVideoUser,
 } from "@workspace/api-client-react";
 import type { CollaborationSeed, ExploreAuthor } from "@workspace/api-client-react";
-import { normalizeTandemUid, tandemUid } from "@/lib/tandem-uid";
+import { normalizeNexetUid, nexetUid } from "@/lib/nexet-uid";
 
 // ---------------------------------------------------------------------------
 // Explore — the Author Den discovery room (the writer analogue of the Creator
 // Den explore page). Search authors by display name, raw user id, or unique
-// Tandem ID, follow them, and browse published seeds (the pitch board work).
+// Nexet ID, follow them, and browse published seeds (the pitch board work).
 // ---------------------------------------------------------------------------
 
 function matchesQuery(author: ExploreAuthor, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const uid = normalizeTandemUid(tandemUid(author.userId));
-  const normalized = normalizeTandemUid(query);
+  const uid = normalizeNexetUid(nexetUid(author.userId));
+  const normalized = normalizeNexetUid(query);
   if (uid.includes(normalized)) return true;
   return (
     author.displayName.toLowerCase().includes(q) ||
@@ -85,7 +85,7 @@ function AuthorRow({ author }: { author: ExploreAuthor }) {
       <AuthorAvatar imageUrl={author.imageUrl} name={author.displayName} />
       <span className="min-w-0">
         <b className="truncate">{author.displayName}</b>
-        <small>{tandemUid(author.userId)}</small>
+        <small>{nexetUid(author.userId)}</small>
       </span>
       <span className="den-author-stats">
         <span title="Published seeds"><BookOpen size={12} /> {author.publishedSeedCount}</span>
@@ -145,7 +145,7 @@ export function ExplorePage() {
         <div>
           <div className="eyebrow">THE WRITER'S ROOM</div>
           <h1>Find your next second voice.</h1>
-          <p>Search authors by name or Tandem ID, follow the ones you want to hear from, and browse the work on the pitch board.</p>
+          <p>Search authors by name or Nexet ID, follow the ones you want to hear from, and browse the work on the pitch board.</p>
         </div>
       </div>
 
@@ -154,7 +154,7 @@ export function ExplorePage() {
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search authors, Tandem IDs, or published work…"
+          placeholder="Search authors, Nexet IDs, or published work…"
           data-testid="explore-search"
         />
       </label>
@@ -183,7 +183,7 @@ export function ExplorePage() {
           <div className="empty-state" data-testid="explore-authors-empty">
             <Users size={22} />
             <h3>No authors match “{query}”.</h3>
-            <p>Authors appear here once they publish a seed to the pitch board. Try a name or their Tandem ID.</p>
+            <p>Authors appear here once they publish a seed to the pitch board. Try a name or their Nexet ID.</p>
           </div>
         )
       ) : seeds.isLoading ? (

@@ -170,7 +170,7 @@ export class WidgetController {
       skipTaskbar: true,
       hasShadow: false,
       show: false,
-      title: "Tandem widget",
+      title: "Nexet widget",
       webPreferences: {
         preload: path.join(__dirname, "..", "preload", "index.js"),
         contextIsolation: true,
@@ -257,7 +257,7 @@ export class WidgetController {
   private createTray(): void {
     const icon = nativeImage.createFromDataURL(TRAY_ICON_DATA_URL);
     const tray = new Tray(icon);
-    tray.setToolTip("Tandem Desktop Agent");
+    tray.setToolTip("Nexet Desktop Agent");
     tray.on("click", () => this.opts.openMainWindow());
     this.tray = tray;
     this.refreshTrayMenu();
@@ -267,7 +267,7 @@ export class WidgetController {
     if (!this.tray) return;
     this.tray.setContextMenu(
       Menu.buildFromTemplate([
-        { label: "Open Tandem Agent", click: () => this.opts.openMainWindow() },
+        { label: "Open Nexet Agent", click: () => this.opts.openMainWindow() },
         {
           label: this.bubble?.isVisible() ? "Hide video widget" : "Show video widget",
           click: () => this.toggleBubble(),
@@ -278,7 +278,7 @@ export class WidgetController {
           click: () => this.opts.openMainWindow(),
         },
         { type: "separator" },
-        { label: "Quit Tandem Agent", click: () => app.quit() },
+        { label: "Quit Nexet Agent", click: () => app.quit() },
       ]),
     );
   }

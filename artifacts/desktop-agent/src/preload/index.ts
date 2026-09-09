@@ -75,6 +75,6 @@ const api = {
   onConfigError: (cb: (msg: string) => void) => on<string>("agent:config-error", cb),
 };
 
-contextBridge.exposeInMainWorld("tandemAgent", api);
+contextBridge.exposeInMainWorld("nexetAgent", api);
 
-export type TandemAgentApi = typeof api;
+export type NexetAgentApi = typeof api;

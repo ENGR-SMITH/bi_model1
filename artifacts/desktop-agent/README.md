@@ -1,8 +1,8 @@
-# Tandem Desktop Agent
+# Nexet Desktop Agent
 
 A small Windows/macOS desktop app that hands files **from your PC to the
 Captain for review** — drag a raw file in (or click to choose it), write a note
-describing it, and both stream to your Tandem API as a **review submission**.
+describing it, and both stream to your Nexet API as a **review submission**.
 The file stays private (a pending entry on the Captain's review desk) until the
 Captain approves it — only then does it land in the project vault and start the
 normal pipeline (hashing, proxy, preview). No asset dropdown, no size cap: the
@@ -29,7 +29,7 @@ Your machine                 Your API server                     Captain's revie
 The agent signs in with **Clerk** through your **system browser**: it hands you a
 one-time sign-up link, you open it in your normal browser, and once you finish
 the app signs you in automatically — showing your account **name and avatar** in
-the app. It reuses your existing Tandem account and talks to the same API the
+the app. It reuses your existing Nexet account and talks to the same API the
 web apps use. If your session token ever goes stale (Clerk tokens are
 short-lived by design), the agent signs itself back in automatically.
 
@@ -40,7 +40,7 @@ short-lived by design), the agent signs itself back in automatically.
 
 ## Configuration
 
-Create `tandem-agent.json` next to the app (or `~/.tandem-agent/config.json`),
+Create `nexet-agent.json` next to the app (or `~/.nexet-agent/config.json`),
 or set environment variables:
 
 ```json
@@ -53,10 +53,10 @@ or set environment variables:
 
 | Config / env            | Meaning                                |
 | ----------------------- | -------------------------------------- |
-| `TANDEM_API_URL`        | API base, no trailing slash. Default `http://localhost:3000` |
-| `TANDEM_CLERK_PUBLISHABLE_KEY` | Your Clerk **publishable** key. |
-| `TANDEM_AGENT_WORK_DIR` | Temp dir for staged uploads. |
-| `TANDEM_UPDATE_URL` / `updateUrl` | Auto-update feed base URL (`latest.yml` / `latest-mac.yml` location). Overrides the publish URL baked in at build time. |
+| `NEXET_API_URL`        | API base, no trailing slash. Default `http://localhost:3000` |
+| `NEXET_CLERK_PUBLISHABLE_KEY` | Your Clerk **publishable** key. |
+| `NEXET_AGENT_WORK_DIR` | Temp dir for staged uploads. |
+| `NEXET_UPDATE_URL` / `updateUrl` | Auto-update feed base URL (`latest.yml` / `latest-mac.yml` location). Overrides the publish URL baked in at build time. |
 
 > Use the **publishable** key (safe to ship in a desktop app — it's public).
 > Never embed the **secret** key.
@@ -82,7 +82,7 @@ pnpm --filter @workspace/desktop-agent install
 pnpm --filter @workspace/desktop-agent run build
 ```
 
-Output installer: `artifacts/desktop-agent/dist-bundle/Tandem Desktop Agent Setup 0.0.1.exe`.
+Output installer: `artifacts/desktop-agent/dist-bundle/Nexet Desktop Agent Setup 0.0.1.exe`.
 
 ### macOS (.dmg)
 
@@ -93,7 +93,7 @@ pnpm --filter @workspace/desktop-agent install
 pnpm --filter @workspace/desktop-agent run build
 ```
 
-Output: `artifacts/desktop-agent/dist-bundle/Tandem-Desktop-Agent-0.0.1.dmg`.
+Output: `artifacts/desktop-agent/dist-bundle/Nexet-Desktop-Agent-0.0.1.dmg`.
 (For notarization you'll add an Apple Developer cert + `notarize` config.)
 
 ### CI (GitHub Actions, cross-OS without a local machine)
@@ -107,11 +107,11 @@ Set these GitHub secrets: `CF_ACCOUNT_ID`, `CF_R2_ACCESS_KEY`, `CF_R2_SECRET_KEY
 (and optionally the repo variable `R2_BUCKET`, default `tandem-media`).
 
 The installer lands at:
-`https://<public-domain>/desktop-agent/tandem-desktop-agent-latest.<exe|dmg>`
+`https://<public-domain>/desktop-agent/nexet-desktop-agent-latest.<exe|dmg>`
 
 ## In-app download button
 
-The Creator Den vault and the Tandem content-creators doorway show a
+The Creator Den vault and the Nexet content-creators doorway show a
 **"Desktop agent for large files"** link whenever `VITE_AGENT_DOWNLOAD_URL` is set
 in the app's `.env` (copy it from the root `.env.example`). Point it at the R2
 public URL above (or a GitHub Release URL) and the button appears for users.
@@ -121,7 +121,7 @@ public URL above (or a GitHub Release URL) and the button appears for users.
 Every upload section in Creator Den also offers **"Desktop agent"** as a second
 upload method, so users pick between the browser and the agent any time. For
 that hand-off the agent runs a tiny loopback control server (bound to
-`127.0.0.1:<port>`, default `41737`, override with `TANDEM_AGENT_CONTROL_PORT`
+`127.0.0.1:<port>`, default `41737`, override with `NEXET_AGENT_CONTROL_PORT`
 — the web app must match with `VITE_AGENT_CONTROL_PORT`):
 
 - `GET /health` — the web app detects whether the agent is running.
@@ -131,11 +131,11 @@ that hand-off the agent runs a tiny loopback control server (bound to
   refreshes the page, and the agent reopens the `returnUrl` so the user lands
   back on Creator Den automatically.
 
-The installer registers the `tandem-agent://` URL scheme (build-time
+The installer registers the `nexet-agent://` URL scheme (build-time
 `protocols` entry + runtime `setAsDefaultProtocolClient`), so a deep link
-(`tandem-agent://launch?projectId=…&returnUrl=…`) starts an installed-but-idle
+(`nexet-agent://launch?projectId=…&returnUrl=…`) starts an installed-but-idle
 agent too. The agent only ever opens `returnUrl` values that point back at the
-configured `TANDEM_WEB_URL` origin.
+configured `NEXET_WEB_URL` origin.
 
 ## Auto-update
 
@@ -143,7 +143,7 @@ The installed app checks for updates on launch (and via the **Check for updates*
 button in the **Agent updates** card on the right) and downloads them in the
 background; when a new version is ready the button becomes **Restart & update**. Releases are published by the
 `build-desktop-agent` CI workflow, which uploads the installer **plus the
-`latest*.yml` feed files and blockmaps** next to it — point `TANDEM_UPDATE_URL`
+`latest*.yml` feed files and blockmaps** next to it — point `NEXET_UPDATE_URL`
 (or the build-time `build.publish.url`) at that public directory.
 
 Update checks only run in the packaged app (`app.isPackaged`) because
@@ -161,7 +161,7 @@ restart needed):
 
 - **Widget** — one switch controls the whole feature: when on, the app keeps
   running in the tray after you close its window (click the tray icon to
-  reopen, or **Quit Tandem Agent** from its menu), and it **auto-shows while a
+  reopen, or **Quit Nexet Agent** from its menu), and it **auto-shows while a
   video plays** — when Windows reports a video playing in a browser or media
   player (via the OS media-session feed), the bubble appears and disappears a
   few seconds after playback stops. Detection polls every ~3 s and only matches
@@ -180,12 +180,12 @@ style:
 
 1. Launch the app → click **Sign up**. The Account card shows a **sign-up link**
    (plus **Copy link** and **Open in browser** buttons).
-2. Open the link in your normal browser on this machine — it opens the Tandem
+2. Open the link in your normal browser on this machine — it opens the Nexet
    sign-up page (powered by the same Clerk instance as the web apps). Sign up,
    or switch to **Sign in** inside the page if you already have an account.
 3. When you finish, the agent **raises its own window and signs you in
    automatically** — your account **name, email, and avatar** appear in the
-   Account card (the page also nudges the app via the `tandem-agent://` deep
+   Account card (the page also nudges the app via the `nexet-agent://` deep
    link as a backup). The link is one-time: it's tied to the sign-in you
    started and expires after 10 minutes.
 
@@ -227,7 +227,7 @@ has no upload rights.
 
 > Signing out only signs the **agent** out. The Clerk session lives in your
 > browser, so signing in again completes instantly with the account active
-> there (it reuses whichever Tandem account that browser is signed into).
+> there (it reuses whichever Nexet account that browser is signed into).
 
 ## Notes & current limits
 

@@ -7,7 +7,7 @@ import path from "node:path";
 import { and, eq } from "drizzle-orm";
 
 process.env.VIDEO_UPLOAD_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "arena-test-"));
-process.env.TANDEM_MEDIA_DEMO = "1";
+process.env.NEXET_MEDIA_DEMO = "1";
 // The proxy-upload write test needs an "R2-configured" server so the request
 // reaches the access gate (member-only) instead of short-circuiting on 503.
 process.env.CF_ACCOUNT_ID = "test-account";
@@ -88,7 +88,7 @@ let seq = 0;
 
 async function seedChannel(ownerId: string): Promise<string> {
   const id = `chan-${++seq}`;
-  await state.db.insert(state.tables.tandemChannelsTable).values({
+  await state.db.insert(state.tables.nexetChannelsTable).values({
     id,
     ownerId,
     status: "CREATED",
@@ -103,7 +103,7 @@ async function seedProject(
 ): Promise<{ id: string; channelId: string | null }> {
   const id = `proj-${++seq}`;
   const channelId = opts.channelId !== undefined ? opts.channelId : await seedChannel(ownerId);
-  await state.db.insert(state.tables.tandemVideoProjectsTable).values({
+  await state.db.insert(state.tables.nexetVideoProjectsTable).values({
     id,
     channelId,
     ownerId,
@@ -112,7 +112,7 @@ async function seedProject(
     visibility: opts.visibility ?? "PRIVATE",
   });
   // Real project creation also inserts the Captain as an ACTIVE CAPTAIN member.
-  await state.db.insert(state.tables.tandemVideoMembersTable).values({
+  await state.db.insert(state.tables.nexetVideoMembersTable).values({
     id: `mem-${id}`,
     projectId: id,
     userId: ownerId,
@@ -127,7 +127,7 @@ async function seedApplication(
   applicantId: string,
   status = "PENDING",
 ) {
-  await state.db.insert(state.tables.tandemArenaApplicationsTable).values({
+  await state.db.insert(state.tables.nexetArenaApplicationsTable).values({
     id: `arenaapp-${++seq}`,
     postId: post.id,
     projectId: post.projectId,
@@ -148,17 +148,17 @@ async function createPost(actor: string, projectId: string, role = "VIDEO", pitc
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemArenaApplicationFilesTable);
-  await state.db.delete(t.tandemArenaApplicationsTable);
-  await state.db.delete(t.tandemArenaPostsTable);
-  await state.db.delete(t.tandemArenaWatchesTable);
-  await state.db.delete(t.tandemArenaReviewsTable);
-  await state.db.delete(t.tandemArenaBlocksTable);
-  await state.db.delete(t.tandemVideoNotificationsTable);
-  await state.db.delete(t.tandemVideoFollowsTable);
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
-  await state.db.delete(t.tandemChannelsTable);
+  await state.db.delete(t.nexetArenaApplicationFilesTable);
+  await state.db.delete(t.nexetArenaApplicationsTable);
+  await state.db.delete(t.nexetArenaPostsTable);
+  await state.db.delete(t.nexetArenaWatchesTable);
+  await state.db.delete(t.nexetArenaReviewsTable);
+  await state.db.delete(t.nexetArenaBlocksTable);
+  await state.db.delete(t.nexetVideoNotificationsTable);
+  await state.db.delete(t.nexetVideoFollowsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
+  await state.db.delete(t.nexetChannelsTable);
   await state.db.delete(t.collaborationActivityEventsTable);
 }
 
@@ -232,8 +232,8 @@ describe("POST /video/arena/posts — publish an open role", () => {
 
     const [row] = await state.db
       .select()
-      .from(state.tables.tandemArenaPostsTable)
-      .where(eq(state.tables.tandemArenaPostsTable.id, post.id));
+      .from(state.tables.nexetArenaPostsTable)
+      .where(eq(state.tables.nexetArenaPostsTable.id, post.id));
     expect(row.status).toBe("OPEN");
     expect(row.postedBy).toBe(CAPTAIN);
 
@@ -272,10 +272,10 @@ describe("GET /video/arena/posts — the board", () => {
 
     // CLOSED + FILLED posts stay off the public board.
     await state.db
-      .update(state.tables.tandemArenaPostsTable)
+      .update(state.tables.nexetArenaPostsTable)
       .set({ status: "CLOSED" })
-      .where(eq(state.tables.tandemArenaPostsTable.id, postA.id));
-    await state.db.insert(state.tables.tandemArenaPostsTable).values({
+      .where(eq(state.tables.nexetArenaPostsTable.id, postA.id));
+    await state.db.insert(state.tables.nexetArenaPostsTable).values({
       id: `arena-filled-${++seq}`,
       channelId: b.channelId!,
       projectId: b.id,
@@ -355,7 +355,7 @@ describe("GET /video/arena/posts — the board", () => {
     await createPost(CAPTAIN2, b.id, "VIDEO"); // older post from a followed captain
     await createPost(CAPTAIN, a.id, "VIDEO"); // newer post from a stranger
 
-    await state.db.insert(state.tables.tandemVideoFollowsTable).values({
+    await state.db.insert(state.tables.nexetVideoFollowsTable).values({
       id: `follow-${++seq}`,
       followerId: ALICE,
       followingId: CAPTAIN2,
@@ -373,9 +373,9 @@ describe("GET /video/arena/posts — the board", () => {
     const own = await createPost(CAPTAIN, a.id, "VIDEO");
     await createPost(CAPTAIN2, b.id, "AUDIO");
     await state.db
-      .update(state.tables.tandemArenaPostsTable)
+      .update(state.tables.nexetArenaPostsTable)
       .set({ status: "CLOSED" })
-      .where(eq(state.tables.tandemArenaPostsTable.id, own.id));
+      .where(eq(state.tables.nexetArenaPostsTable.id, own.id));
 
     state.userId = CAPTAIN;
     const res = await request(API).get("/api/video/arena/posts").query({ mine: 1 });
@@ -415,9 +415,9 @@ describe("GET /video/arena/posts/:postId — post detail", () => {
     await seedApplication(post, ALICE);
     await seedApplication(post, BOB);
     await state.db
-      .update(state.tables.tandemArenaApplicationsTable)
+      .update(state.tables.nexetArenaApplicationsTable)
       .set({ status: "REJECTED", decidedBy: CAPTAIN, decidedAt: new Date() })
-      .where(eq(state.tables.tandemArenaApplicationsTable.applicantId, BOB));
+      .where(eq(state.tables.nexetArenaApplicationsTable.applicantId, BOB));
 
     state.userId = CAPTAIN;
     const res = await request(API).get(`/api/video/arena/posts/${post.id}`);
@@ -464,8 +464,8 @@ describe("PATCH /video/arena/posts/:postId — close/reopen/pitch", () => {
 
     const notified = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.category, "video_arena_closed"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.category, "video_arena_closed"));
     expect(notified.map((n: any) => n.recipientId).sort()).toEqual([ALICE, BOB, CAPTAIN2].sort());
     expect(notified[0].deepLink).toBe(`/creators-den/arena/posts/${post.id}`);
 
@@ -509,9 +509,9 @@ describe("PATCH /video/arena/posts/:postId — close/reopen/pitch", () => {
     const a = await seedProject(CAPTAIN);
     const post = await createPost(CAPTAIN, a.id, "VIDEO");
     await state.db
-      .update(state.tables.tandemArenaPostsTable)
+      .update(state.tables.nexetArenaPostsTable)
       .set({ status: "FILLED" })
-      .where(eq(state.tables.tandemArenaPostsTable.id, post.id));
+      .where(eq(state.tables.nexetArenaPostsTable.id, post.id));
 
     state.userId = CAPTAIN;
     const res = await request(API).patch(`/api/video/arena/posts/${post.id}`).send({ status: "OPEN" });
@@ -545,14 +545,14 @@ describe("DELETE /video/arena/posts/:postId — remove a live post", () => {
 
     const posts = await state.db
       .select()
-      .from(state.tables.tandemArenaPostsTable)
-      .where(eq(state.tables.tandemArenaPostsTable.id, post.id));
+      .from(state.tables.nexetArenaPostsTable)
+      .where(eq(state.tables.nexetArenaPostsTable.id, post.id));
     expect(posts.length).toBe(0);
 
     const applications = await state.db
       .select()
-      .from(state.tables.tandemArenaApplicationsTable)
-      .where(eq(state.tables.tandemArenaApplicationsTable.postId, post.id));
+      .from(state.tables.nexetArenaApplicationsTable)
+      .where(eq(state.tables.nexetArenaApplicationsTable.postId, post.id));
     expect(applications.length).toBe(0);
 
     // The seat is free again — the Captain can repost the same role.
@@ -570,9 +570,9 @@ describe("DELETE /video/arena/posts/:postId — remove a live post", () => {
     const a = await seedProject(CAPTAIN);
     const post = await createPost(CAPTAIN, a.id, "VIDEO");
     await state.db
-      .update(state.tables.tandemArenaPostsTable)
+      .update(state.tables.nexetArenaPostsTable)
       .set({ status: "FILLED" })
-      .where(eq(state.tables.tandemArenaPostsTable.id, post.id));
+      .where(eq(state.tables.nexetArenaPostsTable.id, post.id));
 
     state.userId = CAPTAIN;
     const res = await request(API).delete(`/api/video/arena/posts/${post.id}`);
@@ -581,8 +581,8 @@ describe("DELETE /video/arena/posts/:postId — remove a live post", () => {
 
     const posts = await state.db
       .select()
-      .from(state.tables.tandemArenaPostsTable)
-      .where(eq(state.tables.tandemArenaPostsTable.id, post.id));
+      .from(state.tables.nexetArenaPostsTable)
+      .where(eq(state.tables.nexetArenaPostsTable.id, post.id));
     expect(posts.length).toBe(0);
   });
 });
@@ -672,7 +672,7 @@ describe("role watches — GET/POST/DELETE /video/arena/watches", () => {
 
 describe("notify-on-publish — role watch fan-out", () => {
   async function watch(userId: string, role: string, channelId?: string): Promise<void> {
-    await state.db.insert(state.tables.tandemArenaWatchesTable).values({
+    await state.db.insert(state.tables.nexetArenaWatchesTable).values({
       id: `watch-${++seq}`,
       userId,
       role,
@@ -695,8 +695,8 @@ describe("notify-on-publish — role watch fan-out", () => {
 
     const notifications = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.category, "video_arena_watch"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.category, "video_arena_watch"));
 
     // ALICE + BOB exactly once each; CAPTAIN2 (wrong role) and CAPTAIN (poster) excluded.
     expect(notifications.map((n: any) => n.recipientId).sort()).toEqual([ALICE, BOB]);
@@ -717,8 +717,8 @@ describe("notify-on-publish — role watch fan-out", () => {
 
     const notifications = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.category, "video_arena_watch"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.category, "video_arena_watch"));
     expect(notifications.map((n: any) => n.resourceId).sort()).toEqual([postX.id, postY.id].sort());
   });
 });
@@ -766,7 +766,7 @@ describe("Arena access widening — resolveProjectAccess + viewerAccess", () => 
 
   it("keeps members and Captains on member access", async () => {
     const a = await seedProject(CAPTAIN);
-    await state.db.insert(state.tables.tandemVideoMembersTable).values({
+    await state.db.insert(state.tables.nexetVideoMembersTable).values({
       id: `mem-alice-${++seq}`,
       projectId: a.id,
       userId: ALICE,
@@ -839,8 +839,8 @@ describe("auditions — POST applications (multipart)", () => {
     // The Captain is notified with a link to the post.
     const notices = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.category, "video_arena_applied"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.category, "video_arena_applied"));
     expect(notices.length).toBe(1);
     expect(notices[0].recipientId).toBe(CAPTAIN);
     expect(notices[0].deepLink).toBe(`/creators-den/arena/posts/${post.id}`);
@@ -871,7 +871,7 @@ describe("auditions — POST applications (multipart)", () => {
     expect(own.status).toBe(409);
 
     // ALICE joins the project team, then tries to audition for the open seat.
-    await state.db.insert(state.tables.tandemVideoMembersTable).values({
+    await state.db.insert(state.tables.nexetVideoMembersTable).values({
       id: `mem-alice-${++seq}`,
       projectId: a.id,
       userId: ALICE,
@@ -893,7 +893,7 @@ describe("auditions — POST applications (multipart)", () => {
   it("blocks a user blacklisted by this Captain (403)", async () => {
     const a = await seedProject(CAPTAIN);
     const post = await createPost(CAPTAIN, a.id, "VIDEO");
-    await state.db.insert(state.tables.tandemArenaBlocksTable).values({
+    await state.db.insert(state.tables.nexetArenaBlocksTable).values({
       id: `arena-block-${++seq}`,
       captainId: CAPTAIN,
       applicantId: ALICE,
@@ -1061,30 +1061,30 @@ describe("auditions — accept / reject / withdraw decisions", () => {
     // The post filled and the remaining PENDING auditions were auto-declined.
     const [postRow] = await state.db
       .select()
-      .from(state.tables.tandemArenaPostsTable)
-      .where(eq(state.tables.tandemArenaPostsTable.id, post.id));
+      .from(state.tables.nexetArenaPostsTable)
+      .where(eq(state.tables.nexetArenaPostsTable.id, post.id));
     expect(postRow.status).toBe("FILLED");
 
     const [bobRow] = await state.db
       .select()
-      .from(state.tables.tandemArenaApplicationsTable)
-      .where(eq(state.tables.tandemArenaApplicationsTable.id, bobApp.body.id));
+      .from(state.tables.nexetArenaApplicationsTable)
+      .where(eq(state.tables.nexetArenaApplicationsTable.id, bobApp.body.id));
     expect(bobRow.status).toBe("REJECTED");
     expect(bobRow.decidedBy).toBe(CAPTAIN);
     const [carlRow] = await state.db
       .select()
-      .from(state.tables.tandemArenaApplicationsTable)
-      .where(eq(state.tables.tandemArenaApplicationsTable.id, carlApp.body.id));
+      .from(state.tables.nexetArenaApplicationsTable)
+      .where(eq(state.tables.nexetArenaApplicationsTable.id, carlApp.body.id));
     expect(carlRow.status).toBe("REJECTED");
 
     // ALICE is now an ACTIVE member holding the role + a channel editor.
     const [memberRow] = await state.db
       .select()
-      .from(state.tables.tandemVideoMembersTable)
+      .from(state.tables.nexetVideoMembersTable)
       .where(
         and(
-          eq(state.tables.tandemVideoMembersTable.projectId, a.id),
-          eq(state.tables.tandemVideoMembersTable.userId, ALICE),
+          eq(state.tables.nexetVideoMembersTable.projectId, a.id),
+          eq(state.tables.nexetVideoMembersTable.userId, ALICE),
         ),
       );
     expect(memberRow.status).toBe("ACTIVE");
@@ -1092,11 +1092,11 @@ describe("auditions — accept / reject / withdraw decisions", () => {
 
     const [channelMember] = await state.db
       .select()
-      .from(state.tables.tandemChannelMembersTable)
+      .from(state.tables.nexetChannelMembersTable)
       .where(
         and(
-          eq(state.tables.tandemChannelMembersTable.channelId, a.channelId!),
-          eq(state.tables.tandemChannelMembersTable.userId, ALICE),
+          eq(state.tables.nexetChannelMembersTable.channelId, a.channelId!),
+          eq(state.tables.nexetChannelMembersTable.userId, ALICE),
         ),
       );
     expect(channelMember.role).toBe("EDITOR");
@@ -1104,7 +1104,7 @@ describe("auditions — accept / reject / withdraw decisions", () => {
     // Notifications: hire + auto-declines.
     const categories = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable);
+      .from(state.tables.nexetVideoNotificationsTable);
     expect(categories.filter((n: any) => n.category === "video_arena_accepted" && n.recipientId === ALICE).length).toBe(1);
     expect(categories.filter((n: any) => n.category === "video_arena_rejected").length).toBe(2);
     const acceptedNotice = categories.find((n: any) => n.category === "video_arena_accepted");
@@ -1140,7 +1140,7 @@ describe("auditions — accept / reject / withdraw decisions", () => {
   it("reactivates an existing member row instead of duplicating it", async () => {
     const a = await seedProject(CAPTAIN);
     const post = await createPost(CAPTAIN, a.id, "SCRIPT");
-    await state.db.insert(state.tables.tandemVideoMembersTable).values({
+    await state.db.insert(state.tables.nexetVideoMembersTable).values({
       id: `mem-lapsed-${++seq}`,
       projectId: a.id,
       userId: ALICE,
@@ -1155,11 +1155,11 @@ describe("auditions — accept / reject / withdraw decisions", () => {
 
     const members = await state.db
       .select()
-      .from(state.tables.tandemVideoMembersTable)
+      .from(state.tables.nexetVideoMembersTable)
       .where(
         and(
-          eq(state.tables.tandemVideoMembersTable.projectId, a.id),
-          eq(state.tables.tandemVideoMembersTable.userId, ALICE),
+          eq(state.tables.nexetVideoMembersTable.projectId, a.id),
+          eq(state.tables.nexetVideoMembersTable.userId, ALICE),
         ),
       );
     expect(members.length).toBe(1);
@@ -1185,8 +1185,8 @@ describe("auditions — accept / reject / withdraw decisions", () => {
 
     const notices = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.category, "video_arena_rejected"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.category, "video_arena_rejected"));
     expect(notices.map((n: any) => n.recipientId)).toContain(ALICE);
 
     // A second reject on the resolved row is a conflict.
@@ -1218,8 +1218,8 @@ describe("auditions — accept / reject / withdraw decisions", () => {
 
     const notices = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.category, "video_arena_withdrawn"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.category, "video_arena_withdrawn"));
     expect(notices.map((n: any) => n.recipientId)).toContain(CAPTAIN);
 
     // Withdrawing a resolved audition is a conflict; My Auditions shows it.
@@ -1336,8 +1336,8 @@ describe("mutual work reviews — POST /applications/:id/review", () => {
     // Each side was notified with their own profile deep link.
     const notices = await state.db
       .select()
-      .from(state.tables.tandemVideoNotificationsTable)
-      .where(eq(state.tables.tandemVideoNotificationsTable.category, "video_arena_reviewed"));
+      .from(state.tables.nexetVideoNotificationsTable)
+      .where(eq(state.tables.nexetVideoNotificationsTable.category, "video_arena_reviewed"));
     expect(notices.length).toBe(2);
     expect(notices.find((n: any) => n.recipientId === ALICE)?.deepLink).toBe(`/creators-den/profile/${ALICE}`);
     expect(notices.find((n: any) => n.recipientId === CAPTAIN)?.deepLink).toBe(`/creators-den/profile/${CAPTAIN}`);
@@ -1345,8 +1345,8 @@ describe("mutual work reviews — POST /applications/:id/review", () => {
     // Exactly two public review rows on the hire (one per participant).
     const rows = await state.db
       .select()
-      .from(state.tables.tandemArenaReviewsTable)
-      .where(eq(state.tables.tandemArenaReviewsTable.applicationId, applicationId));
+      .from(state.tables.nexetArenaReviewsTable)
+      .where(eq(state.tables.nexetArenaReviewsTable.applicationId, applicationId));
     expect(rows.length).toBe(2);
     expect(rows.map((r: any) => r.reviewerId).sort()).toEqual([ALICE, CAPTAIN].sort());
   });

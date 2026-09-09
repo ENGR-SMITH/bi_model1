@@ -1,6 +1,6 @@
 // Hosted sign-in page for the desktop agent (device flow).
 //
-// The desktop agent opens this page (on the Tandem web app's domain — the
+// The desktop agent opens this page (on the Nexet web app's domain — the
 // origin Clerk trusts) in the user's normal browser. The page mounts Clerk's
 // standard <SignIn /> UI; once a session exists it hands the session JWT back
 // to the agent's loopback token receiver, which matches the per-attempt
@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { SignIn, useAuth, useUser } from '@clerk/react';
 
-const ATTEMPT_KEY = 'tandem-agent-signin-attempt';
+const ATTEMPT_KEY = 'nexet-agent-signin-attempt';
 
 type Phase = 'loading' | 'signin' | 'posting' | 'success' | 'error';
 
@@ -25,13 +25,13 @@ interface Attempt {
 }
 
 /** Raise the desktop agent app on this machine after sign-in completes.
- * The agent registers the `tandem-agent://` scheme at install, so opening it
+ * The agent registers the `nexet-agent://` scheme at install, so opening it
  * hands control straight back to the app (and focuses its window). A hidden
  * iframe keeps this sign-in tab in place; on browsers that block iframe
  * protocol navigation it falls back to a background tab. No-op when the app
  * isn't installed. */
 function summonDesktopApp(): void {
-  const url = 'tandem-agent://launch';
+  const url = 'nexet-agent://launch';
   try {
     const frame = document.createElement('iframe');
     frame.style.display = 'none';
@@ -79,7 +79,7 @@ export default function AgentSignInPage() {
     if (!attempt) {
       setPhase('error');
       setError(
-        'This sign-in link is incomplete or expired. Close this tab and click “Sign up” again in Tandem Desktop Agent.',
+        'This sign-in link is incomplete or expired. Close this tab and click “Sign up” again in Nexet Desktop Agent.',
       );
     } else if (isLoaded && isSignedIn) {
       setPhase('posting');
@@ -139,14 +139,14 @@ export default function AgentSignInPage() {
           setPhase('error');
           setError(
             'The desktop app did not accept this sign-in (the link may have expired). ' +
-              'Close this tab and click “Sign up” again in Tandem Desktop Agent.',
+              'Close this tab and click “Sign up” again in Nexet Desktop Agent.',
           );
         }
       } catch {
         if (cancelled) return;
         setPhase('error');
         setError(
-          'Could not reach Tandem Desktop Agent. Is the app still running? Close this tab and try again.',
+          'Could not reach Nexet Desktop Agent. Is the app still running? Close this tab and try again.',
         );
       }
     })();
@@ -160,7 +160,7 @@ export default function AgentSignInPage() {
     <div className="agent-signin-page">
       <div className="agent-signin-brand">
         <span className="agent-signin-mark">T</span>
-        <span className="agent-signin-name">Tandem Desktop Agent</span>
+        <span className="agent-signin-name">Nexet Desktop Agent</span>
       </div>
 
       <div className="agent-signin-card">
@@ -173,7 +173,7 @@ export default function AgentSignInPage() {
 
         {phase === 'signin' && (
           <div className="agent-signin-state">
-            <p className="agent-signin-hint">Sign in with your Tandem account to continue in the app.</p>
+            <p className="agent-signin-hint">Sign in with your Nexet account to continue in the app.</p>
             <SignIn />
           </div>
         )}
@@ -189,7 +189,7 @@ export default function AgentSignInPage() {
           <div className="agent-signin-state">
             <div className="agent-signin-check">✓</div>
             <h2>You're signed in</h2>
-            <p>Opening Tandem Desktop Agent… if it doesn't appear, click its icon (or relaunch it) — you can close this tab.</p>
+            <p>Opening Nexet Desktop Agent… if it doesn't appear, click its icon (or relaunch it) — you can close this tab.</p>
           </div>
         )}
 

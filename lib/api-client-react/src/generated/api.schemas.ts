@@ -1743,11 +1743,11 @@ export const VideoMemberInputRole = {
 } as const;
 
 /**
- * Invite a teammate by their unique Tandem ID (e.g. TANDEM6EUHY) — the handle shown on every user's profile.
+ * Invite a teammate by their unique Nexet ID (e.g. NEXET6EUHY) — the handle shown on every user's profile.
  */
 export interface VideoMemberInput {
   /**
-     * The invitee's unique Tandem ID, e.g. TANDEM6EUHY.
+     * The invitee's unique Nexet ID, e.g. NEXET6EUHY.
      * @minLength 1
      * @maxLength 20
      */

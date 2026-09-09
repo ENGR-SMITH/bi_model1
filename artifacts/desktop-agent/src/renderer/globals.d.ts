@@ -11,7 +11,7 @@
 // import/export-free. Every type they need is declared here on the global
 // scope instead; the import() type queries below are erased at compile time.
 interface Window {
-  tandemAgent: import("../preload").TandemAgentApi;
+  nexetAgent: import("../preload").NexetAgentApi;
 }
 
 type AgentSettings = import("../shared/types").AgentSettings;

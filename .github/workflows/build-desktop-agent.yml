@@ -73,7 +73,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: tandem-desktop-agent-${{ matrix.os }}
+          name: nexet-desktop-agent-${{ matrix.os }}
           path: artifacts/desktop-agent/dist-bundle/*
           if-no-files-found: error
 
@@ -103,7 +103,7 @@ jobs:
 
           FILE="${files[0]}"
           EXT="${FILE##*.}"
-          DEST="${R2_PREFIX}/tandem-desktop-agent-latest.${EXT}"
+          DEST="${R2_PREFIX}/nexet-desktop-agent-latest.${EXT}"
 
           aws s3 cp "$FILE" "s3://${R2_BUCKET}/${DEST}" \
             --endpoint-url "https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com" \

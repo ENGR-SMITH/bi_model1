@@ -3,7 +3,7 @@
 **Status:** Plan for review — no code changes made yet
 **Last updated:** 2026-09-04
 **Primary source document:** product brief pasted 2026-09-04 ("WE ARE MAKING SOME RESTRUCTURING AND ADDING THE ANALYTICS FEATURES ON THE CREATOR-DEN TO FIT MCS users")
-**Target apps:** `artifacts/creators-den` (frontend), `artifacts/api-server` (routes/realtime), `lib/db` (schema/migrations), `lib/api-spec` → `lib/api-zod` + `lib/api-client-react` (API contract + codegen), plus the Tandem hub entry card (`artifacts/tandem/src/pages/content-creators.tsx`).
+**Target apps:** `artifacts/creators-den` (frontend), `artifacts/api-server` (routes/realtime), `lib/db` (schema/migrations), `lib/api-spec` → `lib/api-zod` + `lib/api-client-react` (API contract + codegen), plus the Nexet hub entry card (`artifacts/nexet/src/pages/content-creators.tsx`).
 **Related docs:** `TADEM_COLLABORATION_IMPLEMENTATION_PLAN.md`, `FEATURES.md`, `artifacts/creators-den/CREATOR-DEN-VCS-DESIGN.md`, `START-APP.md`, `replit.md`, `.env.example`.
 
 ---
@@ -25,10 +25,10 @@ The target user is a YouTube agency/MCN managing several client channels end-to-
 | Brief term | Code meaning |
 |---|---|
 | CMS page | New Creator Den landing page: the **Channels** grid at `/creators-den/` (owned channels + channels you're an editor on) with a `+` card |
-| Channel | `tandem_channels` row — a workspace owned by one user, optionally bound to a real YouTube channel (`youtubeChannelId` + branding) |
-| New channel via `+` | Create `tandem_channels` (UNLINKED) → Google OAuth consent → fetch YouTube channel metadata → CONNECTED/ACTIVE |
+| Channel | `nexet_channels` row — a workspace owned by one user, optionally bound to a real YouTube channel (`youtubeChannelId` + branding) |
+| New channel via `+` | Create `nexet_channels` (UNLINKED) → Google OAuth consent → fetch YouTube channel metadata → CONNECTED/ACTIVE |
 | Den pages inside the channel | Vault, studios (role pages), review, preview, timeline, notifications — nested under `/creators-den/channels/:channelId/...` |
-| Channel editor list / contributor avatars | `tandem_channel_members` (EDITOR rows) rendered as an avatar strip on the channel home + member presence dots |
+| Channel editor list / contributor avatars | `nexet_channel_members` (EDITOR rows) rendered as an avatar strip on the channel home + member presence dots |
 | Analytics | New YouTube-linked pages: channel video table w/ filters + per-video analytics detail, backed by the YouTube Data API + YouTube Analytics API with DB caching |
 
 ## 3. Scope and release boundaries
@@ -42,7 +42,7 @@ The target user is a YouTube agency/MCN managing several client channels end-to-
 5. YouTube OAuth link + token vault (encrypted refresh tokens, refresh flow, revoke/disconnect) and YouTube channel metadata sync.
 6. Analytics ingestion: channel/video catalog sync (detects recently published uploads), daily metric snapshots (video + channel), on-demand report caching (retention/traffic/demographics/devices/revenue), background refresh loop + manual refresh.
 7. Analytics UI: channel overview KPIs, video table with filters (date range, sort by views/likes/CTR/retention/revenue, search), and a per-video analytics page (KPIs, day-series charts, retention curve, traffic sources, demographics, devices, revenue/RPM/CPM where monetized, subscriber deltas).
-8. v1 anomaly alerts via the existing `notify`/`tandemVideoNotifications` system (§14).
+8. v1 anomaly alerts via the existing `notify`/`nexetVideoNotifications` system (§14).
 9. Route tests (in-memory SQLite mirrors), typecheck/build, and a live walkthrough against a real connected YouTube channel.
 
 ### 3.2 Explicitly future scope (preserved in the model, labeled future, not built in v1)
@@ -51,7 +51,7 @@ The target user is a YouTube agency/MCN managing several client channels end-to-
 - Brand-deal tracking, white-labeled client reports, goal tracking.
 - Comment analysis / demand signals.
 - Alert library beyond the three v1 rules (§14).
-- Ingesting owned channels you manage under someone else's Google account via CMS partnership tokens (v1 binds each channel to the connecting user's own YouTube account; a "manager mode" with delegated OAuth remains a model hook — `tandem_channel_oauth.linkedByUserId`).
+- Ingesting owned channels you manage under someone else's Google account via CMS partnership tokens (v1 binds each channel to the connecting user's own YouTube account; a "manager mode" with delegated OAuth remains a model hook — `nexet_channel_oauth.linkedByUserId`).
 
 Anything in the brief not listed in §3.1 is treated as future scope unless explicitly added later.
 
@@ -61,9 +61,9 @@ Anything in the brief not listed in §3.1 is treated as future scope unless expl
 2. Keep using Clerk as the single identity source; derive the acting user only from `getAuth(req).userId` server-side.
 3. Enforce channel/project ownership and membership in server authorization and DB logic (§10), not just in disabled UI buttons.
 4. Use the existing schema/migration conventions: Drizzle tables in `lib/db/src/schema/*`, guarded idempotent SQL migration `lib/db/migrations/0004_*.sql` (0003 precedent), applied to live DBs via `pnpm --filter db run push-force` (post-merge convention). Mirror every new table in the in-memory SQLite test schema (`artifacts/api-server/src/test/in-memory-db.ts`).
-5. Reuse existing server helpers rather than duplicating: `notify()` (video-platform), `resolveUserProfiles`/`resolveUserNames`, `emitToProject`/`emitToUser` + realtime presence, `encryptSecret`/`decryptSecret` (`artifacts/api-server/src/lib/oracle.ts`, SESSION_SECRET AES — the same helper that protects provider API keys), `tandemUid`/`normalizeTandemUid`, `recordVideoActivity`.
+5. Reuse existing server helpers rather than duplicating: `notify()` (video-platform), `resolveUserProfiles`/`resolveUserNames`, `emitToProject`/`emitToUser` + realtime presence, `encryptSecret`/`decryptSecret` (`artifacts/api-server/src/lib/oracle.ts`, SESSION_SECRET AES — the same helper that protects provider API keys), `nexetUid`/`normalizeNexetUid`, `recordVideoActivity`.
 6. Store YouTube analytics as periodic snapshots in Postgres; never proxy live YouTube API responses through every page view. Report caches have TTLs and are re-fetched on sync/manual refresh (§9).
-7. Reuse the existing `recharts` catalog dependency (already in `tandem`, `authors-den`, `oracle-admin`, `mockup-sandbox`; port `components/ui/chart.tsx` if needed) — do not introduce a second charting library.
+7. Reuse the existing `recharts` catalog dependency (already in `nexet`, `authors-den`, `oracle-admin`, `mockup-sandbox`; port `components/ui/chart.tsx` if needed) — do not introduce a second charting library.
 8. Keep existing den surfaces working: flat legacy project deep links (`/creators-den/projects/:id`, stored in old notification rows and generated by existing server call sites) keep working via a one-hop client redirect into the channel-scoped URL (§12.3). No schema/data migration rewrites old rows.
 9. Update this checklist as work proceeds: `[ ]` → `[x]` with a short completion note and the validation result.
 10. Progress-check-in doc style follows `TADEM_COLLABORATION_IMPLEMENTATION_PLAN.md`.
@@ -72,24 +72,24 @@ Anything in the brief not listed in §3.1 is treated as future scope unless expl
 
 Completed during plan review:
 
-- [x] Trace the current Creator Den entry from Tandem. **Completed: the Content Creators hub card (`artifacts/tandem/src/pages/content-creators.tsx`) links to `/creators-den/`; creators-den is served under the `/creators-den` base (wouter `Router base="/creators-den"`, `App.tsx`); Tandem's vite proxy forwards `/creators-den` → port 5175.**
-- [x] Identify the existing "channel-like" concepts. **Completed: none exist. Projects (`tandem_video_projects`), members (`tandem_video_members`), assets, timelines, submissions, notifications, jobs, chat all exist with no channel dimension. There is no CMS page anywhere in the repo (search for `CMS` returns nothing).**
+- [x] Trace the current Creator Den entry from Nexet. **Completed: the Content Creators hub card (`artifacts/nexet/src/pages/content-creators.tsx`) links to `/creators-den/`; creators-den is served under the `/creators-den` base (wouter `Router base="/creators-den"`, `App.tsx`); Nexet's vite proxy forwards `/creators-den` → port 5175.**
+- [x] Identify the existing "channel-like" concepts. **Completed: none exist. Projects (`nexet_video_projects`), members (`nexet_video_members`), assets, timelines, submissions, notifications, jobs, chat all exist with no channel dimension. There is no CMS page anywhere in the repo (search for `CMS` returns nothing).**
 - [x] Confirm the API conventions. **Completed: OpenAPI (`lib/api-spec/openapi.yaml`, 5k lines) → Orval → `@workspace/api-zod` (server validation) + `@workspace/api-client-react` (React Query hooks, `custom-fetch.ts` mutator). Route files under `artifacts/api-server/src/routes/`, registered in `routes/index.ts`.** Video routes are under `/api/video/*`; notifications deep-link to `/creators-den/projects/:id` in many places (`video.ts`, `video-production.ts`, `video-platform.ts`).
-- [x] Confirm schema/migration conventions. **Completed: drizzle schema in `lib/db/src/schema/*`; idempotent checked-in SQL migrations `0001`–`0003` (0003 `tandem_tours` precedent); live DB applies via `pnpm --filter db run push-force` (`scripts/post-merge.sh`).**
-- [x] Confirm charting + styling capabilities in Creator Den. **Completed: creators-den currently has no chart library; `recharts ^2.15.x` is a catalog dependency already used by tandem/authors-den/oracle-admin.**
+- [x] Confirm schema/migration conventions. **Completed: drizzle schema in `lib/db/src/schema/*`; idempotent checked-in SQL migrations `0001`–`0003` (0003 `nexet_tours` precedent); live DB applies via `pnpm --filter db run push-force` (`scripts/post-merge.sh`).**
+- [x] Confirm charting + styling capabilities in Creator Den. **Completed: creators-den currently has no chart library; `recharts ^2.15.x` is a catalog dependency already used by nexet/authors-den/oracle-admin.**
 - [x] Confirm realtime presence shape. **Completed: `artifacts/api-server/src/realtime.ts` keeps in-memory `presenceByProject` (projectId → userId → {name, leg, joinedAt}); clients join with `presence:join {projectId, leg?, name?}`; `emitToUser` drives notification badges. Channel-level presence is an extension (§12.5).**
 - [x] Confirm YouTube/Google credentials status. **Completed: none configured yet. The user will paste Google Cloud OAuth client credentials (web app) + a YouTube Data API key; see §8 for exact values needed.**
 - [x] Confirm how legacy projects should behave after the channel layer lands. **User decision: existing projects (no channel) stay hidden from channel pages until their owner attaches them to a channel — never auto-migrate. Handled by §6.4.**
 
 ## 6. Domain model and persistence plan
 
-All new tables use the `tandem_` prefix and follow existing conventions (text PK `uid`-style ids, `created_at`/`updated_at` timestamps, snake_case columns).
+All new tables use the `nexet_` prefix and follow existing conventions (text PK `uid`-style ids, `created_at`/`updated_at` timestamps, snake_case columns).
 
-### 6.1 `tandem_channels` — the workspace (new)
+### 6.1 `nexet_channels` — the workspace (new)
 
 | Column | Type | Notes |
 |---|---|---|
-| id | text PK | `chan_…` (randomUUID like other tandem rows) |
+| id | text PK | `chan_…` (randomUUID like other nexet rows) |
 | owner_id | text NOT NULL | Clerk user id of the creator of the channel |
 | name | text NOT NULL | Workspace name; pre-connect it's the user's chosen name, after connect it mirrors the YouTube channel title |
 | status | text NOT NULL default `'UNLINKED'` | `UNLINKED` (created, not connected) → `CONNECTED` (OAuth bound + metadata fetched). Channel cannot host projects or analytics until CONNECTED |
@@ -99,7 +99,7 @@ All new tables use the `tandem_` prefix and follow existing conventions (text PK
 | youtube_country | text | Optional, from snippet |
 | created_at / updated_at | timestamptz | |
 
-`tandem_channel_members` — who is on the channel (new):
+`nexet_channel_members` — who is on the channel (new):
 
 | Column | Notes |
 |---|---|
@@ -112,10 +112,10 @@ Invariant: an OWNER row exists from channel creation. An EDITOR row is ensured (
 
 ### 6.2 Project changes (altered)
 
-- `tandem_video_projects` gains `channel_id` (text, nullable). New project creation requires a channel (and the creator must own it). Legacy rows keep `channel_id = NULL` and are handled per §6.4.
-- `tandem_video_members` unchanged (project-scoped roles stay as today).
+- `nexet_video_projects` gains `channel_id` (text, nullable). New project creation requires a channel (and the creator must own it). Legacy rows keep `channel_id = NULL` and are handled per §6.4.
+- `nexet_video_members` unchanged (project-scoped roles stay as today).
 
-### 6.3 `tandem_channel_oauth` — encrypted YouTube tokens (new)
+### 6.3 `nexet_channel_oauth` — encrypted YouTube tokens (new)
 
 | Column | Notes |
 |---|---|
@@ -129,7 +129,7 @@ Invariant: an OWNER row exists from channel creation. An EDITOR row is ensured (
 | status text default `'ACTIVE'` | `ACTIVE` / `REVOKED` |
 | last_refreshed_at / created_at / updated_at | |
 
-A channel is CONNECTED only when it has an ACTIVE oauth row whose `youtube_channel_id` matches `tandem_channels.youtube_channel_id`.
+A channel is CONNECTED only when it has an ACTIVE oauth row whose `youtube_channel_id` matches `nexet_channels.youtube_channel_id`.
 
 ### 6.4 Legacy projects (user decision: require linking before old projects show)
 
@@ -142,7 +142,7 @@ A channel is CONNECTED only when it has an ACTIVE oauth row whose `youtube_chann
 
 Trigger points (all server-side, in the member add/patch/remove routes of `routes/video.ts`):
 
-- **Member added** to a project whose channel is owned by the project's Captain (project owner == channel owner): ensure `tandem_channel_members` EDITOR row for that user+channel (idempotent — adding them to a second project on the same channel reuses the row), then their CMS card exists / persists.
+- **Member added** to a project whose channel is owned by the project's Captain (project owner == channel owner): ensure `nexet_channel_members` EDITOR row for that user+channel (idempotent — adding them to a second project on the same channel reuses the row), then their CMS card exists / persists.
 - **Member removed or role-scoped off** and left with no ACTIVE membership on any project in that channel: delete the EDITOR row (the CMS card disappears).
 - A member's project roles change (e.g. role merge) never touches channel membership; only membership existence matters for the avatar strip.
 
@@ -150,22 +150,22 @@ The Captain's OWNER row is never removed by these rules.
 
 ### 6.6 Analytics tables (new)
 
-- `tandem_channel_videos` — catalog of videos published on the linked channel (upserted by sync):
+- `nexet_channel_videos` — catalog of videos published on the linked channel (upserted by sync):
   - `id text PK` (`chanvid_…`), `channel_id`, `youtube_video_id`, UNIQUE (channel_id, youtube_video_id)
   - `title`, `description`, `thumbnails jsonb`, `published_at`, `duration_seconds int`, `privacy_status text`, `category_id text`, `default_language text`, `content_kind text` (`LONG_FORM` | `SHORT` | `LIVE` derived), `last_synced_at`
-- `tandem_channel_daily_metrics` — channel-level daily snapshots: `channel_id`, `day date`, `metrics jsonb`, `source text` (`youtube`), UNIQUE (channel_id, day).
+- `nexet_channel_daily_metrics` — channel-level daily snapshots: `channel_id`, `day date`, `metrics jsonb`, `source text` (`youtube`), UNIQUE (channel_id, day).
   - `metrics` shape (zod-validated): `{ views, watchTimeMinutes, averageViewDurationSeconds, subscribersGained, subscribersLost, estimatedRevenueUsd, estimatedAdRevenueUsd, likes, comments, shares }` (absent keys allowed — YouTube returns nulls for non-monetized rows).
-- `tandem_video_daily_metrics` — per-video daily snapshots: `video_row_id` (→ catalog), `day`, `metrics jsonb` (same shape + `impressions`, `impressionsClickThroughRate`, `averageViewPercentage`), UNIQUE (video_row_id, day).
-- `tandem_analytics_reports` — on-demand analytics report cache: `channel_id`, `video_row_id` (nullable for channel-level), `kind text` (`RETENTION` | `TRAFFIC` | `PLAYBACK_LOCATION` | `DEMOGRAPHICS` | `DEVICES` | `REVENUE` | `SUBS`), `period_start date`, `period_end date`, `payload jsonb`, `fetched_at`. Fetched lazily, considered fresh for `YT_REPORT_TTL_MINUTES` (default 360), re-fetched by sync/manual refresh beyond the TTL.
-- `tandem_channel_syncs` — per-channel sync state: `channel_id` UNIQUE, `last_video_sync_at`, `last_metrics_sync_at`, `status text` (`IDLE` | `SYNCING` | `ERROR`), `error`, `new_videos_seen int` (count of uploads discovered on the most recent sync), `updated_at`.
+- `nexet_video_daily_metrics` — per-video daily snapshots: `video_row_id` (→ catalog), `day`, `metrics jsonb` (same shape + `impressions`, `impressionsClickThroughRate`, `averageViewPercentage`), UNIQUE (video_row_id, day).
+- `nexet_analytics_reports` — on-demand analytics report cache: `channel_id`, `video_row_id` (nullable for channel-level), `kind text` (`RETENTION` | `TRAFFIC` | `PLAYBACK_LOCATION` | `DEMOGRAPHICS` | `DEVICES` | `REVENUE` | `SUBS`), `period_start date`, `period_end date`, `payload jsonb`, `fetched_at`. Fetched lazily, considered fresh for `YT_REPORT_TTL_MINUTES` (default 360), re-fetched by sync/manual refresh beyond the TTL.
+- `nexet_channel_syncs` — per-channel sync state: `channel_id` UNIQUE, `last_video_sync_at`, `last_metrics_sync_at`, `status text` (`IDLE` | `SYNCING` | `ERROR`), `error`, `new_videos_seen int` (count of uploads discovered on the most recent sync), `updated_at`.
 
 View refresh uses these tables (upserts), never deletes history.
 
 ## 7. Database changes summary
 
 - Add the tables above to `lib/db/src/schema/` (one new file `channels.ts` + one `channel-analytics.ts`), export from `schema/index.ts`.
-- Migration: `lib/db/migrations/0004_creator_channels.sql` mirroring `0003_tandem_tours.sql`'s guarded, idempotent `DO $$ … IF NOT EXISTS` style (create tables + unique indexes). Apply via `pnpm --filter db run push-force` against dev DBs.
-- `tandem_video_projects` gains `channel_id` via the same migration.
+- Migration: `lib/db/migrations/0004_creator_channels.sql` mirroring `0003_nexet_tours.sql`'s guarded, idempotent `DO $$ … IF NOT EXISTS` style (create tables + unique indexes). Apply via `pnpm --filter db run push-force` against dev DBs.
+- `nexet_video_projects` gains `channel_id` via the same migration.
 - Mirror every new table in `artifacts/api-server/src/test/in-memory-db.ts` (drizzle sqlite definitions + `CREATE TABLE` SQL + the `tables` map), mirroring column-for-column like the existing video tables.
 - New env keys (see §8 for values to paste).
 - Note in `.env.example` under a "YouTube Channel Analytics" section.
@@ -177,7 +177,7 @@ View refresh uses these tables (upserts), never deletes history.
 The user selected "I'll paste Google credentials now". Needed before Phase 2 implementation can be exercised end-to-end:
 
 1. **Google OAuth 2.0 Client ID + Client Secret** of type *Web application* (Google Cloud Console → APIs & Services → Credentials). Must have these enabled APIs on the project: **YouTube Data API v3** and **YouTube Analytics API**.
-2. **Authorized redirect URI** registered in the console: `${TANDEM_WEB_URL}/creators-den/channels/oauth/callback` (per-environment; local dev = `http://localhost:5175/creators-den/channels/oauth/callback`, prod = the deployed origin) plus the authorized JavaScript origin.
+2. **Authorized redirect URI** registered in the console: `${NEXET_WEB_URL}/creators-den/channels/oauth/callback` (per-environment; local dev = `http://localhost:5175/creators-den/channels/oauth/callback`, prod = the deployed origin) plus the authorized JavaScript origin.
 3. **YouTube Data API v3 key** (optional fallback for public stats; analytics still requires OAuth).
 
 ### 8.2 Env vars
@@ -186,7 +186,7 @@ The user selected "I'll paste Google credentials now". Needed before Phase 2 imp
 YOUTUBE_OAUTH_CLIENT_ID=
 YOUTUBE_OAUTH_CLIENT_SECRET=
 YOUTUBE_DATA_API_KEY=
-YOUTUBE_REDIRECT_URI=            # default derived from TANDEM_WEB_URL + /creators-den/channels/oauth/callback
+YOUTUBE_REDIRECT_URI=            # default derived from NEXET_WEB_URL + /creators-den/channels/oauth/callback
 YT_SYNC_INTERVAL_MINUTES=60      # background analytics refresh cadence
 YT_REPORT_TTL_MINUTES=360        # on-demand report cache freshness
 YT_ANALYTICS_DAYS=90             # metric snapshot horizon (days back)
@@ -199,7 +199,7 @@ No credentials are hard-coded. Missing credentials degrade gracefully: the CMS s
 
 1. `POST /api/channels/:channelId/oauth/start` (channel member owner only) — validates the channel is UNLINKED, generates `code_verifier`/`code_challenge` (S256) + `state` (HMAC over `{channelId, verifier, exp}`, `SESSION_SECRET`), stores a short-lived pending connect in memory, returns `{ url }` = Google authorization URL: `https://accounts.google.com/o/oauth2/v2/auth?client_id=…&redirect_uri=${YOUTUBE_REDIRECT_URI}&response_type=code&scope=openid email https://www.googleapis.com/auth/youtube.readonly https://www.googleapis.com/auth/yt-analytics.readonly&access_type=offline&prompt=consent&state=…&code_challenge=…&code_challenge_method=S256`.
 2. User consents; Google redirects to `/creators-den/channels/oauth/callback?code=…&state=…` (a creators-den route; the client reads the query params and calls the exchange endpoint — no server-side web page needed).
-3. `POST /api/channels/:channelId/oauth/exchange` `{ code, codeVerifier }` — verifies `state`, exchanges at `https://oauth2.googleapis.com/token`, calls `GET https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails,statistics,brandingSettings&mine=true` with the access token, validates the returned channel id is not already bound to a different `tandem_channels` row, upserts `tandem_channel_oauth` (encrypted), writes branding metadata + status `CONNECTED` on the channel, and kicks an initial analytics sync (§9).
+3. `POST /api/channels/:channelId/oauth/exchange` `{ code, codeVerifier }` — verifies `state`, exchanges at `https://oauth2.googleapis.com/token`, calls `GET https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails,statistics,brandingSettings&mine=true` with the access token, validates the returned channel id is not already bound to a different `nexet_channels` row, upserts `nexet_channel_oauth` (encrypted), writes branding metadata + status `CONNECTED` on the channel, and kicks an initial analytics sync (§9).
 4. Token refresh: before any YouTube call, if `expires_at` is near/over, refresh with the stored refresh token (`POST https://oauth2.googleapis.com/token`, `grant_type=refresh_token`), re-encrypt + store, mark `REVOKED` + channel `status` on `invalid_grant` (UI shows "Reconnect").
 5. `POST /api/channels/:channelId/oauth/disconnect` (owner only) — calls `https://oauth2.googleapis.com/revoke`, clears the oauth row (keeps the channel + projects), sets status `UNLINKED`.
 
@@ -213,8 +213,8 @@ Triggered by: manual `POST /api/channels/:channelId/analytics/sync` (owner, thro
 
 Per CONNECTED channel, in order:
 
-1. **Catalog sync (detect newly published uploads):** `channels.list?part=contentDetails&mine=true` → uploads playlist id → `playlistItems.list?part=snippet,contentDetails&maxResults=50` paged up to `YT_SYNC_MAX_VIDEO_QUERIES`-bounded pages. Upsert `tandem_channel_videos`; count new `youtube_video_id`s into `new_videos_seen` (UI banner: "N new uploads detected and now tracked"). Store per-video `durationSeconds` (ISO 8601 parse) → `content_kind`.
-2. **Metrics backfill/snapshot:** for the channel and each catalog video, `youtubeAnalytics.reports.query` per day (or day-range rows) over `[today - YT_ANALYTICS_DAYS, today]`, **incrementally** — only days missing from `tandem_*_daily_metrics` are fetched after the first backfill.
+1. **Catalog sync (detect newly published uploads):** `channels.list?part=contentDetails&mine=true` → uploads playlist id → `playlistItems.list?part=snippet,contentDetails&maxResults=50` paged up to `YT_SYNC_MAX_VIDEO_QUERIES`-bounded pages. Upsert `nexet_channel_videos`; count new `youtube_video_id`s into `new_videos_seen` (UI banner: "N new uploads detected and now tracked"). Store per-video `durationSeconds` (ISO 8601 parse) → `content_kind`.
+2. **Metrics backfill/snapshot:** for the channel and each catalog video, `youtubeAnalytics.reports.query` per day (or day-range rows) over `[today - YT_ANALYTICS_DAYS, today]`, **incrementally** — only days missing from `nexet_*_daily_metrics` are fetched after the first backfill.
    - Channel report: `ids=channel==<id>`, `dimensions=day`, metrics `views,estimatedMinutesWatched,averageViewDuration,likes,comments,shares,subscribersGained,subscribersLost,estimatedRevenue,estimatedAdRevenue`.
    - Video reports: `dimensions=day`, `filters=video==<videoId>`, same metrics + `impressions,impressionsClickThroughRate`.
    - (Subscriber deltas on videos are not supported by the Analytics API; the channel daily rows carry them and the video page shows channel-level sub movement alongside.)
@@ -226,19 +226,19 @@ Per CONNECTED channel, in order:
    - `REVENUE`: metrics `estimatedRevenue,estimatedAdRevenue,estimatedCpm,estimatedRpm` + ad-type dimensions (`adType`) where monetized.
    - `SUBS`: channel `dimensions=day` subs gained/lost for charting.
    Responses are the Analytics API `{ columnHeaders, rows }` shape; the client normalizes into zod-validated row arrays before `payload` is stored.
-4. Update `tandem_channel_syncs` status/timestamps; on failure store `ERROR` + message (surface "Last sync failed — retry" on the analytics pages).
+4. Update `nexet_channel_syncs` status/timestamps; on failure store `ERROR` + message (surface "Last sync failed — retry" on the analytics pages).
 
 Quota guard: report queries for individual videos are capped per sync by `YT_SYNC_MAX_VIDEO_QUERIES` and only for videos with data newer than the last metric day; catalog sync is one playlist crawl. Sync never blocks auth or project routes.
 
 ### 9.2 Read paths (all DB-backed)
 
 - Overview + video table + video detail + report sections are served **from the snapshot tables** (§11.3 endpoints), so page loads never call YouTube.
-- Freshness surfaced honestly: each response/UI carries `lastSyncedAt` + `status` from `tandem_channel_syncs`, plus a "Refresh now" action (owner) that runs the sync and invalidates the React Query keys.
+- Freshness surfaced honestly: each response/UI carries `lastSyncedAt` + `status` from `nexet_channel_syncs`, plus a "Refresh now" action (owner) that runs the sync and invalidates the React Query keys.
 - No channel data yet (UNLINKED / never synced / sync error) renders an explainer + connect/refresh CTA — no fake numbers. (A `demo` source column exists on the metric tables for future seeded fixtures but v1 ships without demo data, per the credentials decision.)
 
 ## 10. Authorization matrix
 
-Acting user comes only from `getAuth(req).userId`. `channelRole(channelId, userId)` resolves `OWNER` / `EDITOR` / none from `tandem_channel_members` (owner status of the channel's projects follows the channel OWNER in v1).
+Acting user comes only from `getAuth(req).userId`. `channelRole(channelId, userId)` resolves `OWNER` / `EDITOR` / none from `nexet_channel_members` (owner status of the channel's projects follows the channel OWNER in v1).
 
 | Capability | Channel owner | Channel editor | Others |
 |---|---:|---:|---:|
@@ -276,7 +276,7 @@ Contract-first. All additions go into `lib/api-spec/openapi.yaml` under new tags
 
 - `POST /video/projects` body gains `channelId` (required); validates ownership (project owner == channel owner). Response unchanged otherwise.
 - `GET /video/projects?channelId=…` — optional channel filter that also applies the §10 editor scoping (used by the channel home + workspace menu).
-- `POST /video/projects/:projectId/members`, role patch, and member remove — after the existing member transaction, ensure/remove the `tandem_channel_members` EDITOR row per §6.5, and emit a notification whose deep link targets the channel project URL.
+- `POST /video/projects/:projectId/members`, role patch, and member remove — after the existing member transaction, ensure/remove the `nexet_channel_members` EDITOR row per §6.5, and emit a notification whose deep link targets the channel project URL.
 - New `PATCH /video/projects/:projectId/channel` `{ channelId }` — attach a legacy unlinked project (owner + own CONNECTED channel only).
 - Existing `GET /video/projects` (no filter) keeps returning the user's projects (owned + memberships) with `channelId` included in each row so the client can route/redirect correctly.
 
@@ -299,7 +299,7 @@ Registered in `routes/index.ts`; token refresh + `invalid_grant` handling lives 
 
 ### 12.1 Entry and top-level structure (`artifacts/creators-den/src/App.tsx`)
 
-The Tandem hub card still opens `/creators-den/`; the root is no longer the room but the **Channels (CMS) grid**.
+The Nexet hub card still opens `/creators-den/`; the root is no longer the room but the **Channels (CMS) grid**.
 
 | Route | Page | Purpose |
 |---|---|---|
@@ -348,7 +348,7 @@ In `App.tsx`, before the `Switch`, a `Route path="/projects/:projectId/*?"` comp
 
 ### 12.6 Analytics UI (new)
 
-Shared layout under the channel shell; charts via `recharts` (port the shadcn `chart.tsx` wrapper used in tandem if wanted; creators-den already has `creators.css` primitives to restyle with).
+Shared layout under the channel shell; charts via `recharts` (port the shadcn `chart.tsx` wrapper used in nexet if wanted; creators-den already has `creators.css` primitives to restyle with).
 
 - **`/channels/:channelId/analytics`** — toolbar ("last 7 / 28 / 90 days", From/To, search, sort chips: Most views, Most likes, Watch time, CTR, Retention, Revenue, Newest/oldest) — brief's "filter by date, most views, most likes and so on". Stat cards row (views, watch time, AVD, subs gained, impressions, CTR, est. revenue) + a views/watch-time day chart + the **video table in rows**: thumbnail, title, published, views, watch time, AVD, likes/comments, CTR, retention %, revenue; row click → video page. "N new uploads detected" banner + "Last synced <time> · Refresh now". Unconnected channel → connect CTA instead.
 - **`/channels/:channelId/analytics/videos/:videoRowId`** — header (thumbnail/title/date/shorts-vs-long-form), KPI cards (views, watch time, AVD, likes, comments, shares, impressions, CTR, est. revenue + RPM/CPM where monetized, subscribers +/- channel context), charts: views & watch time by day; **audience retention curve** (elapsed-time ratio vs average view percentage); traffic sources; playback locations; demographics (age/gender); devices; revenue day series. Anomaly banners comparing to channel medians (e.g. "CTR is 42% below this channel's median").
@@ -372,7 +372,7 @@ Copy/visual language stays in the existing Netflix/YouTube dark-cinematic system
 
 ## 14. Alerts, notifications, and anomaly rules
 
-Reuse the existing `tandemVideoNotificationsTable` + `notify()` + inbox surfaces. v1 rules run inside the sync engine after each metrics update and only fire once per (channel/rule/window) via a dedupe column-free approach — store a small `alerts` array on `tandem_channel_syncs` metadata or a dedicated `tandem_channel_alerts` table (id, channel_id, rule, message, period_start, created_at; unique on (channel_id, rule, period_start)):
+Reuse the existing `nexetVideoNotificationsTable` + `notify()` + inbox surfaces. v1 rules run inside the sync engine after each metrics update and only fire once per (channel/rule/window) via a dedupe column-free approach — store a small `alerts` array on `nexet_channel_syncs` metadata or a dedicated `nexet_channel_alerts` table (id, channel_id, rule, message, period_start, created_at; unique on (channel_id, rule, period_start)):
 
 1. **Watch-time drop** — channel watch time down ≥ 15% vs the previous 7-day window (brief's "weekly watch-time drop of 15%").
 2. **Underperforming new video** — a video published ≤ 7 days ago sitting ≥ 40% below the channel's median CTR or median AVD at 72h (brief's "new video far below median CTR").
@@ -438,9 +438,9 @@ Deep links target the video analytics page (rules 1–2) or the channel analytic
 
 ### Phase 3 — Analytics ingestion + APIs
 
-- [x] `youtube/client.ts` + `youtube/sync.ts` (§8.3, §9.1): catalog sync, incremental daily metrics, report caches, background interval + manual sync endpoint, sync-state rows. **Completed: `artifacts/api-server/src/youtube/client.ts` (fetchYoutubeJson + report normalization), `youtube/sync.ts` (catalog crawl w/ videos.list enrichment, incremental channel+video daily metrics, report TTL refresh, anomaly rules, per-channel sync-state upserts), `youtube/analytics-runner.ts` (YT_SYNC_INTERVAL_MINUTES loop, wired in `index.ts`), manual sync endpoint with ~1/min throttle. Schema: `tandem_channel_videos` / `_daily_metrics` / `_reports` / `tandem_channel_syncs` / `tandem_channel_alerts` + migration `0005_channel_analytics.sql` + sqlite mirror. Verified: sync tests green.**
+- [x] `youtube/client.ts` + `youtube/sync.ts` (§8.3, §9.1): catalog sync, incremental daily metrics, report caches, background interval + manual sync endpoint, sync-state rows. **Completed: `artifacts/api-server/src/youtube/client.ts` (fetchYoutubeJson + report normalization), `youtube/sync.ts` (catalog crawl w/ videos.list enrichment, incremental channel+video daily metrics, report TTL refresh, anomaly rules, per-channel sync-state upserts), `youtube/analytics-runner.ts` (YT_SYNC_INTERVAL_MINUTES loop, wired in `index.ts`), manual sync endpoint with ~1/min throttle. Schema: `nexet_channel_videos` / `_daily_metrics` / `_reports` / `nexet_channel_syncs` / `nexet_channel_alerts` + migration `0005_channel_analytics.sql` + sqlite mirror. Verified: sync tests green.**
 - [x] Analytics GET routes + overview/videos/detail/report endpoints (§11.3) + spec/codegen. **Completed: `artifacts/api-server/src/routes/channel-analytics.ts` (overview, video table w/ search/sort/cursor, video detail w/ channel medians, report cache w/ stale→sync, owner sync POST), openapi `channel-analytics` tag + codegen regenerated.**
-- [x] Anomaly rules + notifications (§14). **Completed: WATCH_TIME_DROP / VIDEO_UNDERPERFORMING / UPLOAD_GAP rules run inside the sync, deduped via `tandem_channel_alerts` (channel, rule, period_start) and delivered through `notify()`-style `tandemVideoNotifications` + `emitToUser`; deep links target the channel/video analytics pages.**
+- [x] Anomaly rules + notifications (§14). **Completed: WATCH_TIME_DROP / VIDEO_UNDERPERFORMING / UPLOAD_GAP rules run inside the sync, deduped via `nexet_channel_alerts` (channel, rule, period_start) and delivered through `notify()`-style `nexetVideoNotifications` + `emitToUser`; deep links target the channel/video analytics pages.**
 - [x] Analytics route tests with canned YouTube payloads (§15.1). **Completed: `channels-analytics.test.ts` (12 tests): auth/membership, first-sync backfill, incremental second sync, 403 degradation → ERROR state + stored partials, DB-backed reads with zero YouTube calls, report freshness/stale, owner-only sync + throttle, anomaly dedupe.**
 
 ### Phase 4 — Analytics UI
@@ -461,9 +461,9 @@ Deep links target the video analytics page (rules 1–2) or the channel analytic
 Recorded explicitly instead of silently choosing behavior:
 
 - **Legacy projects are not auto-migrated** (user decision): unlinked projects stay hidden from channel surfaces until their owner attaches them (§6.4).
-- **Creator Den root becomes the Channels/CMS grid** — the Tandem "Open Creators Den" entry still points at `/creators-den/` (§12.1).
+- **Creator Den root becomes the Channels/CMS grid** — the Nexet "Open Creators Den" entry still points at `/creators-den/` (§12.1).
 - **Profile / Explore stay den-level** rather than nested under a channel (a GitHub-style account surface). Channels scope the production surfaces (projects/studios/analytics). Flag for veto if the brief's "move the current creator-den pages into a channel" was intended to include profile/explore.
-- **One YouTube channel per channel row**, bound to the connecting user's own Google account. YouTube Analytics API only serves channels the OAuth account owns. Managing third-party channels under someone else's Google identity (CMS partnership / delegated access) is a future model hook (`tandem_channel_oauth.linkedByUserId`) rather than a v1 claim — the brief lists it under techniques to consider, not as a first-release requirement.
+- **One YouTube channel per channel row**, bound to the connecting user's own Google account. YouTube Analytics API only serves channels the OAuth account owns. Managing third-party channels under someone else's Google identity (CMS partnership / delegated access) is a future model hook (`nexet_channel_oauth.linkedByUserId`) rather than a v1 claim — the brief lists it under techniques to consider, not as a first-release requirement.
 - **Deep links stay flat** (`/creators-den/projects/:id`) and redirect client-side into the channel URL, so old notifications and existing server call sites keep working without rewriting every `notify()` invocation (§12.3).
 - **Analytics is a snapshot/cache layer over the YouTube APIs** (§9): pages never call YouTube on load; freshness + "Refresh now" is explicit. Competitive/benchmark analytics for non-owned channels is future scope and would need a separate public-data source.
 - **Revenue data appears only where YouTube reports it** (monetized channels, `estimatedRevenue`); RPM/CPM shown where the API provides them; otherwise explicit "not monetized / unavailable" states.

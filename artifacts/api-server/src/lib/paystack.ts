@@ -116,7 +116,7 @@ export async function initializeTransaction(
 /**
  * POST /plan — mirror a catalog plan as a Paystack recurring plan. Returns the
  * plan code (PLN_…) that checkout passes to initialize to subscribe customers.
- * Plans are created once per (kind, planId) and cached in tandem_paystack_plans.
+ * Plans are created once per (kind, planId) and cached in nexet_paystack_plans.
  */
 export interface CreatePlanInput {
   name: string;

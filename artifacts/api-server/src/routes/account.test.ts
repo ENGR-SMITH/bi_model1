@@ -49,23 +49,23 @@ const API = createApp();
 
 async function resetDb() {
   const t = state.tables;
-  await state.db.delete(t.tandemUserCvsTable);
-  await state.db.delete(t.tandemAccountQuotasTable);
-  await state.db.delete(t.tandemVideoNotificationsTable);
-  await state.db.delete(t.tandemVideoGrantsTable);
-  await state.db.delete(t.tandemVideoReferencesTable);
-  await state.db.delete(t.tandemVideoSyncsTable);
-  await state.db.delete(t.tandemVideoJobsTable);
-  await state.db.delete(t.tandemVideoCommentsTable);
-  await state.db.delete(t.tandemVideoSubmissionsTable);
-  await state.db.delete(t.tandemVideoTimelineVersionsTable);
-  await state.db.delete(t.tandemVideoTimelinesTable);
-  await state.db.delete(t.tandemVideoTranscriptSegmentsTable);
-  await state.db.delete(t.tandemVideoTranscriptsTable);
-  await state.db.delete(t.tandemVideoAssetFilesTable);
-  await state.db.delete(t.tandemVideoAssetsTable);
-  await state.db.delete(t.tandemVideoMembersTable);
-  await state.db.delete(t.tandemVideoProjectsTable);
+  await state.db.delete(t.nexetUserCvsTable);
+  await state.db.delete(t.nexetAccountQuotasTable);
+  await state.db.delete(t.nexetVideoNotificationsTable);
+  await state.db.delete(t.nexetVideoGrantsTable);
+  await state.db.delete(t.nexetVideoReferencesTable);
+  await state.db.delete(t.nexetVideoSyncsTable);
+  await state.db.delete(t.nexetVideoJobsTable);
+  await state.db.delete(t.nexetVideoCommentsTable);
+  await state.db.delete(t.nexetVideoSubmissionsTable);
+  await state.db.delete(t.nexetVideoTimelineVersionsTable);
+  await state.db.delete(t.nexetVideoTimelinesTable);
+  await state.db.delete(t.nexetVideoTranscriptSegmentsTable);
+  await state.db.delete(t.nexetVideoTranscriptsTable);
+  await state.db.delete(t.nexetVideoAssetFilesTable);
+  await state.db.delete(t.nexetVideoAssetsTable);
+  await state.db.delete(t.nexetVideoMembersTable);
+  await state.db.delete(t.nexetVideoProjectsTable);
   state.userId = null;
 }
 
@@ -157,9 +157,9 @@ describe("account quota", () => {
     // Shrink the account's quota so a small test upload overflows it.
     await request(API).get("/api/account/quota"); // materialize the default row
     await state.db
-      .update(state.tables.tandemAccountQuotasTable)
+      .update(state.tables.nexetAccountQuotasTable)
       .set({ storageLimitBytes: 2048 })
-      .where(eq(state.tables.tandemAccountQuotasTable.userId, "captain-1"));
+      .where(eq(state.tables.nexetAccountQuotasTable.userId, "captain-1"));
 
     const blocked = await request(API)
       .post(`/api/video/projects/${project.id}/assets`)
@@ -174,9 +174,9 @@ describe("account quota", () => {
 
     // Raising the limit lets the same upload through.
     await state.db
-      .update(state.tables.tandemAccountQuotasTable)
+      .update(state.tables.nexetAccountQuotasTable)
       .set({ storageLimitBytes: 10 * 1024 * 1024 })
-      .where(eq(state.tables.tandemAccountQuotasTable.userId, "captain-1"));
+      .where(eq(state.tables.nexetAccountQuotasTable.userId, "captain-1"));
     const ok = await request(API)
       .post(`/api/video/projects/${project.id}/assets`)
       .field("kind", "RAW_VIDEO")

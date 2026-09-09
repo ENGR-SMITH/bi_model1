@@ -1,7 +1,7 @@
 # START-APP.md — How to run the whole app on your local PC
 
 This guide walks you through running **everything** in this repo on your own machine:
-the Tandem app, the Author Den, the Creator Den, the API server, the database, and
+the Nexet app, the Author Den, the Creator Den, the API server, the database, and
 (optionally) the Oracle Admin and video workers.
 
 Everything is a **pnpm workspace** monorepo. All commands below show **which directory**
@@ -14,7 +14,7 @@ to run them from. Paths are relative to the repo root (the folder that contains
 
 | App | Directory | Port | Base path | Purpose |
 |-----|-----------|------|-----------|---------|
-| **Tandem** (main hub) | `artifacts/tandem` | `5173` | `/` | The main web app. Proxies `/api`, `/authors-den`, `/creators-den`, and `/socket.io` to the other services. **Open this one in your browser.** |
+| **Nexet** (main hub) | `artifacts/nexet` | `5173` | `/` | The main web app. Proxies `/api`, `/authors-den`, `/creators-den`, and `/socket.io` to the other services. **Open this one in your browser.** |
 | **Author Den** | `artifacts/authors-den` | `5174` | `/authors-den/` | Writing studio (books/projects, oracle AI, collaboration). |
 | **Creator Den** | `artifacts/creators-den` | `5175` | `/creators-den/` | Video version-control platform — Selects / Cut / Sound / Finish / Thumbnail review stages; external-editor checkout & import, commits, pull requests, A/B compare (no in-browser editing). |
 | **API server** | `artifacts/api-server` | `3000` | — | Express REST API + Socket.IO realtime + Clerk auth + AI (Story Oracle) + video job queue. |
@@ -23,7 +23,7 @@ to run them from. Paths are relative to the repo root (the folder that contains
 | Desktop Agent *(optional)* | `artifacts/desktop-agent` | — | — | Electron app for uploading large files via FFmpeg + R2 presigned URLs. Not part of the web server. |
 | Mockup sandbox *(optional)* | `artifacts/mockup-sandbox` | `5177` | `/` | Standalone UI sandbox, not part of the main flow. |
 
-> The Tandem dev server **proxies** the Author Den and Creator Den, so you can reach
+> The Nexet dev server **proxies** the Author Den and Creator Den, so you can reach
 > them at `http://localhost:5173/authors-den/` and `http://localhost:5173/creators-den/`.
 > You still need to run their dev servers (ports 5174/5175) for the proxy to work.
 
@@ -93,7 +93,7 @@ Edit `.env` and set at least:
 | Variable | What to put |
 |----------|-------------|
 | `PORT` | `3000` (API server port — keep this) |
-| `DATABASE_URL` | `postgresql://postgres:<your-password>@localhost:5432/tandem` |
+| `DATABASE_URL` | `postgresql://postgres:<your-password>@localhost:5432/nexet` |
 | `CLERK_PUBLISHABLE_KEY` | Your Clerk instance's publishable key (sign up at clerk.com) |
 | `CLERK_SECRET_KEY` | Your Clerk instance's secret key |
 | `ADMIN_EMAIL` | The email allowed into the Oracle Admin (magic-link login, e.g. `you@yourdomain.com`) |
@@ -103,10 +103,10 @@ Optional AI provider credentials (used by the Story Oracle AI in Author/Creator 
 `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `OLLAMA_BASE_URL`, `LMSTUDIO_BASE_URL`,
 `FREEBUFF_API_KEY`. These can also be entered later in the Oracle Admin page.
 
-> **Frontend Clerk key:** the Tandem / Author Den / Creator Den apps also need the
+> **Frontend Clerk key:** the Nexet / Author Den / Creator Den apps also need the
 > publishable key at build/dev time. Create small `.env` files:
 > ```bash
-> # artifacts/tandem/.env
+> # artifacts/nexet/.env
 > VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 > ```
 > ```bash
@@ -124,16 +124,16 @@ Optional AI provider credentials (used by the Story Oracle AI in Author/Creator 
 From the **repo root**, run:
 
 ```bash
-DATABASE_URL='postgresql://postgres:<your-password>@localhost:5432/tandem' pnpm --filter db run push-force
+DATABASE_URL='postgresql://postgres:<your-password>@localhost:5432/nexet' pnpm --filter db run push-force
 ```
 
-This creates the `tandem` database tables (the `--force` flag auto-approves schema
+This creates the `nexet` database tables (the `--force` flag auto-approves schema
 changes so it won't hang waiting for input). Re-run this whenever the schema changes.
 
 > Equivalent, from inside `lib/db`:
 > ```bash
 > cd lib/db
-> DATABASE_URL='postgresql://postgres:<your-password>@localhost:5432/tandem' pnpm exec drizzle-kit push --force --config ./drizzle.config.ts
+> DATABASE_URL='postgresql://postgres:<your-password>@localhost:5432/nexet' pnpm exec drizzle-kit push --force --config ./drizzle.config.ts
 > ```
 
 ### 3.5 Build the shared library types (first time only)
@@ -168,12 +168,12 @@ You should see `Server listening` with `port: 3000`.
 > The `dev` script builds first, so startup takes a few seconds. Keep this terminal
 > running.
 
-### Step 2 — Start Tandem (the main app)
+### Step 2 — Start Nexet (the main app)
 
-Directory: `artifacts/tandem`
+Directory: `artifacts/nexet`
 
 ```bash
-cd artifacts/tandem
+cd artifacts/nexet
 PORT=5173 BASE_PATH=/ pnpm run dev
 ```
 
@@ -262,13 +262,13 @@ pnpm run dev
 On first launch:
 1. Click **Sign up** — the app shows a sign-up link tied to that sign-in.
 2. Click **Open in browser** (or copy the link) to finish sign-up/sign-in with
-   your Tandem (Clerk) account in your normal browser; the app signs you in
+   your Nexet (Clerk) account in your normal browser; the app signs you in
    automatically when you're done.
 3. Pick a **project** and an **asset** (a raw file already in the vault).
 4. Select a **source raw file** on disk.
 5. Click **Generate proxy & upload to R2**.
 
-**Configuration** (optional — create `~/.tandem-agent/config.json`):
+**Configuration** (optional — create `~/.nexet-agent/config.json`):
 ```json
 {
   "apiBaseUrl": "http://localhost:3000",
@@ -319,7 +319,7 @@ pnpm run dev
 - **`ECONNREFUSED :3000` in the frontend** — the API server isn't running. Start
   Step 1 first.
 - **Author/Creator Den shows 404 at `/authors-den/`** — the Author Den (5174) or
-  Creator Den (5175) dev server isn't running; Tandem proxies to them.
+  Creator Den (5175) dev server isn't running; Nexet proxies to them.
 - **Collaboration routes return 401** — Clerk isn't configured. Set
   `CLERK_SECRET_KEY` / `CLERK_PUBLISHABLE_KEY` in `.env` and restart the API server.
 - **Port already in use** — something else is on 3000/5173/5174/5175. Stop the

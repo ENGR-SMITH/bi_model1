@@ -1,4 +1,4 @@
-// Blueprint §9 — `tandem/worker-proxy` (FFmpeg): low-res proxies, frame
+// Blueprint §9 — `nexet/worker-proxy` (FFmpeg): low-res proxies, frame
 // extraction, format normalization. Consumes the PROXY queue.
 import "../env";
 import { logger } from "../lib/logger";

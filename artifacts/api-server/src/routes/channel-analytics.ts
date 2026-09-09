@@ -16,13 +16,13 @@ import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
 import {
   db,
-  tandemChannelsTable,
-  tandemChannelVideosTable,
-  tandemChannelDailyMetricsTable,
-  tandemVideoDailyMetricsTable,
-  tandemAnalyticsReportsTable,
-  tandemChannelSyncsTable,
-  type TandemChannelSync,
+  nexetChannelsTable,
+  nexetChannelVideosTable,
+  nexetChannelDailyMetricsTable,
+  nexetVideoDailyMetricsTable,
+  nexetAnalyticsReportsTable,
+  nexetChannelSyncsTable,
+  type NexetChannelSync,
 } from "@workspace/db";
 import {
   GetChannelAnalyticsOverviewQueryParams,
@@ -68,9 +68,9 @@ function pathParam(req: Request, name: "channelId" | "videoRowId"): string {
 /** The caller's role on the channel, or null (also used for the 404 check). */
 async function requireChannelMember(channelId: string, userId: string): Promise<{ role: "OWNER" | "EDITOR" } | null> {
   const [channel] = await db
-    .select({ id: tandemChannelsTable.id })
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, channelId))
+    .select({ id: nexetChannelsTable.id })
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, channelId))
     .limit(1);
   if (!channel) return null;
   const membership = await channelMembership(channelId, userId);
@@ -90,16 +90,16 @@ function sumMetrics(rows: Array<{ metrics: Record<string, number> }>): Record<st
 }
 
 /** The channel's sync-state row, or null. */
-async function syncState(channelId: string): Promise<TandemChannelSync | null> {
+async function syncState(channelId: string): Promise<NexetChannelSync | null> {
   const [row] = await db
     .select()
-    .from(tandemChannelSyncsTable)
-    .where(eq(tandemChannelSyncsTable.channelId, channelId))
+    .from(nexetChannelSyncsTable)
+    .where(eq(nexetChannelSyncsTable.channelId, channelId))
     .limit(1);
   return row ?? null;
 }
 
-function freshness(row: TandemChannelSync | null) {
+function freshness(row: NexetChannelSync | null) {
   if (!row) return { lastSyncedAt: null, status: null, error: null, newVideosSeen: 0 };
   const lastSyncedAt = row.lastMetricsSyncAt ?? row.lastVideoSyncAt ?? null;
   return {
@@ -141,10 +141,10 @@ router.get("/channels/:channelId/analytics/overview", async (req: Request, res):
   }
 
   const rows = await db
-    .select({ day: tandemChannelDailyMetricsTable.day, metrics: tandemChannelDailyMetricsTable.metrics })
-    .from(tandemChannelDailyMetricsTable)
-    .where(eq(tandemChannelDailyMetricsTable.channelId, channelId))
-    .orderBy(asc(tandemChannelDailyMetricsTable.day));
+    .select({ day: nexetChannelDailyMetricsTable.day, metrics: nexetChannelDailyMetricsTable.metrics })
+    .from(nexetChannelDailyMetricsTable)
+    .where(eq(nexetChannelDailyMetricsTable.channelId, channelId))
+    .orderBy(asc(nexetChannelDailyMetricsTable.day));
 
   const today = todayStr();
   const firstDay = rows[0]?.day ?? today;
@@ -203,11 +203,11 @@ router.get("/channels/:channelId/analytics/videos", async (req: Request, res): P
   const q = query.data.q?.trim() ?? "";
   const videos = await db
     .select()
-    .from(tandemChannelVideosTable)
+    .from(nexetChannelVideosTable)
     .where(
       and(
-        eq(tandemChannelVideosTable.channelId, channelId),
-        q ? sql`lower(${tandemChannelVideosTable.title}) like ${`%${q.toLowerCase()}%`}` : undefined,
+        eq(nexetChannelVideosTable.channelId, channelId),
+        q ? sql`lower(${nexetChannelVideosTable.title}) like ${`%${q.toLowerCase()}%`}` : undefined,
       ),
     );
 
@@ -217,12 +217,12 @@ router.get("/channels/:channelId/analytics/videos", async (req: Request, res): P
   const metricRows = ids.length > 0
     ? await db
         .select({
-          videoRowId: tandemVideoDailyMetricsTable.videoRowId,
-          day: tandemVideoDailyMetricsTable.day,
-          metrics: tandemVideoDailyMetricsTable.metrics,
+          videoRowId: nexetVideoDailyMetricsTable.videoRowId,
+          day: nexetVideoDailyMetricsTable.day,
+          metrics: nexetVideoDailyMetricsTable.metrics,
         })
-        .from(tandemVideoDailyMetricsTable)
-        .where(inArray(tandemVideoDailyMetricsTable.videoRowId, ids))
+        .from(nexetVideoDailyMetricsTable)
+        .where(inArray(nexetVideoDailyMetricsTable.videoRowId, ids))
     : [];
   const byVideo = new Map<string, Array<{ day: string; metrics: Record<string, number> }>>();
   for (const row of metricRows) {
@@ -326,8 +326,8 @@ router.get("/channels/:channelId/analytics/videos/:videoRowId", async (req: Requ
 
   const [video] = await db
     .select()
-    .from(tandemChannelVideosTable)
-    .where(and(eq(tandemChannelVideosTable.id, videoRowId), eq(tandemChannelVideosTable.channelId, channelId)))
+    .from(nexetChannelVideosTable)
+    .where(and(eq(nexetChannelVideosTable.id, videoRowId), eq(nexetChannelVideosTable.channelId, channelId)))
     .limit(1);
   if (!video) {
     res.status(404).json({ error: "Video not found in this channel" });
@@ -335,10 +335,10 @@ router.get("/channels/:channelId/analytics/videos/:videoRowId", async (req: Requ
   }
 
   const rows = await db
-    .select({ day: tandemVideoDailyMetricsTable.day, metrics: tandemVideoDailyMetricsTable.metrics })
-    .from(tandemVideoDailyMetricsTable)
-    .where(eq(tandemVideoDailyMetricsTable.videoRowId, video.id))
-    .orderBy(asc(tandemVideoDailyMetricsTable.day));
+    .select({ day: nexetVideoDailyMetricsTable.day, metrics: nexetVideoDailyMetricsTable.metrics })
+    .from(nexetVideoDailyMetricsTable)
+    .where(eq(nexetVideoDailyMetricsTable.videoRowId, video.id))
+    .orderBy(asc(nexetVideoDailyMetricsTable.day));
   const from = query.data.from ?? null;
   const to = query.data.to ?? null;
   const windowRows = rows.filter((r) => (!from || r.day >= from) && (!to || r.day <= to));
@@ -348,19 +348,19 @@ router.get("/channels/:channelId/analytics/videos/:videoRowId", async (req: Requ
   // Channel-median context for anomaly banners: median CTR + median AVD across
   // every catalog video's latest metric day.
   const allVideos = await db
-    .select({ id: tandemChannelVideosTable.id })
-    .from(tandemChannelVideosTable)
-    .where(eq(tandemChannelVideosTable.channelId, channelId));
+    .select({ id: nexetChannelVideosTable.id })
+    .from(nexetChannelVideosTable)
+    .where(eq(nexetChannelVideosTable.channelId, channelId));
   const allIds = allVideos.map((v) => v.id);
   const allMetrics = allIds.length > 0
     ? await db
         .select({
-          videoRowId: tandemVideoDailyMetricsTable.videoRowId,
-          day: tandemVideoDailyMetricsTable.day,
-          metrics: tandemVideoDailyMetricsTable.metrics,
+          videoRowId: nexetVideoDailyMetricsTable.videoRowId,
+          day: nexetVideoDailyMetricsTable.day,
+          metrics: nexetVideoDailyMetricsTable.metrics,
         })
-        .from(tandemVideoDailyMetricsTable)
-        .where(inArray(tandemVideoDailyMetricsTable.videoRowId, allIds))
+        .from(nexetVideoDailyMetricsTable)
+        .where(inArray(nexetVideoDailyMetricsTable.videoRowId, allIds))
     : [];
   const latestByVideo = new Map<string, { day: string; metrics: Record<string, number> }>();
   for (const row of allMetrics) {
@@ -425,8 +425,8 @@ router.get("/channels/:channelId/analytics/videos/:videoRowId/report", async (re
 
   const [video] = await db
     .select()
-    .from(tandemChannelVideosTable)
-    .where(and(eq(tandemChannelVideosTable.id, videoRowId), eq(tandemChannelVideosTable.channelId, channelId)))
+    .from(nexetChannelVideosTable)
+    .where(and(eq(nexetChannelVideosTable.id, videoRowId), eq(nexetChannelVideosTable.channelId, channelId)))
     .limit(1);
   if (!video) {
     res.status(404).json({ error: "Video not found in this channel" });
@@ -441,16 +441,16 @@ router.get("/channels/:channelId/analytics/videos/:videoRowId/report", async (re
 
   const [cached] = await db
     .select()
-    .from(tandemAnalyticsReportsTable)
+    .from(nexetAnalyticsReportsTable)
     .where(
       and(
-        eq(tandemAnalyticsReportsTable.channelId, channelId),
+        eq(nexetAnalyticsReportsTable.channelId, channelId),
         isChannelLevel
-          ? sql`${tandemAnalyticsReportsTable.videoRowId} is null`
-          : eq(tandemAnalyticsReportsTable.videoRowId, video.id),
-        eq(tandemAnalyticsReportsTable.kind, kind),
-        eq(tandemAnalyticsReportsTable.periodStart, periodStart),
-        eq(tandemAnalyticsReportsTable.periodEnd, today),
+          ? sql`${nexetAnalyticsReportsTable.videoRowId} is null`
+          : eq(nexetAnalyticsReportsTable.videoRowId, video.id),
+        eq(nexetAnalyticsReportsTable.kind, kind),
+        eq(nexetAnalyticsReportsTable.periodStart, periodStart),
+        eq(nexetAnalyticsReportsTable.periodEnd, today),
       ),
     )
     .limit(1);

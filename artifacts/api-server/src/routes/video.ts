@@ -3,22 +3,22 @@ import { getAuth, clerkClient } from "@clerk/express";
 import { emitToProject } from "../realtime";
 import {
   db,
-  tandemVideoProjectsTable,
-  tandemVideoMembersTable,
-  tandemChannelsTable,
-  tandemVideoAssetsTable,
-  tandemVideoAssetFilesTable,
-  tandemVideoTranscriptsTable,
-  tandemVideoTranscriptSegmentsTable,
-  tandemVideoReferencesTable,
-  tandemVideoGrantsTable,
-  tandemVideoDownloadsTable,
-  tandemVideoCommentsTable,
-  tandemVideoSubmissionsTable,
-  tandemVideoTimelinesTable,
-  tandemVideoTimelineVersionsTable,
-  tandemVideoJobsTable,
-  tandemVideoSyncsTable,
+  nexetVideoProjectsTable,
+  nexetVideoMembersTable,
+  nexetChannelsTable,
+  nexetVideoAssetsTable,
+  nexetVideoAssetFilesTable,
+  nexetVideoTranscriptsTable,
+  nexetVideoTranscriptSegmentsTable,
+  nexetVideoReferencesTable,
+  nexetVideoGrantsTable,
+  nexetVideoDownloadsTable,
+  nexetVideoCommentsTable,
+  nexetVideoSubmissionsTable,
+  nexetVideoTimelinesTable,
+  nexetVideoTimelineVersionsTable,
+  nexetVideoJobsTable,
+  nexetVideoSyncsTable,
   collaborationActivityEventsTable,
 } from "@workspace/db";
 import {
@@ -52,7 +52,7 @@ import {
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
 import { randomUUID } from "node:crypto";
-import type { TandemVideoMember } from "@workspace/db";
+import type { NexetVideoMember } from "@workspace/db";
 import { notify, projectDeepLink } from "./video-platform";
 import { channelMembership, ensureChannelEditor, syncChannelEditors } from "../channels/channel-members";
 import { visibleChannelProjectRows } from "./channels";
@@ -65,7 +65,7 @@ import { captureVaultStorage, reclaimDeletedVaultFiles } from "../video/storage-
 import { recordVideoActivity } from "../video/activity";
 import { resolveProjectAccess } from "../video/access";
 import { resolveUserNames, resolveUserProfiles } from "../lib/user-names";
-import { normalizeTandemUid, tandemUid } from "../lib/tandem-uid";
+import { normalizeNexetUid, nexetUid } from "../lib/nexet-uid";
 
 const router: IRouter = Router();
 
@@ -105,15 +105,15 @@ const ASSET_LEG: Record<string, string> = {
 async function requireMember(
   projectId: string,
   userId: string,
-): Promise<TandemVideoMember | null> {
+): Promise<NexetVideoMember | null> {
   const [member] = await db
     .select()
-    .from(tandemVideoMembersTable)
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        eq(tandemVideoMembersTable.projectId, projectId),
-        eq(tandemVideoMembersTable.userId, userId),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        eq(nexetVideoMembersTable.projectId, projectId),
+        eq(nexetVideoMembersTable.userId, userId),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     )
     .limit(1);
@@ -140,11 +140,11 @@ router.get("/video/projects", async (req, res): Promise<void> => {
   if (unlinkedOnly) {
     const owned = await db
       .select()
-      .from(tandemVideoProjectsTable)
+      .from(nexetVideoProjectsTable)
       .where(
         and(
-          eq(tandemVideoProjectsTable.ownerId, userId),
-          isNull(tandemVideoProjectsTable.channelId),
+          eq(nexetVideoProjectsTable.ownerId, userId),
+          isNull(nexetVideoProjectsTable.channelId),
         ),
       );
     res.json(
@@ -158,9 +158,9 @@ router.get("/video/projects", async (req, res): Promise<void> => {
   // Channel-scoped listing (the channel home + workspace menu).
   if (channelId) {
     const [channel] = await db
-      .select({ id: tandemChannelsTable.id })
-      .from(tandemChannelsTable)
-      .where(eq(tandemChannelsTable.id, channelId))
+      .select({ id: nexetChannelsTable.id })
+      .from(nexetChannelsTable)
+      .where(eq(nexetChannelsTable.id, channelId))
       .limit(1);
     if (!channel) {
       res.status(404).json({ error: "Channel not found" });
@@ -178,16 +178,16 @@ router.get("/video/projects", async (req, res): Promise<void> => {
 
   const owned = await db
     .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.ownerId, userId));
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.ownerId, userId));
 
   const memberships = await db
-    .select({ projectId: tandemVideoMembersTable.projectId })
-    .from(tandemVideoMembersTable)
+    .select({ projectId: nexetVideoMembersTable.projectId })
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        eq(tandemVideoMembersTable.userId, userId),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        eq(nexetVideoMembersTable.userId, userId),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     );
 
@@ -196,8 +196,8 @@ router.get("/video/projects", async (req, res): Promise<void> => {
     memberProjectIds.length > 0
       ? await db
           .select()
-          .from(tandemVideoProjectsTable)
-          .where(inArray(tandemVideoProjectsTable.id, memberProjectIds))
+          .from(nexetVideoProjectsTable)
+          .where(inArray(nexetVideoProjectsTable.id, memberProjectIds))
       : [];
 
   const byId = new Map<string, (typeof owned)[number]>();
@@ -231,8 +231,8 @@ router.post("/video/projects", async (req, res): Promise<void> => {
   if (channelId) {
     const [channel] = await db
       .select()
-      .from(tandemChannelsTable)
-      .where(eq(tandemChannelsTable.id, channelId))
+      .from(nexetChannelsTable)
+      .where(eq(nexetChannelsTable.id, channelId))
       .limit(1);
     if (!channel) {
       res.status(404).json({ error: "Channel not found" });
@@ -249,7 +249,7 @@ router.post("/video/projects", async (req, res): Promise<void> => {
 
   const [project, member] = await db.transaction(async (tx) => {
     const [created] = await tx
-      .insert(tandemVideoProjectsTable)
+      .insert(nexetVideoProjectsTable)
       .values({
         id: projectId,
         channelId,
@@ -259,7 +259,7 @@ router.post("/video/projects", async (req, res): Promise<void> => {
       })
       .returning();
     const [captain] = await tx
-      .insert(tandemVideoMembersTable)
+      .insert(nexetVideoMembersTable)
       .values({
         id: memberId,
         projectId,
@@ -310,8 +310,8 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
 
   const [project] = await db
     .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
     .limit(1);
 
   if (!project) {
@@ -327,11 +327,11 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
 
   const members = await db
     .select()
-    .from(tandemVideoMembersTable)
+    .from(nexetVideoMembersTable)
     .where(
       and(
-        eq(tandemVideoMembersTable.projectId, project.id),
-        eq(tandemVideoMembersTable.status, "ACTIVE"),
+        eq(nexetVideoMembersTable.projectId, project.id),
+        eq(nexetVideoMembersTable.status, "ACTIVE"),
       ),
     );
 
@@ -340,14 +340,14 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
   // the submitter's own submissions instead.
   const assets = await db
     .select()
-    .from(tandemVideoAssetsTable)
+    .from(nexetVideoAssetsTable)
     .where(
       and(
-        eq(tandemVideoAssetsTable.projectId, project.id),
-        ne(tandemVideoAssetsTable.status, "PENDING_REVIEW"),
+        eq(nexetVideoAssetsTable.projectId, project.id),
+        ne(nexetVideoAssetsTable.status, "PENDING_REVIEW"),
       ),
     )
-    .orderBy(desc(tandemVideoAssetsTable.createdAt));
+    .orderBy(desc(nexetVideoAssetsTable.createdAt));
 
   // Resolve member ids to Clerk display names + avatar urls (cached,
   // best-effort) so the vault roster, the commit log, and the timeline cards
@@ -391,8 +391,8 @@ router.patch(
 
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -404,12 +404,12 @@ router.patch(
     }
 
     const [updated] = await db
-      .update(tandemVideoProjectsTable)
+      .update(nexetVideoProjectsTable)
       .set({
         visibility: body.data.visibility,
         updatedAt: new Date(),
       })
-      .where(eq(tandemVideoProjectsTable.id, project.id))
+      .where(eq(nexetVideoProjectsTable.id, project.id))
       .returning();
 
     res.json(UpdateVideoProjectVisibilityResponse.parse(updated));
@@ -439,8 +439,8 @@ router.delete(
     const projectId = params.data.projectId;
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -457,87 +457,87 @@ router.delete(
 
     await db.transaction(async (tx) => {
       const assets = await tx
-        .select({ id: tandemVideoAssetsTable.id })
-        .from(tandemVideoAssetsTable)
-        .where(eq(tandemVideoAssetsTable.projectId, projectId));
+        .select({ id: nexetVideoAssetsTable.id })
+        .from(nexetVideoAssetsTable)
+        .where(eq(nexetVideoAssetsTable.projectId, projectId));
       const assetIds = assets.map((a) => a.id);
 
       const timelines = await tx
-        .select({ id: tandemVideoTimelinesTable.id })
-        .from(tandemVideoTimelinesTable)
-        .where(eq(tandemVideoTimelinesTable.projectId, projectId));
+        .select({ id: nexetVideoTimelinesTable.id })
+        .from(nexetVideoTimelinesTable)
+        .where(eq(nexetVideoTimelinesTable.projectId, projectId));
       const timelineIds = timelines.map((t) => t.id);
 
       const transcripts =
         assetIds.length > 0
           ? await tx
-              .select({ id: tandemVideoTranscriptsTable.id })
-              .from(tandemVideoTranscriptsTable)
-              .where(inArray(tandemVideoTranscriptsTable.assetId, assetIds))
+              .select({ id: nexetVideoTranscriptsTable.id })
+              .from(nexetVideoTranscriptsTable)
+              .where(inArray(nexetVideoTranscriptsTable.assetId, assetIds))
           : [];
       const transcriptIds = transcripts.map((t) => t.id);
 
       // Asset-scoped rows (children first).
       if (assetIds.length > 0) {
         await tx
-          .delete(tandemVideoAssetFilesTable)
-          .where(inArray(tandemVideoAssetFilesTable.assetId, assetIds));
+          .delete(nexetVideoAssetFilesTable)
+          .where(inArray(nexetVideoAssetFilesTable.assetId, assetIds));
         await tx
-          .delete(tandemVideoReferencesTable)
-          .where(inArray(tandemVideoReferencesTable.assetId, assetIds));
+          .delete(nexetVideoReferencesTable)
+          .where(inArray(nexetVideoReferencesTable.assetId, assetIds));
       }
       if (transcriptIds.length > 0) {
         await tx
-          .delete(tandemVideoTranscriptSegmentsTable)
-          .where(inArray(tandemVideoTranscriptSegmentsTable.transcriptId, transcriptIds));
+          .delete(nexetVideoTranscriptSegmentsTable)
+          .where(inArray(nexetVideoTranscriptSegmentsTable.transcriptId, transcriptIds));
       }
       if (assetIds.length > 0) {
         await tx
-          .delete(tandemVideoTranscriptsTable)
-          .where(inArray(tandemVideoTranscriptsTable.assetId, assetIds));
+          .delete(nexetVideoTranscriptsTable)
+          .where(inArray(nexetVideoTranscriptsTable.assetId, assetIds));
         await tx
-          .delete(tandemVideoAssetsTable)
-          .where(inArray(tandemVideoAssetsTable.id, assetIds));
+          .delete(nexetVideoAssetsTable)
+          .where(inArray(nexetVideoAssetsTable.id, assetIds));
       }
 
       // Timeline-scoped rows.
       if (timelineIds.length > 0) {
         await tx
-          .delete(tandemVideoTimelineVersionsTable)
-          .where(inArray(tandemVideoTimelineVersionsTable.timelineId, timelineIds));
+          .delete(nexetVideoTimelineVersionsTable)
+          .where(inArray(nexetVideoTimelineVersionsTable.timelineId, timelineIds));
         await tx
-          .delete(tandemVideoTimelinesTable)
-          .where(inArray(tandemVideoTimelinesTable.id, timelineIds));
+          .delete(nexetVideoTimelinesTable)
+          .where(inArray(nexetVideoTimelinesTable.id, timelineIds));
       }
 
       // Project-scoped rows.
       await tx
-        .delete(tandemVideoSubmissionsTable)
-        .where(eq(tandemVideoSubmissionsTable.projectId, projectId));
+        .delete(nexetVideoSubmissionsTable)
+        .where(eq(nexetVideoSubmissionsTable.projectId, projectId));
       await tx
-        .delete(tandemVideoCommentsTable)
-        .where(eq(tandemVideoCommentsTable.projectId, projectId));
+        .delete(nexetVideoCommentsTable)
+        .where(eq(nexetVideoCommentsTable.projectId, projectId));
       await tx
-        .delete(tandemVideoJobsTable)
-        .where(eq(tandemVideoJobsTable.projectId, projectId));
+        .delete(nexetVideoJobsTable)
+        .where(eq(nexetVideoJobsTable.projectId, projectId));
       await tx
-        .delete(tandemVideoSyncsTable)
-        .where(eq(tandemVideoSyncsTable.projectId, projectId));
+        .delete(nexetVideoSyncsTable)
+        .where(eq(nexetVideoSyncsTable.projectId, projectId));
       await tx
-        .delete(tandemVideoDownloadsTable)
-        .where(eq(tandemVideoDownloadsTable.projectId, projectId));
+        .delete(nexetVideoDownloadsTable)
+        .where(eq(nexetVideoDownloadsTable.projectId, projectId));
       await tx
-        .delete(tandemVideoGrantsTable)
-        .where(eq(tandemVideoGrantsTable.projectId, projectId));
+        .delete(nexetVideoGrantsTable)
+        .where(eq(nexetVideoGrantsTable.projectId, projectId));
       await tx
         .delete(collaborationActivityEventsTable)
         .where(eq(collaborationActivityEventsTable.projectId, projectId));
       await tx
-        .delete(tandemVideoMembersTable)
-        .where(eq(tandemVideoMembersTable.projectId, projectId));
+        .delete(nexetVideoMembersTable)
+        .where(eq(nexetVideoMembersTable.projectId, projectId));
       await tx
-        .delete(tandemVideoProjectsTable)
-        .where(eq(tandemVideoProjectsTable.id, projectId));
+        .delete(nexetVideoProjectsTable)
+        .where(eq(nexetVideoProjectsTable.id, projectId));
     });
 
     // Physical reclaim (R2 prefix + orphaned local blobs). Best-effort and
@@ -579,8 +579,8 @@ router.patch(
 
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -597,8 +597,8 @@ router.patch(
 
     const [channel] = await db
       .select()
-      .from(tandemChannelsTable)
-      .where(eq(tandemChannelsTable.id, body.data.channelId))
+      .from(nexetChannelsTable)
+      .where(eq(nexetChannelsTable.id, body.data.channelId))
       .limit(1);
     if (!channel) {
       res.status(404).json({ error: "Channel not found" });
@@ -610,16 +610,16 @@ router.patch(
     }
 
     const [updated] = await db
-      .update(tandemVideoProjectsTable)
+      .update(nexetVideoProjectsTable)
       .set({ channelId: channel.id, updatedAt: new Date() })
-      .where(eq(tandemVideoProjectsTable.id, project.id))
+      .where(eq(nexetVideoProjectsTable.id, project.id))
       .returning();
 
     // Existing members on a now-attached legacy project become channel editors.
     const projectMembers = await db
-      .select({ userId: tandemVideoMembersTable.userId })
-      .from(tandemVideoMembersTable)
-      .where(eq(tandemVideoMembersTable.projectId, project.id));
+      .select({ userId: nexetVideoMembersTable.userId })
+      .from(nexetVideoMembersTable)
+      .where(eq(nexetVideoMembersTable.projectId, project.id));
     for (const m of projectMembers) {
       await ensureChannelEditor(channel.id, m.userId);
     }
@@ -648,21 +648,21 @@ router.get(
 
     const owned = await db
       .select()
-      .from(tandemVideoProjectsTable)
+      .from(nexetVideoProjectsTable)
       .where(
         and(
-          eq(tandemVideoProjectsTable.ownerId, profileUserId),
-          eq(tandemVideoProjectsTable.visibility, "PUBLIC"),
+          eq(nexetVideoProjectsTable.ownerId, profileUserId),
+          eq(nexetVideoProjectsTable.visibility, "PUBLIC"),
         ),
       );
 
     const memberships = await db
-      .select({ projectId: tandemVideoMembersTable.projectId })
-      .from(tandemVideoMembersTable)
+      .select({ projectId: nexetVideoMembersTable.projectId })
+      .from(nexetVideoMembersTable)
       .where(
         and(
-          eq(tandemVideoMembersTable.userId, profileUserId),
-          eq(tandemVideoMembersTable.status, "ACTIVE"),
+          eq(nexetVideoMembersTable.userId, profileUserId),
+          eq(nexetVideoMembersTable.status, "ACTIVE"),
         ),
       );
 
@@ -671,11 +671,11 @@ router.get(
       memberProjectIds.length > 0
         ? await db
             .select()
-            .from(tandemVideoProjectsTable)
+            .from(nexetVideoProjectsTable)
             .where(
               and(
-                inArray(tandemVideoProjectsTable.id, memberProjectIds),
-                eq(tandemVideoProjectsTable.visibility, "PUBLIC"),
+                inArray(nexetVideoProjectsTable.id, memberProjectIds),
+                eq(nexetVideoProjectsTable.visibility, "PUBLIC"),
               ),
             )
         : [];
@@ -690,8 +690,8 @@ router.get(
   },
 );
 
-// POST /video/projects/:projectId/members — invite by unique Tandem ID
-// (e.g. TANDEM6EUHY), Captain only. The ID is derived from the user's Clerk
+// POST /video/projects/:projectId/members — invite by unique Nexet ID
+// (e.g. NEXET6EUHY), Captain only. The ID is derived from the user's Clerk
 // id, so it is resolved here by walking the Clerk user list and matching
 // computed IDs.
 router.post(
@@ -712,8 +712,8 @@ router.post(
 
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -724,7 +724,7 @@ router.post(
       return;
     }
 
-    const targetUid = normalizeTandemUid(body.data.uid);
+    const targetUid = normalizeNexetUid(body.data.uid);
     let clerkUserId: string | null = null;
     try {
       // The derived ID is not searchable in Clerk, so walk the user list in
@@ -735,7 +735,7 @@ router.post(
       while (offset < MAX_SCAN) {
         const users = await clerkClient.users.getUserList({ limit: PAGE, offset });
         if (users.data.length === 0) break;
-        const hit = users.data.find((user) => tandemUid(user.id) === targetUid);
+        const hit = users.data.find((user) => nexetUid(user.id) === targetUid);
         if (hit) {
           clerkUserId = hit.id;
           break;
@@ -748,7 +748,7 @@ router.post(
     if (!clerkUserId) {
       res
         .status(400)
-        .json({ error: "No Tandem account found with that ID — ask them to check the ID on their profile" });
+        .json({ error: "No Nexet account found with that ID — ask them to check the ID on their profile" });
       return;
     }
 
@@ -762,9 +762,9 @@ router.post(
         ? existingRoles
         : [...existingRoles, body.data.role];
       const [updated] = await db
-        .update(tandemVideoMembersTable)
+        .update(nexetVideoMembersTable)
         .set({ roles: merged })
-        .where(eq(tandemVideoMembersTable.id, existing.id))
+        .where(eq(nexetVideoMembersTable.id, existing.id))
         .returning();
       const updatedProfiles = await resolveUserProfiles([clerkUserId]);
       // Channel membership follows project membership: the invitee appears on
@@ -790,7 +790,7 @@ router.post(
 
     try {
       const [member] = await db
-        .insert(tandemVideoMembersTable)
+        .insert(nexetVideoMembersTable)
         .values({
           id: randomUUID(),
           projectId: project.id,
@@ -844,8 +844,8 @@ router.patch(
 
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -858,11 +858,11 @@ router.patch(
 
     const [member] = await db
       .select()
-      .from(tandemVideoMembersTable)
+      .from(nexetVideoMembersTable)
       .where(
         and(
-          eq(tandemVideoMembersTable.id, params.data.memberId),
-          eq(tandemVideoMembersTable.projectId, params.data.projectId),
+          eq(nexetVideoMembersTable.id, params.data.memberId),
+          eq(nexetVideoMembersTable.projectId, params.data.projectId),
         ),
       )
       .limit(1);
@@ -882,9 +882,9 @@ router.patch(
     }
 
     const [updated] = await db
-      .update(tandemVideoMembersTable)
+      .update(nexetVideoMembersTable)
       .set({ roles })
-      .where(eq(tandemVideoMembersTable.id, member.id))
+      .where(eq(nexetVideoMembersTable.id, member.id))
       .returning();
     const updatedProfiles = await resolveUserProfiles([member.userId]);
 
@@ -917,8 +917,8 @@ router.delete(
 
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -931,11 +931,11 @@ router.delete(
 
     const [member] = await db
       .select()
-      .from(tandemVideoMembersTable)
+      .from(nexetVideoMembersTable)
       .where(
         and(
-          eq(tandemVideoMembersTable.id, params.data.memberId),
-          eq(tandemVideoMembersTable.projectId, params.data.projectId),
+          eq(nexetVideoMembersTable.id, params.data.memberId),
+          eq(nexetVideoMembersTable.projectId, params.data.projectId),
         ),
       )
       .limit(1);
@@ -950,16 +950,16 @@ router.delete(
 
     await db.transaction(async (tx) => {
       await tx
-        .delete(tandemVideoGrantsTable)
+        .delete(nexetVideoGrantsTable)
         .where(
           and(
-            eq(tandemVideoGrantsTable.projectId, params.data.projectId),
-            eq(tandemVideoGrantsTable.memberId, member.userId),
+            eq(nexetVideoGrantsTable.projectId, params.data.projectId),
+            eq(nexetVideoGrantsTable.memberId, member.userId),
           ),
         );
       await tx
-        .delete(tandemVideoMembersTable)
-        .where(eq(tandemVideoMembersTable.id, member.id));
+        .delete(nexetVideoMembersTable)
+        .where(eq(nexetVideoMembersTable.id, member.id));
     });
 
     // If that was the member's last project membership in the channel, their
@@ -998,14 +998,14 @@ router.get(
     // submitter's own submissions instead.
     const assets = await db
       .select()
-      .from(tandemVideoAssetsTable)
+      .from(nexetVideoAssetsTable)
       .where(
         and(
-          eq(tandemVideoAssetsTable.projectId, params.data.projectId),
-          ne(tandemVideoAssetsTable.status, "PENDING_REVIEW"),
+          eq(nexetVideoAssetsTable.projectId, params.data.projectId),
+          ne(nexetVideoAssetsTable.status, "PENDING_REVIEW"),
         ),
       )
-      .orderBy(desc(tandemVideoAssetsTable.createdAt));
+      .orderBy(desc(nexetVideoAssetsTable.createdAt));
 
     res.json(ListVideoAssetsResponse.parse(assets));
   },
@@ -1095,9 +1095,9 @@ router.post(
     // Captain then reviews and approves their own submission like any other.
     const forceReview = String(req.body?.forceReview ?? "") === "true";
     const [uploadOwner] = await db
-      .select({ ownerId: tandemVideoProjectsTable.ownerId })
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+      .select({ ownerId: nexetVideoProjectsTable.ownerId })
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
       .limit(1);
     const isProjectOwner = uploadOwner?.ownerId === userId;
     const goesThroughReview = submitForReview && (!isProjectOwner || forceReview);
@@ -1130,7 +1130,7 @@ router.post(
       const note = String(req.body?.note ?? "").slice(0, 2000);
       const assetId = randomUUID();
       const [pendingAsset] = await db
-        .insert(tandemVideoAssetsTable)
+        .insert(nexetVideoAssetsTable)
         .values({
           id: assetId,
           projectId: params.data.projectId,
@@ -1149,7 +1149,7 @@ router.post(
         })
         .returning();
       const [submission] = await db
-        .insert(tandemVideoSubmissionsTable)
+        .insert(nexetVideoSubmissionsTable)
         .values({
           id: randomUUID(),
           projectId: params.data.projectId,
@@ -1187,8 +1187,8 @@ router.post(
       });
       const [owner] = await db
         .select()
-        .from(tandemVideoProjectsTable)
-        .where(eq(tandemVideoProjectsTable.id, params.data.projectId))
+        .from(nexetVideoProjectsTable)
+        .where(eq(nexetVideoProjectsTable.id, params.data.projectId))
         .limit(1);
       if (owner && owner.ownerId !== userId) {
         await notify(

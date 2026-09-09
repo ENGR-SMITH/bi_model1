@@ -2,9 +2,9 @@ import crypto from "node:crypto";
 import { eq } from "drizzle-orm";
 import {
   db,
-  tandemChannelsTable,
-  tandemChannelMembersTable,
-  tandemChannelOauthTable,
+  nexetChannelsTable,
+  nexetChannelMembersTable,
+  nexetChannelOauthTable,
 } from "@workspace/db";
 import { encryptSecret, decryptSecret } from "../lib/secrets";
 import { channelMembership } from "../routes/channels";
@@ -41,7 +41,7 @@ export const OAUTH_SCOPE = SCOPES;
 /** The registered redirect URI: explicit env override, else derived from the web origin. */
 export function oauthRedirectUri(): string {
   if (process.env.YOUTUBE_REDIRECT_URI) return process.env.YOUTUBE_REDIRECT_URI;
-  const origin = (process.env.TANDEM_WEB_URL ?? "http://localhost:5175").replace(/\/+$/, "");
+  const origin = (process.env.NEXET_WEB_URL ?? "http://localhost:5175").replace(/\/+$/, "");
   return `${origin}/creators-den/channels/oauth/callback`;
 }
 
@@ -168,8 +168,8 @@ export async function startChannelOauth(
 
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, channelId))
     .limit(1);
   // An existing row must belong to the caller and not already be connected;
   // a missing row is fine — that is the Google-first creation path above.
@@ -179,8 +179,8 @@ export async function startChannelOauth(
     }
     const [existing] = await db
       .select()
-      .from(tandemChannelOauthTable)
-      .where(eq(tandemChannelOauthTable.channelId, channelId))
+      .from(nexetChannelOauthTable)
+      .where(eq(nexetChannelOauthTable.channelId, channelId))
       .limit(1);
     if (existing && existing.status === "ACTIVE") {
       return { error: "This channel is already connected — disconnect it before re-linking" };
@@ -243,8 +243,8 @@ export async function exchangeChannelOauth(
 
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, channelId))
     .limit(1);
   // No row yet = Google-first creation: the workspace is created below from
   // the picked YouTube channel's branding (name, logo, banner).
@@ -293,9 +293,9 @@ export async function exchangeChannelOauth(
 
   // One YouTube channel per workspace: refuse a binding already used elsewhere.
   const [bound] = await db
-    .select({ id: tandemChannelsTable.id })
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.youtubeChannelId, branding.id))
+    .select({ id: nexetChannelsTable.id })
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.youtubeChannelId, branding.id))
     .limit(1);
   if (bound && bound.id !== channelId) {
     throw new Error("That YouTube channel is already linked to another workspace");
@@ -306,7 +306,7 @@ export async function exchangeChannelOauth(
     if (creating) {
       // Google-first: mint the workspace + OWNER membership now, connected
       // and branded, with the real channel's title as its name.
-      await tx.insert(tandemChannelsTable).values({
+      await tx.insert(nexetChannelsTable).values({
         id: channelId,
         ownerId: userId,
         status: "CONNECTED",
@@ -319,7 +319,7 @@ export async function exchangeChannelOauth(
         youtubeCountry: branding.country,
         updatedAt: new Date(),
       });
-      await tx.insert(tandemChannelMembersTable).values({
+      await tx.insert(nexetChannelMembersTable).values({
         id: crypto.randomUUID(),
         channelId,
         userId,
@@ -327,10 +327,10 @@ export async function exchangeChannelOauth(
       });
     } else {
       await tx
-        .delete(tandemChannelOauthTable)
-        .where(eq(tandemChannelOauthTable.channelId, channelId));
+        .delete(nexetChannelOauthTable)
+        .where(eq(nexetChannelOauthTable.channelId, channelId));
     }
-    await tx.insert(tandemChannelOauthTable).values({
+    await tx.insert(nexetChannelOauthTable).values({
       id: crypto.randomUUID(),
       channelId,
       youtubeChannelId: branding.id,
@@ -344,7 +344,7 @@ export async function exchangeChannelOauth(
     });
     if (!creating) {
       await tx
-        .update(tandemChannelsTable)
+        .update(nexetChannelsTable)
         .set({
           status: "CONNECTED",
           youtubeChannelId: branding.id,
@@ -355,7 +355,7 @@ export async function exchangeChannelOauth(
           youtubeCountry: branding.country,
           updatedAt: new Date(),
         })
-        .where(eq(tandemChannelsTable.id, channelId));
+        .where(eq(nexetChannelsTable.id, channelId));
     }
   });
 }
@@ -369,8 +369,8 @@ export async function exchangeChannelOauth(
 export async function getChannelAccessToken(channelId: string): Promise<string | null> {
   const [oauth] = await db
     .select()
-    .from(tandemChannelOauthTable)
-    .where(eq(tandemChannelOauthTable.channelId, channelId))
+    .from(nexetChannelOauthTable)
+    .where(eq(nexetChannelOauthTable.channelId, channelId))
     .limit(1);
   if (!oauth || oauth.status !== "ACTIVE") return null;
 
@@ -408,13 +408,13 @@ export async function getChannelAccessToken(channelId: string): Promise<string |
     // invalid_grant — the link is dead; surface it so the owner can reconnect.
     await db.transaction(async (tx) => {
       await tx
-        .update(tandemChannelOauthTable)
+        .update(nexetChannelOauthTable)
         .set({ status: "REVOKED", updatedAt: new Date() })
-        .where(eq(tandemChannelOauthTable.id, oauth.id));
+        .where(eq(nexetChannelOauthTable.id, oauth.id));
       await tx
-        .update(tandemChannelsTable)
+        .update(nexetChannelsTable)
         .set({ status: "CREATED", updatedAt: new Date() })
-        .where(eq(tandemChannelsTable.id, channelId));
+        .where(eq(nexetChannelsTable.id, channelId));
     });
     return null;
   }
@@ -425,14 +425,14 @@ export async function getChannelAccessToken(channelId: string): Promise<string |
   const refreshedAccessToken = token.access_token;
 
   await db
-    .update(tandemChannelOauthTable)
+    .update(nexetChannelOauthTable)
     .set({
       accessTokenCipher: encryptSecret(refreshedAccessToken),
       expiresAt: new Date(Date.now() + (token.expires_in ?? 3600) * 1000),
       lastRefreshedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(tandemChannelOauthTable.id, oauth.id));
+    .where(eq(nexetChannelOauthTable.id, oauth.id));
 
   return token.access_token;
 }
@@ -449,15 +449,15 @@ export async function disconnectChannelOauth(channelId: string, userId: string):
 
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, channelId))
     .limit(1);
   if (!channel) return { error: "Channel not found" };
 
   const [oauth] = await db
     .select()
-    .from(tandemChannelOauthTable)
-    .where(eq(tandemChannelOauthTable.channelId, channelId))
+    .from(nexetChannelOauthTable)
+    .where(eq(nexetChannelOauthTable.channelId, channelId))
     .limit(1);
   if (oauth && oauth.status === "ACTIVE" && oauth.accessTokenCipher) {
     try {
@@ -475,11 +475,11 @@ export async function disconnectChannelOauth(channelId: string, userId: string):
   await db.transaction(async (tx) => {
     if (oauth) {
       await tx
-        .delete(tandemChannelOauthTable)
-        .where(eq(tandemChannelOauthTable.channelId, channelId));
+        .delete(nexetChannelOauthTable)
+        .where(eq(nexetChannelOauthTable.channelId, channelId));
     }
     await tx
-      .update(tandemChannelsTable)
+      .update(nexetChannelsTable)
       .set({
         status: "CREATED",
         youtubeChannelId: null,
@@ -490,7 +490,7 @@ export async function disconnectChannelOauth(channelId: string, userId: string):
         youtubeCountry: null,
         updatedAt: new Date(),
       })
-      .where(eq(tandemChannelsTable.id, channelId));
+      .where(eq(nexetChannelsTable.id, channelId));
   });
 
   return {};

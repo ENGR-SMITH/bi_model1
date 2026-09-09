@@ -9,8 +9,8 @@ filter). Open decisions remain deferred by design (named branches, AAF import,
 parser library, in-browser editing as the primary path).
 **Scope:** Creator Den (`artifacts/creators-den`), the video platform behind the
 Content Creators door.
-**Deployment note:** the shipped schema additions (`tandem_video_assets.content_hash`,
-`tandem_video_asset_files.content_hash`, `collaboration_activity_events.leg`)
+**Deployment note:** the shipped schema additions (`nexet_video_assets.content_hash`,
+`nexet_video_asset_files.content_hash`, `collaboration_activity_events.leg`)
 need pushing to any live database:
 `pnpm --filter @workspace/db push` (no checked-in migrations by convention).
 After that, run `pnpm --filter @workspace/api-server backfill:hashes` once to
@@ -66,18 +66,18 @@ store/share/track/collaborate layer. Creator Den plays that role for video.
 
 | Git / GitHub | Creator Den |
 |---|---|
-| Repository | Project (`tandem_video_projects`) |
-| Commit (snapshot + message + parent) | Timeline version (`tandem_video_timeline_versions`) |
+| Repository | Project (`nexet_video_projects`) |
+| Commit (snapshot + message + parent) | Timeline version (`nexet_video_timeline_versions`) |
 | Commit message | `message` field + "what I worked on" description |
-| Pull request | Submission (`tandem_video_submissions`) |
+| Pull request | Submission (`nexet_video_submissions`) |
 | PR review / approve / merge | Submission decide → advance `currentVersionId` |
-| Code review comments | Timecode + spatial comments (`tandem_video_comments`) |
-| Large files (Git LFS) | Assets (`tandem_video_assets` / `tandem_video_asset_files`) |
+| Code review comments | Timecode + spatial comments (`nexet_video_comments`) |
+| Large files (Git LFS) | Assets (`nexet_video_assets` / `nexet_video_asset_files`) |
 | `git clone` / checkout | Export a manifest + media bundle (or timed grant) |
 | `git push` | Re-import files + commit message → new version + submission |
 | Diff | Timeline text diff + side-by-side A/B of rendered proxies |
 | `git blame` / provenance | Genealogy (`collaboration_genealogy` pattern) |
-| Contributors / roles | Members (`tandem_video_members`) |
+| Contributors / roles | Members (`nexet_video_members`) |
 
 **The diffable artifact is the timeline, not the pixels.** The timeline/EDL is
 text; the media is LFS. That single insight is what makes "GitHub for video"
@@ -88,23 +88,23 @@ feasible.
 ## 4. What already exists vs. what is new
 
 The codebase already implements most of the VCS skeleton. The table below maps
-GitHub concepts to the existing schema (all prefixed `tandem_`).
+GitHub concepts to the existing schema (all prefixed `nexet_`).
 
 | GitHub concept | Existing table / field | Status |
 |---|---|---|
-| Commit | `tandem_video_timeline_versions` (`version`, `snapshot` jsonb, `message`, `parentVersionId`) | ✅ exists |
-| PR | `tandem_video_submissions` (`note`, `SUBMITTED → APPROVED / REJECTED`) | ✅ exists |
-| Review comments | `tandem_video_comments` (`timecodeMs`, `assetId`, `leg`, `parentId`, `resolvedAt`) | ✅ exists |
-| LFS | `tandem_video_assets` (`version`) + `tandem_video_asset_files` (ORIGINAL / PROXY / TRANSCRIPT / AUDIO_STEM / THUMBNAIL / RENDER) | ✅ exists |
-| External hand-off | `tandem_video_grants` (timed download "for external DAW repair") + `tandem_video_downloads` (audit) | ✅ exists |
-| Roles | `tandem_video_members` + `tandemVideoRoleSchema` | ✅ exists |
+| Commit | `nexet_video_timeline_versions` (`version`, `snapshot` jsonb, `message`, `parentVersionId`) | ✅ exists |
+| PR | `nexet_video_submissions` (`note`, `SUBMITTED → APPROVED / REJECTED`) | ✅ exists |
+| Review comments | `nexet_video_comments` (`timecodeMs`, `assetId`, `leg`, `parentId`, `resolvedAt`) | ✅ exists |
+| LFS | `nexet_video_assets` (`version`) + `nexet_video_asset_files` (ORIGINAL / PROXY / TRANSCRIPT / AUDIO_STEM / THUMBNAIL / RENDER) | ✅ exists |
+| External hand-off | `nexet_video_grants` (timed download "for external DAW repair") + `nexet_video_downloads` (audit) | ✅ exists |
+| Roles | `nexet_video_members` + `nexetVideoRoleSchema` | ✅ exists |
 | Provenance | `collaboration_genealogy` (Author Den already ships fork → PR → merge) | ✅ exists (writing side) |
 | Activity feed | `collaboration_activity_events` | ✅ exists |
 | **Checkout (export bundle)** | new job type + `asset_files` kind `INTERCHANGE` | ⬜ new |
 | **Push (import + parse)** | new endpoint: EDL/FCPXML/OTIO → snapshot | ⬜ new |
 | **Timeline diff / A-B compare** | UI on top of two snapshots + proxies | ⬜ new |
 | **Project-level commit log** | elevate `HistoryPanel` to project scope | ⬜ new |
-| **Spatial annotations** | extend `tandem_video_comments` with geometry/kind/color/label | ⬜ new |
+| **Spatial annotations** | extend `nexet_video_comments` with geometry/kind/color/label | ⬜ new |
 | **Thumbnail role / leg** | 5th leg + new role + annotation canvas | ⬜ new |
 
 ---
@@ -138,9 +138,9 @@ De-risk by proving the loop end-to-end with EDL first.
 - A "version" is mostly **pointer changes + new stems/renders**, never a
   re-upload of unchanged footage.
 - Store media **content-addressed** (dedupe by hash), reuse
-  `tandem_video_asset_files`, and let the existing PROXY / TRANSCRIBE jobs
+  `nexet_video_asset_files`, and let the existing PROXY / TRANSCRIBE jobs
   rebuild previews.
-- `tandem_video_grants` ("stem for external DAW repair") is the existing
+- `nexet_video_grants` ("stem for external DAW repair") is the existing
   hand-off primitive; extend it into full checkout.
 
 ---
@@ -193,7 +193,7 @@ Review feedback must pinpoint the exact place under discussion.
 
 ### Timeline pin (time)
 
-- `tandem_video_comments` already stores `timecodeMs`, `assetId`, `leg`,
+- `nexet_video_comments` already stores `timecodeMs`, `assetId`, `leg`,
   `parentId` (threads), `resolvedAt`; `CommentsPanel` already pins at a
   timestamp.
 - Add: **scope pins to a submission/version** (`submissionId` /
@@ -233,7 +233,7 @@ thumbnail's "document" (chosen image + annotations + title/style) is just a
 One annotation primitive serves both video-frame pins (video review) and image
 annotations (thumbnail review).
 
-### Extend `tandem_video_comments`
+### Extend `nexet_video_comments`
 
 ```ts
 geometry:    jsonb("geometry"),         // { x, y, w, h } normalized 0..1; null = timecode-only note
@@ -251,7 +251,7 @@ Existing `timecodeMs` + `assetId` stay; `timecodeMs` is null for static-image
 
 ```ts
 // roles — the four content roles a member can hold (one or several at once)
-tandemVideoRoleSchema = z.enum([
+nexetVideoRoleSchema = z.enum([
   "CAPTAIN", "VIDEO", "AUDIO", "SCRIPT", "THUMBNAIL",
   "UPLOADER", "VIEWER",
 ]);

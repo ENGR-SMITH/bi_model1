@@ -2,7 +2,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { boolean, integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
 // ---------------------------------------------------------------------------
-// Subscriptions — the single record of every purchase across TANDEM (category
+// Subscriptions — the single record of every purchase across NEXET (category
 // passes), the Creator Den (workspace storage) and the Author Den (project
 // count). One row per purchased subscription, so a "Subscriptions" page can
 // show every subscription done: its type, the plan, what it cost, status, and
@@ -10,7 +10,7 @@ import { boolean, integer, pgTable, primaryKey, text, timestamp } from "drizzle-
 // row is written/updated from the app checkout and from the Clerk webhook.
 // ---------------------------------------------------------------------------
 
-export const tandemSubscriptionsTable = pgTable("tandem_subscriptions", {
+export const nexetSubscriptionsTable = pgTable("nexet_subscriptions", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
   // pass | storage | projects
@@ -57,9 +57,9 @@ export const tandemSubscriptionsTable = pgTable("tandem_subscriptions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const insertTandemSubscriptionSchema = createInsertSchema(tandemSubscriptionsTable);
+export const insertNexetSubscriptionSchema = createInsertSchema(nexetSubscriptionsTable);
 
-export type TandemSubscription = typeof tandemSubscriptionsTable.$inferSelect;
+export type NexetSubscription = typeof nexetSubscriptionsTable.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Subscription plan settings — the few operational knobs an admin can turn on
@@ -68,8 +68,8 @@ export type TandemSubscription = typeof tandemSubscriptionsTable.$inferSelect;
 // here override a plan's default.
 // ---------------------------------------------------------------------------
 
-export const tandemSubscriptionPlanSettingsTable = pgTable(
-  "tandem_subscription_plan_settings",
+export const nexetSubscriptionPlanSettingsTable = pgTable(
+  "nexet_subscription_plan_settings",
   {
     // pass | storage | projects
     kind: text("kind").notNull(),
@@ -84,6 +84,6 @@ export const tandemSubscriptionPlanSettingsTable = pgTable(
   (table) => [primaryKey({ columns: [table.kind, table.planId] })],
 );
 
-export const insertTandemSubscriptionPlanSettingSchema = createInsertSchema(tandemSubscriptionPlanSettingsTable);
+export const insertNexetSubscriptionPlanSettingSchema = createInsertSchema(nexetSubscriptionPlanSettingsTable);
 
-export type TandemSubscriptionPlanSetting = typeof tandemSubscriptionPlanSettingsTable.$inferSelect;
+export type NexetSubscriptionPlanSetting = typeof nexetSubscriptionPlanSettingsTable.$inferSelect;

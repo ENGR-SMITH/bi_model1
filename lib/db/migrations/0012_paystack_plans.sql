@@ -3,9 +3,9 @@
 --
 -- Why: billing moves from the server's renewal scheduler to Paystack's native
 -- recurring plans. Each catalog plan is mirrored once as a Paystack plan
--- (POST /plan, interval monthly) in tandem_paystack_plans; checkout subscribes
+-- (POST /plan, interval monthly) in nexet_paystack_plans; checkout subscribes
 -- the customer with the plan code, and Paystack charges monthly and fires
--- charge.success each cycle. The subscription columns on tandem_subscriptions
+-- charge.success each cycle. The subscription columns on nexet_subscriptions
 -- hold what the admin toggle needs to disable/enable a subscription
 -- (subscription code + email token) and what makes webhook grants idempotent
 -- (the Paystack transaction reference that granted each row).
@@ -18,9 +18,9 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.tables
     WHERE table_schema = current_schema()
-      AND table_name = 'tandem_paystack_plans'
+      AND table_name = 'nexet_paystack_plans'
   ) THEN
-    CREATE TABLE "tandem_paystack_plans" (
+    CREATE TABLE "nexet_paystack_plans" (
       "kind" text NOT NULL,
       "plan_id" text NOT NULL,
       "plan_code" text NOT NULL,
@@ -33,7 +33,7 @@ BEGIN
   END IF;
 END $$;
 
-ALTER TABLE tandem_subscriptions ADD COLUMN IF NOT EXISTS paystack_plan_code text;
-ALTER TABLE tandem_subscriptions ADD COLUMN IF NOT EXISTS paystack_subscription_code text;
-ALTER TABLE tandem_subscriptions ADD COLUMN IF NOT EXISTS paystack_email_token text;
-ALTER TABLE tandem_subscriptions ADD COLUMN IF NOT EXISTS paystack_transaction_reference text;
+ALTER TABLE nexet_subscriptions ADD COLUMN IF NOT EXISTS paystack_plan_code text;
+ALTER TABLE nexet_subscriptions ADD COLUMN IF NOT EXISTS paystack_subscription_code text;
+ALTER TABLE nexet_subscriptions ADD COLUMN IF NOT EXISTS paystack_email_token text;
+ALTER TABLE nexet_subscriptions ADD COLUMN IF NOT EXISTS paystack_transaction_reference text;

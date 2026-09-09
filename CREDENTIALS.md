@@ -36,14 +36,14 @@ App-defined secrets (not from a platform — you create them):
 
 **Platform:** https://dashboard.clerk.com
 
-Clerk is the identity provider. One Clerk instance serves Tandem, Creator Den,
+Clerk is the identity provider. One Clerk instance serves Nexet, Creator Den,
 and Author Den. Every app uses the **same** publishable key; the API server
 uses the same secret key.
 
 **Step-by-step:**
 
 1. Go to https://dashboard.clerk.com and sign up / log in.
-2. Click **Create application**. Name it (e.g. `tandem`), pick your sign-in
+2. Click **Create application**. Name it (e.g. `nexet`), pick your sign-in
    methods (email, Google, etc.), and create it.
 3. On the application's home page you'll see two keys under **API Keys**:
    - **Publishable key** — starts with `pk_test_…` (or `pk_live_…` in prod)
@@ -76,7 +76,7 @@ And in **each frontend app's** own `.env` file (Vite apps need the publishable
 key at build time):
 
 ```bash
-# artifacts/tandem/.env
+# artifacts/nexet/.env
 VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
 
 # artifacts/authors-den/.env
@@ -106,21 +106,21 @@ file.
 **Step-by-step — Neon (recommended hosted option):**
 
 1. Go to https://neon.tech and sign up (free tier is fine).
-2. Click **Create a project**, name it (e.g. `tandem`), pick a region.
+2. Click **Create a project**, name it (e.g. `nexet`), pick a region.
 3. On the project dashboard click **Connect**.
 4. Copy the **connection string** — it looks like:
-   `postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/tandem?sslmode=require`
+   `postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/nexet?sslmode=require`
    Use the **pooled** or **direct** string as you prefer.
 
 **Where it goes:**
 
 ```env
-DATABASE_URL=postgresql://user:password@host:5432/tandem
+DATABASE_URL=postgresql://user:password@host:5432/nexet
 ```
 
 **Local alternative:** install PostgreSQL 16+ on your machine, create a
-`tandem` database, and use:
-`postgresql://postgres:<your-password>@localhost:5432/tandem`
+`nexet` database, and use:
+`postgresql://postgres:<your-password>@localhost:5432/nexet`
 
 **After setting it:** push the schema once (from repo root):
 ```bash
@@ -382,21 +382,21 @@ admin page shows a setup hint instead of the login form.
 ## 13. Desktop agent configuration
 
 The desktop agent (`artifacts/desktop-agent`) reads its own config from
-`tandem-agent.json` next to the app, `~/.tandem-agent/config.json`, or env vars:
+`nexet-agent.json` next to the app, `~/.nexet-agent/config.json`, or env vars:
 
 | Config / env | Value |
 |--------------|-------|
-| `TANDEM_API_URL` | Your API base URL, no trailing slash (default `http://localhost:3000`) |
-| `TANDEM_CLERK_PUBLISHABLE_KEY` | Same Clerk publishable key as the web apps |
-| `TANDEM_FFMPEG_PATH` | Path to the ffmpeg binary (else it uses PATH) |
-| `TANDEM_AGENT_WORK_DIR` | Temp dir for staged proxies |
-| `TANDEM_UPDATE_URL` | Auto-update feed base URL (where `latest.yml` / `latest-mac.yml` live). Optional — overrides the publish URL baked in at build time. |
+| `NEXET_API_URL` | Your API base URL, no trailing slash (default `http://localhost:3000`) |
+| `NEXET_CLERK_PUBLISHABLE_KEY` | Same Clerk publishable key as the web apps |
+| `NEXET_FFMPEG_PATH` | Path to the ffmpeg binary (else it uses PATH) |
+| `NEXET_AGENT_WORK_DIR` | Temp dir for staged proxies |
+| `NEXET_UPDATE_URL` | Auto-update feed base URL (where `latest.yml` / `latest-mac.yml` live). Optional — overrides the publish URL baked in at build time. |
 
 The in-app **"Desktop agent for large files"** button (Creator Den vault +
-Tandem doorway) shows when the frontend `.env` sets:
+Nexet doorway) shows when the frontend `.env` sets:
 
 ```env
-VITE_AGENT_DOWNLOAD_URL=https://<public-r2-or-release-url>/desktop-agent/tandem-desktop-agent-latest.exe
+VITE_AGENT_DOWNLOAD_URL=https://<public-r2-or-release-url>/desktop-agent/nexet-desktop-agent-latest.exe
 ```
 
 Optional frontend env (only if the API server runs on a different host than
@@ -413,7 +413,7 @@ VITE_SOCKET_URL=https://<api-host>/
 - [ ] `.env` created from `.env.example` with at least:
       `DATABASE_URL`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 - [ ] DB schema pushed: `DATABASE_URL='…' pnpm --filter db run push-force`
-- [ ] `artifacts/tandem/.env`, `artifacts/authors-den/.env`,
+- [ ] `artifacts/nexet/.env`, `artifacts/authors-den/.env`,
       `artifacts/creators-den/.env` each have `VITE_CLERK_PUBLISHABLE_KEY`
 - [ ] (Optional) R2: `CF_ACCOUNT_ID`, `CF_R2_BUCKET`, `CF_R2_ACCESS_KEY`,
       `CF_R2_SECRET_KEY`

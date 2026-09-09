@@ -1,23 +1,23 @@
 // ---------------------------------------------------------------------------
-// Desktop-agent bridge — how Creator Den talks to the installed Tandem
+// Desktop-agent bridge — how Creator Den talks to the installed Nexet
 // Desktop Agent.
 //
 // The agent runs a tiny loopback control server on 127.0.0.1 (fixed port,
-// override with VITE_AGENT_CONTROL_PORT / TANDEM_AGENT_CONTROL_PORT) so the
+// override with VITE_AGENT_CONTROL_PORT / NEXET_AGENT_CONTROL_PORT) so the
 // web app can:
 //   · detect whether the agent is running            GET  /health
 //   · hand it the current project + a return URL     POST /launch
 //   · watch an upload job until it finishes          GET  /job-status
 //
 // When the agent is installed but NOT running, no loopback server answers —
-// the web app falls back to the `tandem-agent://launch` deep link, which the
+// the web app falls back to the `nexet-agent://launch` deep link, which the
 // OS hands to the agent (the installer registers the scheme). Launching via
 // an in-page iframe keeps the Creator Den page in place, so the return-URL
 // hand-off (open the page again after the upload) keeps working.
 // ---------------------------------------------------------------------------
 
 /** Custom URL scheme the desktop agent registers (see desktop-agent build). */
-export const AGENT_PROTOCOL = 'tandem-agent';
+export const AGENT_PROTOCOL = 'nexet-agent';
 
 /** Fixed loopback port the agent's control server binds (env-overridable). */
 export const AGENT_CONTROL_PORT = Number(import.meta.env.VITE_AGENT_CONTROL_PORT ?? '41737');
@@ -61,7 +61,7 @@ export function agentReturnUrl(): string {
   return typeof window !== 'undefined' ? window.location.href : '';
 }
 
-/** `tandem-agent://launch?projectId=…&returnUrl=…` deep link. */
+/** `nexet-agent://launch?projectId=…&returnUrl=…` deep link. */
 export function agentLaunchUrl(opts: AgentLaunchContext): string {
   const params = new URLSearchParams();
   if (opts.projectId) params.set('projectId', opts.projectId);

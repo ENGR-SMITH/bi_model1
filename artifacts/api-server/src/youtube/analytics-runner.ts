@@ -8,8 +8,8 @@
 import { and, eq, inArray } from "drizzle-orm";
 import {
   db,
-  tandemChannelsTable,
-  tandemChannelOauthTable,
+  nexetChannelsTable,
+  nexetChannelOauthTable,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { runChannelSync } from "./sync";
@@ -26,16 +26,16 @@ let _timer: ReturnType<typeof setInterval> | null = null;
 /** Sync every CONNECTED channel that still has an ACTIVE oauth link. */
 export async function syncConnectedChannels(): Promise<void> {
   const oauthRows = await db
-    .select({ channelId: tandemChannelOauthTable.channelId })
-    .from(tandemChannelOauthTable)
-    .where(eq(tandemChannelOauthTable.status, "ACTIVE"));
+    .select({ channelId: nexetChannelOauthTable.channelId })
+    .from(nexetChannelOauthTable)
+    .where(eq(nexetChannelOauthTable.status, "ACTIVE"));
   if (oauthRows.length === 0) return;
   const linkedIds = oauthRows.map((row) => row.channelId);
 
   const channels = await db
-    .select({ id: tandemChannelsTable.id })
-    .from(tandemChannelsTable)
-    .where(and(eq(tandemChannelsTable.status, "CONNECTED"), inArray(tandemChannelsTable.id, linkedIds)));
+    .select({ id: nexetChannelsTable.id })
+    .from(nexetChannelsTable)
+    .where(and(eq(nexetChannelsTable.status, "CONNECTED"), inArray(nexetChannelsTable.id, linkedIds)));
 
   for (const channel of channels) {
     try {

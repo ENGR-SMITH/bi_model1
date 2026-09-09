@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { getAuth } from "@clerk/express";
 import { and, eq, gt } from "drizzle-orm";
-import { db, tandemPromoCodesTable, tandemPromoRedemptionsTable, tandemTicketsTable, tandemToursTable } from "@workspace/db";
+import { db, nexetPromoCodesTable, nexetPromoRedemptionsTable, nexetTicketsTable, nexetToursTable } from "@workspace/db";
 import { applySubscriptionPurchase } from "../video/subscriptions";
 import {
   GetTicketStatusResponse,
@@ -20,7 +20,7 @@ const router: IRouter = Router();
 export const PASS_PRICE_USD = 588; // $5.88 in cents
 export const PASS_MONTHS = 1;
 // A visitor without a pass gets ONE 10-minute preview tour per den (a row in
-// tandem_tours). Each den tours independently, matching its own pass.
+// nexet_tours). Each den tours independently, matching its own pass.
 export const TOUR_MINUTES = 10;
 export const TOUR_MS = TOUR_MINUTES * 60 * 1000;
 export const TICKET_CATEGORIES = ["authors", "content-creators"] as const;
@@ -64,10 +64,10 @@ interface ResolvedPromo {
 /** True when this user has already redeemed the code (one per person). */
 export async function promoRedeemedByUser(code: string, userId: string): Promise<boolean> {
   const [redemption] = await db
-    .select({ code: tandemPromoRedemptionsTable.code })
-    .from(tandemPromoRedemptionsTable)
+    .select({ code: nexetPromoRedemptionsTable.code })
+    .from(nexetPromoRedemptionsTable)
     .where(
-      and(eq(tandemPromoRedemptionsTable.code, code), eq(tandemPromoRedemptionsTable.userId, userId)),
+      and(eq(nexetPromoRedemptionsTable.code, code), eq(nexetPromoRedemptionsTable.userId, userId)),
     )
     .limit(1);
   return Boolean(redemption);
@@ -82,8 +82,8 @@ export async function resolvePromo(
   const code = raw.trim().toUpperCase();
   const [promo] = await db
     .select()
-    .from(tandemPromoCodesTable)
-    .where(eq(tandemPromoCodesTable.code, code))
+    .from(nexetPromoCodesTable)
+    .where(eq(nexetPromoCodesTable.code, code))
     .limit(1);
   if (!promo) return null;
   // Paused by an admin — keep the row, stop accepting it.
@@ -125,22 +125,22 @@ router.get("/tickets/access/:category", async (req: Request, res: Response): Pro
 
   const [pass] = await db
     .select()
-    .from(tandemTicketsTable)
+    .from(nexetTicketsTable)
     .where(
       and(
-        eq(tandemTicketsTable.userId, userId),
-        eq(tandemTicketsTable.category, category),
-        gt(tandemTicketsTable.expiresAt, new Date()),
+        eq(nexetTicketsTable.userId, userId),
+        eq(nexetTicketsTable.category, category),
+        gt(nexetTicketsTable.expiresAt, new Date()),
       ),
     )
-    .orderBy(tandemTicketsTable.expiresAt)
+    .orderBy(nexetTicketsTable.expiresAt)
     .limit(1);
   // At most one tour row per (user, category) is ever granted.
   const [tour] = await db
     .select()
-    .from(tandemToursTable)
-    .where(and(eq(tandemToursTable.userId, userId), eq(tandemToursTable.category, category)))
-    .orderBy(tandemToursTable.startedAt)
+    .from(nexetToursTable)
+    .where(and(eq(nexetToursTable.userId, userId), eq(nexetToursTable.category, category)))
+    .orderBy(nexetToursTable.startedAt)
     .limit(1);
 
   const passActive = Boolean(pass);
@@ -177,15 +177,15 @@ router.post("/tickets/tour/start", async (req: Request, res: Response): Promise<
 
   const [pass] = await db
     .select()
-    .from(tandemTicketsTable)
+    .from(nexetTicketsTable)
     .where(
       and(
-        eq(tandemTicketsTable.userId, userId),
-        eq(tandemTicketsTable.category, category as string),
-        gt(tandemTicketsTable.expiresAt, new Date()),
+        eq(nexetTicketsTable.userId, userId),
+        eq(nexetTicketsTable.category, category as string),
+        gt(nexetTicketsTable.expiresAt, new Date()),
       ),
     )
-    .orderBy(tandemTicketsTable.expiresAt)
+    .orderBy(nexetTicketsTable.expiresAt)
     .limit(1);
   if (pass) {
     res.status(400).json({ error: "You already have an active pass — no tour needed." });
@@ -194,9 +194,9 @@ router.post("/tickets/tour/start", async (req: Request, res: Response): Promise<
 
   const [existing] = await db
     .select()
-    .from(tandemToursTable)
+    .from(nexetToursTable)
     .where(
-      and(eq(tandemToursTable.userId, userId), eq(tandemToursTable.category, category as string)),
+      and(eq(nexetToursTable.userId, userId), eq(nexetToursTable.category, category as string)),
     )
     .limit(1);
   if (existing) {
@@ -212,7 +212,7 @@ router.post("/tickets/tour/start", async (req: Request, res: Response): Promise<
   const startedAt = new Date();
   const endsAt = new Date(startedAt.getTime() + TOUR_MS);
   const [tour] = await db
-    .insert(tandemToursTable)
+    .insert(nexetToursTable)
     .values({
       id: randomUUID(),
       userId,
@@ -243,9 +243,9 @@ router.get("/tickets/status", async (req: Request, res: Response): Promise<void>
 
   const rows = await db
     .select()
-    .from(tandemTicketsTable)
-    .where(and(eq(tandemTicketsTable.userId, userId), gt(tandemTicketsTable.expiresAt, new Date())))
-    .orderBy(tandemTicketsTable.purchasedAt);
+    .from(nexetTicketsTable)
+    .where(and(eq(nexetTicketsTable.userId, userId), gt(nexetTicketsTable.expiresAt, new Date())))
+    .orderBy(nexetTicketsTable.purchasedAt);
 
   // One pass per category — the most recent purchase wins (a renewal extends
   // the same pass, so the latest row carries the furthest expiry).

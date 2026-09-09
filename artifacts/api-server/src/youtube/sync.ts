@@ -2,9 +2,9 @@
 // Channel analytics sync engine (Phase 3, §9.1). Runs per CONNECTED channel:
 //
 //   1. Catalog sync — crawl the linked channel's uploads playlist, upsert the
-//      `tandem_channel_videos` catalog, count newly-published uploads.
+//      `nexet_channel_videos` catalog, count newly-published uploads.
 //   2. Metrics sync  — incremental daily snapshots (channel + per-video) from
-//      the YouTube Analytics API into `tandem_*_daily_metrics` (only missing
+//      the YouTube Analytics API into `nexet_*_daily_metrics` (only missing
 //      days are fetched after the first backfill).
 //   3. Report refresh — on-demand report caches (retention/traffic/demographics/
 //      devices/revenue/subs) re-fetched only beyond `YT_REPORT_TTL_MINUTES`.
@@ -19,17 +19,17 @@ import { and, desc, eq, gte, isNull, lte, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import {
   db,
-  tandemChannelsTable,
-  tandemChannelVideosTable,
-  tandemChannelDailyMetricsTable,
-  tandemVideoDailyMetricsTable,
-  tandemAnalyticsReportsTable,
-  tandemChannelSyncsTable,
-  tandemChannelAlertsTable,
-  tandemVideoNotificationsTable,
+  nexetChannelsTable,
+  nexetChannelVideosTable,
+  nexetChannelDailyMetricsTable,
+  nexetVideoDailyMetricsTable,
+  nexetAnalyticsReportsTable,
+  nexetChannelSyncsTable,
+  nexetChannelAlertsTable,
+  nexetVideoNotificationsTable,
   type ChannelMetrics,
   type VideoMetrics,
-  type TandemChannel,
+  type NexetChannel,
 } from "@workspace/db";
 import { getChannelAccessToken } from "../channels/oauth";
 import { emitToUser } from "../realtime";
@@ -174,9 +174,9 @@ export async function syncCatalog(
   }
 
   const existing = await db
-    .select({ youtubeVideoId: tandemChannelVideosTable.youtubeVideoId })
-    .from(tandemChannelVideosTable)
-    .where(eq(tandemChannelVideosTable.channelId, channelId));
+    .select({ youtubeVideoId: nexetChannelVideosTable.youtubeVideoId })
+    .from(nexetChannelVideosTable)
+    .where(eq(nexetChannelVideosTable.channelId, channelId));
   const existingIds = new Set(existing.map((row) => row.youtubeVideoId));
   let newVideos = 0;
 
@@ -238,10 +238,10 @@ export async function syncCatalog(
         lastSyncedAt: new Date(),
       };
       await db
-        .insert(tandemChannelVideosTable)
+        .insert(nexetChannelVideosTable)
         .values({ id: randomUUID(), channelId, youtubeVideoId, ...values })
         .onConflictDoUpdate({
-          target: [tandemChannelVideosTable.channelId, tandemChannelVideosTable.youtubeVideoId],
+          target: [nexetChannelVideosTable.channelId, nexetChannelVideosTable.youtubeVideoId],
           set: values,
         });
       if (!existingIds.has(youtubeVideoId)) newVideos += 1;
@@ -299,10 +299,10 @@ export async function syncChannelMetrics(
   channelYoutubeId: string,
 ): Promise<number> {
   const [maxRow] = await db
-    .select({ maxDay: sql<string>`max(${tandemChannelDailyMetricsTable.day})` })
-    .from(tandemChannelDailyMetricsTable)
-    .where(eq(tandemChannelDailyMetricsTable.channelId, channelId));
-  const { startDate, endDate } = missingWindow(tandemChannelDailyMetricsTable.day, maxRow?.maxDay ?? null);
+    .select({ maxDay: sql<string>`max(${nexetChannelDailyMetricsTable.day})` })
+    .from(nexetChannelDailyMetricsTable)
+    .where(eq(nexetChannelDailyMetricsTable.channelId, channelId));
+  const { startDate, endDate } = missingWindow(nexetChannelDailyMetricsTable.day, maxRow?.maxDay ?? null);
   if (startDate > endDate) return 0;
 
   const payload = await fetchYoutubeJson<YoutubeReportPayload>("youtubeAnalytics/v2/reports", token, {
@@ -318,10 +318,10 @@ export async function syncChannelMetrics(
   for (const { day, metrics } of rowsToMetrics(payload)) {
     if (day < startDate || day > endDate) continue;
     await db
-      .insert(tandemChannelDailyMetricsTable)
+      .insert(nexetChannelDailyMetricsTable)
       .values({ channelId, day, metrics, source: "youtube" })
       .onConflictDoUpdate({
-        target: [tandemChannelDailyMetricsTable.channelId, tandemChannelDailyMetricsTable.day],
+        target: [nexetChannelDailyMetricsTable.channelId, nexetChannelDailyMetricsTable.day],
         set: { metrics, source: "youtube" },
       });
     stored += 1;
@@ -337,18 +337,18 @@ export async function syncVideoMetrics(
 ): Promise<number> {
   const videos = await db
     .select()
-    .from(tandemChannelVideosTable)
-    .where(eq(tandemChannelVideosTable.channelId, channelId))
-    .orderBy(desc(tandemChannelVideosTable.publishedAt))
+    .from(nexetChannelVideosTable)
+    .where(eq(nexetChannelVideosTable.channelId, channelId))
+    .orderBy(desc(nexetChannelVideosTable.publishedAt))
     .limit(maxVideoQueries());
 
   let stored = 0;
   for (const video of videos) {
     const [maxRow] = await db
-      .select({ maxDay: sql<string>`max(${tandemVideoDailyMetricsTable.day})` })
-      .from(tandemVideoDailyMetricsTable)
-      .where(eq(tandemVideoDailyMetricsTable.videoRowId, video.id));
-    const { startDate, endDate } = missingWindow(tandemVideoDailyMetricsTable.day, maxRow?.maxDay ?? null);
+      .select({ maxDay: sql<string>`max(${nexetVideoDailyMetricsTable.day})` })
+      .from(nexetVideoDailyMetricsTable)
+      .where(eq(nexetVideoDailyMetricsTable.videoRowId, video.id));
+    const { startDate, endDate } = missingWindow(nexetVideoDailyMetricsTable.day, maxRow?.maxDay ?? null);
     if (startDate > endDate) continue;
 
     try {
@@ -364,10 +364,10 @@ export async function syncVideoMetrics(
       for (const { day, metrics } of rowsToMetrics(payload)) {
         if (day < startDate || day > endDate) continue;
         await db
-          .insert(tandemVideoDailyMetricsTable)
+          .insert(nexetVideoDailyMetricsTable)
           .values({ videoRowId: video.id, day, metrics })
           .onConflictDoUpdate({
-            target: [tandemVideoDailyMetricsTable.videoRowId, tandemVideoDailyMetricsTable.day],
+            target: [nexetVideoDailyMetricsTable.videoRowId, nexetVideoDailyMetricsTable.day],
             set: { metrics },
           });
         stored += 1;
@@ -417,17 +417,17 @@ async function refreshOneReport(
   channelYoutubeId: string,
 ): Promise<boolean> {
   const conditions = [
-    eq(tandemAnalyticsReportsTable.channelId, channelId),
+    eq(nexetAnalyticsReportsTable.channelId, channelId),
     videoRowId === null
-      ? isNull(tandemAnalyticsReportsTable.videoRowId)
-      : eq(tandemAnalyticsReportsTable.videoRowId, videoRowId),
-    eq(tandemAnalyticsReportsTable.kind, config.kind),
-    eq(tandemAnalyticsReportsTable.periodStart, periodStart),
-    eq(tandemAnalyticsReportsTable.periodEnd, periodEnd),
+      ? isNull(nexetAnalyticsReportsTable.videoRowId)
+      : eq(nexetAnalyticsReportsTable.videoRowId, videoRowId),
+    eq(nexetAnalyticsReportsTable.kind, config.kind),
+    eq(nexetAnalyticsReportsTable.periodStart, periodStart),
+    eq(nexetAnalyticsReportsTable.periodEnd, periodEnd),
   ];
   const [existing] = await db
-    .select({ id: tandemAnalyticsReportsTable.id, fetchedAt: tandemAnalyticsReportsTable.fetchedAt })
-    .from(tandemAnalyticsReportsTable)
+    .select({ id: nexetAnalyticsReportsTable.id, fetchedAt: nexetAnalyticsReportsTable.fetchedAt })
+    .from(nexetAnalyticsReportsTable)
     .where(and(...conditions))
     .limit(1);
   if (existing && Date.now() - existing.fetchedAt.getTime() < reportTtlMs()) return false;
@@ -446,11 +446,11 @@ async function refreshOneReport(
 
   if (existing) {
     await db
-      .update(tandemAnalyticsReportsTable)
+      .update(nexetAnalyticsReportsTable)
       .set({ payload: rows, fetchedAt: new Date() })
-      .where(eq(tandemAnalyticsReportsTable.id, existing.id));
+      .where(eq(nexetAnalyticsReportsTable.id, existing.id));
   } else {
-    await db.insert(tandemAnalyticsReportsTable).values({
+    await db.insert(nexetAnalyticsReportsTable).values({
       id: randomUUID(),
       channelId,
       videoRowId,
@@ -473,9 +473,9 @@ export async function refreshStaleReports(
   const today = todayStr();
   const videos = await db
     .select()
-    .from(tandemChannelVideosTable)
-    .where(eq(tandemChannelVideosTable.channelId, channelId))
-    .orderBy(desc(tandemChannelVideosTable.publishedAt))
+    .from(nexetChannelVideosTable)
+    .where(eq(nexetChannelVideosTable.channelId, channelId))
+    .orderBy(desc(nexetChannelVideosTable.publishedAt))
     .limit(maxVideoQueries());
 
   let refreshed = 0;
@@ -502,7 +502,7 @@ export async function refreshStaleReports(
 
 // ---------------------------------------------------------------------------
 // 4. Anomaly rules (§14) — fire once per (channel, rule, window), notify the
-//    owner through the existing tandemVideoNotifications system.
+//    owner through the existing nexetVideoNotifications system.
 // ---------------------------------------------------------------------------
 
 function median(values: number[]): number {
@@ -512,18 +512,18 @@ function median(values: number[]): number {
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
 }
 
-async function fireAlert(channel: TandemChannel, rule: string, periodStart: string, message: string, deepLink: string): Promise<void> {
+async function fireAlert(channel: NexetChannel, rule: string, periodStart: string, message: string, deepLink: string): Promise<void> {
   const inserted = await db
-    .insert(tandemChannelAlertsTable)
+    .insert(nexetChannelAlertsTable)
     .values({ id: randomUUID(), channelId: channel.id, rule, message, periodStart })
     .onConflictDoNothing({
-      target: [tandemChannelAlertsTable.channelId, tandemChannelAlertsTable.rule, tandemChannelAlertsTable.periodStart],
+      target: [nexetChannelAlertsTable.channelId, nexetChannelAlertsTable.rule, nexetChannelAlertsTable.periodStart],
     })
-    .returning({ id: tandemChannelAlertsTable.id });
+    .returning({ id: nexetChannelAlertsTable.id });
   if (inserted.length === 0) return; // already fired for this window
 
   const [notification] = await db
-    .insert(tandemVideoNotificationsTable)
+    .insert(nexetVideoNotificationsTable)
     .values({
       id: randomUUID(),
       recipientId: channel.ownerId,
@@ -538,17 +538,17 @@ async function fireAlert(channel: TandemChannel, rule: string, periodStart: stri
 }
 
 /** Rule 1 — weekly watch-time drop ≥ 15% vs the previous 7-day window. */
-async function ruleWatchTimeDrop(channel: TandemChannel, today: string): Promise<void> {
+async function ruleWatchTimeDrop(channel: NexetChannel, today: string): Promise<void> {
   const weekStart = addDays(today, -6);
   const prevWeekStart = addDays(today, -13);
   const rows = await db
-    .select({ day: tandemChannelDailyMetricsTable.day, metrics: tandemChannelDailyMetricsTable.metrics })
-    .from(tandemChannelDailyMetricsTable)
+    .select({ day: nexetChannelDailyMetricsTable.day, metrics: nexetChannelDailyMetricsTable.metrics })
+    .from(nexetChannelDailyMetricsTable)
     .where(
       and(
-        eq(tandemChannelDailyMetricsTable.channelId, channel.id),
-        gte(tandemChannelDailyMetricsTable.day, prevWeekStart),
-        lte(tandemChannelDailyMetricsTable.day, today),
+        eq(nexetChannelDailyMetricsTable.channelId, channel.id),
+        gte(nexetChannelDailyMetricsTable.day, prevWeekStart),
+        lte(nexetChannelDailyMetricsTable.day, today),
       ),
     );
   let current = 0;
@@ -570,22 +570,22 @@ async function ruleWatchTimeDrop(channel: TandemChannel, today: string): Promise
 }
 
 /** Rule 2 — a video published ≤ 7 days ago ≥ 40% below the channel's median CTR or median AVD. */
-async function ruleUnderperformingVideo(channel: TandemChannel, today: string): Promise<void> {
+async function ruleUnderperformingVideo(channel: NexetChannel, today: string): Promise<void> {
   const cutoff = addDays(today, -7);
   const videos = await db
     .select()
-    .from(tandemChannelVideosTable)
-    .where(eq(tandemChannelVideosTable.channelId, channel.id));
+    .from(nexetChannelVideosTable)
+    .where(eq(nexetChannelVideosTable.channelId, channel.id));
   if (videos.length === 0) return;
 
   const avgCtrByVideo = new Map<string, number>();
   const avgAvdByVideo = new Map<string, number>();
   for (const video of videos) {
     const rows = await db
-      .select({ metrics: tandemVideoDailyMetricsTable.metrics })
-      .from(tandemVideoDailyMetricsTable)
-      .where(eq(tandemVideoDailyMetricsTable.videoRowId, video.id))
-      .orderBy(desc(tandemVideoDailyMetricsTable.day))
+      .select({ metrics: nexetVideoDailyMetricsTable.metrics })
+      .from(nexetVideoDailyMetricsTable)
+      .where(eq(nexetVideoDailyMetricsTable.videoRowId, video.id))
+      .orderBy(desc(nexetVideoDailyMetricsTable.day))
       .limit(7);
     const ctrs: number[] = [];
     const avds: number[] = [];
@@ -619,13 +619,13 @@ async function ruleUnderperformingVideo(channel: TandemChannel, today: string): 
 }
 
 /** Rule 3 — no new published upload for ≥ 14 days. */
-async function ruleUploadGap(channel: TandemChannel, today: string): Promise<void> {
+async function ruleUploadGap(channel: NexetChannel, today: string): Promise<void> {
   const gapStart = addDays(today, -13);
   const [newest] = await db
-    .select({ publishedAt: tandemChannelVideosTable.publishedAt })
-    .from(tandemChannelVideosTable)
-    .where(eq(tandemChannelVideosTable.channelId, channel.id))
-    .orderBy(desc(tandemChannelVideosTable.publishedAt))
+    .select({ publishedAt: nexetChannelVideosTable.publishedAt })
+    .from(nexetChannelVideosTable)
+    .where(eq(nexetChannelVideosTable.channelId, channel.id))
+    .orderBy(desc(nexetChannelVideosTable.publishedAt))
     .limit(1);
   if (!newest?.publishedAt) return; // fresh channel with no uploads yet — not a gap
   if (newest.publishedAt.getTime() >= new Date(`${gapStart}T00:00:00Z`).getTime()) return;
@@ -643,8 +643,8 @@ async function ruleUploadGap(channel: TandemChannel, today: string): Promise<voi
 export async function runAnomalyRules(channelId: string): Promise<void> {
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, channelId))
     .limit(1);
   if (!channel) return;
   const today = todayStr();
@@ -667,14 +667,14 @@ export interface ChannelSyncResult {
   newVideosSeen: number;
 }
 
-type SyncPatch = Partial<typeof tandemChannelSyncsTable.$inferInsert>;
+type SyncPatch = Partial<typeof nexetChannelSyncsTable.$inferInsert>;
 
 async function upsertSyncRow(channelId: string, patch: SyncPatch): Promise<void> {
   await db
-    .insert(tandemChannelSyncsTable)
+    .insert(nexetChannelSyncsTable)
     .values({ channelId, ...patch, updatedAt: new Date() })
     .onConflictDoUpdate({
-      target: tandemChannelSyncsTable.channelId,
+      target: nexetChannelSyncsTable.channelId,
       set: { ...patch, updatedAt: new Date() },
     });
 }
@@ -686,8 +686,8 @@ async function upsertSyncRow(channelId: string, patch: SyncPatch): Promise<void>
 export async function runChannelSync(channelId: string): Promise<ChannelSyncResult> {
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, channelId))
     .limit(1);
   if (!channel) return { status: "ERROR", error: "Channel not found", newVideosSeen: 0 };
   if (!channel.youtubeChannelId) {

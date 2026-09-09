@@ -2,7 +2,7 @@
 // Timeline diff — the text-diff half of the review layer (VCS design §8,
 // phase 3: "Timeline text diff (clips added/moved, in/out changes)").
 //
-// Snapshots are JSON documents from `tandem_video_timeline_versions`; the
+// Snapshots are JSON documents from `nexet_video_timeline_versions`; the
 // diffable artifact is the timeline, not the pixels. This module compares two
 // snapshots (any two versions of any leg) and reports what changed in
 // review-oriented terms: clips added / removed / moved / trimmed / slipped,

@@ -5,7 +5,7 @@
 // passkey/WebAuthn UX and split sessions. So instead of opening an in-app
 // window, the agent hands the user a link that completes in *their* browser.
 //
-// The page itself runs on the Tandem web app (creators-den), NOT on a loopback
+// The page itself runs on the Nexet web app (creators-den), NOT on a loopback
 // server. That's a hard Clerk constraint: Clerk only initialises its JS from
 // origins registered on the instance (the web app's domain), so a page served
 // from a random http://127.0.0.1:<port> origin fails with "the sign-in
@@ -71,7 +71,7 @@ export interface BrowserSignInAttempt {
  *
  * @param publishableKey Clerk publishable key, used to derive the expected JWT
  *   issuer (the instance's Frontend API origin).
- * @param webAppUrl      Public origin of the Tandem web app whose /agent-signin
+ * @param webAppUrl      Public origin of the Nexet web app whose /agent-signin
  *   page performs the sign-in. Must be a registered Clerk origin.
  */
 export async function beginBrowserSignIn(
@@ -81,7 +81,7 @@ export async function beginBrowserSignIn(
   const origin = clerkAccountsOrigin(publishableKey);
   if (!origin) {
     throw new Error(
-      "Invalid Clerk publishable key. Set TANDEM_CLERK_PUBLISHABLE_KEY or add it to the agent config.",
+      "Invalid Clerk publishable key. Set NEXET_CLERK_PUBLISHABLE_KEY or add it to the agent config.",
     );
   }
   let webOrigin: string;
@@ -89,7 +89,7 @@ export async function beginBrowserSignIn(
     webOrigin = new URL(webAppUrl).origin;
   } catch {
     throw new Error(
-      "Invalid web app URL. Set TANDEM_WEB_URL to the Tandem web app origin (e.g. https://app.example.com).",
+      "Invalid web app URL. Set NEXET_WEB_URL to the Nexet web app origin (e.g. https://app.example.com).",
     );
   }
 

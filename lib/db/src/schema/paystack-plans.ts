@@ -9,8 +9,8 @@ import { integer, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-co
 // Keyed by (kind, planId) matching the plan ids used across the checkout.
 // ---------------------------------------------------------------------------
 
-export const tandemPaystackPlansTable = pgTable(
-  "tandem_paystack_plans",
+export const nexetPaystackPlansTable = pgTable(
+  "nexet_paystack_plans",
   {
     // pass | storage | projects
     kind: text("kind").notNull(),
@@ -30,6 +30,6 @@ export const tandemPaystackPlansTable = pgTable(
   (table) => [primaryKey({ columns: [table.kind, table.planId] })],
 );
 
-export const insertTandemPaystackPlanSchema = createInsertSchema(tandemPaystackPlansTable);
+export const insertNexetPaystackPlanSchema = createInsertSchema(nexetPaystackPlansTable);
 
-export type TandemPaystackPlan = typeof tandemPaystackPlansTable.$inferSelect;
+export type NexetPaystackPlan = typeof nexetPaystackPlansTable.$inferSelect;

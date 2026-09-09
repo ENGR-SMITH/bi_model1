@@ -52,7 +52,7 @@ import { useProjectRealtime } from '@/lib/realtime';
 import { isAudioKind, proxyUrlFor } from '@/components/asset-preview';
 import { MemberAvatar } from '@/components/member-avatar';
 import { matchesCreatorQuery } from '@/lib/explore-search';
-import { isTandemUid, normalizeTandemUid, tandemUid } from '@/lib/tandem-uid';
+import { isNexetUid, normalizeNexetUid, nexetUid } from '@/lib/nexet-uid';
 import {
   ALL_ROLES,
   CONTENT_ROLES,
@@ -191,13 +191,13 @@ function InviteForm({ projectId }: { projectId: string }) {
   const [suggestOpen, setSuggestOpen] = useState(false);
   const suggestBlur = useRef<number | null>(null);
 
-  const normalized = normalizeTandemUid(uid);
-  const valid = isTandemUid(normalized);
+  const normalized = normalizeNexetUid(uid);
+  const valid = isNexetUid(normalized);
   const touched = uid.trim().length > 0;
 
   // Live teammate search: as the Captain types, matching creators (with their
   // real avatars) are offered right under the field — pick one to fill in its
-  // Tandem ID. Typing the ID manually still works for anyone not listed.
+  // Nexet ID. Typing the ID manually still works for anyone not listed.
   const creators = useListExploreCreators({
     query: { queryKey: getListExploreCreatorsQueryKey(), enabled: touched },
   });
@@ -205,7 +205,7 @@ function InviteForm({ projectId }: { projectId: string }) {
     ? (creators.data ?? []).filter((creator) => matchesCreatorQuery(creator, uid)).slice(0, 6)
     : [];
   const pick = (userId: string) => {
-    setUid(tandemUid(userId));
+    setUid(nexetUid(userId));
     setSuggestOpen(false);
   };
 
@@ -230,7 +230,7 @@ function InviteForm({ projectId }: { projectId: string }) {
       <div className="min-w-0">
         <div className="invite-field">
           {/* The field always reads as a search box: a person icon on the
-              left and a fixed "@" prefix so the Tandem ID slot is obvious. */}
+              left and a fixed "@" prefix so the Nexet ID slot is obvious. */}
           <span className="invite-field-icon" aria-hidden><User size={14} /></span>
           <div className="invite-pick">
             <span className="invite-at" aria-hidden>@</span>
@@ -251,11 +251,11 @@ function InviteForm({ projectId }: { projectId: string }) {
               onKeyDown={(event) => {
                 if (event.key === 'Escape') setSuggestOpen(false);
               }}
-              placeholder="Search by name or TANDEM ID…"
+              placeholder="Search by name or NEXET ID…"
               spellCheck={false}
               autoCapitalize="characters"
               className="font-mono uppercase tracking-wider"
-              aria-label="Teammate's unique Tandem ID"
+              aria-label="Teammate's unique Nexet ID"
               data-testid="input-invite-uid"
             />
             {suggestions.length > 0 && suggestOpen && !valid && (
@@ -273,7 +273,7 @@ function InviteForm({ projectId }: { projectId: string }) {
                     </span>
                     <span className="min-w-0">
                       <b>{creator.displayName}</b>
-                      <small>@{tandemUid(creator.userId)}</small>
+                      <small>@{nexetUid(creator.userId)}</small>
                     </span>
                     <span className="invite-suggest-pick">Pick</span>
                   </button>
@@ -285,9 +285,9 @@ function InviteForm({ projectId }: { projectId: string }) {
         {touched && !valid && (
           <p className="setting-copy !text-[11px] mt-1" role="alert">
             {suggestions.length > 0 ? (
-              <>Pick a teammate above, or type their full Tandem ID.</>
+              <>Pick a teammate above, or type their full Nexet ID.</>
             ) : (
-              <>A Tandem ID looks like <span className="mono-label">@TANDEM6EUHY</span> — find it on the teammate's profile.</>
+              <>A Nexet ID looks like <span className="mono-label">@NEXET6EUHY</span> — find it on the teammate's profile.</>
             )}
           </p>
         )}
@@ -385,8 +385,8 @@ function MemberRow({
               </span>
             ))
           )}
-          <span className="mono-label" title="Unique Tandem ID — share it to invite this member">
-            {tandemUid(member.userId)}
+          <span className="mono-label" title="Unique Nexet ID — share it to invite this member">
+            {nexetUid(member.userId)}
           </span>
         </small>
         {error && (
@@ -979,7 +979,7 @@ export default function ContentCreatorsProjectPage() {
           {captain ? (
             <div className="mt-4 border-t pt-4" style={{ borderColor: 'hsl(var(--border))' }}>
               <span className="eyebrow"><UserPlus size={12} /> Invite a teammate</span>
-              <p className="setting-copy mt-1">Search by name or paste their Tandem ID, then assign a role — Video, Audio, Script, or Thumbnail. Inviting a current member just adds the role to their set.</p>
+              <p className="setting-copy mt-1">Search by name or paste their Nexet ID, then assign a role — Video, Audio, Script, or Thumbnail. Inviting a current member just adds the role to their set.</p>
               <InviteForm projectId={p.id} />
             </div>
           ) : (

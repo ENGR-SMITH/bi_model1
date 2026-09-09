@@ -2,7 +2,7 @@
 -- here override a plan's defaults. Keyed by (kind, planId) matching the plan
 -- ids used across the checkout paths.
 
-CREATE TABLE tandem_subscription_plan_settings (
+CREATE TABLE nexet_subscription_plan_settings (
   kind text NOT NULL,
   plan_id text NOT NULL,
   auto_renew_available boolean NOT NULL DEFAULT false,

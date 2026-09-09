@@ -3,19 +3,19 @@ import path from "node:path";
 import { getAuth } from "@clerk/express";
 import {
   db,
-  tandemArenaApplicationFilesTable,
-  tandemArenaApplicationsTable,
-  tandemArenaBlocksTable,
-  tandemArenaPostsTable,
-  tandemArenaReviewsTable,
-  tandemArenaWatchesTable,
-  tandemChannelsTable,
-  tandemVideoFollowsTable,
-  tandemVideoMembersTable,
-  tandemVideoProjectsTable,
-  type TandemArenaApplication,
-  type TandemArenaPost,
-  type TandemArenaWatch,
+  nexetArenaApplicationFilesTable,
+  nexetArenaApplicationsTable,
+  nexetArenaBlocksTable,
+  nexetArenaPostsTable,
+  nexetArenaReviewsTable,
+  nexetArenaWatchesTable,
+  nexetChannelsTable,
+  nexetVideoFollowsTable,
+  nexetVideoMembersTable,
+  nexetVideoProjectsTable,
+  type NexetArenaApplication,
+  type NexetArenaPost,
+  type NexetArenaWatch,
 } from "@workspace/db";
 import {
   AcceptArenaApplicationParams,
@@ -123,7 +123,7 @@ type PostSummary = {
  * across the pg schema and the in-memory SQLite mirror (no dialect SQL).
  */
 async function hydratePosts(
-  posts: TandemArenaPost[],
+  posts: NexetArenaPost[],
   viewerId: string,
 ): Promise<{ items: PostSummary[]; pendingByPost: Map<string, number>; totalByPost: Map<string, number> }> {
   if (posts.length === 0) {
@@ -138,14 +138,14 @@ async function hydratePosts(
     channelIds.length > 0
       ? db
           .select()
-          .from(tandemChannelsTable)
-          .where(inArray(tandemChannelsTable.id, channelIds))
+          .from(nexetChannelsTable)
+          .where(inArray(nexetChannelsTable.id, channelIds))
       : Promise.resolve([]),
     projectIds.length > 0
       ? db
           .select()
-          .from(tandemVideoProjectsTable)
-          .where(inArray(tandemVideoProjectsTable.id, projectIds))
+          .from(nexetVideoProjectsTable)
+          .where(inArray(nexetVideoProjectsTable.id, projectIds))
       : Promise.resolve([]),
   ]);
   const channelById = new Map(channelRows.map((row) => [row.id, row]));
@@ -158,13 +158,13 @@ async function hydratePosts(
   // ACCEPTED applicant (who filled the role — "Role filled by <name>").
   const applicationRows = await db
     .select({
-      postId: tandemArenaApplicationsTable.postId,
-      applicantId: tandemArenaApplicationsTable.applicantId,
-      status: tandemArenaApplicationsTable.status,
-      createdAt: tandemArenaApplicationsTable.createdAt,
+      postId: nexetArenaApplicationsTable.postId,
+      applicantId: nexetArenaApplicationsTable.applicantId,
+      status: nexetArenaApplicationsTable.status,
+      createdAt: nexetArenaApplicationsTable.createdAt,
     })
-    .from(tandemArenaApplicationsTable)
-    .where(inArray(tandemArenaApplicationsTable.postId, postIds));
+    .from(nexetArenaApplicationsTable)
+    .where(inArray(nexetArenaApplicationsTable.postId, postIds));
 
   const pendingByPost = new Map<string, number>();
   const totalByPost = new Map<string, number>();
@@ -224,7 +224,7 @@ async function hydratePosts(
       pitch: post.pitch,
       status: post.status,
       postedBy: post.postedBy,
-      posterName: profile?.name ?? "Tandem creator",
+      posterName: profile?.name ?? "Nexet creator",
       posterImageUrl: profile?.imageUrl ?? null,
       channelName: channel?.name ?? "Unknown channel",
       channelAvatarUrl: channel?.youtubeAvatarUrl ?? null,
@@ -233,12 +233,12 @@ async function hydratePosts(
       applicantCount: pendingByPost.get(post.id) ?? 0,
       applicants: (applicantsByPost.get(post.id) ?? []).map((id) => {
         const profile = applicantProfiles[id];
-        return { id, name: profile?.name ?? "Tandem creator", imageUrl: profile?.imageUrl ?? null };
+        return { id, name: profile?.name ?? "Nexet creator", imageUrl: profile?.imageUrl ?? null };
       }),
       myApplication,
       filledBy:
         hiredApplicantId && hiredProfile
-          ? { id: hiredApplicantId, name: hiredProfile.name ?? "Tandem creator", imageUrl: hiredProfile.imageUrl }
+          ? { id: hiredApplicantId, name: hiredProfile.name ?? "Nexet creator", imageUrl: hiredProfile.imageUrl }
           : null,
       createdAt: post.createdAt,
       updatedAt: post.updatedAt,
@@ -251,9 +251,9 @@ async function hydratePosts(
 /** The Clerk user ids this viewer follows (captains/creators they follow). */
 async function followedCreatorIds(viewerId: string): Promise<Set<string>> {
   const rows = await db
-    .select({ followingId: tandemVideoFollowsTable.followingId })
-    .from(tandemVideoFollowsTable)
-    .where(eq(tandemVideoFollowsTable.followerId, viewerId));
+    .select({ followingId: nexetVideoFollowsTable.followingId })
+    .from(nexetVideoFollowsTable)
+    .where(eq(nexetVideoFollowsTable.followerId, viewerId));
   return new Set(rows.map((row) => row.followingId));
 }
 
@@ -264,22 +264,22 @@ async function followedCreatorIds(viewerId: string): Promise<Set<string>> {
  * specific channel notification, never two. The poster never notifies
  * themselves; anyone who already applied to the post already knows.
  */
-async function fanOutWatchNotifications(post: TandemArenaPost, projectName: string): Promise<void> {
+async function fanOutWatchNotifications(post: NexetArenaPost, projectName: string): Promise<void> {
   const watches = await db
     .select()
-    .from(tandemArenaWatchesTable)
+    .from(nexetArenaWatchesTable)
     .where(
       and(
-        eq(tandemArenaWatchesTable.role, post.role),
+        eq(nexetArenaWatchesTable.role, post.role),
         or(
-          eq(tandemArenaWatchesTable.channelId, post.channelId),
-          isNull(tandemArenaWatchesTable.channelId),
+          eq(nexetArenaWatchesTable.channelId, post.channelId),
+          isNull(nexetArenaWatchesTable.channelId),
         ),
       ),
     );
 
   // One notification per recipient — the most specific matching watch wins.
-  const byRecipient = new Map<string, TandemArenaWatch>();
+  const byRecipient = new Map<string, NexetArenaWatch>();
   for (const watch of watches) {
     if (watch.userId === post.postedBy) continue;
     const existing = byRecipient.get(watch.userId);
@@ -381,14 +381,14 @@ function removeUploadedFiles(files: Express.Multer.File[]): void {
  * uploaded document metadata, and decision metadata. Portable across pg + the
  * in-memory SQLite mirror.
  */
-async function hydrateApplications(rows: TandemArenaApplication[]): Promise<unknown[]> {
+async function hydrateApplications(rows: NexetArenaApplication[]): Promise<unknown[]> {
   if (rows.length === 0) return [];
 
   const applicationIds = rows.map((row) => row.id);
   const fileRows = await db
     .select()
-    .from(tandemArenaApplicationFilesTable)
-    .where(inArray(tandemArenaApplicationFilesTable.applicationId, applicationIds));
+    .from(nexetArenaApplicationFilesTable)
+    .where(inArray(nexetArenaApplicationFilesTable.applicationId, applicationIds));
   const filesByApplication = new Map<string, typeof fileRows>();
   for (const file of fileRows) {
     const bucket = filesByApplication.get(file.applicationId) ?? [];
@@ -434,23 +434,23 @@ router.get("/video/arena/posts", async (req: Request, res: Response): Promise<vo
 
   const conditions = [];
   if (query.data.mine) {
-    conditions.push(eq(tandemArenaPostsTable.postedBy, userId));
+    conditions.push(eq(nexetArenaPostsTable.postedBy, userId));
   } else {
-    conditions.push(eq(tandemArenaPostsTable.status, "OPEN"));
+    conditions.push(eq(nexetArenaPostsTable.status, "OPEN"));
   }
-  if (query.data.role) conditions.push(eq(tandemArenaPostsTable.role, query.data.role));
+  if (query.data.role) conditions.push(eq(nexetArenaPostsTable.role, query.data.role));
   if (query.data.channelId) {
-    conditions.push(eq(tandemArenaPostsTable.channelId, query.data.channelId));
+    conditions.push(eq(nexetArenaPostsTable.channelId, query.data.channelId));
   }
   if (query.data.projectId) {
-    conditions.push(eq(tandemArenaPostsTable.projectId, query.data.projectId));
+    conditions.push(eq(nexetArenaPostsTable.projectId, query.data.projectId));
   }
 
   const posts = await db
     .select()
-    .from(tandemArenaPostsTable)
+    .from(nexetArenaPostsTable)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(tandemArenaPostsTable.createdAt));
+    .orderBy(desc(nexetArenaPostsTable.createdAt));
 
   const { items, pendingByPost } = await hydratePosts(posts, userId);
   let ordered = items;
@@ -505,8 +505,8 @@ router.post("/video/arena/posts", async (req: Request, res: Response): Promise<v
 
   const [project] = await db
     .select()
-    .from(tandemVideoProjectsTable)
-    .where(eq(tandemVideoProjectsTable.id, body.data.projectId))
+    .from(nexetVideoProjectsTable)
+    .where(eq(nexetVideoProjectsTable.id, body.data.projectId))
     .limit(1);
   if (!project) {
     res.status(404).json({ error: "Project not found" });
@@ -523,8 +523,8 @@ router.post("/video/arena/posts", async (req: Request, res: Response): Promise<v
 
   const [channel] = await db
     .select()
-    .from(tandemChannelsTable)
-    .where(eq(tandemChannelsTable.id, project.channelId))
+    .from(nexetChannelsTable)
+    .where(eq(nexetChannelsTable.id, project.channelId))
     .limit(1);
   if (!channel || channel.ownerId !== userId) {
     res.status(403).json({ error: "Only the channel owner can post an open role" });
@@ -532,13 +532,13 @@ router.post("/video/arena/posts", async (req: Request, res: Response): Promise<v
   }
 
   const [duplicate] = await db
-    .select({ id: tandemArenaPostsTable.id })
-    .from(tandemArenaPostsTable)
+    .select({ id: nexetArenaPostsTable.id })
+    .from(nexetArenaPostsTable)
     .where(
       and(
-        eq(tandemArenaPostsTable.projectId, project.id),
-        eq(tandemArenaPostsTable.role, body.data.role),
-        eq(tandemArenaPostsTable.status, "OPEN"),
+        eq(nexetArenaPostsTable.projectId, project.id),
+        eq(nexetArenaPostsTable.role, body.data.role),
+        eq(nexetArenaPostsTable.status, "OPEN"),
       ),
     )
     .limit(1);
@@ -548,7 +548,7 @@ router.post("/video/arena/posts", async (req: Request, res: Response): Promise<v
   }
 
   const [post] = await db
-    .insert(tandemArenaPostsTable)
+    .insert(nexetArenaPostsTable)
     .values({
       id: randomUUID(),
       channelId: channel.id,
@@ -596,8 +596,8 @@ router.get("/video/arena/posts/:postId", async (req: Request, res: Response): Pr
 
   const [post] = await db
     .select()
-    .from(tandemArenaPostsTable)
-    .where(eq(tandemArenaPostsTable.id, params.data.postId))
+    .from(nexetArenaPostsTable)
+    .where(eq(nexetArenaPostsTable.id, params.data.postId))
     .limit(1);
   if (!post) {
     res.status(404).json({ error: "Post not found" });
@@ -642,8 +642,8 @@ router.patch("/video/arena/posts/:postId", async (req: Request, res: Response): 
 
   const [post] = await db
     .select()
-    .from(tandemArenaPostsTable)
-    .where(eq(tandemArenaPostsTable.id, params.data.postId))
+    .from(nexetArenaPostsTable)
+    .where(eq(nexetArenaPostsTable.id, params.data.postId))
     .limit(1);
   if (!post) {
     res.status(404).json({ error: "Post not found" });
@@ -674,25 +674,25 @@ router.patch("/video/arena/posts/:postId", async (req: Request, res: Response): 
   }
 
   const [updated] = await db
-    .update(tandemArenaPostsTable)
+    .update(nexetArenaPostsTable)
     .set({
       ...(body.data.pitch !== undefined ? { pitch: body.data.pitch.trim() } : {}),
       ...(body.data.status !== undefined ? { status: targetStatus } : {}),
       updatedAt: new Date(),
     })
-    .where(eq(tandemArenaPostsTable.id, post.id))
+    .where(eq(nexetArenaPostsTable.id, post.id))
     .returning();
 
   if (closed) {
     // The read-only preview window closes with the post; PENDING applicants
     // learn their audition survived but the door is shut for now.
     const pending = await db
-      .select({ applicantId: tandemArenaApplicationsTable.applicantId })
-      .from(tandemArenaApplicationsTable)
+      .select({ applicantId: nexetArenaApplicationsTable.applicantId })
+      .from(nexetArenaApplicationsTable)
       .where(
         and(
-          eq(tandemArenaApplicationsTable.postId, post.id),
-          eq(tandemArenaApplicationsTable.status, "PENDING"),
+          eq(nexetArenaApplicationsTable.postId, post.id),
+          eq(nexetArenaApplicationsTable.status, "PENDING"),
         ),
       );
     for (const row of pending) {
@@ -749,8 +749,8 @@ router.delete("/video/arena/posts/:postId", async (req: Request, res: Response):
 
   const [post] = await db
     .select()
-    .from(tandemArenaPostsTable)
-    .where(eq(tandemArenaPostsTable.id, params.data.postId))
+    .from(nexetArenaPostsTable)
+    .where(eq(nexetArenaPostsTable.id, params.data.postId))
     .limit(1);
   if (!post) {
     res.status(404).json({ error: "Post not found" });
@@ -765,24 +765,24 @@ router.delete("/video/arena/posts/:postId", async (req: Request, res: Response):
   const storageKeys: string[] = [];
   await db.transaction(async (tx) => {
     const applicationRows = await tx
-      .select({ id: tandemArenaApplicationsTable.id })
-      .from(tandemArenaApplicationsTable)
-      .where(eq(tandemArenaApplicationsTable.postId, post.id));
+      .select({ id: nexetArenaApplicationsTable.id })
+      .from(nexetArenaApplicationsTable)
+      .where(eq(nexetArenaApplicationsTable.postId, post.id));
     if (applicationRows.length > 0) {
       const applicationIds = applicationRows.map((row) => row.id);
       const fileRows = await tx
-        .select({ storageKey: tandemArenaApplicationFilesTable.storageKey })
-        .from(tandemArenaApplicationFilesTable)
-        .where(inArray(tandemArenaApplicationFilesTable.applicationId, applicationIds));
+        .select({ storageKey: nexetArenaApplicationFilesTable.storageKey })
+        .from(nexetArenaApplicationFilesTable)
+        .where(inArray(nexetArenaApplicationFilesTable.applicationId, applicationIds));
       storageKeys.push(...fileRows.map((row) => row.storageKey));
       await tx
-        .delete(tandemArenaApplicationFilesTable)
-        .where(inArray(tandemArenaApplicationFilesTable.applicationId, applicationIds));
+        .delete(nexetArenaApplicationFilesTable)
+        .where(inArray(nexetArenaApplicationFilesTable.applicationId, applicationIds));
       await tx
-        .delete(tandemArenaApplicationsTable)
-        .where(eq(tandemArenaApplicationsTable.postId, post.id));
+        .delete(nexetArenaApplicationsTable)
+        .where(eq(nexetArenaApplicationsTable.postId, post.id));
     }
-    await tx.delete(tandemArenaPostsTable).where(eq(tandemArenaPostsTable.id, post.id));
+    await tx.delete(nexetArenaPostsTable).where(eq(nexetArenaPostsTable.id, post.id));
   });
   for (const key of storageKeys) {
     try {
@@ -825,8 +825,8 @@ router.post(
 
     const [post] = await db
       .select()
-      .from(tandemArenaPostsTable)
-      .where(eq(tandemArenaPostsTable.id, params.data.postId))
+      .from(nexetArenaPostsTable)
+      .where(eq(nexetArenaPostsTable.id, params.data.postId))
       .limit(1);
     if (!post) {
       res.status(404).json({ error: "Post not found" });
@@ -843,8 +843,8 @@ router.post(
 
     const [project] = await db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(eq(tandemVideoProjectsTable.id, post.projectId))
+      .from(nexetVideoProjectsTable)
+      .where(eq(nexetVideoProjectsTable.id, post.projectId))
       .limit(1);
     if (!project) {
       res.status(404).json({ error: "Project not found" });
@@ -853,12 +853,12 @@ router.post(
 
     const [member] = await db
       .select()
-      .from(tandemVideoMembersTable)
+      .from(nexetVideoMembersTable)
       .where(
         and(
-          eq(tandemVideoMembersTable.projectId, project.id),
-          eq(tandemVideoMembersTable.userId, userId),
-          eq(tandemVideoMembersTable.status, "ACTIVE"),
+          eq(nexetVideoMembersTable.projectId, project.id),
+          eq(nexetVideoMembersTable.userId, userId),
+          eq(nexetVideoMembersTable.status, "ACTIVE"),
         ),
       )
       .limit(1);
@@ -869,12 +869,12 @@ router.post(
 
     // Per-Captain block: this Captain has blacklisted the caller.
     const [block] = await db
-      .select({ id: tandemArenaBlocksTable.id })
-      .from(tandemArenaBlocksTable)
+      .select({ id: nexetArenaBlocksTable.id })
+      .from(nexetArenaBlocksTable)
       .where(
         and(
-          eq(tandemArenaBlocksTable.captainId, post.postedBy),
-          eq(tandemArenaBlocksTable.applicantId, userId),
+          eq(nexetArenaBlocksTable.captainId, post.postedBy),
+          eq(nexetArenaBlocksTable.applicantId, userId),
         ),
       )
       .limit(1);
@@ -885,13 +885,13 @@ router.post(
 
     // One PENDING audition per (post, applicant).
     const [pending] = await db
-      .select({ id: tandemArenaApplicationsTable.id })
-      .from(tandemArenaApplicationsTable)
+      .select({ id: nexetArenaApplicationsTable.id })
+      .from(nexetArenaApplicationsTable)
       .where(
         and(
-          eq(tandemArenaApplicationsTable.postId, post.id),
-          eq(tandemArenaApplicationsTable.applicantId, userId),
-          eq(tandemArenaApplicationsTable.status, "PENDING"),
+          eq(nexetArenaApplicationsTable.postId, post.id),
+          eq(nexetArenaApplicationsTable.applicantId, userId),
+          eq(nexetArenaApplicationsTable.status, "PENDING"),
         ),
       )
       .limit(1);
@@ -903,12 +903,12 @@ router.post(
     // Per-week apply cap (rolling 7 days, all statuses — no refunds).
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const recent = await db
-      .select({ id: tandemArenaApplicationsTable.id })
-      .from(tandemArenaApplicationsTable)
+      .select({ id: nexetArenaApplicationsTable.id })
+      .from(nexetArenaApplicationsTable)
       .where(
         and(
-          eq(tandemArenaApplicationsTable.applicantId, userId),
-          gte(tandemArenaApplicationsTable.createdAt, weekAgo),
+          eq(nexetArenaApplicationsTable.applicantId, userId),
+          gte(nexetArenaApplicationsTable.createdAt, weekAgo),
         ),
       );
     if (recent.length >= APPLICATIONS_PER_WEEK) {
@@ -957,7 +957,7 @@ router.post(
 
     const applicationId = randomUUID();
     await db.transaction(async (tx) => {
-      await tx.insert(tandemArenaApplicationsTable).values({
+      await tx.insert(nexetArenaApplicationsTable).values({
         id: applicationId,
         postId: post.id,
         projectId: project.id,
@@ -967,7 +967,7 @@ router.post(
         status: "PENDING",
       });
       if (files.length > 0) {
-        await tx.insert(tandemArenaApplicationFilesTable).values(
+        await tx.insert(nexetArenaApplicationFilesTable).values(
           files.map((file) => ({
             id: randomUUID(),
             applicationId,
@@ -982,8 +982,8 @@ router.post(
 
     const [created] = await db
       .select()
-      .from(tandemArenaApplicationsTable)
-      .where(eq(tandemArenaApplicationsTable.id, applicationId))
+      .from(nexetArenaApplicationsTable)
+      .where(eq(nexetArenaApplicationsTable.id, applicationId))
       .limit(1);
     const [item] = (await hydrateApplications([created])) as Array<Record<string, unknown>>;
 
@@ -1021,8 +1021,8 @@ router.get(
 
     const [post] = await db
       .select()
-      .from(tandemArenaPostsTable)
-      .where(eq(tandemArenaPostsTable.id, params.data.postId))
+      .from(nexetArenaPostsTable)
+      .where(eq(nexetArenaPostsTable.id, params.data.postId))
       .limit(1);
     if (!post) {
       res.status(404).json({ error: "Post not found" });
@@ -1035,9 +1035,9 @@ router.get(
 
     const rows = await db
       .select()
-      .from(tandemArenaApplicationsTable)
-      .where(eq(tandemArenaApplicationsTable.postId, post.id))
-      .orderBy(desc(tandemArenaApplicationsTable.createdAt));
+      .from(nexetArenaApplicationsTable)
+      .where(eq(nexetArenaApplicationsTable.postId, post.id))
+      .orderBy(desc(nexetArenaApplicationsTable.createdAt));
 
     res.json(ListArenaPostApplicationsResponse.parse(await hydrateApplications(rows)));
   },
@@ -1054,20 +1054,20 @@ router.get("/video/arena/applications/mine", async (req: Request, res: Response)
 
   const rows = await db
     .select()
-    .from(tandemArenaApplicationsTable)
-    .where(eq(tandemArenaApplicationsTable.applicantId, userId))
-    .orderBy(desc(tandemArenaApplicationsTable.createdAt));
+    .from(nexetArenaApplicationsTable)
+    .where(eq(nexetArenaApplicationsTable.applicantId, userId))
+    .orderBy(desc(nexetArenaApplicationsTable.createdAt));
 
   res.json(ListMyArenaApplicationsResponse.parse(await hydrateApplications(rows)));
 });
 
 /** True when the caller may see this application (the applicant or the post's Captain). */
-async function canViewApplication(application: TandemArenaApplication, userId: string): Promise<boolean> {
+async function canViewApplication(application: NexetArenaApplication, userId: string): Promise<boolean> {
   if (application.applicantId === userId) return true;
   const [post] = await db
-    .select({ postedBy: tandemArenaPostsTable.postedBy })
-    .from(tandemArenaPostsTable)
-    .where(eq(tandemArenaPostsTable.id, application.postId))
+    .select({ postedBy: nexetArenaPostsTable.postedBy })
+    .from(nexetArenaPostsTable)
+    .where(eq(nexetArenaPostsTable.id, application.postId))
     .limit(1);
   return post?.postedBy === userId;
 }
@@ -1092,8 +1092,8 @@ router.get(
 
     const [application] = await db
       .select()
-      .from(tandemArenaApplicationsTable)
-      .where(eq(tandemArenaApplicationsTable.id, params.data.applicationId))
+      .from(nexetArenaApplicationsTable)
+      .where(eq(nexetArenaApplicationsTable.id, params.data.applicationId))
       .limit(1);
     if (!application || !(await canViewApplication(application, userId))) {
       res.status(404).json({ error: "Application not found" });
@@ -1124,8 +1124,8 @@ router.get(
 
     const [application] = await db
       .select()
-      .from(tandemArenaApplicationsTable)
-      .where(eq(tandemArenaApplicationsTable.id, params.data.applicationId))
+      .from(nexetArenaApplicationsTable)
+      .where(eq(nexetArenaApplicationsTable.id, params.data.applicationId))
       .limit(1);
     if (!application || !(await canViewApplication(application, userId))) {
       res.status(404).json({ error: "Application not found" });
@@ -1134,11 +1134,11 @@ router.get(
 
     const [file] = await db
       .select()
-      .from(tandemArenaApplicationFilesTable)
+      .from(nexetArenaApplicationFilesTable)
       .where(
         and(
-          eq(tandemArenaApplicationFilesTable.id, params.data.fileId),
-          eq(tandemArenaApplicationFilesTable.applicationId, application.id),
+          eq(nexetArenaApplicationFilesTable.id, params.data.fileId),
+          eq(nexetArenaApplicationFilesTable.applicationId, application.id),
         ),
       )
       .limit(1);
@@ -1181,8 +1181,8 @@ router.post(
 
     const [application] = await db
       .select()
-      .from(tandemArenaApplicationsTable)
-      .where(eq(tandemArenaApplicationsTable.id, params.data.applicationId))
+      .from(nexetArenaApplicationsTable)
+      .where(eq(nexetArenaApplicationsTable.id, params.data.applicationId))
       .limit(1);
     if (!application) {
       res.status(404).json({ error: "Application not found" });
@@ -1191,8 +1191,8 @@ router.post(
 
     const [post] = await db
       .select()
-      .from(tandemArenaPostsTable)
-      .where(eq(tandemArenaPostsTable.id, application.postId))
+      .from(nexetArenaPostsTable)
+      .where(eq(nexetArenaPostsTable.id, application.postId))
       .limit(1);
     if (!post || post.postedBy !== userId) {
       res.status(403).json({ error: "Only the Captain of this audition can accept it" });
@@ -1210,11 +1210,11 @@ router.post(
     // Guard against a member row appearing between apply and accept.
     const [existingMember] = await db
       .select()
-      .from(tandemVideoMembersTable)
+      .from(nexetVideoMembersTable)
       .where(
         and(
-          eq(tandemVideoMembersTable.projectId, post.projectId),
-          eq(tandemVideoMembersTable.userId, application.applicantId),
+          eq(nexetVideoMembersTable.projectId, post.projectId),
+          eq(nexetVideoMembersTable.userId, application.applicantId),
         ),
       )
       .limit(1);
@@ -1225,39 +1225,39 @@ router.post(
 
     const now = new Date();
     const declinedIds: string[] = [];
-    let accepted: TandemArenaApplication | undefined;
+    let accepted: NexetArenaApplication | undefined;
     await db.transaction(async (tx) => {
       [accepted] = await tx
-        .update(tandemArenaApplicationsTable)
+        .update(nexetArenaApplicationsTable)
         .set({ status: "ACCEPTED", decidedBy: userId, decidedAt: now, updatedAt: now })
-        .where(eq(tandemArenaApplicationsTable.id, application.id))
+        .where(eq(nexetArenaApplicationsTable.id, application.id))
         .returning();
 
       await tx
-        .update(tandemArenaPostsTable)
+        .update(nexetArenaPostsTable)
         .set({ status: "FILLED", updatedAt: now })
-        .where(eq(tandemArenaPostsTable.id, post.id));
+        .where(eq(nexetArenaPostsTable.id, post.id));
 
       const remaining = await tx
-        .select({ id: tandemArenaApplicationsTable.id })
-        .from(tandemArenaApplicationsTable)
+        .select({ id: nexetArenaApplicationsTable.id })
+        .from(nexetArenaApplicationsTable)
         .where(
           and(
-            eq(tandemArenaApplicationsTable.postId, post.id),
-            eq(tandemArenaApplicationsTable.status, "PENDING"),
-            ne(tandemArenaApplicationsTable.id, application.id),
+            eq(nexetArenaApplicationsTable.postId, post.id),
+            eq(nexetArenaApplicationsTable.status, "PENDING"),
+            ne(nexetArenaApplicationsTable.id, application.id),
           ),
         );
       declinedIds.push(...remaining.map((row) => row.id));
       if (remaining.length > 0) {
         await tx
-          .update(tandemArenaApplicationsTable)
+          .update(nexetArenaApplicationsTable)
           .set({ status: "REJECTED", decidedBy: userId, decidedAt: now, updatedAt: now })
           .where(
             and(
-              eq(tandemArenaApplicationsTable.postId, post.id),
-              eq(tandemArenaApplicationsTable.status, "PENDING"),
-              ne(tandemArenaApplicationsTable.id, application.id),
+              eq(nexetArenaApplicationsTable.postId, post.id),
+              eq(nexetArenaApplicationsTable.status, "PENDING"),
+              ne(nexetArenaApplicationsTable.id, application.id),
             ),
           );
       }
@@ -1266,11 +1266,11 @@ router.post(
       const roles = new Set([...(existingMember?.roles ?? []), post.role]);
       if (existingMember) {
         await tx
-          .update(tandemVideoMembersTable)
+          .update(nexetVideoMembersTable)
           .set({ roles: [...roles], status: "ACTIVE" })
-          .where(eq(tandemVideoMembersTable.id, existingMember.id));
+          .where(eq(nexetVideoMembersTable.id, existingMember.id));
       } else {
-        await tx.insert(tandemVideoMembersTable).values({
+        await tx.insert(nexetVideoMembersTable).values({
           id: randomUUID(),
           projectId: post.projectId,
           userId: application.applicantId,
@@ -1342,8 +1342,8 @@ router.post(
 
     const [application] = await db
       .select()
-      .from(tandemArenaApplicationsTable)
-      .where(eq(tandemArenaApplicationsTable.id, params.data.applicationId))
+      .from(nexetArenaApplicationsTable)
+      .where(eq(nexetArenaApplicationsTable.id, params.data.applicationId))
       .limit(1);
     if (!application) {
       res.status(404).json({ error: "Application not found" });
@@ -1352,8 +1352,8 @@ router.post(
 
     const [post] = await db
       .select()
-      .from(tandemArenaPostsTable)
-      .where(eq(tandemArenaPostsTable.id, application.postId))
+      .from(nexetArenaPostsTable)
+      .where(eq(nexetArenaPostsTable.id, application.postId))
       .limit(1);
     if (!post || post.postedBy !== userId) {
       res.status(403).json({ error: "Only the Captain of this audition can reject it" });
@@ -1366,9 +1366,9 @@ router.post(
 
     const now = new Date();
     const [rejected] = await db
-      .update(tandemArenaApplicationsTable)
+      .update(nexetArenaApplicationsTable)
       .set({ status: "REJECTED", decidedBy: userId, decidedAt: now, updatedAt: now })
-      .where(eq(tandemArenaApplicationsTable.id, application.id))
+      .where(eq(nexetArenaApplicationsTable.id, application.id))
       .returning();
 
     await notify(
@@ -1405,8 +1405,8 @@ router.post(
 
     const [application] = await db
       .select()
-      .from(tandemArenaApplicationsTable)
-      .where(eq(tandemArenaApplicationsTable.id, params.data.applicationId))
+      .from(nexetArenaApplicationsTable)
+      .where(eq(nexetArenaApplicationsTable.id, params.data.applicationId))
       .limit(1);
     if (!application || application.applicantId !== userId) {
       res.status(404).json({ error: "Application not found" });
@@ -1418,16 +1418,16 @@ router.post(
     }
 
     const [withdrawn] = await db
-      .update(tandemArenaApplicationsTable)
+      .update(nexetArenaApplicationsTable)
       .set({ status: "WITHDRAWN", updatedAt: new Date() })
-      .where(eq(tandemArenaApplicationsTable.id, application.id))
+      .where(eq(nexetArenaApplicationsTable.id, application.id))
       .returning();
 
     // The Captain learns the audition is no longer competing.
     const [post] = await db
-      .select({ postedBy: tandemArenaPostsTable.postedBy })
-      .from(tandemArenaPostsTable)
-      .where(eq(tandemArenaPostsTable.id, application.postId))
+      .select({ postedBy: nexetArenaPostsTable.postedBy })
+      .from(nexetArenaPostsTable)
+      .where(eq(nexetArenaPostsTable.id, application.postId))
       .limit(1);
     if (post) {
       const profiles = await resolveUserProfiles([userId]);
@@ -1469,8 +1469,8 @@ router.post(
 
     const [application] = await db
       .select()
-      .from(tandemArenaApplicationsTable)
-      .where(eq(tandemArenaApplicationsTable.id, params.data.applicationId))
+      .from(nexetArenaApplicationsTable)
+      .where(eq(nexetArenaApplicationsTable.id, params.data.applicationId))
       .limit(1);
     if (!application) {
       res.status(404).json({ error: "Application not found" });
@@ -1483,8 +1483,8 @@ router.post(
 
     const [post] = await db
       .select()
-      .from(tandemArenaPostsTable)
-      .where(eq(tandemArenaPostsTable.id, application.postId))
+      .from(nexetArenaPostsTable)
+      .where(eq(nexetArenaPostsTable.id, application.postId))
       .limit(1);
     if (!post) {
       // Without the post there is no Captain to pair the review with.
@@ -1501,12 +1501,12 @@ router.post(
 
     // One review per participant per hire (unique application + reviewer).
     const [existing] = await db
-      .select({ id: tandemArenaReviewsTable.id })
-      .from(tandemArenaReviewsTable)
+      .select({ id: nexetArenaReviewsTable.id })
+      .from(nexetArenaReviewsTable)
       .where(
         and(
-          eq(tandemArenaReviewsTable.applicationId, application.id),
-          eq(tandemArenaReviewsTable.reviewerId, userId),
+          eq(nexetArenaReviewsTable.applicationId, application.id),
+          eq(nexetArenaReviewsTable.reviewerId, userId),
         ),
       )
       .limit(1);
@@ -1518,7 +1518,7 @@ router.post(
     const reviewerId = userId;
     const revieweeId = reviewerId === captainId ? hiredId : captainId;
     const [review] = await db
-      .insert(tandemArenaReviewsTable)
+      .insert(nexetArenaReviewsTable)
       .values({
         id: randomUUID(),
         applicationId: application.id,
@@ -1547,8 +1547,8 @@ router.post(
       resolveUserProfiles([reviewerId]),
       db
         .select()
-        .from(tandemVideoProjectsTable)
-        .where(eq(tandemVideoProjectsTable.id, application.projectId))
+        .from(nexetVideoProjectsTable)
+        .where(eq(nexetVideoProjectsTable.id, application.projectId))
         .limit(1),
     ]);
     res.status(201).json(
@@ -1590,9 +1590,9 @@ router.get("/video/arena/reviews", async (req: Request, res: Response): Promise<
 
   const reviews = await db
     .select()
-    .from(tandemArenaReviewsTable)
-    .where(eq(tandemArenaReviewsTable.revieweeId, query.data.userId))
-    .orderBy(desc(tandemArenaReviewsTable.createdAt));
+    .from(nexetArenaReviewsTable)
+    .where(eq(nexetArenaReviewsTable.revieweeId, query.data.userId))
+    .orderBy(desc(nexetArenaReviewsTable.createdAt));
   if (reviews.length === 0) {
     res.json(ListArenaReviewsResponse.parse([]));
     return;
@@ -1606,8 +1606,8 @@ router.get("/video/arena/reviews", async (req: Request, res: Response): Promise<
     resolveUserProfiles(reviewerIds),
     db
       .select()
-      .from(tandemVideoProjectsTable)
-      .where(inArray(tandemVideoProjectsTable.id, projectIds)),
+      .from(nexetVideoProjectsTable)
+      .where(inArray(nexetVideoProjectsTable.id, projectIds)),
   ]);
   const projectNameById = new Map(projectRows.map((row) => [row.id, row.name]));
 
@@ -1633,9 +1633,9 @@ router.get("/video/arena/watches", async (req: Request, res: Response): Promise<
 
   const watches = await db
     .select()
-    .from(tandemArenaWatchesTable)
-    .where(eq(tandemArenaWatchesTable.userId, userId))
-    .orderBy(desc(tandemArenaWatchesTable.createdAt));
+    .from(nexetArenaWatchesTable)
+    .where(eq(nexetArenaWatchesTable.userId, userId))
+    .orderBy(desc(nexetArenaWatchesTable.createdAt));
 
   res.json(ListArenaWatchesResponse.parse(watches));
 });
@@ -1664,9 +1664,9 @@ router.post("/video/arena/watches", async (req: Request, res: Response): Promise
   const targetChannelId = body.data.channelId?.trim() || null;
   if (targetChannelId) {
     const [channel] = await db
-      .select({ id: tandemChannelsTable.id })
-      .from(tandemChannelsTable)
-      .where(eq(tandemChannelsTable.id, targetChannelId))
+      .select({ id: nexetChannelsTable.id })
+      .from(nexetChannelsTable)
+      .where(eq(nexetChannelsTable.id, targetChannelId))
       .limit(1);
     if (!channel) {
       res.status(404).json({ error: "Channel not found" });
@@ -1676,11 +1676,11 @@ router.post("/video/arena/watches", async (req: Request, res: Response): Promise
 
   const mine = await db
     .select()
-    .from(tandemArenaWatchesTable)
+    .from(nexetArenaWatchesTable)
     .where(
       and(
-        eq(tandemArenaWatchesTable.userId, userId),
-        eq(tandemArenaWatchesTable.role, body.data.role),
+        eq(nexetArenaWatchesTable.userId, userId),
+        eq(nexetArenaWatchesTable.role, body.data.role),
       ),
     );
   const duplicate = mine.find(
@@ -1692,7 +1692,7 @@ router.post("/video/arena/watches", async (req: Request, res: Response): Promise
   }
 
   const [watch] = await db
-    .insert(tandemArenaWatchesTable)
+    .insert(nexetArenaWatchesTable)
     .values({
       id: randomUUID(),
       userId,
@@ -1719,11 +1719,11 @@ router.delete("/video/arena/watches/:watchId", async (req: Request, res: Respons
   }
 
   const [deleted] = await db
-    .delete(tandemArenaWatchesTable)
+    .delete(nexetArenaWatchesTable)
     .where(
       and(
-        eq(tandemArenaWatchesTable.id, params.data.watchId),
-        eq(tandemArenaWatchesTable.userId, userId),
+        eq(nexetArenaWatchesTable.id, params.data.watchId),
+        eq(nexetArenaWatchesTable.userId, userId),
       ),
     )
     .returning();
