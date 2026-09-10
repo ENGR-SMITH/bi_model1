@@ -718,7 +718,7 @@ function formatDate(value: string) {
 
 // ---------------------------------------------------------------------------
 // Ticket promo codes — the admin surface for the monthly passes. Only FREE
-// codes are accepted at checkout: every plan bills monthly through Paystack,
+// codes are accepted at checkout: every plan bills monthly through Whop,
 // so percent/dollar-off codes (which would discount the first charge) don't
 // apply. Legacy PERCENT/FLAT rows are still listed for history but are not
 // accepted. Codes are created/edited/deleted here; the checkout validates
@@ -746,7 +746,7 @@ function PromosSection({ session }: { session: boolean }) {
         <PageHeading
           eyebrow="Control room / ticket passes"
           title="Manage the promo codes."
-          description="Create and retire the codes the monthly checkout accepts. Only FREE codes apply — every plan bills monthly through Paystack, so percent and dollar-off codes can't discount a subscription. A FREE code grants one free month with no card charge; every code can be shared by many people — each person may redeem it once — and a code that is paused stops working immediately without losing its history."
+          description="Create and retire the codes the monthly checkout accepts. Only FREE codes apply — every plan bills monthly through Whop, so percent and dollar-off codes can't discount a subscription. A FREE code grants one free month with no card charge; every code can be shared by many people — each person may redeem it once — and a code that is paused stops working immediately without losing its history."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
@@ -1444,7 +1444,7 @@ function SubscriptionRow({ sub, updating, onToggle, compact = false }: { sub: Ad
 
 // ---------------------------------------------------------------------------
 // Subscription plan settings — the operational knobs on the code-defined plan
-// catalog. Every Paystack subscription auto-renews by default; this is where
+// catalog. Every Whop subscription auto-renews by default; this is where
 // an admin can switch auto-renewal off for a whole plan. New purchases follow
 // this switch, and the per-subscription toggle in the Subscriptions room
 // overrides an individual row.
@@ -1473,7 +1473,7 @@ function PlanSettingsSection({ session }: { session: boolean }) {
         <PageHeading
           eyebrow="Control room / subscriptions"
           title="Tune the subscription plans."
-          description="Turn server-managed auto-renewal on or off per plan. New purchases follow this switch — every Paystack subscription renews by default unless switched off here (or on an individual subscription in the Subscriptions room)."
+          description="Turn server-managed auto-renewal on or off per plan. New purchases follow this switch — every Whop subscription renews by default unless switched off here (or on an individual subscription in the Subscriptions room)."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}

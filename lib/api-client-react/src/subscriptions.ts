@@ -132,7 +132,7 @@ export function useListSubscriptions<
 
 export const getSubscriptionAutoRenewUrl = (id: string) => `/api/subscriptions/${encodeURIComponent(id)}/auto-renew`;
 
-// Every Paystack subscription auto-renews by default; the server rejects
+// Every Whop subscription auto-renews by default; the server rejects
 // user attempts to change it (403 — only an administrator can turn it off).
 export const setSubscriptionAutoRenew = async (
   body: { id: string; enabled: boolean },

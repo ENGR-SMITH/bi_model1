@@ -67,9 +67,9 @@ if (process.env.CLERK_SECRET_KEY) {
     })),
   );
 }
-// Paystack signs webhook bodies with HMAC-SHA512 over the raw bytes, so the
-// JSON parser stashes the exact request buffer on the request (req.rawBody)
-// while still populating req.body for every other route.
+// Whop signs webhook bodies with HMAC-SHA256 over the raw bytes (Standard
+// Webhooks spec), so the JSON parser stashes the exact request buffer on the
+// request (req.rawBody) while still populating req.body for every other route.
 app.use(express.json({ verify: (req, _res, buf) => { (req as { rawBody?: Buffer }).rawBody = buf; } }));
 app.use(express.urlencoded({ extended: true }));
 

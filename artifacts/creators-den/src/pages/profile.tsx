@@ -21,7 +21,7 @@ import type { VideoContributionDay, VideoProject } from '@workspace/api-client-r
 import { SectionEyebrow } from '@/components/shell';
 import { FollowButton } from '@/pages/explore';
 import { CvCard, StorageBar } from '@/components/account-panel';
-import { PaystackReturnGate } from '@/components/paystack-return';
+import { WhopReturnGate } from '@/components/whop-return';
 import { WorkReviewsCard } from '@/components/work-reviews-card';
 
 // ---------------------------------------------------------------------------
@@ -441,8 +441,8 @@ export default function ProfilePage() {
         Only PUBLIC projects appear on a profile — private vaults never leave the room.
       </p>
 
-      {/* Confirms a Paystack payment when the customer returns from checkout. */}
-      <PaystackReturnGate />
+      {/* Confirms a Whop payment when the customer returns from checkout. */}
+      <WhopReturnGate />
     </div>
   );
 }

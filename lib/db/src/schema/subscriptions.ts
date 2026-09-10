@@ -32,24 +32,19 @@ export const nexetSubscriptionsTable = pgTable("nexet_subscriptions", {
   clerkSubscriptionId: text("clerk_subscription_id"),
   promoCode: text("promo_code"),
   cardLast4: text("card_last_4"),
-  // Server-managed auto-renewal. Every Paystack subscription (pass, storage,
+  // Server-managed auto-renewal. Every Whop subscription (pass, storage,
   // projects) is signed up by default and only an administrator can turn it
   // off. True keeps the card on file, charging every cycle.
   autoRenew: boolean("auto_renew").notNull().default(false),
-  // Paystack card authorization + customer captured on first payment — what
-  // Paystack re-charges each monthly cycle of the subscription.
-  paystackAuthorizationCode: text("paystack_authorization_code"),
-  paystackCustomerCode: text("paystack_customer_code"),
-  paystackEmail: text("paystack_email"),
-  // The Paystack plan this subscription bills on (PLN_…) and the recurring
-  // subscription itself (SUB_…). The email token is required by Paystack's
-  // enable/disable endpoints, which the admin toggle calls.
-  paystackPlanCode: text("paystack_plan_code"),
-  paystackSubscriptionCode: text("paystack_subscription_code"),
-  paystackEmailToken: text("paystack_email_token"),
-  // The Paystack transaction reference that granted this row — makes the
-  // webhook grant idempotent for subscription charges (which have no intent).
-  paystackTransactionReference: text("paystack_transaction_reference"),
+  // The Whop membership (mem_…) this row bills on — Whop re-charges the saved
+  // card each cycle and fires payment.succeeded. The admin toggle flips its
+  // cancel_at_period_end flag instead of calling enable/disable endpoints.
+  whopMembershipId: text("whop_membership_id"),
+  whopPlanId: text("whop_plan_id"),
+  whopEmail: text("whop_email"),
+  // The Whop payment (pay_…) that granted this row — makes the webhook grant
+  // idempotent for subscription charges (which have no intent).
+  whopPaymentId: text("whop_payment_id"),
   // When the last auto-renew charge failed, why (shown on the subscriptions
   // page); cleared when a charge succeeds or the user re-enables.
   renewalFailure: text("renewal_failure"),

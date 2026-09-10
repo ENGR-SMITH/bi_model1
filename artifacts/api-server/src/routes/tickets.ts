@@ -16,7 +16,7 @@ const router: IRouter = Router();
 
 // The category pass: $5.88 per month, per category. One active pass opens the
 // whole category (Author-Writer room / Content-Creators room). Billed monthly
-// through a Paystack subscription plan.
+// through a Whop subscription plan.
 export const PASS_PRICE_USD = 588; // $5.88 in cents
 export const PASS_MONTHS = 1;
 // A visitor without a pass gets ONE 10-minute preview tour per den (a row in
@@ -306,7 +306,7 @@ router.post("/tickets/promo/validate", async (req: Request, res: Response): Prom
 // POST /tickets/purchase — dev/test simulated card checkout for a category
 // pass. The card is validated in-house (Luhn + expiry + cvc), only the last-4
 // is kept, and the ticket is granted immediately. This is NOT a payment rail:
-// real purchases run through Paystack hosted checkout (/paystack/checkout →
+// real purchases run through Whop hosted checkout (/whop/checkout →
 // webhook/verify), which never collects card details. Disabled in production.
 router.post("/tickets/purchase", async (req: Request, res: Response): Promise<void> => {
   const userId = getAuth(req).userId;
@@ -316,9 +316,9 @@ router.post("/tickets/purchase", async (req: Request, res: Response): Promise<vo
   }
 
   // Simulated no-charge checkout — only for local dev and tests. All real
-  // payments run through Paystack, so never allow free grants in production.
+  // payments run through Whop, so never allow free grants in production.
   if (process.env.NODE_ENV === "production") {
-    res.status(403).json({ error: "Payments are processed through Paystack; this simulated checkout is disabled in production." });
+    res.status(403).json({ error: "Payments are processed through Whop; this simulated checkout is disabled in production." });
     return;
   }
 

@@ -23,7 +23,7 @@ import { PASS_PRICE_USD, TICKET_CATEGORIES, type TicketCategory } from "../route
 
 export type SubscriptionKind = "pass" | "storage" | "projects";
 
-/** One subscription period — a month. Every plan bills monthly via Paystack. */
+/** One subscription period — a month. Every plan bills monthly via Whop. */
 export const SUBSCRIPTION_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 /** The billing rhythm every plan shares. */
 export const SUBSCRIPTION_INTERVAL_LABEL = "1 month";
@@ -43,7 +43,7 @@ export interface SubscriptionPlan {
 
 /** Whether a plan kind allows auto-renewal when no admin override exists. */
 function defaultAutoRenewAvailable(_kind: SubscriptionKind): boolean {
-  // Every Paystack subscription auto-renews by default — passes, storage, and
+  // Every Whop subscription auto-renews by default — passes, storage, and
   // project plans alike. Only an admin can turn it off, either here (per
   // plan) or on an individual subscription row.
   return true;
@@ -75,8 +75,8 @@ export async function subscriptionPlans(): Promise<SubscriptionPlan[]> {
     return row ? row.autoRenewAvailable : defaultAutoRenewAvailable(kind);
   };
 
-  // Every plan bills monthly through a Paystack subscription plan — the pass
-  // and the storage/project extensions all share the same one-month rhythm.
+  // Every plan bills monthly through a Whop renewal plan — the pass and the
+  // storage/project extensions all share the same one-month rhythm.
   const passes: SubscriptionPlan[] = TICKET_CATEGORIES.map((category) => ({
     kind: "pass",
     planId: category,
@@ -123,7 +123,7 @@ function formatBytes(bytes: number): string {
 /**
  * Resolve a purchasable product (kind + planId) to its catalog fields, or
  * null when the kind/plan combination is unknown. Shared by the card checkout
- * and the Paystack checkout so a plan always prices the same everywhere.
+ * and the Whop checkout so a plan always prices the same everywhere.
  */
 export function resolveSubscriptionProduct(
   kind: SubscriptionKind,
@@ -179,13 +179,10 @@ export interface RecordSubscriptionInput {
   promoCode?: string | null;
   cardLast4?: string | null;
   autoRenew?: boolean;
-  paystackAuthorizationCode?: string | null;
-  paystackCustomerCode?: string | null;
-  paystackEmail?: string | null;
-  paystackPlanCode?: string | null;
-  paystackSubscriptionCode?: string | null;
-  paystackEmailToken?: string | null;
-  paystackTransactionReference?: string | null;
+  whopMembershipId?: string | null;
+  whopPlanId?: string | null;
+  whopEmail?: string | null;
+  whopPaymentId?: string | null;
 }
 
 /** Inserts a subscription record for an entitlement that was just granted. */
@@ -207,13 +204,10 @@ export async function recordSubscription(input: RecordSubscriptionInput): Promis
     promoCode: input.promoCode ?? null,
     cardLast4: input.cardLast4 ?? null,
     autoRenew: input.autoRenew === true,
-    paystackAuthorizationCode: input.paystackAuthorizationCode ?? null,
-    paystackCustomerCode: input.paystackCustomerCode ?? null,
-    paystackEmail: input.paystackEmail ?? null,
-    paystackPlanCode: input.paystackPlanCode ?? null,
-    paystackSubscriptionCode: input.paystackSubscriptionCode ?? null,
-    paystackEmailToken: input.paystackEmailToken ?? null,
-    paystackTransactionReference: input.paystackTransactionReference ?? null,
+    whopMembershipId: input.whopMembershipId ?? null,
+    whopPlanId: input.whopPlanId ?? null,
+    whopEmail: input.whopEmail ?? null,
+    whopPaymentId: input.whopPaymentId ?? null,
   });
   return id;
 }
@@ -240,16 +234,12 @@ export interface ApplySubscriptionPurchaseInput {
   source?: "checkout" | "clerk";
   /** Sign this subscription up for server-managed auto-renewal (pass only). */
   autoRenew?: boolean;
-  /** Card authorization + customer details kept for renewals (paystack). */
-  paystackAuthorizationCode?: string | null;
-  paystackCustomerCode?: string | null;
-  paystackEmail?: string | null;
-  /** The Paystack plan + recurring subscription this row bills on. */
-  paystackPlanCode?: string | null;
-  paystackSubscriptionCode?: string | null;
-  paystackEmailToken?: string | null;
-  /** The Paystack charge that granted this row (idempotency for webhooks). */
-  paystackTransactionReference?: string | null;
+  /** The Whop membership + plan this row bills on. */
+  whopMembershipId?: string | null;
+  whopPlanId?: string | null;
+  whopEmail?: string | null;
+  /** The Whop payment that granted this row (idempotency for webhooks). */
+  whopPaymentId?: string | null;
   /** When this purchase is an auto-renewal of an existing row, the id of the
       row being renewed — cleared of auto-renew so only the newest record is
       the live renewal (one charge chain per pass). */
@@ -267,21 +257,21 @@ export interface AppliedSubscription {
  * stacks onto the current pass, or extra storage/projects on the account
  * quota), records the subscription, and bumps the promo code's use count.
  * This is the single grant point used by every checkout path (the card
- * checkout, the Paystack webhook, and the Paystack verify-on-return), so a
- * paid plan always lands the same way.
+ * checkout, the Whop webhook, and the Whop confirm-on-return), so a paid
+ * plan always lands the same way.
  */
 /**
  * True when a granted subscription should carry the auto-renewal flag: the
- * checkout signed the customer up for a Paystack plan (autoRenew is on unless
- * an admin turned it off for the plan), or this row is the renewal of an
- * existing auto-renewing chain. Paystack holds the card and bills the plan on
+ * checkout signed the customer up for a Whop renewal plan (autoRenew is on
+ * unless an admin turned it off for the plan), or this row is the renewal of
+ * an existing auto-renewing chain. Whop holds the card and bills the plan on
  * its own, so no local authorization code is required. Applies to every kind
  * — passes, storage, and projects.
  */
 function shouldAutoRenew(input: {
   kind: SubscriptionKind;
   autoRenew?: boolean;
-  paystackAuthorizationCode?: string | null;
+  whopMembershipId?: string | null;
   renewsSubscriptionId?: string | null;
 }): boolean {
   if (input.renewsSubscriptionId) return true; // a renewal of an auto-renew row
@@ -363,13 +353,10 @@ export async function applySubscriptionPurchase(
     promoCode: input.promoCode ?? null,
     cardLast4: input.cardLast4 ?? null,
     autoRenew,
-    paystackAuthorizationCode: input.paystackAuthorizationCode ?? null,
-    paystackCustomerCode: input.paystackCustomerCode ?? null,
-    paystackEmail: input.paystackEmail ?? null,
-    paystackPlanCode: input.paystackPlanCode ?? null,
-    paystackSubscriptionCode: input.paystackSubscriptionCode ?? null,
-    paystackEmailToken: input.paystackEmailToken ?? null,
-    paystackTransactionReference: input.paystackTransactionReference ?? null,
+    whopMembershipId: input.whopMembershipId ?? null,
+    whopPlanId: input.whopPlanId ?? null,
+    whopEmail: input.whopEmail ?? null,
+    whopPaymentId: input.whopPaymentId ?? null,
   });
 
   // The row this renewal extended stops being the live auto-renew record —

@@ -1923,7 +1923,7 @@ export const GetAccountQuotaResponse = zod.object({
 
 
 /**
- * Extends the account's storage or project limit by the purchased plan. Real purchases are paid through Paystack (POST /paystack/checkout) and granted server-side; this dev/test endpoint applies the plan without a charge and is disabled in production.
+ * Extends the account's storage or project limit by the purchased plan. Real purchases are paid through Whop (POST /whop/checkout) and granted server-side; this dev/test endpoint applies the plan without a charge and is disabled in production.
  * @summary Apply a buy-more plan to the account
  */
 export const PurchaseAccountQuotaBody = zod.object({
@@ -2073,7 +2073,7 @@ export const ValidateTicketPromoResponse = zod.object({
 
 
 /**
- * Dev/test simulated checkout for a category pass: validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass. Only the card's last-4 is stored and no real charge is made — production purchases run through Paystack hosted checkout, and this endpoint is disabled in production.
+ * Dev/test simulated checkout for a category pass: validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass. Only the card's last-4 is stored and no real charge is made — production purchases run through Whop hosted checkout, and this endpoint is disabled in production.
  * @summary Buy a category pass with a credit card
  */
 export const PurchaseTicketBody = zod.object({

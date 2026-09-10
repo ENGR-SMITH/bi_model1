@@ -18,7 +18,7 @@ optional video workers and a desktop agent. Everything you deploy comes from
 
 | Unit | Source | What it is | Needs at runtime |
 |------|--------|------------|------------------|
-| **API server** | `artifacts/api-server` | Express 5 REST API + Socket.IO realtime + Clerk auth + Paystack webhooks + video job queue + Oracle admin backend | Node 24, Postgres, **ffmpeg/ffprobe** for real video, R2, optional Redis |
+| **API server** | `artifacts/api-server` | Express 5 REST API + Socket.IO realtime + Clerk auth + Whop webhooks + video job queue + Oracle admin backend | Node 24, Postgres, **ffmpeg/ffprobe** for real video, R2, optional Redis |
 | **Nexet** | `artifacts/nexet` | Main hub SPA, served at `/` | Static files only |
 | **Author Den** | `artifacts/authors-den` | Writing studio SPA, served at `/authors-den/` | Static files only |
 | **Creator Den** | `artifacts/creators-den` | Video platform SPA, served at `/creators-den/` | Static files only |
@@ -57,7 +57,7 @@ else to this app").
                                          │
               ┌──────────────────────────┼──────────────────────────┐
               ▼                          ▼                          ▼
-        Supabase Postgres          Cloudflare R2              Clerk / Paystack
+        Supabase Postgres          Cloudflare R2              Clerk / Whop
         (DATABASE_URL)             (video files)              (auth / payments)
 ```
 
@@ -73,7 +73,7 @@ else to this app").
 | 2 | **Render** — the app host | One Docker container running nginx (the 4 SPAs + router) **and** the Node API server together, under one origin | Runs the Express API + Socket.IO + the in-process video worker, with ffmpeg installed. Render has **no request-body cap** (unlike Cloud Run's 32 MiB), so the browser upload path (multer, up to the UI's 500 MB cap) works as-is. Paid instance types support WebSockets. `Standard` (2 GB / 1 CPU, $25/mo) is the right size. |
 | 3 | **Cloudflare R2** | S3-compatible object storage, zero egress | Video proxies, renders, exports, bundles, thumbnails. Already fully integrated (presigned URLs + AWS SDK). Supabase Storage could replace it later (also S3-compatible) but the code is wired for R2 today. |
 | 4 | **Clerk** | Authentication + admin magic links | Already integrated in every app. Provides the email the Oracle Admin magic-link login runs on — no SMTP provider needed. |
-| 5 | **Paystack** | USD card payments + webhooks | All paid entitlements (subscriptions, tickets, storage). Webhook URL must point at your API server. |
+| 5 | **Whop** | USD card payments + webhooks (hosted checkout) | All paid entitlements (subscriptions, tickets, storage). Webhook URL must point at your API server. |
 | 6 | **Domain: registrar (Porkbun / Cloudflare Registrar) + Cloudflare DNS** | `app.yourdomain.com` | Everything hangs off one public origin. Register cheaply (Porkbun) or at cost (Cloudflare Registrar, same account as R2); keep DNS at Cloudflare. One `CNAME app →` your Render URL handles the rest; Render issues the TLS certificate. |
 | 7 | **GitHub Actions** | CI/CD for the desktop agent | Two workflows already exist (`build-desktop-agent.yml`, `desktop-agent-windows.yml`). The web app + API deploy needs no workflow — Render deploys straight from the git repo. |
 
@@ -152,7 +152,7 @@ Render services behind the same domain — but only after Redis is in.
 
 - [ ] Repo pushed to GitHub (`ENGR-SMITH/bi_model1`)
 - [ ] A domain you control (or a subdomain like `app.yourdomain.com`)
-- [ ] Accounts: Supabase, Cloudflare, Clerk, Paystack, Render
+- [ ] Accounts: Supabase, Cloudflare, Clerk, Whop, Render
 
 ### Phase 1 — Supabase (the database)
 
@@ -168,9 +168,9 @@ Render services behind the same domain — but only after Redis is in.
    ```
    > Alternative (no drizzle-kit on the box): apply the SQL migrations in
    > `lib/db/migrations/*.sql` in order via the Supabase **SQL Editor** or
-   > `psql "$DATABASE_URL" -f lib/db/migrations/0012_paystack_plans.sql` etc.
+   > `psql "$DATABASE_URL" -f lib/db/migrations/0014_whop_payments.sql` etc.
 4. **Verify:** `\dt` shows tables like `nexet_subscriptions`,
-   `nexet_paystack_plans`, `nexet_promo_codes`, `nexet_video_jobs`.
+   `nexet_whop_plans`, `nexet_promo_codes`, `nexet_video_jobs`.
 
 > Note: Supabase's own auth/storage/realtime features are **not** used — you
 > only consume it as a Postgres server. Do not enable RLS or touch its auth
@@ -270,7 +270,10 @@ CLERK_SECRET_KEY=sk_live_...
 CORS_ORIGINS=https://app.yourdomain.com        # all origins that call the API
 ADMIN_EMAIL=you@yourdomain.com
 SESSION_SECRET=<openssl rand -hex 32>
-PAYSTACK_SECRET_KEY=sk_live_...
+WHOP_API_KEY=whop_...
+WHOP_ACCOUNT_ID=biz_...
+WHOP_PRODUCT_ID=prod_...
+WHOP_WEBHOOK_SECRET=ws_...
 
 # Storage (video) — optional but recommended
 CF_ACCOUNT_ID=...
@@ -302,10 +305,11 @@ CF_R2_SECRET_KEY=...
      `/sign-in`, `/sign-up` paths).
    - **Email verification link** enabled, and **"Require the same device and
      browser" turned OFF** (magic links must work from any browser).
-2. **Paystack** (dashboard → Settings → API Keys & Webhooks):
-   - Webhook URL → `https://<api-host>/api/paystack/webhook` (Test *and* Live).
-   - Live keys only after business activation; **USD settlement** (international
-     payments + Zenith USD account) or USD charges fail.
+2. **Whop** (dashboard → Developer):
+   - Account API key (`whop_…`), Account ID (`biz_…`), Product ID (`prod_…`).
+   - Webhook URL → `https://<api-host>/api/whop/webhook`, events `payment.*` +
+     `membership.*`; copy the `ws_…` signing secret (shown once).
+   - Live keys only after business activation/KYC; test in the Whop sandbox first.
 3. **Cloudflare R2**: bucket + API token (Object Read & Write) → the four
    `CF_*` vars above. Public bucket URL → `VITE_AGENT_DOWNLOAD_URL` if you ship
    the desktop agent.
@@ -323,8 +327,8 @@ CF_R2_SECRET_KEY=...
 - [ ] A **large browser upload (e.g. 200 MB) succeeds** — no request-body cap
       on Render (this would have failed on Cloud Run's 32 MiB limit)
 - [ ] Oracle Admin: magic-link login with `ADMIN_EMAIL`, provider keys save
-- [ ] Test-mode Paystack checkout completes → subscription row created, webhook
-      grants entitlement, auto-renew plan exists on Paystack
+- [ ] Sandbox Whop checkout completes → subscription row created, webhook
+      grants entitlement, auto-renew membership exists on Whop
 - [ ] A video upload produces a real ffmpeg proxy (log shows `demo: false`)
 - [ ] DB rows visible in Supabase (subscriptions, video jobs, promo codes)
 
@@ -346,8 +350,8 @@ CF_R2_SECRET_KEY=...
    Author Den at `/authors-den/`, Creator Den at `/creators-den/`, Oracle
    Admin at `/oracle-admin/`, API at `/api`.
 6. **Remember to update Clerk redirect URLs** (`https://app.yourdomain.com`
-   and `/oracle-admin/verify`) and **Paystack webhook**
-   (`https://app.yourdomain.com/api/paystack/webhook`) once the domain is live.
+   and `/oracle-admin/verify`) and the **Whop webhook**
+   (`https://app.yourdomain.com/api/whop/webhook`) once the domain is live.
 
 ---
 

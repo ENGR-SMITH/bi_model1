@@ -76,8 +76,8 @@ router.get("/subscriptions", async (req: Request, res: Response): Promise<void> 
 // product (category pass, storage plan, or project plan). The card is
 // validated in-house (Luhn + expiry + cvc), only the last-4 is kept, and the
 // entitlement is granted immediately. This is NOT a payment rail: real
-// purchases go through Paystack hosted checkout (/paystack/checkout →
-// webhook/verify), which grants through the same applySubscriptionPurchase
+// purchases go through Whop hosted checkout (/whop/checkout →
+// webhook/confirm), which grants through the same applySubscriptionPurchase
 // helper and never collects card details. Disabled in production.
 router.post("/subscriptions/purchase", async (req: Request, res: Response): Promise<void> => {
   const userId = getAuth(req).userId;
@@ -87,9 +87,9 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
   }
 
   // Simulated no-charge checkout — only for local dev and tests. All real
-  // payments run through Paystack, so never allow free grants in production.
+  // payments run through Whop, so never allow free grants in production.
   if (process.env.NODE_ENV === "production") {
-    res.status(403).json({ error: "Payments are processed through Paystack; this simulated checkout is disabled in production." });
+    res.status(403).json({ error: "Payments are processed through Whop; this simulated checkout is disabled in production." });
     return;
   }
 
@@ -109,7 +109,7 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
   }
   const kind = rawKind as SubscriptionKind;
 
-  // Resolve the product + price (shared with the Paystack checkout).
+  // Resolve the product + price (shared with the Whop checkout).
   const product = resolveSubscriptionProduct(kind, planId);
   if (!product) {
     res.status(400).json({ error: unknownProductMessage(kind, planId) });
@@ -166,7 +166,7 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
   });
 });
 
-// PATCH /subscriptions/:id/auto-renew — reserved for the admin. Every Paystack
+// PATCH /subscriptions/:id/auto-renew — reserved for the admin. Every Whop
 // subscription auto-renews by default and customers cannot switch it off;
 // only the admin (via /admin/subscriptions/:id/auto-renew or the per-plan
 // setting) can stop renewals. The route exists so a stale client call fails
@@ -178,7 +178,7 @@ router.patch("/subscriptions/:id/auto-renew", async (req: Request, res: Response
     return;
   }
   res.status(403).json({
-    error: "Automatic renewal is always on for Paystack subscriptions — only an administrator can turn it off.",
+    error: "Automatic renewal is always on for Whop subscriptions — only an administrator can turn it off.",
   });
 });
 

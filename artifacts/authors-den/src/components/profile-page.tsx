@@ -7,7 +7,7 @@ import {
   getGetUserCvQueryKey,
   getSubscriptionPlansQueryKey,
   getUserCvFile,
-  useCreatePaystackCheckout,
+  useCreateWhopCheckout,
   useDeleteUserCv,
   useGetAccountQuota,
   useGetUserCv,
@@ -90,8 +90,8 @@ export function ProfilePage({ projectCount }: { projectCount: number }) {
 }
 
 // The buy-more projects modal — $5/10, $20/50, $50/200 as specified. Picking a
-// plan opens Paystack's hosted checkout (USD); when the customer returns to the
-// app, the PaystackReturnGate confirms the charge and the bar refreshes. Also
+// plan opens Whop's hosted checkout (USD); when the customer returns to the
+// app, the WhopReturnGate confirms the charge and the bar refreshes. Also
 // rendered app-wide when a create/duplicate hits the limit.
 export function BuyProjectsModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -105,7 +105,7 @@ export function BuyProjectsModal({ onClose }: { onClose: () => void }) {
     void queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
   };
 
-  const checkout = useCreatePaystackCheckout({
+  const checkout = useCreateWhopCheckout({
     mutation: {
       onSuccess: (res) => {
         if (res.granted) {
@@ -148,7 +148,7 @@ export function BuyProjectsModal({ onClose }: { onClose: () => void }) {
         <button type="button" className="modal-close" onClick={onClose} disabled={busy} aria-label="Close"><X size={16} /></button>
         <span className="eyebrow">WORK PROJECTS</span>
         <h2>Buy more projects.</h2>
-        <p>Pick a plan — Paystack handles the payment (USD). You&apos;ll come back here when it&apos;s done and the bar updates.</p>
+        <p>Pick a plan — Whop handles the payment (USD). You&apos;ll come back here when it&apos;s done and the bar updates.</p>
         <div className="plan-grid" data-testid="plan-grid-projects">
           {plans.map((plan) => (
             <button
@@ -166,7 +166,7 @@ export function BuyProjectsModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <p className="profile-footnote mt-3" style={{ display: "flex", gap: 6 }}>
-          <Lock size={13} /> Secure checkout by Paystack — no card details ever pass through this site.
+          <Lock size={13} /> Secure checkout by Whop — no card details ever pass through this site.
         </p>
         {error && <p className="buy-error" role="alert">{error}</p>}
         <button

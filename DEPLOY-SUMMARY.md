@@ -4,7 +4,7 @@
 
 One repo, one API server, four SPAs, optional video workers, optional desktop agent.
 
-- **API server** — `artifacts/api-server`. Express 5 + Socket.IO + Clerk proxy/auth + Paystack hosted checkout/webhooks + video job queue + YouTube channel analytics sync + storage metering/retention + Story Oracle AI routing. Built by `build.mjs` (esbuild) into `dist/index.mjs` and `dist/workers/*`.
+- **API server** — `artifacts/api-server`. Express 5 + Socket.IO + Clerk proxy/auth + Whop hosted checkout/webhooks + video job queue + YouTube channel analytics sync + storage metering/retention + Story Oracle AI routing. Built by `build.mjs` (esbuild) into `dist/index.mjs` and `dist/workers/*`.
 - **Four SPAs** — `artifacts/nexet` (main hub, `/`), `artifacts/authors-den` (`/authors-den/`), `artifacts/creators-den` (`/creators-den/`), `artifacts/oracle-admin` (`/oracle-admin/`). All Vite + React + Clerk + TanStack Query.
 - **Desktop agent** — `artifacts/desktop-agent`. Electron app, loopback control server on port 41737, FFmpeg proxy generation, R2 upload via presigned URLs, browser-based Clerk sign-in via the web app's `/creators-den/agent-signin`.
 - **Mockup sandbox** — `artifacts/mockup-sandbox`. Standalone UI scratchpad, not part of the core product.
@@ -96,7 +96,7 @@ At minimum for a bootable production deploy:
 
 Optional, depending on which features you want live on day one:
 
-- `PAYSTACK_SECRET_KEY=sk_live_...`
+- `WHOP_API_KEY=whop_...`, `WHOP_ACCOUNT_ID=biz_...`, `WHOP_PRODUCT_ID=prod_...`, `WHOP_WEBHOOK_SECRET=ws_...`
 - `CF_ACCOUNT_ID`, `CF_R2_ACCESS_KEY`, `CF_R2_SECRET_KEY`, `CF_R2_BUCKET`
 - `VIDEO_UPLOAD_DIR` if you want uploads on a Render Disk path
 - `YOUTUBE_OAUTH_CLIENT_ID`, `YOUTUBE_OAUTH_CLIENT_SECRET`, `YOUTUBE_DATA_API_KEY`, `YOUTUBE_REDIRECT_URI`
@@ -159,7 +159,7 @@ The Oracle Admin build does not need `VITE_CLERK_PUBLISHABLE_KEY` because it rea
 
 ## What will not work until you add it
 
-- Real payments until `PAYSTACK_SECRET_KEY` is set and the webhook is registered.
+- Real payments until `WHOP_API_KEY` (+ account/product ids + webhook secret) is set and the webhook is registered.
 - Durable video storage until R2 is configured or a Render Disk is attached to `VIDEO_UPLOAD_DIR`.
 - YouTube channel sync until the YouTube env vars are set and the OAuth redirect URI is registered with Google.
 - Story Oracle AI routing until at least one provider is configured in Oracle Admin.
@@ -168,11 +168,11 @@ The Oracle Admin build does not need `VITE_CLERK_PUBLISHABLE_KEY` because it rea
 ## What to do after the service is live
 
 1. Point Clerk at the deployed domain. Once you have the Render URL or a custom domain, add those origins to your Clerk instance as allowed origins / redirect URLs.
-2. Point Paystack at the deployed webhook:
+2. Point Whop at the deployed webhook:
    ```
-   https://<your-render-url>/api/paystack/webhook
+   https://<your-render-url>/api/whop/webhook
    ```
-3. Add a custom domain if you want one. After the domain is live, update `CORS_ORIGINS` if you added a new origin, and update Clerk and Paystack URLs to match.
+3. Add a custom domain if you want one. After the domain is live, update `CORS_ORIGINS` if you added a new origin, and update Clerk and Whop URLs to match.
 4. Decide on uploads. By default `VIDEO_UPLOAD_DIR` lives on the container filesystem. If you expect real upload traffic, attach a Render Disk and set `VIDEO_UPLOAD_DIR` to a path on that disk. If you also configure R2, the durable copies survive restarts regardless.
 
 ## How the app behaves if something is missing

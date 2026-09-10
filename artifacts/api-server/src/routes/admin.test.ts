@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
   db: null as any,
   tables: null as any,
   emails: {} as Record<string, string>,
-  paystackCalls: [] as Array<{ method: string; url: string; body?: any }>,
+  whopCalls: [] as Array<{ method: string; url: string; body?: any }>,
 }));
 
 vi.mock("@clerk/express", () => ({
@@ -80,19 +80,19 @@ async function resetDb() {
   await state.db.delete(t.oracleProvidersTable);
   state.emails = {};
   state.userId = null;
-  state.paystackCalls = [];
+  state.whopCalls = [];
 }
 
-/** Stub the Paystack subscription enable/disable endpoints. */
-function stubPaystackSubscriptions() {
+/** Stub the Whop membership cancel/resume endpoint. */
+function stubWhopMemberships() {
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: any) => {
-      state.paystackCalls.push({ method: init?.method ?? "GET", url: String(url), body: init?.body ? JSON.parse(init.body) : undefined });
+      state.whopCalls.push({ method: init?.method ?? "GET", url: String(url), body: init?.body ? JSON.parse(init.body) : undefined });
       return {
         ok: true,
         status: 200,
-        text: async () => JSON.stringify({ status: true, message: "ok" }),
+        text: async () => JSON.stringify({ id: "mem_abc123" }),
       };
     }),
   );
@@ -100,14 +100,16 @@ function stubPaystackSubscriptions() {
 
 beforeEach(async () => {
   process.env.ADMIN_EMAIL = "admin@example.com";
-  process.env.PAYSTACK_SECRET_KEY = "sk_test_secret_key";
+  process.env.WHOP_API_KEY = "whop_test_api_key";
+  process.env.WHOP_ACCOUNT_ID = "biz_test";
   await resetDb();
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.ADMIN_EMAIL;
-  delete process.env.PAYSTACK_SECRET_KEY;
+  delete process.env.WHOP_API_KEY;
+  delete process.env.WHOP_ACCOUNT_ID;
 });
 
 describe("admin access", () => {
@@ -437,7 +439,7 @@ describe("admin subscriptions", () => {
     await seedSubscription({
       id: "sub-new",
       autoRenew: true,
-      paystackAuthorizationCode: "auth_123",
+      whopMembershipId: "mem_123",
       cardLast4: "4081",
       createdAt: new Date(2000),
     });
@@ -467,36 +469,35 @@ describe("admin subscriptions", () => {
     expect(res.body[0].userEmail).toBeNull();
   });
 
-  it("toggles auto-renew on and off for one subscription (any kind), telling Paystack", async () => {
+  it("toggles auto-renew on and off for one subscription (any kind), telling Whop", async () => {
     const cookie = await login();
-    stubPaystackSubscriptions();
+    stubWhopMemberships();
     await seedSubscription({
       id: "sub-1",
-      paystackSubscriptionCode: "SUB_abc123",
-      paystackEmailToken: "tok_abc",
-      paystackAuthorizationCode: "auth_123",
+      whopMembershipId: "mem_abc123",
     });
 
-    // Turning it off disables the Paystack subscription so charges stop.
+    // Turning it off sets cancel_at_period_end on the Whop membership so
+    // charges stop at the end of the current period.
     const off = await request(API)
       .patch("/api/admin/subscriptions/sub-1/auto-renew")
       .set("Cookie", cookie)
       .send({ enabled: false });
     expect(off.status).toBe(200);
     expect(off.body.autoRenew).toBe(false);
-    expect(state.paystackCalls).toContainEqual(
-      expect.objectContaining({ url: "https://api.paystack.co/subscription/disable", body: { code: "SUB_abc123", token: "tok_abc" } }),
+    expect(state.whopCalls).toContainEqual(
+      expect.objectContaining({ url: "https://api.whop.com/api/v1/memberships/mem_abc123", method: "PATCH", body: { cancel_at_period_end: true } }),
     );
 
-    // Turning it back on resumes the same subscription.
+    // Turning it back on resumes the same membership.
     const on = await request(API)
       .patch("/api/admin/subscriptions/sub-1/auto-renew")
       .set("Cookie", cookie)
       .send({ enabled: true });
     expect(on.status).toBe(200);
     expect(on.body.autoRenew).toBe(true);
-    expect(state.paystackCalls).toContainEqual(
-      expect.objectContaining({ url: "https://api.paystack.co/subscription/enable", body: { code: "SUB_abc123", token: "tok_abc" } }),
+    expect(state.whopCalls).toContainEqual(
+      expect.objectContaining({ url: "https://api.whop.com/api/v1/memberships/mem_abc123", method: "PATCH", body: { cancel_at_period_end: false } }),
     );
 
     // Storage subscriptions can be toggled by the admin too.
@@ -507,8 +508,7 @@ describe("admin subscriptions", () => {
       planLabel: "200 GB more space",
       priceUsd: 2000,
       intervalLabel: "1 month",
-      paystackSubscriptionCode: "SUB_storage",
-      paystackEmailToken: "tok_storage",
+      whopMembershipId: "mem_storage",
     });
     const storageOff = await request(API)
       .patch("/api/admin/subscriptions/sub-storage/auto-renew")
@@ -518,7 +518,7 @@ describe("admin subscriptions", () => {
     expect(storageOff.body.autoRenew).toBe(false);
   });
 
-  it("refuses to enable auto-renew without a linked Paystack subscription", async () => {
+  it("refuses to enable auto-renew without a linked Whop membership", async () => {
     const cookie = await login();
     await seedSubscription({ id: "sub-nolink" });
 
@@ -527,7 +527,7 @@ describe("admin subscriptions", () => {
       .set("Cookie", cookie)
       .send({ enabled: true });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/Paystack subscription is linked/i);
+    expect(res.body.error).toMatch(/Whop membership is linked/i);
   });
 
   it("rejects unknown ids, unlinked rows, and unauthenticated callers", async () => {
@@ -541,7 +541,7 @@ describe("admin subscriptions", () => {
       intervalLabel: "1 month",
     });
 
-    // A storage row without a Paystack subscription cannot be turned on.
+    // A storage row without a Whop membership cannot be turned on.
     const nonPass = await request(API)
       .patch("/api/admin/subscriptions/sub-storage/auto-renew")
       .set("Cookie", cookie)

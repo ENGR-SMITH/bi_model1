@@ -1653,7 +1653,7 @@ paths:
       operationId: purchaseAccountQuota
       tags: [account]
       summary: Apply a buy-more plan to the account
-      description: Extends the account's storage or project limit by the purchased plan. Real purchases are paid through Paystack (POST /paystack/checkout) and granted server-side; this dev/test endpoint applies the plan without a charge and is disabled in production.
+      description: Extends the account's storage or project limit by the purchased plan. Real purchases are paid through Whop (POST /whop/checkout) and granted server-side; this dev/test endpoint applies the plan without a charge and is disabled in production.
       requestBody:
         required: true
         content:
@@ -1823,7 +1823,7 @@ paths:
       operationId: purchaseTicket
       tags: [nexets]
       summary: Buy a category pass with a credit card
-      description: "Dev/test simulated checkout for a category pass: validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass. Only the card's last-4 is stored and no real charge is made — production purchases run through Paystack hosted checkout, and this endpoint is disabled in production."
+      description: "Dev/test simulated checkout for a category pass: validates the card (Luhn, expiry, cvc) and optional promo code, then grants or extends the 3-week pass. Only the card's last-4 is stored and no real charge is made — production purchases run through Whop hosted checkout, and this endpoint is disabled in production."
       requestBody:
         required: true
         content:
@@ -5417,7 +5417,7 @@ components:
     AdminPromoInput:
       type: object
       # Only FREE codes are accepted at checkout — every plan bills monthly
-      # through Paystack, so percent/dollar-off codes can't discount a
+      # through Whop, so percent/dollar-off codes can't discount a
       # subscription. New codes must be kind=FREE (the API rejects others).
       description: Create a promo code. New codes must be FREE — percent and dollar-off codes don't apply to monthly subscriptions.
       properties:
@@ -5458,7 +5458,7 @@ components:
         planLabel: { type: string }
         priceUsd: { type: integer }
         intervalLabel: { type: string }
-        # Whether this plan's purchases auto-renew by default. Every Paystack
+        # Whether this plan's purchases auto-renew by default. Every Whop
         # subscription (pass, storage, projects) renews automatically unless an
         # admin switches it off here; only rows in
         # nexet_subscription_plan_settings override the default.

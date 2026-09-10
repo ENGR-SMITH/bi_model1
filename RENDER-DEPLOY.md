@@ -56,11 +56,11 @@ From the Clerk dashboard:
 
 After the service is live and you have a domain, add the deployed origins as allowed sign-in URLs / redirect URLs in Clerk. Until then the dev/placeholder origins will not match.
 
-### 4. Paystack only if you want real payments
+### 4. Whop only if you want real payments
 
-If you want real hosted checkout and webhooks, set `PAYSTACK_SECRET_KEY` on the Render service. The app can still boot without it, but real Paystack checkouts and webhook handling need it. If you are not ready for that, leave it unset and the Paystack paths will not function as production payments.
+If you want real hosted checkout and webhooks, set the four Whop variables on the Render service: `WHOP_API_KEY` (`whop_...`), `WHOP_ACCOUNT_ID` (`biz_...`), `WHOP_PRODUCT_ID` (`prod_...`), and `WHOP_WEBHOOK_SECRET` (`ws_...`). The app can still boot without them, but real Whop checkouts and webhook handling need them. If you are not ready for that, leave them unset and the Whop paths will not function as production payments.
 
-If you set it, use the live secret (`sk_live_...`) on the production service, and set the Paystack webhook URL to your deployed `/api/paystack/webhook` once the domain is live.
+If you set them, use the live keys on the production service (test in the Whop sandbox first), and set the Whop webhook URL to your deployed `/api/whop/webhook` once the domain is live.
 
 ### 5. Cloudflare R2 only if you want durable video storage
 
@@ -114,7 +114,7 @@ At minimum for a bootable production deploy:
 
 Optional, depending on which features you want live on day one:
 
-- `PAYSTACK_SECRET_KEY=sk_live_...`
+- `WHOP_API_KEY=whop_...`, `WHOP_ACCOUNT_ID=biz_...`, `WHOP_PRODUCT_ID=prod_...`, `WHOP_WEBHOOK_SECRET=ws_...`
 - `CF_ACCOUNT_ID`, `CF_R2_ACCESS_KEY`, `CF_R2_SECRET_KEY`, `CF_R2_BUCKET`
 - `VIDEO_UPLOAD_DIR` if you want uploads on a Render Disk path
 - `YOUTUBE_OAUTH_CLIENT_ID`, `YOUTUBE_OAUTH_CLIENT_SECRET`, `YOUTUBE_DATA_API_KEY`, `YOUTUBE_REDIRECT_URI`
@@ -180,19 +180,19 @@ The Oracle Admin build does not need `VITE_CLERK_PUBLISHABLE_KEY` because it rea
 
 Once you have the Render URL or a custom domain, add those origins to your Clerk instance as allowed origins / redirect URLs. Until they match, sign-in flows from the deployed apps will not complete.
 
-### 2. Point Paystack at the deployed webhook
+### 2. Point Whop at the deployed webhook
 
-If you enabled Paystack, set the webhook URL in the Paystack dashboard to:
+If you enabled Whop, set the webhook URL in the Whop dashboard (Developer → Webhooks) to:
 
 ```
-https://<your-render-url>/api/paystack/webhook
+https://<your-render-url>/api/whop/webhook
 ```
 
 Replace `<your-render-url>` with the actual deployed origin.
 
 ### 3. Add a custom domain if you want one
 
-Add the domain in Render, then point your DNS to Render. After the domain is live, update `CORS_ORIGINS` if you added a new origin, and update Clerk and Paystack URLs to match.
+Add the domain in Render, then point your DNS to Render. After the domain is live, update `CORS_ORIGINS` if you added a new origin, and update Clerk and Whop URLs to match.
 
 ### 4. Decide on uploads
 
@@ -200,7 +200,7 @@ By default `VIDEO_UPLOAD_DIR` lives on the container filesystem. That is fine fo
 
 ## What will not work until you add it
 
-- Real payments until `PAYSTACK_SECRET_KEY` is set and the webhook is registered.
+- Real payments until the `WHOP_*` vars are set and the webhook is registered.
 - Durable video storage until R2 is configured or a Render Disk is attached to `VIDEO_UPLOAD_DIR`.
 - YouTube channel sync until the YouTube env vars are set and the OAuth redirect URI is registered with Google.
 - Story Oracle AI routing until at least one provider is configured in Oracle Admin.

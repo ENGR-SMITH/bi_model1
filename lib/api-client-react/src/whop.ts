@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
-// Paystack — hand-written react-query hooks for the hosted-checkout flow.
+// Whop — hand-written react-query hooks for the hosted-checkout flow.
 // Mirrors the generated Orval hook shape so the apps can use these exactly
 // like the generated hooks. No card details are ever collected client-side:
-// checkout returns a Paystack authorization URL the app redirects to, and
-// confirm is called from the return page once the customer is back.
+// checkout returns a Whop purchase URL the app redirects to, and confirm is
+// called from the return page once the customer is back.
 // ---------------------------------------------------------------------------
 
 import { useMutation } from "@tanstack/react-query";
@@ -18,166 +18,166 @@ import type { ErrorType } from "./custom-fetch";
 
 export type SubscriptionKind = "pass" | "storage" | "projects";
 
-export type PaystackCheckoutInput = {
+export type WhopCheckoutInput = {
   kind: SubscriptionKind;
   planId: string;
   promoCode?: string;
-  /** Where Paystack should send the customer after paying (their own page). */
+  /** Where Whop should send the customer after paying (their own page). */
   callbackUrl?: string;
-  /** Deprecated and ignored — every Paystack subscription auto-renews by
+  /** Deprecated and ignored — every Whop subscription auto-renews by
       default and only an administrator can turn it off. */
   autoRenew?: boolean;
 };
 
-export type PaystackCheckoutResponse =
+export type WhopCheckoutResponse =
   | { granted: true; checkoutUrl: null; reference: null }
   | { granted: false; checkoutUrl: string; reference: string };
 
-export type PaystackReceipt = {
+export type WhopReceipt = {
   total: number;
   cardLast4: string | null;
   promoCode: string | null;
 };
 
-export type PaystackConfirmResponse = {
+export type WhopConfirmResponse = {
   granted: boolean;
   status?: string;
   error?: string;
-  receipt?: PaystackReceipt;
+  receipt?: WhopReceipt;
 };
 
 // ---- create checkout ----
 
-export const getPaystackCheckoutUrl = () => `/api/paystack/checkout`;
+export const getWhopCheckoutUrl = () => `/api/whop/checkout`;
 
-export const createPaystackCheckout = async (
-  body: PaystackCheckoutInput,
+export const createWhopCheckout = async (
+  body: WhopCheckoutInput,
   options?: Parameters<typeof customFetch>[1],
-): Promise<PaystackCheckoutResponse> =>
-  customFetch<PaystackCheckoutResponse>(getPaystackCheckoutUrl(), {
+): Promise<WhopCheckoutResponse> =>
+  customFetch<WhopCheckoutResponse>(getWhopCheckoutUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
     body: JSON.stringify(body),
   });
 
-export const getCreatePaystackCheckoutMutationOptions = <
+export const getCreateWhopCheckoutMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createPaystackCheckout>>,
+    Awaited<ReturnType<typeof createWhopCheckout>>,
     TError,
-    { data: PaystackCheckoutInput },
+    { data: WhopCheckoutInput },
     TContext
   >;
   request?: Parameters<typeof customFetch>[1];
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof createPaystackCheckout>>,
+  Awaited<ReturnType<typeof createWhopCheckout>>,
   TError,
-  { data: PaystackCheckoutInput },
+  { data: WhopCheckoutInput },
   TContext
 > => {
-  const mutationKey = ["createPaystackCheckout"];
+  const mutationKey = ["createWhopCheckout"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
     : { mutation: { mutationKey }, request: undefined };
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof createPaystackCheckout>>,
-    { data: PaystackCheckoutInput }
-  > = ({ data }) => createPaystackCheckout(data, requestOptions);
+    Awaited<ReturnType<typeof createWhopCheckout>>,
+    { data: WhopCheckoutInput }
+  > = ({ data }) => createWhopCheckout(data, requestOptions);
   return { mutationFn, ...mutationOptions };
 };
 
-export const useCreatePaystackCheckoutId = "createPaystackCheckout";
+export const useCreateWhopCheckoutId = "createWhopCheckout";
 
-export function useCreatePaystackCheckout<
+export function useCreateWhopCheckout<
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof createPaystackCheckout>>,
+    Awaited<ReturnType<typeof createWhopCheckout>>,
     TError,
-    { data: PaystackCheckoutInput },
+    { data: WhopCheckoutInput },
     TContext
   >;
   request?: Parameters<typeof customFetch>[1];
 }): UseMutationResult<
-  Awaited<ReturnType<typeof createPaystackCheckout>>,
+  Awaited<ReturnType<typeof createWhopCheckout>>,
   TError,
-  { data: PaystackCheckoutInput },
+  { data: WhopCheckoutInput },
   TContext
 > {
-  return useMutation(getCreatePaystackCheckoutMutationOptions(options));
+  return useMutation(getCreateWhopCheckoutMutationOptions(options));
 }
 
 // ---- confirm (called from the return page after redirect) ----
 
-export const getPaystackConfirmUrl = () => `/api/paystack/confirm`;
+export const getWhopConfirmUrl = () => `/api/whop/confirm`;
 
-export const confirmPaystackCheckout = async (
+export const confirmWhopCheckout = async (
   body: { reference: string },
   options?: Parameters<typeof customFetch>[1],
-): Promise<PaystackConfirmResponse> =>
-  customFetch<PaystackConfirmResponse>(getPaystackConfirmUrl(), {
+): Promise<WhopConfirmResponse> =>
+  customFetch<WhopConfirmResponse>(getWhopConfirmUrl(), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...options?.headers },
     body: JSON.stringify(body),
   });
 
-export const getConfirmPaystackCheckoutMutationOptions = <
+export const getConfirmWhopCheckoutMutationOptions = <
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof confirmPaystackCheckout>>,
+    Awaited<ReturnType<typeof confirmWhopCheckout>>,
     TError,
     { data: { reference: string } },
     TContext
   >;
   request?: Parameters<typeof customFetch>[1];
 }): UseMutationOptions<
-  Awaited<ReturnType<typeof confirmPaystackCheckout>>,
+  Awaited<ReturnType<typeof confirmWhopCheckout>>,
   TError,
   { data: { reference: string } },
   TContext
 > => {
-  const mutationKey = ["confirmPaystackCheckout"];
+  const mutationKey = ["confirmWhopCheckout"];
   const { mutation: mutationOptions, request: requestOptions } = options
     ? options.mutation && "mutationKey" in options.mutation && options.mutation.mutationKey
       ? options
       : { ...options, mutation: { ...options.mutation, mutationKey } }
     : { mutation: { mutationKey }, request: undefined };
   const mutationFn: MutationFunction<
-    Awaited<ReturnType<typeof confirmPaystackCheckout>>,
+    Awaited<ReturnType<typeof confirmWhopCheckout>>,
     { data: { reference: string } }
-  > = ({ data }) => confirmPaystackCheckout(data, requestOptions);
+  > = ({ data }) => confirmWhopCheckout(data, requestOptions);
   return { mutationFn, ...mutationOptions };
 };
 
-export const useConfirmPaystackCheckoutId = "confirmPaystackCheckout";
+export const useConfirmWhopCheckoutId = "confirmWhopCheckout";
 
-export function useConfirmPaystackCheckout<
+export function useConfirmWhopCheckout<
   TError = ErrorType<unknown>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
-    Awaited<ReturnType<typeof confirmPaystackCheckout>>,
+    Awaited<ReturnType<typeof confirmWhopCheckout>>,
     TError,
     { data: { reference: string } },
     TContext
   >;
   request?: Parameters<typeof customFetch>[1];
 }): UseMutationResult<
-  Awaited<ReturnType<typeof confirmPaystackCheckout>>,
+  Awaited<ReturnType<typeof confirmWhopCheckout>>,
   TError,
   { data: { reference: string } },
   TContext
 > {
-  return useMutation(getConfirmPaystackCheckoutMutationOptions(options));
+  return useMutation(getConfirmWhopCheckoutMutationOptions(options));
 }
 
-export default { useCreatePaystackCheckout, useConfirmPaystackCheckout };
+export default { useCreateWhopCheckout, useConfirmWhopCheckout };
