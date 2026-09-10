@@ -761,26 +761,23 @@ export const nexetSubscriptionsTable = sqliteTable("nexet_subscriptions", {
   promoCode: text("promo_code"),
   cardLast4: text("card_last_4"),
   autoRenew: integer("auto_renew", { mode: "boolean" }).notNull().default(false),
-  paystackAuthorizationCode: text("paystack_authorization_code"),
-  paystackCustomerCode: text("paystack_customer_code"),
-  paystackEmail: text("paystack_email"),
-  paystackPlanCode: text("paystack_plan_code"),
-  paystackSubscriptionCode: text("paystack_subscription_code"),
-  paystackEmailToken: text("paystack_email_token"),
-  paystackTransactionReference: text("paystack_transaction_reference"),
+  whopMembershipId: text("whop_membership_id"),
+  whopPlanId: text("whop_plan_id"),
+  whopEmail: text("whop_email"),
+  whopPaymentId: text("whop_payment_id"),
   renewalFailure: text("renewal_failure"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
 
-export const nexetPaystackPlansTable = sqliteTable(
-  "nexet_paystack_plans",
+export const nexetWhopPlansTable = sqliteTable(
+  "nexet_whop_plans",
   {
     kind: text("kind").notNull(),
     planId: text("plan_id").notNull(),
-    planCode: text("plan_code").notNull(),
+    whopPlanId: text("whop_plan_id").notNull(),
     amountUsd: integer("amount_usd").notNull(),
-    interval: text("interval").notNull().default("monthly"),
+    billingPeriodDays: integer("billing_period_days").notNull().default(30),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
     updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   },
@@ -798,7 +795,7 @@ export const nexetSubscriptionPlanSettingsTable = sqliteTable(
   (table) => [primaryKey({ columns: [table.kind, table.planId] })],
 );
 
-export const nexetPaystackIntentsTable = sqliteTable("nexet_paystack_intents", {
+export const nexetWhopIntentsTable = sqliteTable("nexet_whop_intents", {
   reference: text("reference").primaryKey(),
   userId: text("user_id").notNull(),
   kind: text("kind").notNull(),
@@ -813,6 +810,8 @@ export const nexetPaystackIntentsTable = sqliteTable("nexet_paystack_intents", {
   autoRenew: integer("auto_renew", { mode: "boolean" }).notNull().default(false),
   renewalFor: text("renewal_for"),
   customerEmail: text("customer_email"),
+  whopPaymentId: text("whop_payment_id"),
+  whopMembershipId: text("whop_membership_id"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
@@ -1226,16 +1225,14 @@ export async function buildInMemoryDb() {
       source TEXT NOT NULL DEFAULT 'checkout',
       clerk_subscription_id TEXT, promo_code TEXT, card_last_4 TEXT,
       auto_renew INTEGER NOT NULL DEFAULT 0,
-      paystack_authorization_code TEXT, paystack_customer_code TEXT,
-      paystack_email TEXT, paystack_plan_code TEXT,
-      paystack_subscription_code TEXT, paystack_email_token TEXT,
-      paystack_transaction_reference TEXT, renewal_failure TEXT,
+      whop_membership_id TEXT, whop_plan_id TEXT,
+      whop_email TEXT, whop_payment_id TEXT, renewal_failure TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
-    CREATE TABLE nexet_paystack_plans (
+    CREATE TABLE nexet_whop_plans (
       kind TEXT NOT NULL, plan_id TEXT NOT NULL,
-      plan_code TEXT NOT NULL, amount_usd INTEGER NOT NULL,
-      interval TEXT NOT NULL DEFAULT 'monthly',
+      whop_plan_id TEXT NOT NULL, amount_usd INTEGER NOT NULL,
+      billing_period_days INTEGER NOT NULL DEFAULT 30,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
       PRIMARY KEY (kind, plan_id)
     );
@@ -1252,7 +1249,7 @@ export async function buildInMemoryDb() {
       created_at INTEGER NOT NULL,
       UNIQUE (project_id, day)
     );
-    CREATE TABLE nexet_paystack_intents (
+    CREATE TABLE nexet_whop_intents (
       reference TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
       kind TEXT NOT NULL, plan_id TEXT NOT NULL, plan_label TEXT NOT NULL,
       interval_label TEXT NOT NULL DEFAULT '', amount_usd INTEGER NOT NULL,
@@ -1261,6 +1258,7 @@ export async function buildInMemoryDb() {
       promo_code TEXT, card_last_4 TEXT,
       auto_renew INTEGER NOT NULL DEFAULT 0,
       renewal_for TEXT, customer_email TEXT,
+      whop_payment_id TEXT, whop_membership_id TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
     CREATE TABLE nexet_account_quotas (
@@ -1404,8 +1402,8 @@ export async function buildInMemoryDb() {
     nexetPromoRedemptionsTable,
     nexetSubscriptionsTable,
     nexetSubscriptionPlanSettingsTable,
-    nexetPaystackPlansTable,
-    nexetPaystackIntentsTable,
+    nexetWhopPlansTable,
+    nexetWhopIntentsTable,
     nexetVideoStorageSnapshotsTable,
     nexetArenaPostsTable,
     nexetArenaApplicationsTable,

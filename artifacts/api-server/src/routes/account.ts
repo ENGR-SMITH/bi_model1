@@ -63,7 +63,7 @@ router.get("/account/quota", async (req: Request, res: Response): Promise<void> 
 
 // POST /account/quota/purchase — dev/test shortcut that applies a buy-more
 // storage/projects plan with no charge. Real purchases are paid through
-// Paystack (/paystack/checkout → confirm) and granted via
+// Whop (/whop/checkout → confirm) and granted via
 // applySubscriptionPurchase; this handler bypasses payment entirely and is
 // disabled in production.
 router.post(
@@ -76,9 +76,9 @@ router.post(
     }
 
     // Simulated no-charge grant — only for local dev and tests. All real
-    // purchases run through Paystack, so never allow free grants in production.
+    // purchases run through Whop, so never allow free grants in production.
     if (process.env.NODE_ENV === "production") {
-      res.status(403).json({ error: "Payments are processed through Paystack; this simulated grant is disabled in production." });
+      res.status(403).json({ error: "Payments are processed through Whop; this simulated grant is disabled in production." });
       return;
     }
 

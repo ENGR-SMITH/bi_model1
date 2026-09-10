@@ -26,7 +26,7 @@ for, where to get the value, and what happens if it's missing.
 | 6 | `CORS_ORIGINS` | Your deployed frontend origins | Yes — server **refuses to boot** without it |
 | 7 | `ADMIN_EMAIL` | Your own email | Yes — server **refuses to boot** without it |
 | 8 | `SESSION_SECRET` | Generate with `openssl rand -hex 32` | Yes — must be strong, **non-default** |
-| 9 | `PAYSTACK_SECRET_KEY` | Paystack dashboard | Required for real payments (simulated checkouts are disabled in production) |
+| 9 | `WHOP_API_KEY` + `WHOP_ACCOUNT_ID` + `WHOP_PRODUCT_ID` + `WHOP_WEBHOOK_SECRET` | Whop dashboard (see §8) | Required for real payments (simulated checkouts are disabled in production) |
 
 Plus a frontend key for three of the apps: `VITE_CLERK_PUBLISHABLE_KEY`
 (section 4). The **Oracle Admin** reads `CLERK_PUBLISHABLE_KEY` from the
@@ -196,32 +196,39 @@ SESSION_SECRET=<paste the 64-char hex string>
 
 ---
 
-## 8. `PAYSTACK_SECRET_KEY` — real payments
+## 8. Whop — real payments (four variables)
 
-**What it is:** the secret key for card payments. In production the simulated
-"no charge" checkouts (subscriptions, tickets, account quota) return **403** —
-paid entitlements can only be granted through Paystack webhooks, so this key
-is what makes money move.
+**What it is:** the Whop credentials for card payments. In production the
+simulated "no charge" checkouts (subscriptions, tickets, account quota) return
+**403** — paid entitlements can only be granted through Whop webhooks, so these
+are what make money move. All four are server-only; never put them in a
+frontend `.env`.
 
-**Where to get it:** https://dashboard.paystack.com → **Settings → API Keys &
-Webhooks**:
-- Test keys (`sk_test_…`) appear immediately; **live keys (`sk_live_…`) only
-  after your business account is activated** (KYC) and USD settlement is
-  enabled.
-- Click the eye icon (asks for your account password) to reveal/copy the key.
+**Where to get them** (one-time Whop setup):
+1. Create your account + business at **https://whop.com/start** and complete
+   activation/KYC (required before live payments and payouts).
+2. `WHOP_API_KEY` — **Developer → Account API Keys → Create** → copy the key
+   (`whop_…`).
+3. `WHOP_ACCOUNT_ID` — **Dashboard → Settings** → Account ID (`biz_…`).
+4. `WHOP_PRODUCT_ID` — **Dashboard → Products → Create** → one product
+   (`prod_…`) that every subscription plan is mirrored under.
+5. `WHOP_WEBHOOK_SECRET` — **Developer → Webhooks → Create webhook**: URL
+   `https://<api-host>/api/whop/webhook`, subscribe to `payment.*` and
+   `membership.*` events → copy the signing secret (`ws_…`). It is shown
+   **only once** at creation — store it immediately.
 
 ```env
-PAYSTACK_SECRET_KEY=sk_live_...
+WHOP_API_KEY=whop_...
+WHOP_ACCOUNT_ID=biz_...
+WHOP_PRODUCT_ID=prod_...
+WHOP_WEBHOOK_SECRET=ws_...
 ```
 
-**Also configure on Paystack (same page):**
-- **Webhook URL** → `https://<api-host>/api/paystack/webhook` (set for Test
-  and Live separately) — this is how purchases get granted even if the buyer
-  never returns.
-- **USD:** the account must accept international payments and have a Zenith
-  Bank USD domiciliary account added, or USD charges fail.
-- The same secret key verifies webhook signatures (HMAC-SHA512 via the
-  `x-paystack-signature` header) — there is no separate webhook secret.
+**Webhook:** Whop signs every webhook with HMAC-SHA256 over the raw body
+(Standard Webhooks spec, `webhook-id`/`webhook-timestamp`/`webhook-signature`
+headers) keyed by `WHOP_WEBHOOK_SECRET` — that is the only webhook secret.
+For development use the **sandbox** environment (sandbox.whop.com, its own
+keys) so no real money moves; swap in live keys for production.
 
 ---
 
@@ -236,13 +243,16 @@ CLERK_SECRET_KEY=sk_live_...             # section 4
 CORS_ORIGINS=https://...                 # section 5 — all deployed origins
 ADMIN_EMAIL=you@yourdomain.com           # section 6
 SESSION_SECRET=<openssl rand -hex 32>    # section 7 — strong, stable
-PAYSTACK_SECRET_KEY=sk_live_...          # section 8 — if taking payments
+WHOP_API_KEY=whop_...                    # section 8 — if taking payments
+WHOP_ACCOUNT_ID=biz_...
+WHOP_PRODUCT_ID=prod_...
+WHOP_WEBHOOK_SECRET=ws_...
 ```
 
 - [ ] `.env` has every required variable above
 - [ ] the three frontend `.env` files have `VITE_CLERK_PUBLISHABLE_KEY` (Oracle Admin reads `CLERK_PUBLISHABLE_KEY` from the root `.env`)
 - [ ] DB schema pushed (`pnpm --filter db run push-force`)
-- [ ] Paystack webhook URL points at `/api/paystack/webhook`
+- [ ] Whop webhook URL points at `/api/whop/webhook`
 - [ ] Clerk dashboard: email verification link enabled + redirect URLs added
 - [ ] Deployed origins all listed in `CORS_ORIGINS`
 

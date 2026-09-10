@@ -2,10 +2,10 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { PiArrowUpRightDuotone, PiCheckCircleDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiLockKeyDuotone, PiTicketDuotone, PiXDuotone } from 'react-icons/pi';
 import {
-  confirmPaystackCheckout,
+  confirmWhopCheckout,
   getGetTicketStatusQueryKey,
   getTicketCategoryAccessQueryKey,
-  useCreatePaystackCheckout,
+  useCreateWhopCheckout,
   useGetTicketStatus,
   useTicketCategoryAccess,
 } from '@workspace/api-client-react';
@@ -14,8 +14,8 @@ import {
 // Ticket gate — the NEXET category paywall. Each available category
 // (Author-Writer, Content-Creators) requires an active pass ($5.88 / month)
 // before the room opens. Without a pass the page renders dimmed behind a
-// coupon-style popup. Payment runs through Paystack's hosted checkout (USD):
-// the popup opens a Paystack page, and when the customer returns the gate
+// coupon-style popup. Payment runs through Whop's hosted checkout (USD):
+// the popup opens a Whop page, and when the customer returns the gate
 // confirms the charge (?reference=…) before the room unlocks. No card
 // details are ever collected here.
 // ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ export function TicketGate({
   });
   const active = status.data?.tickets.some((ticket) => ticket.category === slug) ?? false;
 
-  // Paystack return: the checkout redirects back with ?reference=… — confirm
+  // Whop return: the checkout redirects back with ?reference=… — confirm
   // the charge server-side, unlock the room, and show the stamped pass.
   const [confirming, setConfirming] = useState(false);
   const [returnStamp, setReturnStamp] = useState<{ expiresAt: string; total: number; cardLast4: string | null; promoCode: string | null } | null>(null);
@@ -47,7 +47,7 @@ export function TicketGate({
     setConfirming(true);
     void (async () => {
       try {
-        const res = await confirmPaystackCheckout({ reference });
+        const res = await confirmWhopCheckout({ reference });
         if (disposed) return;
         window.history.replaceState(window.history.state, '', window.location.pathname);
         if (res.granted) {
@@ -121,7 +121,7 @@ export function TicketGate({
 }
 
 // The stamped pass receipt — shown right after a purchase (including a FREE
-// promo granted server-side) or when the customer returns from the Paystack
+// promo granted server-side) or when the customer returns from the Whop
 // checkout.
 function PassStamp({
   name,
@@ -250,7 +250,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
 
-  const checkout = useCreatePaystackCheckout({
+  const checkout = useCreateWhopCheckout({
     mutation: {
       onSuccess: (res) => {
         if (res.granted) {
@@ -266,7 +266,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
         }
         setError('');
         setOpening(true);
-        // Let the spinner paint before leaving for Paystack.
+        // Let the spinner paint before leaving for Whop.
         window.setTimeout(() => {
           window.location.assign(res.checkoutUrl);
         }, 350);
@@ -350,14 +350,14 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <span className="absolute -right-2 h-4 w-4 rounded-full bg-[#131316]/90" />
         </div>
 
-        {/* Payment body — Paystack hosted checkout (USD), no card fields. */}
+        {/* Payment body — Whop hosted checkout (USD), no card fields. */}
         <div className="relative p-7 pt-6">
           <div className="flex items-start gap-3 rounded-2xl border border-[#34d399]/15 bg-gradient-to-br from-[#34d399]/10 to-transparent p-3.5">
             <span className="icon-chip h-8 w-8 shrink-0 text-[#34d399]">
               <PiLockKeyDuotone className="h-3.5 w-3.5" />
             </span>
             <p className="text-xs leading-relaxed text-zinc-300">
-              You'll be taken to <b className="text-white">Paystack's secure checkout</b> (USD) to pay. You'll land back here when it's done.
+              You'll be taken to <b className="text-white">Whop's secure checkout</b> (USD) to pay. You'll land back here when it's done.
             </p>
           </div>
 
@@ -407,7 +407,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <div className="border-l border-white/10 pl-3">
             <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Payment</p>
             <p className="mt-1 flex items-center gap-1.5 text-sm font-bold text-white">
-              <PiLockKeyDuotone className="h-3 w-3 shrink-0 text-[#34d399]" /> Paystack
+              <PiLockKeyDuotone className="h-3 w-3 shrink-0 text-[#34d399]" /> Whop
             </p>
           </div>
         </div>

@@ -2,16 +2,16 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, X } from 'lucide-react';
 import {
-  confirmPaystackCheckout,
+  confirmWhopCheckout,
   getGetAccountQuotaQueryKey,
   getSubscriptionPlansQueryKey,
 } from '@workspace/api-client-react';
 
 // ---------------------------------------------------------------------------
-// PaystackReturnGate — mounted on the profile page (where storage is bought).
-// After Paystack redirects the customer back, the URL carries ?reference=…;
-// this gate confirms the charge with the server, refreshes the account quota,
-// and shows the outcome over the page.
+// WhopReturnGate — mounted on the profile page (where storage is bought).
+// After Whop redirects the customer back, the URL carries ?reference=…; this
+// gate confirms the charge with the server, refreshes the account quota, and
+// shows the outcome over the page.
 // ---------------------------------------------------------------------------
 
 type ReturnState =
@@ -24,7 +24,7 @@ function apiErrorMessage(e: unknown): string {
   return err?.response?.data?.error || err?.message || 'Something went wrong. Please try again.';
 }
 
-export function PaystackReturnGate() {
+export function WhopReturnGate() {
   const queryClient = useQueryClient();
   const [state, setState] = useState<ReturnState | null>(null);
 
@@ -36,7 +36,7 @@ export function PaystackReturnGate() {
 
     void (async () => {
       try {
-        const res = await confirmPaystackCheckout({ reference });
+        const res = await confirmWhopCheckout({ reference });
         if (disposed) return;
         // Drop the query params so a refresh doesn't re-confirm (harmless anyway).
         window.history.replaceState(window.history.state, '', window.location.pathname);
@@ -70,14 +70,14 @@ export function PaystackReturnGate() {
 
   return (
     <div className="modal-backdrop">
-      <div className="modal small-modal plan-modal" role="dialog" aria-modal="true" data-testid="paystack-return-gate">
+      <div className="modal small-modal plan-modal" role="dialog" aria-modal="true" data-testid="whop-return-gate">
         <button type="button" className="modal-close" onClick={() => setState(null)} aria-label="Close"><X size={16} /></button>
         {state.kind === 'busy' && (
           <>
-            <span className="eyebrow">PAYSTACK</span>
+            <span className="eyebrow">WHOP</span>
             <h2>Confirming your payment…</h2>
             <p>This can take a few seconds. Your storage updates as soon as it lands.</p>
-            <p className="den-footnote mt-3" style={{ display: 'flex', gap: 6 }}><Loader2 size={13} className="spin" /> Checking with Paystack…</p>
+            <p className="den-footnote mt-3" style={{ display: 'flex', gap: 6 }}><Loader2 size={13} className="spin" /> Checking with Whop…</p>
           </>
         )}
         {state.kind === 'success' && (

@@ -5,9 +5,9 @@ import type { IconType } from 'react-icons';
 import { Link } from 'wouter';
 import { SectionEyebrow } from '@/components/protected-shell';
 import {
-  confirmPaystackCheckout,
+  confirmWhopCheckout,
   getSubscriptionPlansQueryKey,
-  useCreatePaystackCheckout,
+  useCreateWhopCheckout,
   useSubscriptionPlans,
   type SubscriptionPlan,
   type SubscriptionRecord,
@@ -20,9 +20,9 @@ import {
 // and lets the user subscribe to any available plan here — the same products
 // are also payable inline on the Creator Den and Author Den themselves.
 //
-// Payments run through Paystack's hosted checkout (USD). Buying a plan opens
-// a Paystack page; when the customer returns, the page confirms the charge
-// with the server (POST /paystack/confirm) and shows the receipt.
+// Payments run through Whop's hosted checkout (USD). Buying a plan opens a
+// Whop page; when the customer returns, the page confirms the charge with the
+// server (POST /whop/confirm) and shows the receipt.
 // ---------------------------------------------------------------------------
 
 function formatBytes(bytes: number): string {
@@ -97,7 +97,7 @@ type ResultOverlay =
   | { kind: 'success'; total?: number; cardLast4?: string | null; promoCode?: string | null }
   | { kind: 'error'; message: string };
 
-// Automatic renewal is always on for Paystack subscriptions — shown as a
+// Automatic renewal is always on for Whop subscriptions — shown as a
 // read-only note on an active plan. Customers cannot switch it off; only an
 // administrator can (per plan or per subscription).
 function AutoRenewNote({ sub }: { sub: SubscriptionRecord }) {
@@ -125,7 +125,7 @@ function AutoRenewNote({ sub }: { sub: SubscriptionRecord }) {
 function ResultOverlayView({ state, onClose }: { state: ResultOverlay; onClose: () => void }) {
   if (state.kind === 'busy') {
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="paystack-result-busy">
+      <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="whop-result-busy">
         <div className="relative w-full max-w-sm rounded-3xl border border-white/10 bg-[#111111] p-8 text-center text-white shadow-2xl">
           <PiCircleNotchDuotone className="mx-auto h-8 w-8 animate-spin text-[#3b82f6]" />
           <p className="mt-4 text-sm font-semibold text-zinc-100">{state.message}</p>
@@ -208,9 +208,9 @@ export default function SubscriptionsPage() {
     void queryClient.invalidateQueries({ queryKey: getSubscriptionPlansQueryKey() });
   };
 
-  // On return from the Paystack checkout the URL carries ?reference=… (Paystack
-  // appends it to the callback_url). Confirm the charge server-side, then show
-  // the outcome and drop the query params so a refresh doesn't re-confirm.
+  // On return from the Whop checkout the URL carries ?reference=… (we add it
+  // to the Whop redirect_url ourselves). Confirm the charge server-side, then
+  // show the outcome and drop the query params so a refresh doesn't re-confirm.
   useEffect(() => {
     const reference = new URLSearchParams(window.location.search).get('reference');
     if (!reference) return;
@@ -219,7 +219,7 @@ export default function SubscriptionsPage() {
 
     void (async () => {
       try {
-        const res = await confirmPaystackCheckout({ reference });
+        const res = await confirmWhopCheckout({ reference });
         if (disposed) return;
         window.history.replaceState(window.history.state, '', window.location.pathname);
         if (res.granted) {
@@ -522,8 +522,8 @@ export default function SubscriptionsPage() {
 
 // ---------------------------------------------------------------------------
 // PayModal — confirm + pay for one plan. No card fields: clicking through
-// opens Paystack's hosted checkout (USD) in this tab; Paystack sends the user
-// back to this page (?reference=…), which confirms the charge on mount.
+// opens Whop's hosted checkout (USD) in this tab; Whop sends the user back to
+// this page (?reference=…), which confirms the charge on mount.
 // ---------------------------------------------------------------------------
 
 function PayModal({
@@ -539,7 +539,7 @@ function PayModal({
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
 
-  const checkout = useCreatePaystackCheckout({
+  const checkout = useCreateWhopCheckout({
     mutation: {
       onSuccess: (res) => {
         if (res.granted) {
@@ -549,7 +549,7 @@ function PayModal({
         }
         setError('');
         setOpening(true);
-        // Let the spinner paint before leaving for Paystack.
+        // Let the spinner paint before leaving for Whop.
         window.setTimeout(() => {
           window.location.assign(res.checkoutUrl);
         }, 350);
@@ -604,7 +604,7 @@ function PayModal({
           <div className="flex items-start gap-3 rounded-xl border border-white/5 bg-white/[.03] p-3">
             <PiLockKeyDuotone className="mt-0.5 h-4 w-4 shrink-0 text-[#34d399]" />
             <p className="text-xs leading-relaxed text-zinc-400">
-              You'll be taken to <b className="text-zinc-200">Paystack's secure checkout</b> (USD) to pay. You'll land back here when it's done.
+              You'll be taken to <b className="text-zinc-200">Whop's secure checkout</b> (USD) to pay. You'll land back here when it's done.
             </p>
           </div>
 

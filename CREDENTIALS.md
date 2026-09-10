@@ -25,7 +25,7 @@ step-by-step how to obtain it. Everything ends up in your `.env` file (copy
 | 8 | Freebuff | `FREEBUFF_API_KEY` | Model gateway AI | No (optional AI) |
 | 9 | Redis (Upstash/Redis Cloud/local) | `REDIS_URL` | BullMQ video job queue | No (optional) |
 | 10 | GitHub | Secrets + vars | CI build of the desktop agent | For CI |
-| 11 | Paystack | Secret key (+ USD account) | Direct USD card payments for subscriptions | For real payments |
+| 11 | Whop | `WHOP_API_KEY`, `WHOP_ACCOUNT_ID`, `WHOP_PRODUCT_ID`, `WHOP_WEBHOOK_SECRET` | USD card payments for subscriptions (hosted checkout + webhooks) | For real payments |
 
 App-defined secrets (not from a platform — you create them):
 `ADMIN_EMAIL`, `SESSION_SECRET` — see section 12.
@@ -285,47 +285,47 @@ Actions → Variables → New repository variable):
 
 ---
 
-## 11. Paystack — real payments (USD), direct gateway
+## 11. Whop — real payments (USD), hosted checkout
 
-**Platform:** https://dashboard.paystack.com → **Settings → API Keys & Webhooks**
+**Platform:** https://whop.com (dashboard at whop.com/dashboard)
 
-Real card charging for subscriptions runs through **Paystack directly** (hosted
-checkout: the server calls `transaction.initialize`, the customer pays on
-Paystack's page, and a webhook/verify grants the entitlement). Only one
-credential is needed — there is **no separate webhook secret**; Paystack signs
-webhook bodies with HMAC-SHA512 **using your secret key**
-(`x-paystack-signature` header).
+Real card charging for subscriptions runs through **Whop** (hosted checkout:
+the server mirrors each catalog plan as a Whop renewal plan, opens a checkout
+configuration, the customer pays on Whop's page, and a webhook grants the
+entitlement). Four credentials are needed:
 
 **Step-by-step:**
 
-1. Create/activate your Paystack business (KYC). **Live** keys only appear after
-   activation — until then use **Test Mode** keys.
-2. Dashboard → Settings → **API Keys & Webhooks** → under *API Configuration –
-   Test Mode* (and later *Live Mode*), click the eye icon (asks for your
-   account password) and copy the **Secret Key** (`sk_test_…` / `sk_live_…`).
-3. **(USD only):** the account must accept international payments
-   (Settings → **Preferences** → *Accept international payments*) and have a
-   **Zenith Bank USD domiciliary account** added (Settings → **Accounts** →
-   *Add USD account* — confirmed within ~24h). Without these, USD charges fail.
-4. **Webhook URL** (set separately for Test and Live): point it at
-   `https://<api-host>/api/paystack/webhook`. Paystack posts `charge.success`
-   here so entitlements are granted even if the customer never returns.
-5. (Optional) a global **Callback URL** on the same settings page — the app
-   overrides it per purchase with the page the user came from.
+1. Create your Whop account + business at **whop.com/start** and complete
+   activation/KYC — required before live payments and payouts.
+2. **`WHOP_API_KEY`** — Dashboard → **Developer → Account API Keys → Create**
+   (name it e.g. "Nexet production") → copy the key (`whop_…`). Start with the
+   Admin role; narrow to the exact permissions the app uses later.
+3. **`WHOP_ACCOUNT_ID`** — Dashboard → **Settings** → Account ID (`biz_…`).
+4. **`WHOP_PRODUCT_ID`** — Dashboard → **Products → Create product** (`prod_…`);
+   every subscription plan is mirrored under it, and its title shows on the
+   Whop checkout page.
+5. **`WHOP_WEBHOOK_SECRET`** — Dashboard → **Developer → Webhooks → Create
+   webhook**: URL `https://<api-host>/api/whop/webhook`, subscribe to the
+   `payment.*` and `membership.*` events → copy the signing secret (`ws_…`).
+   It is shown **ONLY ONCE** at creation — store it immediately. Whop signs
+   webhooks with HMAC-SHA256 over the raw body (Standard Webhooks spec); this
+   secret is the verification key.
 
-**Where it goes:**
+**Where it goes (all server-only — never in a frontend .env):**
 
 ```env
-# root .env (server only)
-PAYSTACK_SECRET_KEY=sk_test_...
-# Optional — only for a Paystack Inline JS popup instead of hosted checkout.
-# Frontend-safe; copied into each Vite app's .env as VITE_PAYSTACK_PUBLIC_KEY if used.
-PAYSTACK_PUBLIC_KEY=pk_test_...
+WHOP_API_KEY=whop_...
+WHOP_ACCOUNT_ID=biz_...
+WHOP_PRODUCT_ID=prod_...
+WHOP_WEBHOOK_SECRET=ws_...
 ```
 
-> **Test mode:** toggle Test Mode on the dashboard and pay with Paystack's test
-> card `4084 0840 8408 4081` — no real money moves until you switch to live
-> keys. Fees on live USD charges: 3.9% flat.
+> **Sandbox:** Whop has a separate sandbox environment (sandbox.whop.com) with
+> its own keys and test cards — use it for development so no real money moves,
+> then swap in the live keys for production. Live fees: 2.7% + $0.30 per
+> transaction (domestic cards), +1.5% international cards, +1% currency
+> conversion.
 
 ---
 
@@ -418,6 +418,6 @@ VITE_SOCKET_URL=https://<api-host>/
 - [ ] (Optional) R2: `CF_ACCOUNT_ID`, `CF_R2_BUCKET`, `CF_R2_ACCESS_KEY`,
       `CF_R2_SECRET_KEY`
 - [ ] (Optional) AI: `GROQ_API_KEY` / `OPENROUTER_API_KEY` (or Ollama/LM Studio)
-- [ ] (Optional) Payments: `PAYSTACK_SECRET_KEY` set (test or live — section 11)
+- [ ] (Optional) Payments: `WHOP_API_KEY` + `WHOP_ACCOUNT_ID` + `WHOP_PRODUCT_ID` + `WHOP_WEBHOOK_SECRET` set (sandbox or live — section 11)
 - [ ] (Optional) CI: GitHub secrets `CF_ACCOUNT_ID`, `CF_R2_ACCESS_KEY`,
       `CF_R2_SECRET_KEY` (+ variable `R2_BUCKET`)

@@ -4,7 +4,7 @@ import { boolean, integer, pgTable, primaryKey, text, timestamp } from "drizzle-
 // ---------------------------------------------------------------------------
 // NEXET category passes — the ticket 🎫 paywall. Each available category
 // (authors, content-creators) requires an active pass: $5.88 / month (billed
-// monthly by Paystack). One pass per (user, category); renewing extends the
+// monthly by Whop). One pass per (user, category); renewing extends the
 // current pass when it is still active. FREE promo codes grant a free month.
 // ---------------------------------------------------------------------------
 

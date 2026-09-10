@@ -22,7 +22,7 @@ import {
   UpdateAdminSubscriptionAutoRenewResponse,
 } from "@workspace/api-zod";
 import { checkProvider, listProviderStatuses, updateProvider, type ProviderId } from "../lib/oracle";
-import { disableSubscription, enableSubscription, PaystackApiError } from "../lib/paystack";
+import { setMembershipAutoRenew, WhopApiError } from "../lib/whop";
 import { resolveSubscriptionProduct, subscriptionPlans, type SubscriptionKind } from "../video/subscriptions";
 
 const router: IRouter = Router();
@@ -296,7 +296,7 @@ router.delete("/admin/promos/:code", requireAdmin, async (req, res): Promise<voi
 // ---------------------------------------------------------------------------
 // Subscription plan settings — per-plan knobs on the code-defined catalog. An
 // admin can turn server-managed auto-renewal on/off for a plan here; the plans
-// endpoint (and the paystack checkout) read the same rows, so the storefront
+// endpoint (and the whop checkout) read the same rows, so the storefront
 // checkbox follows what is switched on in this room.
 // ---------------------------------------------------------------------------
 
@@ -341,9 +341,9 @@ router.patch("/admin/plan-settings/:kind/:planId", requireAdmin, async (req, res
 // ---------------------------------------------------------------------------
 // Subscriptions admin — every purchase across all users, newest first, with
 // the buyer's email resolved from Clerk. The auto-renew toggle here is the
-// per-account override: it switches the Paystack subscription on/off (so
-// Paystack stops or resumes the monthly charges) and mirrors that on the row.
-// Every Paystack subscription auto-renews by default; this is the only place
+// per-account override: it flips the Whop membership's cancel_at_period_end
+// (so Whop stops or resumes the monthly charges) and mirrors that on the row.
+// Every Whop subscription auto-renews by default; this is the only place
 // (besides the per-plan setting) that can turn it off.
 // ---------------------------------------------------------------------------
 
@@ -420,29 +420,25 @@ router.patch("/admin/subscriptions/:id/auto-renew", requireAdmin, async (req, re
     res.status(404).json({ error: "Subscription not found" });
     return;
   }
-  if (body.data.enabled && !sub.paystackSubscriptionCode) {
+  if (body.data.enabled && !sub.whopMembershipId) {
     res.status(400).json({
-      error: "No Paystack subscription is linked to this row — automatic renewal cannot be turned on.",
+      error: "No Whop membership is linked to this row — automatic renewal cannot be turned on.",
     });
     return;
   }
 
-  // Turning a Paystack-backed row off must stop Paystack from charging the
-  // card first — otherwise the customer keeps getting billed. Turning it back
-  // on resumes the same subscription.
-  if (sub.paystackSubscriptionCode && sub.paystackEmailToken) {
+  // Turning a Whop-backed row off must stop Whop from charging the card first
+  // — otherwise the customer keeps getting billed. Turning it back on resumes
+  // the same membership (cancel_at_period_end false).
+  if (sub.whopMembershipId) {
     try {
-      if (body.data.enabled) {
-        await enableSubscription(sub.paystackSubscriptionCode, sub.paystackEmailToken);
-      } else {
-        await disableSubscription(sub.paystackSubscriptionCode, sub.paystackEmailToken);
-      }
+      await setMembershipAutoRenew(sub.whopMembershipId, body.data.enabled);
     } catch (cause) {
       res.status(502).json({
         error:
-          cause instanceof PaystackApiError
-            ? `Paystack could not ${body.data.enabled ? "resume" : "stop"} this subscription: ${cause.message}`
-            : `Paystack could not ${body.data.enabled ? "resume" : "stop"} this subscription.`,
+          cause instanceof WhopApiError
+            ? `Whop could not ${body.data.enabled ? "resume" : "stop"} this subscription: ${cause.message}`
+            : `Whop could not ${body.data.enabled ? "resume" : "stop"} this subscription.`,
       });
       return;
     }

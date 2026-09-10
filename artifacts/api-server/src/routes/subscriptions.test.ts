@@ -185,7 +185,7 @@ describe("auto-renew toggle (admin-only)", () => {
       periodStart: new Date(),
       periodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       autoRenew: true,
-      paystackAuthorizationCode: "auth_123",
+      whopMembershipId: "mem_123",
     });
 
     const off = await request(API)

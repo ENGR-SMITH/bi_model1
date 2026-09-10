@@ -35,7 +35,7 @@ export interface ProjectPlan {
 
 // Buy-more storage plans — $20/200GB, $40/500GB, $60/1TB as specified, in USD
 // cents (2000/4000/6000) so they share the pass's priceUsd unit and map
-// directly onto Paystack's smallest-unit amounts.
+// directly onto Whop's dollar amounts (converted at the API boundary).
 export const STORAGE_PLANS: StoragePlan[] = [
   { id: "g200", label: "200 GB", priceUsd: 2000, bytes: 200 * 1024 ** 3 },
   { id: "g500", label: "500 GB", priceUsd: 4000, bytes: 500 * 1024 ** 3 },

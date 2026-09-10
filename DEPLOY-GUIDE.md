@@ -27,8 +27,13 @@ Copy the 64-character output somewhere safe. **You'll paste it into Render later
 
 > ⚠️ If your Clerk instance only has `pk_test_` keys, you must switch it to **Production** mode in Clerk first (it will create `pk_live_` / `sk_live_` keys). The app can technically boot with test keys, but real users can't sign in.
 
-### Step 1.3 — Get your Paystack production key (if selling subscriptions)
-**Paystack Dashboard → Settings → API Keys & Webhooks** → copy the **Secret key** (`sk_live_...`). Only needed if you want real payments on day one.
+### Step 1.3 — Get your Whop keys (if selling subscriptions)
+1. **whop.com/start** → create your account + business, complete activation/KYC (required for live payments).
+2. **Dashboard → Developer → Account API Keys → Create** → copy `WHOP_API_KEY` (`whop_...`).
+3. **Dashboard → Settings** → copy `WHOP_ACCOUNT_ID` (`biz_...`).
+4. **Dashboard → Products → Create product** → copy `WHOP_PRODUCT_ID` (`prod_...`).
+5. **Dashboard → Developer → Webhooks → Create webhook** (URL: `https://app.YOURDOMAIN.com/api/whop/webhook`, events: `payment.*` + `membership.*`) → copy `WHOP_WEBHOOK_SECRET` (`ws_...`, shown **once**).
+Only needed if you want real payments on day one.
 
 ### Step 1.4 — Confirm your Supabase database (already done ✅)
 Your `DATABASE_URL` (the Supabase pooler one) is verified working, and the schema is **already pushed** — all 59 tables renamed to `nexet_*`. Nothing to do here.
@@ -82,7 +87,10 @@ ADMIN_EMAIL=<the email that opens Oracle Admin>
 SESSION_SECRET=<the 64-char hex from Step 1.1>
 REDIS_URL=rediss://default:gQAAAAAAA2EJAAIgcDJhM2ZhNjU5NDMwNmQ0ZTI5ODJlMWNhZmFkZDFiNzFlYw@eternal-polecat-221449.upstash.io:6379
 NEXET_WEB_URL=https://app.YOURDOMAIN.com
-PAYSTACK_SECRET_KEY=sk_live_...            (if enabling payments)
+WHOP_API_KEY=whop_...                     (if enabling payments)
+WHOP_ACCOUNT_ID=biz_...
+WHOP_PRODUCT_ID=prod_...
+WHOP_WEBHOOK_SECRET=ws_...
 CF_ACCOUNT_ID=<your value>
 CF_R2_BUCKET=tandem-media
 CF_R2_ACCESS_KEY=<your value>
@@ -96,7 +104,7 @@ Also add these optional/tuning vars from your `.env`: `LOG_LEVEL`, `YT_*` values
 
 **⚠️ Important notes:**
 - `PORT=8080` **overrides Render's default** (`10000`) — nginx listens on 8080. Don't skip this.
-- Don't bother setting: `PAYSTACK_PUBLIC_KEY`, `ADMIN_ACCESS_CODE`, `ANON_PUBLIC`, `SERVICE_ROLE`, or the desktop-agent `NEXET_*` vars — the web app doesn't read them (harmless if you do anyway).
+- Don't bother setting: `ADMIN_ACCESS_CODE`, `ANON_PUBLIC`, `SERVICE_ROLE`, or the desktop-agent `NEXET_*` vars — the web app doesn't read them (harmless if you do anyway).
 - Replace `YOURDOMAIN.com` with your real domain in `CORS_ORIGINS` and `NEXET_WEB_URL` (or use Render's `https://<service>.onrender.com` URL temporarily).
 
 ### Step 2.4 — Add a Disk (do this regardless — safety net)
@@ -138,10 +146,10 @@ node ./artifacts/api-server/dist/workers/all.mjs
    - `https://app.YOURDOMAIN.com` (once custom domain is live)
 4. **Clerk → Email → Templates**: your sign-in emails will now come from your live app
 
-### Step 4.2 — Paystack (if enabled)
-**Paystack Dashboard → Settings → Webhooks** → set URL:
+### Step 4.2 — Whop webhook (if enabled)
+**Whop Dashboard → Developer → Webhooks** → set URL:
 ```
-https://app.YOURDOMAIN.com/api/paystack/webhook
+https://app.YOURDOMAIN.com/api/whop/webhook
 ```
 (Or the Render URL until your domain is live.)
 

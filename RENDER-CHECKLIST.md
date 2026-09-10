@@ -34,7 +34,7 @@ From the code I read, the container will fail closed (exit with a message) witho
 - `ADMIN_EMAIL` — `routes/admin.ts` throws in production without it.
 - a strong, non-default `SESSION_SECRET`.
 - `CLERK_SECRET_KEY` — `routes/admin.ts` / Clerk proxy middleware need it.
-- `PAYSTACK_SECRET_KEY` / Paystack webhook handling needs it.
+- `WHOP_API_KEY` + `WHOP_ACCOUNT_ID` + `WHOP_PRODUCT_ID` + `WHOP_WEBHOOK_SECRET` / Whop webhook handling needs them.
 - `CF_*` / R2 settings if the video upload/worker path is used.
 - `YOUTUBE_*` if YouTube channel sync is used.
 - `GROQ_*` / `OPENROUTER_*` / `OLLAMA_*` / `LMSTUDIO_*` depending on which Story Oracle AI path is active.
@@ -45,7 +45,7 @@ From the code I read, the container will fail closed (exit with a message) witho
 
 #### 4. Recommended after deploy
 - Add a Render Disk for `VIDEO_UPLOAD_DIR` if upload volume is meaningful; the default container filesystem is ephemeral.
-- Add the custom domain + DNS, then re-verify Clerk redirect URLs and the Paystack webhook URL against the live domain.
+- Add the custom domain + DNS, then re-verify Clerk redirect URLs and the Whop webhook URL against the live domain.
 
 ### How to verify locally before pushing
 Run the same build the Dockerfile runs:
@@ -61,5 +61,5 @@ docker buildx build . \
 If that succeeds, the same env on Render should build. If it fails, the failure is in the build steps (frontend build, bundle, copy) and is visible locally before deploy.
 
 ### What is intentionally not in scope here
-- Generating the real `SESSION_SECRET`, the real DB, the real Clerk/Paystack keys, or the DNS setup — those are environment steps, not code steps.
+- Generating the real `SESSION_SECRET`, the real DB, the real Clerk/Whop keys, or the DNS setup — those are environment steps, not code steps.
 - Enabling the video worker, YouTube sync, R2, or the Story Oracle providers — those are runtime toggles driven by the env, not build blockers.
