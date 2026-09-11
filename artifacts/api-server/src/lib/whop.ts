@@ -370,7 +370,10 @@ export async function findPaymentByReference(
 export async function listPaymentsSince(since: Date, first = 50): Promise<WhopPayment[]> {
   const accountId = whopAccountId();
   const params = new URLSearchParams({ first: String(first) });
-  if (accountId) params.set("company_id", accountId);
+  // Whop renamed this filter: GET /payments rejects `company_id`
+  // ("company_id is not supported; filter by account_id") and expects the
+  // owning account id under `account_id`, unlike the legacy field name.
+  if (accountId) params.set("account_id", accountId);
   // A minute of slack for clock skew between us and Whop.
   params.set("created_after", new Date(since.getTime() - 60_000).toISOString());
 
