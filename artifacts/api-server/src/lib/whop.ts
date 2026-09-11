@@ -178,6 +178,33 @@ export async function createCheckout(input: CreateCheckoutInput): Promise<Create
   return { checkoutId: json.id, purchaseUrl: json.purchase_url };
 }
 
+/**
+ * Hide Whop's email input on the checkout page. Whop exposes no API field for
+ * this — it is driven by URL parameters on the purchase URL:
+ *
+ *   email=<address>     fills the field in
+ *   email.hidden=1      hides it entirely (email.disabled=1 locks it instead)
+ *
+ * We already know the customer's address from Clerk, so we pass it and hide the
+ * input rather than asking for the same address twice. Without an address the
+ * field must stay visible, otherwise the customer has no way to enter one and
+ * cannot pay at all.
+ *
+ * https://docs.whop.com/manage-your-business/payment-processing/checkout-branding
+ */
+export function withKnownEmail(purchaseUrl: string, email: string | null): string {
+  if (!email) return purchaseUrl;
+  try {
+    const url = new URL(purchaseUrl);
+    url.searchParams.set("email", email);
+    url.searchParams.set("email.hidden", "1");
+    return url.toString();
+  } catch {
+    // A URL we cannot parse must never break a checkout Whop already opened.
+    return purchaseUrl;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Memberships — the admin auto-renew toggle maps to Whop's cancel_at_period_end
 // flag: on keeps billing, off stops renewals at the end of the current period
@@ -243,6 +270,15 @@ export function whopSignatureValid(rawBody: string | Buffer, headers: WhopWebhoo
 export interface WhopPayment {
   id: string;
   status: string;
+  /** Friendly status (e.g. "succeeded") — decisions use `paid_at`, not this. */
+  substatus?: string | null;
+  /** ISO timestamp, set only once the charge succeeded (null while pending). */
+  paid_at?: string | null;
+  /** ISO timestamp of the refund, when the payment was refunded. */
+  refunded_at?: string | null;
+  refunded_amount?: number | null;
+  /** Disputes (chargebacks) against this payment; empty when there are none. */
+  disputes?: Array<{ id?: string; status?: string | null }> | null;
   /** Total charged in whole dollars (e.g. 5.88 for $5.88). */
   total?: number | null;
   /** Settlement amount in whole dollars — fallback when `total` is absent. */
@@ -267,4 +303,117 @@ export function whopPaymentAmountCents(payment: WhopPayment): number | null {
 /** Normalize a Whop currency string ("usd") for comparison with ours ("USD"). */
 export function whopCurrencyMatches(currency: string | null | undefined, expected: string): boolean {
   return typeof currency === "string" && currency.toUpperCase() === expected.toUpperCase();
+}
+
+/**
+ * Whether a Whop payment actually settled. Whop sets `paid_at` only once the
+ * charge succeeds ("Null if the payment has not yet succeeded") and reports
+ * `status: "paid"`; accepting either means a tweak to one field cannot silently
+ * block every grant. Everything else — pending, draft, uncollectible,
+ * unresolved, void — is not a success and must never grant an entitlement.
+ */
+export function whopPaymentSucceeded(payment: WhopPayment): boolean {
+  if (typeof payment.paid_at === "string" && payment.paid_at.length > 0) return true;
+  return payment.status === "paid";
+}
+
+/** Whether a settled payment has since been (partly or fully) refunded. */
+export function whopPaymentRefunded(payment: WhopPayment): boolean {
+  if (typeof payment.refunded_at === "string" && payment.refunded_at.length > 0) return true;
+  return typeof payment.refunded_amount === "number" && payment.refunded_amount > 0;
+}
+
+/**
+ * Look up the payment a checkout reference produced. The reference rides on the
+ * checkout-configuration metadata and Whop copies it onto the payment — the
+ * same mapping the payment.succeeded webhook matches on, just pulled instead of
+ * pushed. This is what lets the app verify a purchase when no webhook arrived.
+ *
+ * `since` bounds the scan to payments created around the intent so the page we
+ * read stays small. Returns null when Whop has no matching payment yet.
+ */
+export async function findPaymentByReference(
+  reference: string,
+  since: Date,
+): Promise<WhopPayment | null> {
+  const payments = await listPaymentsSince(since);
+  const match = payments.find((payment) => {
+    const ref = payment.metadata?.reference;
+    return typeof ref === "string" && ref === reference;
+  });
+  return match ?? null;
+}
+
+/**
+ * GET /payments — every payment on the account created since `since` (newest
+ * first, one page). Callers filter; the reconcile sweep walks all of them.
+ */
+export async function listPaymentsSince(since: Date, first = 50): Promise<WhopPayment[]> {
+  const accountId = whopAccountId();
+  const params = new URLSearchParams({ first: String(first) });
+  if (accountId) params.set("company_id", accountId);
+  // A minute of slack for clock skew between us and Whop.
+  params.set("created_after", new Date(since.getTime() - 60_000).toISOString());
+
+  const json = await whopRequest<{ data?: WhopPayment[] }>(`/payments?${params.toString()}`, {
+    method: "GET",
+  });
+  return Array.isArray(json?.data) ? json.data : [];
+}
+
+/** GET /payments/{id} — null when Whop has no such payment. */
+export async function fetchPaymentById(paymentId: string): Promise<WhopPayment | null> {
+  try {
+    return await whopRequest<WhopPayment>(`/payments/${encodeURIComponent(paymentId)}`, {
+      method: "GET",
+    });
+  } catch (cause) {
+    if (cause instanceof WhopApiError && cause.status === 404) return null;
+    throw cause;
+  }
+}
+
+/** The full amount charged, in whole dollars (Whop's reporting unit). */
+export function whopPaymentTotal(payment: WhopPayment): number | null {
+  const dollars = payment.total ?? payment.usd_total;
+  return typeof dollars === "number" && Number.isFinite(dollars) ? dollars : null;
+}
+
+/**
+ * Whether the *whole* charge was given back. A partial refund leaves the
+ * customer with what they paid for, so callers must not revoke on it.
+ */
+export function whopPaymentFullyRefunded(payment: WhopPayment): boolean {
+  const refunded = payment.refunded_amount;
+  if (typeof refunded !== "number" || refunded <= 0) {
+    // No amount reported, but `refunded_at` says a refund happened — with
+    // nothing to compare against, assume the whole charge went back.
+    return typeof payment.refunded_at === "string" && payment.refunded_at.length > 0;
+  }
+  const total = whopPaymentTotal(payment);
+  // Whop reports whole dollars; allow a cent for rounding.
+  return total === null || total <= 0 || refunded >= total - 0.01;
+}
+
+/**
+ * Dispute statuses that mean a chargeback is still in play. Whop keeps decided
+ * disputes in the payment's list, so anything outside this set is a terminal
+ * outcome — which is what lets a *won* dispute restore access again.
+ * `refreshSubscriptionForPayment` logs the statuses it observes, so this set can
+ * be extended if Whop introduces another in-flight state.
+ */
+const OPEN_DISPUTE_STATUSES = new Set([
+  "needs_response",
+  "warning_needs_response",
+  "under_review",
+  "warning_under_review",
+]);
+
+/** Whether a chargeback against this payment is still unresolved. */
+export function whopPaymentHasOpenDispute(payment: WhopPayment): boolean {
+  const disputes = Array.isArray(payment.disputes) ? payment.disputes : [];
+  return disputes.some((dispute) => {
+    const status = dispute?.status;
+    return typeof status === "string" && OPEN_DISPUTE_STATUSES.has(status);
+  });
 }

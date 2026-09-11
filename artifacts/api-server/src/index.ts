@@ -6,6 +6,7 @@ import { initRealtime } from "./realtime";
 import { startVideoWorker } from "./video/worker";
 import { startStorageMaintenance } from "./video/storage-maintenance-runner";
 import { startChannelAnalyticsSync } from "./youtube/analytics-runner";
+import { startWhopReconciliation } from "./whop/reconcile-runner";
 
 const rawPort = process.env["PORT"];
 
@@ -36,4 +37,8 @@ server.listen(port, () => {
   startVideoWorker();
   startStorageMaintenance();
   startChannelAnalyticsSync();
+  // Settles PENDING Whop checkout intents against Whop's API, so a missed
+  // payment.succeeded webhook can never leave a paying customer without their
+  // entitlement.
+  startWhopReconciliation();
 });

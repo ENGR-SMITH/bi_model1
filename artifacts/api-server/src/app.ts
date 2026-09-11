@@ -1,4 +1,9 @@
-import express, { type Express } from "express";
+import express, {
+  type Express,
+  type NextFunction,
+  type Request,
+  type Response,
+} from "express";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -93,5 +98,35 @@ if (fs.existsSync(agentDist)) {
 }
 
 app.use("/api", router);
+
+// Express's built-in error handler answers with an HTML page (e.g.
+// "<pre>Bad Request</pre>") and, in production, hides the message — so a throw
+// that escaped a route became an unreadable dead end for the client and the
+// logs alike. Most recently that hid `WhopApiError` (400) from POST /whop/checkout.
+// Answer with JSON instead, and always log the underlying error so a 500 is
+// diagnosable from the deploy logs. A deliberate 4xx is passed through with its
+// message (those are user-facing API errors, e.g. WhopApiError carries Whop's
+// own status); anything else is reported as a 500 and its message withheld
+// outside development, so an unexpected status or internal detail never leaks.
+function errorStatus(err: unknown): number {
+  const raw =
+    (err as { status?: unknown } | null)?.status ??
+    (err as { statusCode?: unknown } | null)?.statusCode;
+  const status = typeof raw === "number" ? raw : Number(raw);
+  return Number.isInteger(status) && status >= 400 && status <= 599 ? status : 500;
+}
+
+app.use((err: unknown, req: Request, res: Response, next: NextFunction): void => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  const status = errorStatus(err);
+  const message = err instanceof Error && err.message ? err.message : "Internal Server Error";
+  req.log.error({ err, status }, "request failed");
+  res.status(status).json({
+    error: status < 500 || process.env.NODE_ENV !== "production" ? message : "Internal Server Error",
+  });
+});
 
 export default app;

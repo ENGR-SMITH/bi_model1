@@ -9,7 +9,13 @@ import {
   nexetSubscriptionsTable,
   nexetTicketsTable,
 } from "@workspace/db";
-import { STORAGE_PLANS, PROJECT_PLANS, getOrCreateQuota } from "./quota";
+import {
+  STORAGE_PLANS,
+  PROJECT_PLANS,
+  getOrCreateQuota,
+  DEFAULT_STORAGE_LIMIT_BYTES,
+  DEFAULT_PROJECT_LIMIT,
+} from "./quota";
 import { PASS_PRICE_USD, TICKET_CATEGORIES, type TicketCategory } from "../routes/tickets";
 
 // ---------------------------------------------------------------------------
@@ -369,6 +375,239 @@ export async function applySubscriptionPurchase(
   }
 
   return { subscriptionId, periodStart, periodEnd };
+}
+
+// ---------------------------------------------------------------------------
+// Taking a grant back — the reversal half of `applySubscriptionPurchase`.
+//
+// A refund must cut access *now*, not at the end of the paid period, so the
+// same entitlement the grant created is removed the moment Whop reports the
+// reversal. Every field needed to identify what to remove (and to put it back
+// if the reversal is itself reversed, e.g. a dispute we win) travels in the
+// reference below, and the pass ticket is matched by the exact expiry the
+// grant stamped on it — so a second, separately-paid pass is never collateral
+// damage.
+// ---------------------------------------------------------------------------
+
+/** What one subscription row granted, enough to revoke it and to restore it. */
+export interface SubscriptionEntitlementRef {
+  userId: string;
+  kind: SubscriptionKind;
+  planId: string;
+  /** The period this row granted — also the expiry stamped on its ticket. */
+  periodEnd: Date;
+  priceUsd: number;
+  promoCode?: string | null;
+  cardLast4?: string | null;
+}
+
+/** What a revocation or restoration actually changed. */
+export interface EntitlementChange {
+  /** A pass ticket was removed (revoke) or re-created (restore). */
+  ticketChanged: boolean;
+  /** Storage bytes taken back / given again. */
+  storageBytes: number;
+  /** Project slots taken back / given again. */
+  projectSlots: number;
+  /** Anything a human should look at — the caller logs these. */
+  warnings: string[];
+}
+
+/**
+ * The database handle, or an open transaction. Accepting either lets a
+ * revocation and the subscription row that records it commit together, so
+ * access can never be cut without the record saying so — or vice versa.
+ */
+type SubscriptionDbExecutor =
+  | typeof db
+  | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function emptyChange(): EntitlementChange {
+  return { ticketChanged: false, storageBytes: 0, projectSlots: 0, warnings: [] };
+}
+
+/**
+ * Remove, immediately, the access a subscription granted: its pass ticket, or
+ * the storage/project credits it added to the account quota.
+ *
+ * Safe to run twice — deleting a ticket that is already gone is a no-op, and
+ * the caller claims the row's status first so a redelivered webhook cannot
+ * subtract the same credits twice.
+ */
+export async function revokeSubscriptionEntitlement(
+  ref: SubscriptionEntitlementRef,
+  executor: SubscriptionDbExecutor = db,
+): Promise<EntitlementChange> {
+  const change = emptyChange();
+
+  if (ref.kind === "pass") {
+    if (!isPassCategory(ref.planId)) return change;
+    const category = ref.planId;
+
+    // The grant stamped this row's `periodEnd` onto the ticket it created, so
+    // that exact expiry identifies *this* purchase's ticket.
+    const [exact] = await executor
+      .select({ id: nexetTicketsTable.id })
+      .from(nexetTicketsTable)
+      .where(
+        and(
+          eq(nexetTicketsTable.userId, ref.userId),
+          eq(nexetTicketsTable.category, category),
+          eq(nexetTicketsTable.expiresAt, ref.periodEnd),
+        ),
+      )
+      .limit(1);
+
+    let ticketId = exact?.id ?? null;
+    if (!ticketId) {
+      // Nothing matched exactly. Rather than guess which pass to cut, only do
+      // it when the choice is unambiguous: exactly one live pass for the
+      // category. Anything else is flagged for a human instead of blind-cut.
+      const live = await executor
+        .select({ id: nexetTicketsTable.id })
+        .from(nexetTicketsTable)
+        .where(
+          and(
+            eq(nexetTicketsTable.userId, ref.userId),
+            eq(nexetTicketsTable.category, category),
+            gt(nexetTicketsTable.expiresAt, new Date()),
+          ),
+        )
+        .orderBy(desc(nexetTicketsTable.expiresAt));
+      if (live.length === 1) {
+        ticketId = live[0].id;
+        change.warnings.push(
+          "refund: pass ticket matched by elimination (one live pass), not by exact expiry",
+        );
+      } else if (live.length > 1) {
+        change.warnings.push(
+          `refund: ${live.length} live passes for ${category} and none matched this purchase — cut one manually`,
+        );
+      }
+    }
+
+    if (ticketId) {
+      await executor.delete(nexetTicketsTable).where(eq(nexetTicketsTable.id, ticketId));
+      change.ticketChanged = true;
+    }
+    return change;
+  }
+
+  // Storage / projects: take back exactly the credits this purchase added. The
+  // quota row holds the running total, so the grant's own amount is what goes.
+  const [quota] = await executor
+    .select({
+      storageLimitBytes: nexetAccountQuotasTable.storageLimitBytes,
+      projectLimit: nexetAccountQuotasTable.projectLimit,
+    })
+    .from(nexetAccountQuotasTable)
+    .where(eq(nexetAccountQuotasTable.userId, ref.userId))
+    .limit(1);
+  if (!quota) return change; // never granted — nothing to take back
+
+  if (ref.kind === "storage") {
+    const bytes = storagePlanBytes(ref.planId);
+    if (bytes <= 0) return change;
+    // Floored at the free tier: a refund can never push an account below what
+    // every account starts with.
+    const next = Math.max(DEFAULT_STORAGE_LIMIT_BYTES, quota.storageLimitBytes - bytes);
+    const removed = quota.storageLimitBytes - next;
+    if (removed <= 0) return change;
+    await executor
+      .update(nexetAccountQuotasTable)
+      .set({ storageLimitBytes: next })
+      .where(eq(nexetAccountQuotasTable.userId, ref.userId));
+    change.storageBytes = removed;
+    return change;
+  }
+
+  const count = projectPlanCount(ref.planId);
+  if (count <= 0) return change;
+  const next = Math.max(DEFAULT_PROJECT_LIMIT, quota.projectLimit - count);
+  const removed = quota.projectLimit - next;
+  if (removed <= 0) return change;
+  await executor
+    .update(nexetAccountQuotasTable)
+    .set({ projectLimit: next })
+    .where(eq(nexetAccountQuotasTable.userId, ref.userId));
+  change.projectSlots = removed;
+  return change;
+}
+
+/**
+ * Give back the access a revocation took away — for a dispute decided in our
+ * favour, where no money ended up leaving.
+ *
+ * Idempotent: it will not re-create a ticket that is already there, and the
+ * caller only reaches it from the REFUNDED → ACTIVE claim. A period that has
+ * already lapsed is left alone, because there would be no access to restore.
+ */
+export async function restoreSubscriptionEntitlement(
+  ref: SubscriptionEntitlementRef,
+  executor: SubscriptionDbExecutor = db,
+): Promise<EntitlementChange> {
+  const change = emptyChange();
+
+  if (ref.kind === "pass") {
+    if (!isPassCategory(ref.planId)) return change;
+    if (ref.periodEnd.getTime() <= Date.now()) return change;
+    const category = ref.planId;
+
+    const [existing] = await executor
+      .select({ id: nexetTicketsTable.id })
+      .from(nexetTicketsTable)
+      .where(
+        and(
+          eq(nexetTicketsTable.userId, ref.userId),
+          eq(nexetTicketsTable.category, category),
+          eq(nexetTicketsTable.expiresAt, ref.periodEnd),
+        ),
+      )
+      .limit(1);
+    if (existing) return change; // already granted — nothing to put back
+
+    await executor.insert(nexetTicketsTable).values({
+      id: randomUUID(),
+      userId: ref.userId,
+      category,
+      priceUsd: ref.priceUsd,
+      promoCode: ref.promoCode ?? null,
+      cardLast4: ref.cardLast4 ?? "",
+      expiresAt: ref.periodEnd,
+    });
+    change.ticketChanged = true;
+    return change;
+  }
+
+  const [quota] = await executor
+    .select({
+      storageLimitBytes: nexetAccountQuotasTable.storageLimitBytes,
+      projectLimit: nexetAccountQuotasTable.projectLimit,
+    })
+    .from(nexetAccountQuotasTable)
+    .where(eq(nexetAccountQuotasTable.userId, ref.userId))
+    .limit(1);
+  if (!quota) return change;
+
+  if (ref.kind === "storage") {
+    const bytes = storagePlanBytes(ref.planId);
+    if (bytes <= 0) return change;
+    await executor
+      .update(nexetAccountQuotasTable)
+      .set({ storageLimitBytes: quota.storageLimitBytes + bytes })
+      .where(eq(nexetAccountQuotasTable.userId, ref.userId));
+    change.storageBytes = bytes;
+    return change;
+  }
+
+  const count = projectPlanCount(ref.planId);
+  if (count <= 0) return change;
+  await executor
+    .update(nexetAccountQuotasTable)
+    .set({ projectLimit: quota.projectLimit + count })
+    .where(eq(nexetAccountQuotasTable.userId, ref.userId));
+  change.projectSlots = count;
+  return change;
 }
 
 export interface UserSubscriptionView {
