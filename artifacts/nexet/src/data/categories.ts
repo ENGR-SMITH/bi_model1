@@ -94,6 +94,14 @@ export const nexetDashboardCategories = nexetCategories.filter((category) =>
   DASHBOARD_SLUGS.includes(category.slug),
 );
 
+// The rooms that are still only on the blueprint. Explore All is the doorway to
+// these, not one of them, so it stays out of the list: the dashboard names them
+// inside its Explore All card and the marketing page gives each one its own
+// "Upcoming features" card.
+export const nexetUpcomingCategories = nexetCategories.filter(
+  (category) => category.status === 'Coming Soon' && category.slug !== 'explore',
+);
+
 export function getNexetCategory(slug?: string) {
   return nexetCategories.find((category) => category.slug === slug);
 }

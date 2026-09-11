@@ -1,7 +1,7 @@
 import { PiArrowUpRightDuotone, PiEyeDuotone, PiMagicWandDuotone, PiSparkleDuotone, PiStackDuotone } from 'react-icons/pi';
 import { Link } from 'wouter';
 import { HouseNav, NexetLogo } from '@/components/nexet-house';
-import { nexetCategories } from '@/data/categories';
+import { nexetCategories, nexetUpcomingCategories } from '@/data/categories';
 
 function PlatformDiagram() {
   return (
@@ -43,6 +43,11 @@ function PlatformDiagram() {
  * Content Creators. Everything else is still on the blueprint and lives behind
  * the waitlist page, so it gets no card here. */
 const openRooms = nexetCategories.filter((category) => category.status === 'Available');
+
+/** The rooms still being built. They used to sit among the open doors; they now
+ * live in their own "Upcoming features" row so visitors can see the whole house
+ * without being sold a room they cannot enter. */
+const upcomingRooms = nexetUpcomingCategories;
 
 export default function Home() {
   return (
@@ -151,6 +156,50 @@ export default function Home() {
               </Link>
             );
           })}
+        </div>
+      </section>
+
+      <section id="upcoming" className="border-t border-white/5 bg-[#0d0d0d]">
+        <div className="mx-auto max-w-[1400px] px-4 py-20 sm:px-5 lg:px-6 lg:py-28">
+          <div className="flex flex-col justify-between gap-7 sm:flex-row sm:items-end">
+            <div>
+              <h2 className="mt-5 max-w-[12ch] text-5xl font-bold leading-[.92] tracking-[-0.04em] text-white sm:text-6xl">The rest of the house is still being built.</h2>
+            </div>
+            <p className="max-w-[22rem] text-sm leading-relaxed text-zinc-400">Upcoming features, already on the blueprint. Leave your email on any room and we&apos;ll light it up the day it opens.</p>
+          </div>
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {upcomingRooms.map((room) => {
+              const Icon = room.icon;
+              return (
+                <Link
+                  key={room.slug}
+                  href={`/categories/${room.slug}`}
+                  className="focus-house group relative flex min-h-[240px] flex-col justify-between overflow-hidden rounded-2xl border border-white/10 card-surface card-surface-hover p-6 transition-all hover:-translate-y-1 hover:border-white/20"
+                  data-testid={`link-upcoming-${room.slug}`}
+                >
+                  <span className="card-spot" />
+                  <span className="card-shine" />
+                  <span className="absolute -right-10 -top-12 h-36 w-36 rounded-full border border-white/5 opacity-20 transition-transform duration-500 group-hover:scale-125" />
+                  <div className="relative flex items-center justify-between">
+                    <span className="icon-chip h-12 w-12 text-zinc-300">
+                      <Icon className="h-6 w-6" />
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-mono-ui text-[9px] uppercase tracking-[0.13em] text-zinc-400">
+                      Coming soon
+                    </span>
+                  </div>
+                  <div className="relative mt-10">
+                    <h3 className="max-w-[14ch] text-xl font-bold leading-[1.05] tracking-[-0.03em] text-zinc-100">{room.name}</h3>
+                    <p className="mt-3 max-w-[20rem] text-sm leading-relaxed text-zinc-500">{room.description}</p>
+                  </div>
+                  <span className="relative mt-7 inline-flex items-center gap-2 text-xs font-semibold text-zinc-400">
+                    Join the waitlist
+                    <PiArrowUpRightDuotone className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </section>
 
