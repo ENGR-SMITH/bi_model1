@@ -40,8 +40,14 @@ short-lived by design), the agent signs itself back in automatically.
 
 ## Configuration
 
-Create `nexet-agent.json` next to the app (or `~/.nexet-agent/config.json`),
-or set environment variables:
+Values are resolved in this order — first one wins, per field:
+
+1. **environment variables** (`NEXET_API_URL`, `NEXET_WEB_URL`, …)
+2. **a JSON config file** — searched as `NEXET_AGENT_CONFIG`, then
+   `nexet-agent.json` next to the running app, then `nexet-agent.json` in the
+   working directory, then `~/.nexet-agent/config.json`, then
+   `~/.nexet-agent.json`
+3. **the built-in defaults** — the hosted `https://nexet.co` deployment
 
 ```json
 {
@@ -54,6 +60,13 @@ or set environment variables:
 
 The shipped defaults point at the real deployment (`https://nexet.co`), where
 the API and the web app share one origin. Override them to develop locally.
+
+**Nothing here is required.** Leave all three layers alone and the agent uses
+`https://nexet.co` — so if its sign-in link points somewhere unexpected, an
+override is the cause. The agent now says so out loud: the footer shows
+`sign-in · <origin>`, and when an env var or config file supplied it, the auth
+card names that file or "environment variables". Delete the override and
+relaunch to fall back to the built-in default.
 
 | Config / env            | Meaning                                |
 | ----------------------- | -------------------------------------- |
@@ -147,9 +160,16 @@ configured `NEXET_WEB_URL` origin.
 The installed app checks for updates on launch (and via the **Check for updates**
 button in the **Agent updates** card on the right) and downloads them in the
 background; when a new version is ready the button becomes **Restart & update**. Releases are published by the
-`build-desktop-agent` CI workflow, which uploads the installer **plus the
-`latest*.yml` feed files and blockmaps** next to it — point `NEXET_UPDATE_URL`
-(or the build-time `build.publish.url`) at that public directory.
+`build-desktop-agent` CI workflow (tag `agent-v*`, or a manual dispatch), which
+uploads the installer **plus the `latest*.yml` feed files and blockmaps** next
+to it — point `NEXET_UPDATE_URL` (or the build-time `build.publish.url`) at that
+public directory.
+
+> `desktop-agent-windows.yml` — the workflow that runs on every push to `main`
+> — is **artifact-only**. Running it does not change the installer users
+> download; only `build-desktop-agent` publishes to R2, and it needs the
+> `CF_ACCOUNT_ID` / `CF_R2_ACCESS_KEY` / `CF_R2_SECRET_KEY` secrets to do so
+> (it fails loudly when they are missing rather than skipping silently).
 
 Update checks only run in the packaged app (`app.isPackaged`) because
 `electron-updater` needs the `app-update.yml` that electron-builder bakes into

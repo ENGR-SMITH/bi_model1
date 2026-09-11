@@ -882,18 +882,35 @@ function App() {
       <Sidebar view={view} setView={setView} project={project} projects={projects} openProject={openProject} openEditor={openEditor} mobile={mobileNav} close={() => setMobileNav(false)} onNew={() => { setDraftNudge(false); setModal("project"); }} onTutorial={startTutorial} workspaceOpen={sidebarWorkspaceOpen} setWorkspaceOpen={setSidebarWorkspaceOpen} mode={mode} hasUserProject={hasUserProject} notify={notify} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
     <main className="main-stage">
       <header className="topbar">
+        <div className="topbar-chrome">
         <div className="topbar-left">
         <button className="icon-btn mobile-only" aria-label="Open navigation" onClick={() => setMobileNav(true)}><Menu size={19} /></button>
-        <div className="top-workspace-wrap" onPointerLeave={() => setTopWorkspaceOpen(false)}><button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)}><span>Workspace</span><ChevronDown size={13} /><b>{project?.title ?? "Your projects"}</b></button>{topWorkspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setTopWorkspaceOpen(false); }} onNew={() => { setModal("project"); setTopWorkspaceOpen(false); }} />}</div>
-        <TopArenaButton active={arenaOpen} onClick={() => setView("arena")} />
         </div>
         <div className="topbar-center">
-         {/* The Draft/Lesson switch only appears while on the Lesson — in Draft
-             mode the lesson stays reachable from the sidebar's "Explore the
-             tutorial" button instead of cluttering the top bar. */}
-         {mode === "lesson" ? <div className="mode-switch mode-switch-inline" role="tablist" aria-label="Writing mode"><button className="draft-mode-tab wave-nudge" onClick={switchToDraft} role="tab" aria-selected={false}><PenLine size={13} /> Draft</button><button className="active" onClick={switchToLesson} role="tab" aria-selected={true}><BookOpen size={13} /> Lesson</button></div> : <TopExploreSearch onOpenExplore={openExplore} onOpenSeed={openSeed} />}
+        <TopExploreSearch onOpenExplore={openExplore} onOpenSeed={openSeed} />
         </div>
-         <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><TopNotificationsBell unread={unreadCount} onClick={() => setView("notifications")} /><TopAccountChip onOpenProfile={() => setView("profile")} /><TopExitButton /></div>
+         <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><TopNotificationsBell unread={unreadCount} onClick={() => setView("notifications")} /><TopAccountChip onOpenProfile={() => setView("profile")} /></div>
+        </div>
+        <div className="topbar-secondary">
+          <div className="topbar-workspace-col">
+            {/* The workspace switcher, moved down to the second row the way the
+                Creators Den keeps its Channel/Project dropdowns there. */}
+            <div className="topnav-chip">
+              <div className="top-workspace-wrap" onPointerLeave={() => setTopWorkspaceOpen(false)}><button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)}><span>Workspace</span><b>{project?.title ?? "Your projects"}</b><ChevronDown size={13} /></button>{topWorkspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setTopWorkspaceOpen(false); }} onNew={() => { setModal("project"); setTopWorkspaceOpen(false); }} />}</div>
+            </div>
+            <div className="topnav-chip">
+              <TopArenaButton active={arenaOpen} onClick={() => setView("arena")} />
+            </div>
+          </div>
+          {/* The Draft/Lesson switch sits on the second row with the workspace
+              chips, so the Explore search keeps the main bar's centre. */}
+          <div className="topbar-tabs">
+            {mode === "lesson" && <div className="mode-switch mode-switch-inline" role="tablist" aria-label="Writing mode"><button className="draft-mode-tab wave-nudge" onClick={switchToDraft} role="tab" aria-selected={false}><PenLine size={13} /> Draft</button><button className="active" onClick={switchToLesson} role="tab" aria-selected={true}><BookOpen size={13} /> Lesson</button></div>}
+          </div>
+          <div className="topbar-signout-col">
+            <div className="topnav-chip"><TopExitButton /></div>
+          </div>
+        </div>
       </header>
         {cloneBusy && <div className="den-status-banner"><RefreshCw size={15} className="spin" /> Opening your fork of this seed…</div>}
         {forkError && <div className="den-status-banner error"><XCircle size={15} /> {forkError}</div>}

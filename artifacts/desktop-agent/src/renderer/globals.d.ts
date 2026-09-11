@@ -16,6 +16,7 @@ interface Window {
 
 type AgentSettings = import("../shared/types").AgentSettings;
 type AppInfo = import("../shared/types").AppInfo;
+type ConfigStatus = import("../shared/types").ConfigStatus;
 type JobProgress = import("../shared/types").JobProgress;
 type UpdateEvent = import("../shared/types").UpdateEvent;
 type LaunchContext = import("../shared/types").LaunchContext;

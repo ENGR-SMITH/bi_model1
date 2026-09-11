@@ -56,6 +56,30 @@ export interface AppInfo {
   packaged: boolean;
 }
 
+/** Which configuration layer supplied a resolved value. */
+export type ConfigSource = "env" | "file" | "default";
+
+/**
+ * The resolved deployment config, surfaced in the UI so a stale override is
+ * visible: an old nexet-agent.json or an exported NEXET_WEB_URL would
+ * otherwise send sign-in at a dev origin with nothing on screen explaining why.
+ */
+export interface ConfigStatus {
+  clerkConfigured: boolean;
+  apiBaseUrl: string;
+  webAppUrl: string;
+  apiBaseUrlSource: ConfigSource;
+  webAppUrlSource: ConfigSource;
+  /** True when an env var or a config file — not the built-in default — chose
+   * the API / sign-in origins. */
+  overridden: boolean;
+  /** What did the overriding — "environment variables" or the config file's
+   * path — or null when the shipped defaults are in effect. */
+  overrideSource: string | null;
+  /** Absolute path of the config file that was read, when one was. */
+  configFile: string | null;
+}
+
 /**
  * Context handed to the agent when Creator Den launches it for an upload:
  * which project to preselect, and the page to reopen once the upload lands

@@ -536,6 +536,10 @@
         font: 500 10.5px var(--font-mono); color: var(--faint-fg); letter-spacing: 0.08em;
       }
       .footer-actions { display: flex; gap: 8px; align-items: center; min-width: 0; }
+      .footer-origin {
+        max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font: 500 11.5px var(--font-mono); color: var(--faint-fg);
+      }
       .footer-account {
         max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
         font: 500 11.5px var(--font-mono); color: var(--muted-fg);
@@ -721,6 +725,9 @@
       <footer class="footer">
         <span class="version">v<span id="version">0.0.0</span> · Nexet Desktop Agent</span>
         <div class="footer-actions">
+          <!-- Where sign-in will run, and where that choice came from. A stale
+               nexet-agent.json is otherwise invisible until the link is wrong. -->
+          <span id="footer-config" class="footer-origin"></span>
           <span id="footer-account" class="footer-account hidden"></span>
         </div>
       </footer>

@@ -1,4 +1,9 @@
-name: Desktop Agent Windows Build
+# Artifact-only Windows build — runs on every push to main so a broken build
+# surfaces early. It deliberately does NOT publish: the installer the in-app
+# "Desktop agent" button serves comes from build-desktop-agent.yml (tag
+# agent-v*, or a manual dispatch), which is also the workflow that writes
+# latest.yml. Running THIS one does not change what users download.
+name: Desktop Agent Windows Build (artifact only)
 
 on:
   workflow_dispatch:
