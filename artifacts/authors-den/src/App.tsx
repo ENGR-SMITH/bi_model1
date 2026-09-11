@@ -4,7 +4,7 @@ import {
   AlertTriangle, Archive, ArrowLeft, ArrowRight, BookOpen, Bold, Check, CheckCircle2, ChevronDown, CircleHelp,
   ClipboardList, Clock3, Copy, Download, Eraser, ExternalLink, FileDown, FileText, FolderOpen,
   GitFork, Globe2, Heading1, Heading2, Highlighter, ImagePlus,  Italic, Library, Link2, List,
-  ListOrdered, Lock, LockOpen, LogOut, MapPin, Menu, Mic, Move, PanelLeft, PenLine, Play, Plus,
+  ListOrdered, Lock, LockOpen, MapPin, Menu, Mic, Move, PanelLeft, PenLine, Play, Plus,
   Printer, Quote, Redo2, RefreshCw, RotateCcw, Save, Search, Send, Settings, ShieldCheck, Sparkles, Strikethrough, Trash2,
   Type, Undo2, Upload, Users, WandSparkles, X, XCircle, Zap, MessageCircle
 } from "lucide-react";
@@ -19,7 +19,7 @@ import { ArenaPage } from "@/components/arena";
 import { ArenaPostPage } from "@/components/arena-post";
 import { ArenaMinePage } from "@/components/arena-mine";
 import { ArenaRoleModal, type ArenaRoleBrief } from "@/components/arena-role-modal";
-import { TopAccountChip, TopArenaButton, TopExploreSearch, TopNotificationsBell } from "@/components/top-nav";
+import { TopAccountChip, TopArenaButton, TopExitButton, TopExploreSearch, TopNotificationsBell } from "@/components/top-nav";
 import { WRITER_ROLES, apiErrorText, writerRoleLabel } from "@/lib/arena";
 import { continuityAudit, oracleChat, outlineAssist, transcribeAudio, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
 import {
@@ -893,7 +893,7 @@ function App() {
              tutorial" button instead of cluttering the top bar. */}
          {mode === "lesson" ? <div className="mode-switch mode-switch-inline" role="tablist" aria-label="Writing mode"><button className="draft-mode-tab wave-nudge" onClick={switchToDraft} role="tab" aria-selected={false}><PenLine size={13} /> Draft</button><button className="active" onClick={switchToLesson} role="tab" aria-selected={true}><BookOpen size={13} /> Lesson</button></div> : <TopExploreSearch onOpenExplore={openExplore} onOpenSeed={openSeed} />}
         </div>
-         <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><TopNotificationsBell unread={unreadCount} onClick={() => setView("notifications")} /><TopAccountChip onOpenProfile={() => setView("profile")} /></div>
+         <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><TopNotificationsBell unread={unreadCount} onClick={() => setView("notifications")} /><TopAccountChip onOpenProfile={() => setView("profile")} /><TopExitButton /></div>
       </header>
         {cloneBusy && <div className="den-status-banner"><RefreshCw size={15} className="spin" /> Opening your fork of this seed…</div>}
         {forkError && <div className="den-status-banner error"><XCircle size={15} /> {forkError}</div>}
@@ -937,7 +937,7 @@ function Sidebar({ view, setView, project, projects, openProject, openEditor, mo
   // The Arena is a den-level room like Explore: reachable without a project.
   const openRoom = (id: View) => ["profile", "explore", "notifications", "arena", "arena-post", "arena-mine"].includes(id);
   const go = (id: View) => { if (openRoom(id)) { setView(id); close(); return; } if (gated) { notify("Create a project first to open your current work"); return; } if (id === "editor") openEditor(); else setView(id); close(); };
-   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><a className="nexet-back-btn" href="/" title="Back to Nexet"><LogOut size={15} /><span>Back to Nexet</span></a><div className="brand-row"><div className="brand-mark">A</div><div className="brand-copy"><div className="brand-name">Authors Den</div><div className="brand-sub">writing studio</div></div><button className="icon-btn sidebar-close mobile-only" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
+   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><div className="brand-row"><div className="brand-mark">A</div><div className="brand-copy"><div className="brand-name">Authors Den</div><div className="brand-sub">writing studio</div></div><button className="icon-btn sidebar-close mobile-only" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
      <div className="workspace-switch-wrap" onPointerLeave={() => setWorkspaceOpen(false)}><button className={`workspace-switch ${workspaceOpen ? "open" : ""}`} onClick={() => setWorkspaceOpen(!workspaceOpen)}><span className="workspace-icon"><Library size={14} /></span><span className="workspace-copy"><small>WORKSPACE</small><strong>My writing desk</strong></span><ChevronDown size={14} /></button>{workspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setWorkspaceOpen(false); }} onNew={() => { onNew(); setWorkspaceOpen(false); }} />}</div>
     <button className={`nav-item ${view === "home" ? "active" : ""}`} onClick={() => { setView("home"); close(); }}><FolderOpen size={17} /><span>Projects</span><span className="nav-count">{projects.length}</span></button>
      <div className="nav-label">CURRENT WORK</div>{project ? nav.map(([id, label, icon]) => <button key={id} className={`nav-item ${view === id ? "active" : ""} ${gated ? "nav-item-gated" : ""}`} onClick={() => go(id)} disabled={gated} title={gated ? "Create a project first before opening current work" : undefined}>{icon}<span>{label}</span>{id === "outline" && <span className="nav-count">{project.scenes.length}</span>}{gated && <span className="nav-lock">Create first</span>}</button>) : <div className="empty-sidebar">Open a project to begin.</div>}
