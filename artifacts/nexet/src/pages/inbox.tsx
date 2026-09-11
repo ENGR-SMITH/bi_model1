@@ -10,7 +10,6 @@ import {
   useMarkVideoNotificationRead,
 } from '@workspace/api-client-react';
 import type { VideoNotification } from '@workspace/api-client-react';
-import { SectionEyebrow } from '@/components/protected-shell';
 import {
   denPageCtaLabel,
   metaFor,
@@ -121,7 +120,6 @@ export default function InboxPage() {
     <div className="mx-auto max-w-[1320px]">
       <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-10 md:flex-row md:items-end">
         <div>
-          <SectionEyebrow>Messages / inbox</SectionEyebrow>
           <h1 className="mt-5 max-w-[12ch] text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">
             Your inbox.
           </h1>

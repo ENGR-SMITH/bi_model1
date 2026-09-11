@@ -64,7 +64,6 @@ export function AuthFrame({ children }: { children: React.ReactNode }) {
       </div>
       <div className="grid w-full max-w-[1060px] flex-1 items-center gap-10 py-12 lg:grid-cols-[.78fr_1fr] lg:gap-20">
         <div className="hidden lg:block">
-          <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">A private door</p>
           <h1 className="mt-6 max-w-[8ch] text-7xl font-bold leading-[.9] tracking-[-0.05em] text-white">Come in, there&apos;s room.</h1>
           <p className="mt-7 max-w-[20rem] text-sm leading-[1.8] text-zinc-400">Nexet is where unfinished ideas find the person who can change their shape.</p>
           <div className="mt-10 h-1 w-20 rounded-full bg-gradient-to-r from-[#3b82f6] to-transparent" />

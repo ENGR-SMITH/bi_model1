@@ -4,7 +4,6 @@ import {
   getListWaitlistEntriesQueryKey,
   useListWaitlistEntries,
 } from '@workspace/api-client-react';
-import { SectionEyebrow } from '@/components/protected-shell';
 import { nexetCategories } from '@/data/categories';
 
 export default function ProfilePage() {
@@ -29,7 +28,6 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-[980px]">
-      <SectionEyebrow>Your corner / profile</SectionEyebrow>
       <h1 className="mt-5 text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">
         Your place in the house.
       </h1>
@@ -40,7 +38,6 @@ export default function ProfilePage() {
               {initials}
             </div>
             <div>
-              <p className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#3b82f6]">Nexet member</p>
               <h2 className="mt-2 text-3xl font-bold tracking-[-0.03em] text-white">{name}</h2>
               <p className="mt-2 flex items-center gap-2 text-sm text-zinc-400"><PiEnvelopeDuotone className="h-4 w-4 text-zinc-500" />{email}</p>
             </div>
@@ -48,7 +45,6 @@ export default function ProfilePage() {
         </div>
         <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-8">
           <div className="card-surface rounded-2xl p-6 sm:col-span-2">
-            <p className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#3b82f6]">Your lights on</p>
             <h3 className="mt-3 text-xl font-bold tracking-[-0.03em] text-zinc-100">Rooms you're waiting for</h3>
             {isLoadingWaitlist ? (
               <p className="mt-3 text-sm text-zinc-500">Checking the house plan...</p>

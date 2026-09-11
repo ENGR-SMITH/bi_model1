@@ -9,7 +9,6 @@ export default function NotFound() {
           <span className="icon-chip mx-auto h-16 w-16 text-[#3b82f6]">
             <PiCompassRoseDuotone className="h-8 w-8 animate-spin-slow" />
           </span>
-          <p className="mt-8 font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">Off the blueprint / 404</p>
           <h1 className="mt-4 text-5xl font-extrabold leading-[.9] tracking-[-0.06em] text-white">This door moved.</h1>
           <p className="mt-4 text-sm leading-relaxed text-zinc-500">
             The room you were looking for is not on Nexet's current plan — or it never was.

@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/react';
 import { Link, useParams } from 'wouter';
 import { useCreateWaitlistEntry } from '@workspace/api-client-react';
-import { SectionEyebrow } from '@/components/protected-shell';
 import { getNexetCategory } from '@/data/categories';
 import AuthorsPage from '@/pages/authors';
 import ContentCreatorsPage from '@/pages/content-creators';
@@ -70,7 +69,6 @@ export default function CategoryUnavailable() {
           <span className="icon-chip h-16 w-16 text-[#3b82f6]">
             <category.icon className="h-7 w-7" />
           </span>
-          <SectionEyebrow>Door {category.shortName.toLowerCase()} / on the blueprint</SectionEyebrow>
           <h1 className="mt-5 text-6xl font-extrabold leading-[.86] tracking-[-0.08em] text-white sm:text-8xl">Not quite lit.</h1>
           <p className="mt-7 max-w-[25rem] text-base leading-[1.8] text-zinc-400">{category.description} We&apos;re preparing this room with care.</p>
         </div>
@@ -78,7 +76,6 @@ export default function CategoryUnavailable() {
           <div className="flex items-start gap-4">
             <span className="mt-1 icon-chip h-11 w-11 shrink-0 text-[#3b82f6]"><PiBellDuotone className="h-5 w-5 animate-breathe" /></span>
             <div>
-              <p className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-[#3b82f6]">Leave a light on</p>
               <h2 className="mt-2 text-3xl font-extrabold tracking-[-0.05em] text-white">Be first through the door.</h2>
               <p className="mt-3 text-sm leading-relaxed text-zinc-500">Add your email and we&apos;ll let you know when {category.shortName.toLowerCase()} has a place in the house.</p>
             </div>
@@ -114,7 +111,6 @@ export default function CategoryUnavailable() {
 function CategoryNotFound() {
   return (
     <div className="mx-auto max-w-2xl py-16">
-      <SectionEyebrow>Door not found</SectionEyebrow>
       <h1 className="mt-5 text-6xl font-extrabold tracking-[-0.08em]">That room moved.</h1>
       <Link href="/dashboard" className="mt-8 inline-flex rounded-lg bg-[#3b82f6] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#2563eb]" data-testid="link-return-rooms">Return to the atrium</Link>
     </div>
