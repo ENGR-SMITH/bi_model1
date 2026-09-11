@@ -93,10 +93,9 @@
 
 .app-shell { min-height: 100dvh; display: flex; background: hsl(var(--background)); }
 .sidebar { width: 244px; flex: 0 0 244px; min-height: 100dvh; padding: 27px 16px 19px; background: hsl(var(--sidebar)); color: hsl(var(--sidebar-foreground)); display: flex; flex-direction: column; position: sticky; top: 0; z-index: 20; transition: width .25s ease, flex-basis .25s ease, padding .25s ease; }
-.brand-row { display: flex; align-items: center; gap: 10px; padding: 0 10px 29px; white-space: nowrap; overflow: hidden; }
-.brand-mark { width: 27px; height: 27px; flex: 0 0 27px; border: 1px solid hsl(var(--sidebar-primary)); color: hsl(var(--sidebar-primary)); border-radius: 50%; display: grid; place-items: center; font: 700 17px var(--app-font-serif); font-style: italic; }
-.brand-name { font: 700 17px var(--app-font-serif); letter-spacing: -.04em; }
-.brand-sub { color: hsl(var(--sidebar-foreground) / .52); font: 9px var(--app-font-mono); letter-spacing: .12em; text-transform: uppercase; margin-top: 2px; }
+/* The sidebar's brand row is gone — the den name now sits in the top bar's
+   chrome layer. All that stays here is the mobile close affordance. */
+.sidebar-mobile-head { display: none; justify-content: flex-end; padding: 0 2px 16px; }
 .workspace-switch-wrap { position: relative; margin-bottom: 20px; }
 .workspace-switch { width: 100%; display: flex; gap: 9px; align-items: center; background: hsl(var(--sidebar-accent)); border: 1px solid hsl(var(--sidebar-border)); color: inherit; padding: 10px; border-radius: 8px; text-align: left; }
 .workspace-switch:hover, .workspace-switch.open { border-color: hsl(var(--sidebar-primary) / .55); background: hsl(var(--sidebar-accent) / .8); }
@@ -249,8 +248,7 @@
 
 @media (min-width: 981px) {
   .sidebar:not(:hover) { width: 76px; flex-basis: 76px; padding-left: 12px; padding-right: 12px; }
-  .sidebar:not(:hover) .brand-copy, .sidebar:not(:hover) .workspace-copy, .sidebar:not(:hover) .workspace-switch > svg, .sidebar:not(:hover) .nav-item span, .sidebar:not(:hover) .nav-label, .sidebar:not(:hover) .tutorial-btn span, .sidebar:not(:hover) .new-project-btn span { display: none; }
-  .sidebar:not(:hover) .brand-row { justify-content: center; padding-left: 0; padding-right: 0; }
+  .sidebar:not(:hover) .workspace-copy, .sidebar:not(:hover) .workspace-switch > svg, .sidebar:not(:hover) .nav-item span, .sidebar:not(:hover) .nav-label, .sidebar:not(:hover) .tutorial-btn span, .sidebar:not(:hover) .new-project-btn span { display: none; }
   .sidebar:not(:hover) .workspace-switch { justify-content: center; padding: 9px 6px; }
   .sidebar:not(:hover) .workspace-icon { width: 29px; height: 29px; }
   .sidebar:not(:hover) .nav-item { justify-content: center; padding: 11px 8px; }
@@ -685,13 +683,6 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
   width: calc(100% - 72px);
   margin-left: 72px;
 }
-.sidebar.sidebar-collapsed .brand-row {
-  justify-content: center;
-  gap: 3px;
-  padding-left: 0;
-  padding-right: 0;
-}
-.sidebar.sidebar-collapsed .brand-copy,
 .sidebar.sidebar-collapsed .workspace-copy,
 .sidebar.sidebar-collapsed .workspace-switch > svg,
 .sidebar.sidebar-collapsed .nav-label,
@@ -1378,6 +1369,7 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
 @media (max-width: 700px) {
   .desktop-only { display: none !important; }
   .mobile-only { display: inline-grid; }
+  .sidebar-mobile-head { display: flex; }
   .sidebar.sidebar-collapsed {
     width: 244px;
     flex-basis: 244px;
@@ -1633,6 +1625,17 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
    -------------------------------------------------------------------------- */
 .topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .topbar-center { display: flex; justify-content: center; min-width: 0; }
+
+/* The den name, in the chrome layer — the same lockup the Creators Den runs
+   in its first tier. It reads on the paper background, so it takes the accent
+   and foreground tokens rather than the sidebar's. */
+.topnav-brand { display: flex; align-items: center; gap: 10px; margin-left: -6px; padding: 4px 6px; border: 0; border-radius: 9px; background: transparent; color: hsl(var(--foreground)); text-align: left; white-space: nowrap; transition: background .18s ease; }
+.topnav-brand:hover { background: hsl(var(--foreground) / .05); }
+.topnav-brand-mark { width: 30px; height: 30px; flex: 0 0 30px; border: 1px solid hsl(var(--accent)); color: hsl(var(--accent)); border-radius: 50%; display: grid; place-items: center; font: italic 700 16px var(--app-font-serif); transition: transform .2s cubic-bezier(.22, 1, .36, 1), box-shadow .2s ease, border-color .2s ease; }
+.topnav-brand:hover .topnav-brand-mark { transform: translateY(-1px); box-shadow: 0 4px 14px hsl(var(--accent) / .3); }
+.topnav-brand-copy { display: flex; flex-direction: column; min-width: 0; }
+.topnav-brand-name { font: 700 16px var(--app-font-serif); letter-spacing: -.04em; }
+.topnav-brand-sub { color: hsl(var(--muted-foreground)); font: 9px var(--app-font-mono); letter-spacing: .12em; text-transform: uppercase; margin-top: 2px; }
 .mode-switch-inline { position: static; transform: none; }
 
 /* ---- Tier 2: the chip row -------------------------------------------------
@@ -1721,6 +1724,9 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
   .topnav-bell-label { display: none; }
   .topbar-chrome, .topbar-secondary { padding: 0 25px; }
 }
+@media (max-width: 980px) {
+  .topnav-brand-sub { display: none; }
+}
 @media (max-width: 900px) {
   /* The field folds down to its telescope button, which still opens Explore. */
   .topnav-search { width: auto; }
@@ -1736,6 +1742,9 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
   .topbar-chrome { height: 59px; padding: 0 15px; gap: 8px; }
   .topbar-secondary { height: 42px; padding: 0 15px; }
   .topbar-secondary .top-workspace > span { display: none; }
+  .topnav-brand { margin-left: -4px; padding: 3px 5px; gap: 7px; }
+  .topnav-brand-mark { width: 26px; height: 26px; flex-basis: 26px; font-size: 14px; }
+  .topnav-brand-name { font-size: 14px; }
 }
 @media (max-width: 700px) {
   .topnav-arena span { display: none; }
