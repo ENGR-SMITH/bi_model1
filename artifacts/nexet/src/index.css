@@ -350,6 +350,115 @@
   50%, 100% { transform: scaleX(1); opacity: 0.9; }
 }
 
+/* Payment loading overlay — shown the instant a pay button is clicked, while
+   the Whop checkout session is created and the browser is handed off to Whop's
+   hosted page. Full-screen on purpose: the unfinished purchase cannot be
+   re-triggered while it settles, and the pay button keeps its own inline
+   spinner underneath. */
+.pay-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(9, 9, 11, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: payLoaderIn 200ms ease both;
+}
+.pay-loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.pay-loader-orbit {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+}
+.pay-loader-orbit::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.34), transparent 68%);
+  animation: payLoaderGlow 1.9s ease-in-out infinite;
+}
+.pay-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.07);
+  border-top-color: #3b82f6;
+  border-right-color: #8b5cf6;
+  animation: payLoaderSpin 900ms linear infinite;
+}
+.pay-loader-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.14);
+  color: #60a5fa;
+  animation: payLoaderBob 2s ease-in-out infinite;
+}
+.pay-loader-bar {
+  position: relative;
+  width: 190px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.pay-loader-bar > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #34d399);
+  animation: payLoaderSweep 1.4s ease-in-out infinite;
+}
+.pay-loader-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+}
+@keyframes payLoaderIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes payLoaderSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes payLoaderGlow {
+  0%, 100% { opacity: 0.45; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+@keyframes payLoaderBob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes payLoaderSweep {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(310%); }
+}
+
 @keyframes reveal {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
@@ -402,4 +511,65 @@ section[id^="plans-"] { scroll-margin-top: 110px; }
   /* The desktop-agent download loop is intentionally NOT disabled here —
      the Creator Den vault billboard keeps its live download icon animating
      too, so the two buttons stay in step. */
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The payment overlay still blocks the page, it just stops moving: the ring
+     and sweep freeze, so no one sensitive to motion is spun at. */
+  .pay-loader, .pay-loader-orbit::before, .pay-loader-ring,
+  .pay-loader-icon, .pay-loader-bar > i {
+    animation: none !important;
+  }
+}
+
+/* Brief "payment confirmed" mark — a circle and check that draw themselves in
+   once (~0.8s) with a single ring burst behind them. The Whop return gates
+   show it the moment a charge is confirmed. It plays once and then stays; no
+   loop, so it reads as an event that happened rather than work in progress. */
+.success-check {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  color: #34d399;
+}
+.success-check--sm { width: 62px; height: 62px; }
+.success-check > svg { position: relative; width: 100%; height: 100%; }
+.success-check-circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: successCheckCircle .5s cubic-bezier(.65, 0, .45, 1) forwards;
+}
+.success-check-mark {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: successCheckMark .35s cubic-bezier(.65, 0, .45, 1) .45s forwards;
+}
+.success-check-burst {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  opacity: 0;
+  animation: successCheckBurst .75s ease-out .3s 1;
+}
+@keyframes successCheckCircle { to { stroke-dashoffset: 0; } }
+@keyframes successCheckMark { to { stroke-dashoffset: 0; } }
+@keyframes successCheckBurst {
+  0% { opacity: .5; transform: scale(.75); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* No drawing or burst — the confirmed mark is simply present. */
+  .success-check-circle, .success-check-mark { stroke-dashoffset: 0; animation: none !important; }
+  .success-check-burst { display: none; }
 }

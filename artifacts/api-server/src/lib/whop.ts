@@ -110,6 +110,25 @@ export interface CreatePlanResult {
   purchaseUrl: string;
 }
 
+// Whop rejects a plan title longer than this ("Validation failed: Title is too
+// long (maximum is 30 characters)"). Our catalog labels plus a suffix sail
+// close to it — "Content Creators pass (Monthly)" is 31 — so every title is
+// clamped at the boundary rather than trusted to fit.
+export const WHOP_PLAN_TITLE_MAX = 30;
+
+/**
+ * Clamp a plan title to Whop's limit without splitting a word, so a long
+ * catalog label degrades to a shorter readable title instead of failing the
+ * checkout outright. "Content Creators pass (Monthly)" → "Content Creators pass".
+ */
+export function clampWhopPlanTitle(title: string): string {
+  const clean = title.trim();
+  if (clean.length <= WHOP_PLAN_TITLE_MAX) return clean;
+  const cut = clean.slice(0, WHOP_PLAN_TITLE_MAX);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trim();
+}
+
 /** POST /plans — create a renewal plan under WHOP_PRODUCT_ID. */
 export async function createPlan(input: CreatePlanInput): Promise<CreatePlanResult> {
   const accountId = whopAccountId();
@@ -125,7 +144,7 @@ export async function createPlan(input: CreatePlanInput): Promise<CreatePlanResu
     body: JSON.stringify({
       account_id: accountId,
       product_id: productId,
-      title: input.title,
+      title: clampWhopPlanTitle(input.title),
       plan_type: "renewal",
       initial_price: 0,
       renewal_price: input.amountCents / 100,

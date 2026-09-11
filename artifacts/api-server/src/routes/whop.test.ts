@@ -316,6 +316,21 @@ describe("POST /api/whop/checkout", () => {
     expect(planCallsAfterSecond).toBe(1);
   });
 
+  it("clamps the plan title to Whop's 30-character limit", async () => {
+    state.userId = "user-1";
+    // "Content Creators pass (Monthly)" is 31 chars — Whop answers 400 ("Title
+    // is too long") and the whole checkout fails without the clamp.
+    const res = await request(API).post("/api/whop/checkout").send({ kind: "pass", planId: "content-creators" });
+    expect(res.status).toBe(201);
+
+    const planCall = state.whopCalls.find((call) => call.url.endsWith("/plans"));
+    expect(planCall).toBeTruthy();
+    const title: string = planCall!.body.title;
+    expect(title.length).toBeLessThanOrEqual(30);
+    // Trimmed at a word boundary, so it reads as the plan not a fragment.
+    expect(title).toBe("Content Creators pass");
+  });
+
   it("refuses percentage/dollar-off promos on monthly subscriptions", async () => {
     state.userId = "user-1";
     await state.db.insert(state.tables.nexetPromoCodesTable).values({
