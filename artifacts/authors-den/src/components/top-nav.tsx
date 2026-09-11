@@ -18,6 +18,25 @@ import { nexetUid } from "@/lib/nexet-uid";
 // ---------------------------------------------------------------------------
 
 /**
+ * The den's name, in the first layer of the top bar — the same slot the
+ * Creators Den keeps its brand in — so the sidebar is left to the writing
+ * desk alone. Clicking it returns to the den's Projects home.
+ */
+export function TopBrand({ onOpenHome }: { onOpenHome: () => void }) {
+  return (
+    <button type="button" className="topnav-brand" onClick={onOpenHome} title="Authors Den home" data-testid="nav-home">
+      <span className="topnav-brand-mark" aria-hidden>
+        A
+      </span>
+      <span className="topnav-brand-copy">
+        <span className="topnav-brand-name">Authors Den</span>
+        <span className="topnav-brand-sub">writing studio</span>
+      </span>
+    </button>
+  );
+}
+
+/**
  * Explore, centred in the top bar. Typing opens a live results dropdown over
  * the same two lists the Explore room shows — writers and published work —
  * reusing its matchers so the two surfaces never disagree. Enter (or the

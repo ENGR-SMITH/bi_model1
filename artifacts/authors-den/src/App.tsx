@@ -19,7 +19,7 @@ import { ArenaPage } from "@/components/arena";
 import { ArenaPostPage } from "@/components/arena-post";
 import { ArenaMinePage } from "@/components/arena-mine";
 import { ArenaRoleModal, type ArenaRoleBrief } from "@/components/arena-role-modal";
-import { TopAccountChip, TopArenaButton, TopExitButton, TopExploreSearch, TopNotificationsBell } from "@/components/top-nav";
+import { TopAccountChip, TopArenaButton, TopBrand, TopExitButton, TopExploreSearch, TopNotificationsBell } from "@/components/top-nav";
 import { WRITER_ROLES, apiErrorText, writerRoleLabel } from "@/lib/arena";
 import { continuityAudit, oracleChat, outlineAssist, transcribeAudio, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
 import {
@@ -885,6 +885,9 @@ function App() {
         <div className="topbar-chrome">
         <div className="topbar-left">
         <button className="icon-btn mobile-only" aria-label="Open navigation" onClick={() => setMobileNav(true)}><Menu size={19} /></button>
+        {/* The den name lives here now, in the chrome layer — the sidebar's
+            top row is gone, its close button folded into a mobile-only head. */}
+        <TopBrand onOpenHome={() => { setView("home"); setMobileNav(false); }} />
         </div>
         <div className="topbar-center">
         <TopExploreSearch onOpenExplore={openExplore} onOpenSeed={openSeed} />
@@ -954,7 +957,7 @@ function Sidebar({ view, setView, project, projects, openProject, openEditor, mo
   // The Arena is a den-level room like Explore: reachable without a project.
   const openRoom = (id: View) => ["profile", "explore", "notifications", "arena", "arena-post", "arena-mine"].includes(id);
   const go = (id: View) => { if (openRoom(id)) { setView(id); close(); return; } if (gated) { notify("Create a project first to open your current work"); return; } if (id === "editor") openEditor(); else setView(id); close(); };
-   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><div className="brand-row"><div className="brand-mark">A</div><div className="brand-copy"><div className="brand-name">Authors Den</div><div className="brand-sub">writing studio</div></div><button className="icon-btn sidebar-close mobile-only" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
+   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><div className="sidebar-mobile-head"><button className="icon-btn sidebar-close" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
      <div className="workspace-switch-wrap" onPointerLeave={() => setWorkspaceOpen(false)}><button className={`workspace-switch ${workspaceOpen ? "open" : ""}`} onClick={() => setWorkspaceOpen(!workspaceOpen)}><span className="workspace-icon"><Library size={14} /></span><span className="workspace-copy"><small>WORKSPACE</small><strong>My writing desk</strong></span><ChevronDown size={14} /></button>{workspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setWorkspaceOpen(false); }} onNew={() => { onNew(); setWorkspaceOpen(false); }} />}</div>
     <button className={`nav-item ${view === "home" ? "active" : ""}`} onClick={() => { setView("home"); close(); }}><FolderOpen size={17} /><span>Projects</span><span className="nav-count">{projects.length}</span></button>
      <div className="nav-label">CURRENT WORK</div>{project ? nav.map(([id, label, icon]) => <button key={id} className={`nav-item ${view === id ? "active" : ""} ${gated ? "nav-item-gated" : ""}`} onClick={() => go(id)} disabled={gated} title={gated ? "Create a project first before opening current work" : undefined}>{icon}<span>{label}</span>{id === "outline" && <span className="nav-count">{project.scenes.length}</span>}{gated && <span className="nav-lock">Create first</span>}</button>) : <div className="empty-sidebar">Open a project to begin.</div>}
