@@ -68,10 +68,6 @@ export function HouseNav() {
               The method
               <span className="absolute inset-x-4 bottom-1 h-px bg-gradient-to-r from-[#3b82f6]/80 to-[#8b5cf6]/80 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
             </button>
-            <Link href="/room/engine" className="group ml-2 flex items-center gap-2 rounded-full bg-gradient-to-b from-[#3b82f6] to-[#2563eb] px-4 py-2 text-sm font-semibold text-white shadow-[0_0_24px_-8px_rgba(59,130,246,0.7)] transition-all duration-200 hover:shadow-[0_0_32px_-4px_rgba(59,130,246,0.9)]" data-testid="link-nav-engine">
-              Start at the Engine
-              <PiArrowUpRightDuotone className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-            </Link>
           </nav>
           <div className="hidden items-center gap-2 md:flex">
             <span aria-hidden="true" className="mr-1 flex items-center gap-[3px]">
@@ -114,10 +110,6 @@ export function HouseNav() {
               The method
             </button>
             <div className="my-1 h-px bg-white/5" />
-            <Link href="/room/engine" onClick={() => setOpen(false)} className="group flex items-center justify-between rounded-xl bg-gradient-to-b from-[#3b82f6] to-[#2563eb] px-4 py-3 text-sm font-semibold text-white shadow-[0_0_24px_-8px_rgba(59,130,246,0.7)]" data-testid="link-mobile-engine">
-              Start at the Engine
-              <PiArrowUpRightDuotone className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-            </Link>
             <Show when="signed-out">
               <Link href="/sign-in" onClick={() => setOpen(false)} className="mt-1 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid="link-mobile-login">
                 Log in
