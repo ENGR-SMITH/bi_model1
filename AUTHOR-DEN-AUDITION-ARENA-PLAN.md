@@ -123,6 +123,8 @@ One active watch per (user, role, creator-or-global); exact duplicate → 409.
 
 A role card/post shows the number of **currently open auditions** — `COUNT(*)` over `seed_applications` for that seed where `status in ('DRAFT','SUBMITTED','UNDER_REVIEW','ACCEPTED_PENDING_CONTRACT')`, i.e. the same "active application" set the existing partial unique index already uses. It goes up when new auditions land and down when they are declined or withdrawn, and it is replaced by the accepted writer's name once `filled_by` is set. Computed in the same query as the listing so cards and detail never drift.
 
+**Implemented as the existing `respondentCount`.** `seedView`/`seedCount()` already compute exactly this set, so the Arena reuses that field on `CollaborationSeed` and `WriterArenaPostSummary` rather than adding a parallel `applicantCount`; the post detail adds `totalApplications` (every audition ever received, author-only) on top. No new column and no second count query.
+
 ### 6.4 Not re-created
 
 Applications, submissions, contracts, shared-project documents, work blocks, story bible, genealogy, activity, threads, messages, and annotations are **not** duplicated. The Arena reads and writes them through the existing tables and routes.
@@ -292,12 +294,13 @@ Loading, empty, error, closed, filled, already-auditioned, own-post, and unautho
 - **Reviews.** Mutual work reviews are omitted from v1 (Creator Den has them). Adding them later reuses `collaboration_projects` completion state rather than a new table.
 - **Applicant cap and blocks.** A per-week audition cap and per-author blocks are Creator Den anti-spam features. v1 inherits the existing seed rate/one-active-application rules; a cap/blocks slice is future scope.
 - **Navigation model.** The Author Den has no router; the Arena is a View set with query intents. If the den later adopts real routes, `arena` / `arena-post` / `arena-mine` map cleanly to `/arena`, `/arena/posts/:seedId`, `/arena/mine`.
+- **Count field name (Phase 0 deviation).** The plan originally called the live count `applicantCount`; Phase 0 reuses the existing `respondentCount` instead, because `seedCount()` already computes the identical active-application set. `WriterArenaPostSummary` adds `totalApplications` for the author view. See §6.3.
 
 ## 14. Delivery sequence
 
 ### Phase 0 — Contract and schema
-- [ ] Migration `0015_author_arena.sql`: `collaboration_seeds` additive columns + partial unique index + `collaboration_arena_watches`; mirror in the in-memory test schema.
-- [ ] OpenAPI definitions for §9 endpoints and fields; regenerate clients.
+- [x] Migration `0015_author_arena.sql`: `collaboration_seeds` additive columns + partial unique index + `collaboration_arena_watches`; mirror in the in-memory test schema. **Completed:** schema in `lib/db/src/schema/collaborations.ts` (`kind`/`role`/`role_pitch`/`filled_by`/`filled_at` + partial unique index) and new `lib/db/src/schema/author-arena.ts` (writing roles + `collaboration_arena_watches`); guarded migration `lib/db/migrations/0015_author_arena.sql`; in-memory SQLite mirror updated in `artifacts/api-server/src/test/in-memory-db.ts` (columns + partial index + watches table + `tables` map). Validation: workspace `pnpm run typecheck` clean, api-server suite 433/433.
+- [x] OpenAPI definitions for §9 endpoints and fields; regenerate clients. **Completed:** `lib/api-spec/openapi.yaml` gains the `CollaborationSeed` Arena fields (`kind`/`role`/`rolePitch`/`filledBy`/`filledAt`) and the `WriterArena*` schemas + `/collaborations/arena/*` paths (board, post detail/patch, auditions/mine, withdraw, watches); `pnpm --filter @workspace/api-spec codegen` regenerated `@workspace/api-zod` + `@workspace/api-client-react` (`useListWriterArenaPosts`, `useCreateWriterArenaPost`, `useGetWriterArenaPost`, `useUpdateWriterArenaPost`, `useListMyWriterArenaAuditions`, `useWithdrawWriterArenaAudition`, `useListWriterArenaWatches`, `useCreateWriterArenaWatch`, `useDeleteWriterArenaWatch`). `seedView` (`routes/collaboration.ts`) now emits the new seed fields so the existing contract stays honest.
 
 ### Phase 1 — Server: board, roles, watches
 - [ ] Arena listing (rails, role filter, sort, `mine`) + role create/patch with authorization tests.

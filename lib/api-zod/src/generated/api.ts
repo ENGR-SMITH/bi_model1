@@ -556,6 +556,11 @@ export const ListCollaborationSeedsResponseItem = zod.object({
   "myApplicationId": zod.string().nullable(),
   "myApplicationStatus": zod.string().nullable(),
   "availability": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']),
+  "role": zod.string().nullable().describe('WriterArenaRole for ROLE rows; null for seeds'),
+  "rolePitch": zod.string().nullable(),
+  "filledBy": zod.string().nullable().describe('User id of the accepted writer once a role is filled'),
+  "filledAt": zod.coerce.date().nullable(),
   "publishedAt": zod.coerce.date(),
   "createdAt": zod.coerce.date()
 })
@@ -619,6 +624,11 @@ export const CreateCollaborationSeedResponse = zod.object({
   "myApplicationId": zod.string().nullable(),
   "myApplicationStatus": zod.string().nullable(),
   "availability": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']),
+  "role": zod.string().nullable().describe('WriterArenaRole for ROLE rows; null for seeds'),
+  "rolePitch": zod.string().nullable(),
+  "filledBy": zod.string().nullable().describe('User id of the accepted writer once a role is filled'),
+  "filledAt": zod.coerce.date().nullable(),
   "publishedAt": zod.coerce.date(),
   "createdAt": zod.coerce.date()
 })
@@ -656,6 +666,11 @@ export const GetCollaborationSeedResponse = zod.object({
   "myApplicationId": zod.string().nullable(),
   "myApplicationStatus": zod.string().nullable(),
   "availability": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']),
+  "role": zod.string().nullable().describe('WriterArenaRole for ROLE rows; null for seeds'),
+  "rolePitch": zod.string().nullable(),
+  "filledBy": zod.string().nullable().describe('User id of the accepted writer once a role is filled'),
+  "filledAt": zod.coerce.date().nullable(),
   "publishedAt": zod.coerce.date(),
   "createdAt": zod.coerce.date()
 })
@@ -713,6 +728,11 @@ export const UpdateCollaborationSeedResponse = zod.object({
   "myApplicationId": zod.string().nullable(),
   "myApplicationStatus": zod.string().nullable(),
   "availability": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']),
+  "role": zod.string().nullable().describe('WriterArenaRole for ROLE rows; null for seeds'),
+  "rolePitch": zod.string().nullable(),
+  "filledBy": zod.string().nullable().describe('User id of the accepted writer once a role is filled'),
+  "filledAt": zod.coerce.date().nullable(),
   "publishedAt": zod.coerce.date(),
   "createdAt": zod.coerce.date()
 })
@@ -4999,5 +5019,308 @@ export const DeleteArenaWatchParams = zod.object({
 })
 
 export const DeleteArenaWatchResponse = zod.void()
+
+
+/**
+ * Open writing roles (kind=ROLE) and seed pitches (kind=SEED) with the author summary, the live open-audition count, and the caller's own audition state. ?mine=1 returns only the caller's own calls.
+ * @summary List Writers' Audition Arena posts across both rails
+ */
+export const ListWriterArenaPostsQueryParams = zod.object({
+  "rail": zod.enum(['role', 'seed']).optional().describe('Restrict the board to one rail'),
+  "role": zod.enum(['CO_WRITER', 'EDITOR', 'BETA_READER', 'GHOSTWRITER', 'PROOFREADER']).optional(),
+  "sort": zod.enum(['newest', 'most_applied']).optional(),
+  "followed": zod.coerce.boolean().optional().describe('Order posts from authors the caller follows first'),
+  "mine": zod.coerce.boolean().optional().describe('Return only the caller\'s own calls')
+})
+
+export const ListWriterArenaPostsResponseItem = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']).describe('SEED — a pitch-board post; ROLE — an open writing role call'),
+  "role": zod.string().nullable().describe('WriterArenaRole for ROLE posts; null for seeds'),
+  "rolePitch": zod.string().nullable(),
+  "creatorId": zod.string(),
+  "creatorName": zod.string(),
+  "creatorImageUrl": zod.string().nullable(),
+  "sourceProjectId": zod.string(),
+  "sourceProjectTitle": zod.string(),
+  "seedText": zod.string(),
+  "unitType": zod.string(),
+  "protocol": zod.string(),
+  "genre": zod.string(),
+  "tone": zod.string(),
+  "language": zod.string(),
+  "plotConstraints": zod.string(),
+  "desiredRole": zod.string(),
+  "availability": zod.enum(['OPEN', 'CLOSED']),
+  "respondentLimit": zod.number().int(),
+  "respondentCount": zod.number().int().describe('Live open auditions on this post'),
+  "totalApplications": zod.number().int().describe('Every audition ever received (author-only detail; equal to respondentCount for other viewers)'),
+  "myApplicationId": zod.string().nullable(),
+  "myApplicationStatus": zod.string().nullable(),
+  "filledBy": zod.string().nullable(),
+  "filledAt": zod.coerce.date().nullable(),
+  "publishedAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('An Arena post — an open writing role (kind=ROLE) or a seed pitch (kind=SEED)')
+export const ListWriterArenaPostsResponse = zod.array(ListWriterArenaPostsResponseItem)
+
+
+/**
+ * Creates a collaboration_seeds row with kind=ROLE; only one OPEN call per (project, role). The existing seed pipeline then carries the auditions.
+ * @summary Open a writing role on one of the caller's projects
+ */
+
+
+
+export const createWriterArenaPostBodyOneSeedTextMax = 12000;
+
+
+
+
+
+
+
+export const createWriterArenaPostBodyTwoRolePitchMin = 10;
+export const createWriterArenaPostBodyTwoRolePitchMax = 2000;
+
+
+
+export const CreateWriterArenaPostBody = zod.object({
+  "sourceProjectId": zod.string().min(1),
+  "sourceProjectTitle": zod.string().min(1),
+  "creatorName": zod.string().optional(),
+  "sourceSceneId": zod.string().nullish(),
+  "sourceVersion": zod.number().int().min(1).optional(),
+  "seedText": zod.string().min(1).max(createWriterArenaPostBodyOneSeedTextMax),
+  "unitType": zod.string().min(1),
+  "protocol": zod.string().min(1),
+  "genre": zod.string().min(1),
+  "tone": zod.string().min(1),
+  "language": zod.string().min(1),
+  "plotConstraints": zod.string(),
+  "desiredRole": zod.string().min(1),
+  "visibility": zod.enum(['SEED_AND_BRIEF', 'SEED_ONLY']),
+  "respondentLimit": zod.union([zod.literal(3),zod.literal(5),zod.literal(10),zod.literal(0)]),
+  "projectDocument": zod.record(zod.string(), zod.unknown()).optional().describe('A serialized Author Den project (title, scenes, characters, plots, world).')
+}).and(zod.object({
+  "role": zod.enum(['CO_WRITER', 'EDITOR', 'BETA_READER', 'GHOSTWRITER', 'PROOFREADER']).describe('The writing roles an author can call for in the Author Den Arena'),
+  "rolePitch": zod.string().min(createWriterArenaPostBodyTwoRolePitchMin).max(createWriterArenaPostBodyTwoRolePitchMax)
+})).describe('Open a writing role on one of the caller\'s projects (the seed brief plus the typed role and pitch)')
+
+export const CreateWriterArenaPostResponse = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']).describe('SEED — a pitch-board post; ROLE — an open writing role call'),
+  "role": zod.string().nullable().describe('WriterArenaRole for ROLE posts; null for seeds'),
+  "rolePitch": zod.string().nullable(),
+  "creatorId": zod.string(),
+  "creatorName": zod.string(),
+  "creatorImageUrl": zod.string().nullable(),
+  "sourceProjectId": zod.string(),
+  "sourceProjectTitle": zod.string(),
+  "seedText": zod.string(),
+  "unitType": zod.string(),
+  "protocol": zod.string(),
+  "genre": zod.string(),
+  "tone": zod.string(),
+  "language": zod.string(),
+  "plotConstraints": zod.string(),
+  "desiredRole": zod.string(),
+  "availability": zod.enum(['OPEN', 'CLOSED']),
+  "respondentLimit": zod.number().int(),
+  "respondentCount": zod.number().int().describe('Live open auditions on this post'),
+  "totalApplications": zod.number().int().describe('Every audition ever received (author-only detail; equal to respondentCount for other viewers)'),
+  "myApplicationId": zod.string().nullable(),
+  "myApplicationStatus": zod.string().nullable(),
+  "filledBy": zod.string().nullable(),
+  "filledAt": zod.coerce.date().nullable(),
+  "publishedAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('An Arena post — an open writing role (kind=ROLE) or a seed pitch (kind=SEED)')
+
+
+/**
+ * @summary Read an Arena post (role call or seed pitch)
+ */
+
+
+
+export const GetWriterArenaPostParams = zod.object({
+  "seedId": zod.coerce.string().min(1)
+})
+
+export const GetWriterArenaPostResponse = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']).describe('SEED — a pitch-board post; ROLE — an open writing role call'),
+  "role": zod.string().nullable().describe('WriterArenaRole for ROLE posts; null for seeds'),
+  "rolePitch": zod.string().nullable(),
+  "creatorId": zod.string(),
+  "creatorName": zod.string(),
+  "creatorImageUrl": zod.string().nullable(),
+  "sourceProjectId": zod.string(),
+  "sourceProjectTitle": zod.string(),
+  "seedText": zod.string(),
+  "unitType": zod.string(),
+  "protocol": zod.string(),
+  "genre": zod.string(),
+  "tone": zod.string(),
+  "language": zod.string(),
+  "plotConstraints": zod.string(),
+  "desiredRole": zod.string(),
+  "availability": zod.enum(['OPEN', 'CLOSED']),
+  "respondentLimit": zod.number().int(),
+  "respondentCount": zod.number().int().describe('Live open auditions on this post'),
+  "totalApplications": zod.number().int().describe('Every audition ever received (author-only detail; equal to respondentCount for other viewers)'),
+  "myApplicationId": zod.string().nullable(),
+  "myApplicationStatus": zod.string().nullable(),
+  "filledBy": zod.string().nullable(),
+  "filledAt": zod.coerce.date().nullable(),
+  "publishedAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('An Arena post — an open writing role (kind=ROLE) or a seed pitch (kind=SEED)')
+
+
+/**
+ * @summary Close/reopen a role call or edit its pitch (author only)
+ */
+
+
+
+export const UpdateWriterArenaPostParams = zod.object({
+  "seedId": zod.coerce.string().min(1)
+})
+
+export const updateWriterArenaPostBodyRolePitchMin = 10;
+export const updateWriterArenaPostBodyRolePitchMax = 2000;
+
+
+
+export const UpdateWriterArenaPostBody = zod.object({
+  "availability": zod.enum(['OPEN', 'CLOSED']).optional(),
+  "rolePitch": zod.string().min(updateWriterArenaPostBodyRolePitchMin).max(updateWriterArenaPostBodyRolePitchMax).optional()
+}).describe('Close\/reopen a role call or edit its pitch while OPEN (author only)')
+
+export const UpdateWriterArenaPostResponse = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']).describe('SEED — a pitch-board post; ROLE — an open writing role call'),
+  "role": zod.string().nullable().describe('WriterArenaRole for ROLE posts; null for seeds'),
+  "rolePitch": zod.string().nullable(),
+  "creatorId": zod.string(),
+  "creatorName": zod.string(),
+  "creatorImageUrl": zod.string().nullable(),
+  "sourceProjectId": zod.string(),
+  "sourceProjectTitle": zod.string(),
+  "seedText": zod.string(),
+  "unitType": zod.string(),
+  "protocol": zod.string(),
+  "genre": zod.string(),
+  "tone": zod.string(),
+  "language": zod.string(),
+  "plotConstraints": zod.string(),
+  "desiredRole": zod.string(),
+  "availability": zod.enum(['OPEN', 'CLOSED']),
+  "respondentLimit": zod.number().int(),
+  "respondentCount": zod.number().int().describe('Live open auditions on this post'),
+  "totalApplications": zod.number().int().describe('Every audition ever received (author-only detail; equal to respondentCount for other viewers)'),
+  "myApplicationId": zod.string().nullable(),
+  "myApplicationStatus": zod.string().nullable(),
+  "filledBy": zod.string().nullable(),
+  "filledAt": zod.coerce.date().nullable(),
+  "publishedAt": zod.coerce.date(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('An Arena post — an open writing role (kind=ROLE) or a seed pitch (kind=SEED)')
+
+
+/**
+ * Every application the caller has made to an Arena post (role call or seed pitch), newest first. Never another writer's rows.
+ * @summary The caller's own auditions across both rails
+ */
+export const ListMyWriterArenaAuditionsResponseItem = zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']).describe('SEED — a pitch-board post; ROLE — an open writing role call'),
+  "role": zod.string().nullable(),
+  "rolePitch": zod.string().nullable(),
+  "sourceProjectTitle": zod.string(),
+  "creatorId": zod.string(),
+  "creatorName": zod.string(),
+  "status": zod.string(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('The caller\'s own audition on an Arena post')
+export const ListMyWriterArenaAuditionsResponse = zod.array(ListMyWriterArenaAuditionsResponseItem)
+
+
+/**
+ * @summary Withdraw an open audition (applicant only)
+ */
+
+
+
+export const WithdrawWriterArenaAuditionParams = zod.object({
+  "applicationId": zod.coerce.string().min(1)
+})
+
+export const WithdrawWriterArenaAuditionResponse = zod.object({
+  "id": zod.string(),
+  "postId": zod.string(),
+  "kind": zod.enum(['SEED', 'ROLE']).describe('SEED — a pitch-board post; ROLE — an open writing role call'),
+  "role": zod.string().nullable(),
+  "rolePitch": zod.string().nullable(),
+  "sourceProjectTitle": zod.string(),
+  "creatorId": zod.string(),
+  "creatorName": zod.string(),
+  "status": zod.string(),
+  "submittedAt": zod.coerce.date().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}).describe('The caller\'s own audition on an Arena post')
+
+
+/**
+ * @summary List the caller's role watches
+ */
+export const ListWriterArenaWatchesResponseItem = zod.object({
+  "id": zod.string(),
+  "role": zod.enum(['CO_WRITER', 'EDITOR', 'BETA_READER', 'GHOSTWRITER', 'PROOFREADER']).describe('The writing roles an author can call for in the Author Den Arena'),
+  "creatorId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+export const ListWriterArenaWatchesResponse = zod.array(ListWriterArenaWatchesResponseItem)
+
+
+/**
+ * @summary Watch a writing role (optionally one author's calls)
+ */
+export const CreateWriterArenaWatchBody = zod.object({
+  "role": zod.enum(['CO_WRITER', 'EDITOR', 'BETA_READER', 'GHOSTWRITER', 'PROOFREADER']).describe('The writing roles an author can call for in the Author Den Arena'),
+  "creatorId": zod.string().optional()
+}).describe('Watch a writing role — across the whole Arena, or scoped to one author')
+
+export const CreateWriterArenaWatchResponse = zod.object({
+  "id": zod.string(),
+  "role": zod.enum(['CO_WRITER', 'EDITOR', 'BETA_READER', 'GHOSTWRITER', 'PROOFREADER']).describe('The writing roles an author can call for in the Author Den Arena'),
+  "creatorId": zod.string().nullable(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Stop watching (own watch only)
+ */
+
+
+
+export const DeleteWriterArenaWatchParams = zod.object({
+  "watchId": zod.coerce.string().min(1)
+})
+
+export const DeleteWriterArenaWatchResponse = zod.void()
 
 

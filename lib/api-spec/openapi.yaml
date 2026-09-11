@@ -4593,6 +4593,233 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/arena/posts:
+    get:
+      operationId: listWriterArenaPosts
+      tags: [collaborations]
+      summary: List Writers' Audition Arena posts across both rails
+      description: Open writing roles (kind=ROLE) and seed pitches (kind=SEED) with the author summary, the live open-audition count, and the caller's own audition state. ?mine=1 returns only the caller's own calls.
+      parameters:
+        - name: rail
+          in: query
+          required: false
+          description: Restrict the board to one rail
+          schema: { type: string, enum: [role, seed] }
+        - name: role
+          in: query
+          required: false
+          schema: { $ref: "#/components/schemas/WriterArenaRole" }
+        - name: sort
+          in: query
+          required: false
+          schema: { type: string, enum: [newest, most_applied] }
+        - name: followed
+          in: query
+          required: false
+          description: Order posts from authors the caller follows first
+          schema: { type: boolean }
+        - name: mine
+          in: query
+          required: false
+          description: Return only the caller's own calls
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: Arena posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WriterArenaPostSummary" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createWriterArenaPost
+      tags: [collaborations]
+      summary: Open a writing role on one of the caller's projects
+      description: Creates a collaboration_seeds row with kind=ROLE; only one OPEN call per (project, role). The existing seed pipeline then carries the auditions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WriterArenaPostInput" }
+      responses:
+        "201":
+          description: Published role call
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriterArenaPostSummary" }
+        "400":
+          description: Invalid call
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: An OPEN call for that role already exists on the project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/arena/posts/{seedId}:
+    get:
+      operationId: getWriterArenaPost
+      tags: [collaborations]
+      summary: Read an Arena post (role call or seed pitch)
+      parameters:
+        - { $ref: "#/components/parameters/SeedId" }
+      responses:
+        "200":
+          description: Arena post
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriterArenaPostSummary" }
+        "404":
+          description: Post not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    patch:
+      operationId: updateWriterArenaPost
+      tags: [collaborations]
+      summary: Close/reopen a role call or edit its pitch (author only)
+      parameters:
+        - { $ref: "#/components/parameters/SeedId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WriterArenaPostUpdate" }
+      responses:
+        "200":
+          description: Updated call
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriterArenaPostSummary" }
+        "400":
+          description: Invalid update
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Not the author who posted the call
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/arena/auditions/mine:
+    get:
+      operationId: listMyWriterArenaAuditions
+      tags: [collaborations]
+      summary: The caller's own auditions across both rails
+      description: Every application the caller has made to an Arena post (role call or seed pitch), newest first. Never another writer's rows.
+      responses:
+        "200":
+          description: The caller's auditions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WriterArenaAudition" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/arena/auditions/{applicationId}/withdraw:
+    post:
+      operationId: withdrawWriterArenaAudition
+      tags: [collaborations]
+      summary: Withdraw an open audition (applicant only)
+      parameters:
+        - { $ref: "#/components/parameters/ApplicationId" }
+      responses:
+        "200":
+          description: Withdrawn audition
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriterArenaAudition" }
+        "403":
+          description: Not the applicant
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: The audition was already decided
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/arena/watches:
+    get:
+      operationId: listWriterArenaWatches
+      tags: [collaborations]
+      summary: List the caller's role watches
+      responses:
+        "200":
+          description: The caller's watches
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/WriterArenaWatch" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+    post:
+      operationId: createWriterArenaWatch
+      tags: [collaborations]
+      summary: Watch a writing role (optionally one author's calls)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WriterArenaWatchInput" }
+      responses:
+        "201":
+          description: Created watch
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WriterArenaWatch" }
+        "400":
+          description: Invalid watch
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Already watching that role (and author)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /collaborations/arena/watches/{watchId}:
+    delete:
+      operationId: deleteWriterArenaWatch
+      tags: [collaborations]
+      summary: Stop watching (own watch only)
+      parameters:
+        - name: watchId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1 }
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Not the watcher
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Watch not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 components:
   parameters:
     SeedId:
@@ -4768,9 +4995,17 @@ components:
         myApplicationId: { type: ["string", "null"] }
         myApplicationStatus: { type: ["string", "null"] }
         availability: { type: string }
+        # Writers' Audition Arena (AUTHOR-DEN-AUDITION-ARENA-PLAN.md): both rails
+        # share this model. kind = SEED (pitch board) | ROLE (open writing role);
+        # role/rolePitch are set only for ROLE rows.
+        kind: { type: string, enum: [SEED, ROLE] }
+        role: { type: ["string", "null"], description: WriterArenaRole for ROLE rows; null for seeds }
+        rolePitch: { type: ["string", "null"] }
+        filledBy: { type: ["string", "null"], description: User id of the accepted writer once a role is filled }
+        filledAt: { type: ["string", "null"], format: date-time }
         publishedAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
-      required: [id, creatorId, creatorName, sourceProjectId, sourceProjectTitle, sourceSceneId, sourceVersion, seedText, unitType, protocol, genre, tone, language, plotConstraints, desiredRole, visibility, respondentLimit, respondentCount, myApplicationId, myApplicationStatus, availability, publishedAt, createdAt]
+      required: [id, creatorId, creatorName, sourceProjectId, sourceProjectTitle, sourceSceneId, sourceVersion, seedText, unitType, protocol, genre, tone, language, plotConstraints, desiredRole, visibility, respondentLimit, respondentCount, myApplicationId, myApplicationStatus, availability, kind, role, rolePitch, filledBy, filledAt, publishedAt, createdAt]
     CollaborationSeedInput:
       type: object
       properties:
@@ -6776,3 +7011,100 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
       required: [id, role, channelId, createdAt, updatedAt]
+    WriterArenaRole:
+      type: string
+      enum: [CO_WRITER, EDITOR, BETA_READER, GHOSTWRITER, PROOFREADER]
+      description: The writing roles an author can call for in the Author Den Arena
+    WriterArenaPostKind:
+      type: string
+      enum: [SEED, ROLE]
+      description: "SEED — a pitch-board post; ROLE — an open writing role call"
+    WriterArenaPostSummary:
+      type: object
+      description: An Arena post — an open writing role (kind=ROLE) or a seed pitch (kind=SEED)
+      properties:
+        id: { type: string }
+        kind: { $ref: "#/components/schemas/WriterArenaPostKind" }
+        role: { type: ["string", "null"], description: WriterArenaRole for ROLE posts; null for seeds }
+        rolePitch: { type: ["string", "null"] }
+        creatorId: { type: string }
+        creatorName: { type: string }
+        creatorImageUrl: { type: ["string", "null"] }
+        sourceProjectId: { type: string }
+        sourceProjectTitle: { type: string }
+        seedText: { type: string }
+        unitType: { type: string }
+        protocol: { type: string }
+        genre: { type: string }
+        tone: { type: string }
+        language: { type: string }
+        plotConstraints: { type: string }
+        desiredRole: { type: string }
+        availability: { type: string, enum: [OPEN, CLOSED] }
+        respondentLimit: { type: integer }
+        respondentCount: { type: integer, description: Live open auditions on this post }
+        totalApplications: { type: integer, description: Every audition ever received (author-only detail; equal to respondentCount for other viewers) }
+        myApplicationId: { type: ["string", "null"] }
+        myApplicationStatus: { type: ["string", "null"] }
+        filledBy: { type: ["string", "null"] }
+        filledAt: { type: ["string", "null"], format: date-time }
+        publishedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, kind, role, rolePitch, creatorId, creatorName, creatorImageUrl, sourceProjectId, sourceProjectTitle, seedText, unitType, protocol, genre, tone, language, plotConstraints, desiredRole, availability, respondentLimit, respondentCount, totalApplications, myApplicationId, myApplicationStatus, filledBy, filledAt, publishedAt, createdAt, updatedAt]
+    WriterArenaPostInput:
+      description: Open a writing role on one of the caller's projects (the seed brief plus the typed role and pitch)
+      allOf:
+        - $ref: "#/components/schemas/CollaborationSeedInput"
+        - type: object
+          properties:
+            role: { $ref: "#/components/schemas/WriterArenaRole" }
+            rolePitch:
+              type: string
+              minLength: 10
+              maxLength: 2000
+          required: [role, rolePitch]
+    WriterArenaPostUpdate:
+      type: object
+      description: Close/reopen a role call or edit its pitch while OPEN (author only)
+      properties:
+        availability:
+          type: string
+          enum: [OPEN, CLOSED]
+        rolePitch:
+          type: string
+          minLength: 10
+          maxLength: 2000
+    WriterArenaAudition:
+      type: object
+      description: The caller's own audition on an Arena post
+      properties:
+        id: { type: string }
+        postId: { type: string }
+        kind: { $ref: "#/components/schemas/WriterArenaPostKind" }
+        role: { type: ["string", "null"] }
+        rolePitch: { type: ["string", "null"] }
+        sourceProjectTitle: { type: string }
+        creatorId: { type: string }
+        creatorName: { type: string }
+        status: { type: string }
+        submittedAt: { type: ["string", "null"], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, postId, kind, role, rolePitch, sourceProjectTitle, creatorId, creatorName, status, submittedAt, createdAt, updatedAt]
+    WriterArenaWatchInput:
+      type: object
+      description: Watch a writing role — across the whole Arena, or scoped to one author
+      properties:
+        role: { $ref: "#/components/schemas/WriterArenaRole" }
+        creatorId: { type: string }
+      required: [role]
+    WriterArenaWatch:
+      type: object
+      properties:
+        id: { type: string }
+        role: { $ref: "#/components/schemas/WriterArenaRole" }
+        creatorId: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, role, creatorId, createdAt, updatedAt]

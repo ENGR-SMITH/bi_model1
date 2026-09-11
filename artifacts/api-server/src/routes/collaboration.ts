@@ -119,6 +119,15 @@ function seedView(
     myApplicationId: application?.id ?? null,
     myApplicationStatus: application?.status ?? null,
     availability: seed.availability,
+    // Writers' Audition Arena (AUTHOR-DEN-AUDITION-ARENA-PLAN.md): every seed
+    // is a 'SEED' row unless it was opened as an open writing role. Kept on the
+    // shared seed view so the existing pitch-board surfaces carry the same
+    // fields as the Arena board.
+    kind: seed.kind,
+    role: seed.role ?? null,
+    rolePitch: seed.rolePitch ?? null,
+    filledBy: seed.filledBy ?? null,
+    filledAt: value(seed.filledAt),
     publishedAt: seed.publishedAt.toISOString(),
     createdAt: seed.createdAt.toISOString(),
   };

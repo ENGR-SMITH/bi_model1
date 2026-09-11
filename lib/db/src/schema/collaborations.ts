@@ -39,11 +39,27 @@ export const collaborationSeedsTable = pgTable("collaboration_seeds", {
   // document when they answer; creators merge against it on accept.
   projectDocument: jsonb("project_document"),
   availability: text("availability").notNull().default("OPEN"),
+  // Both rails of the Writers' Audition Arena share this model. A 'SEED' row is
+  // the classic frozen pitch-board post; a 'ROLE' row is an open writing role
+  // carrying a typed `role` and the author's `rolePitch`. Rows created before
+  // the Arena default to 'SEED' and behave exactly as they always have.
+  kind: text("kind").notNull().default("SEED"),
+  role: text("role"),
+  rolePitch: text("role_pitch"),
+  // Set when an accepted audition fills the role (the writer's Clerk user id).
+  filledBy: text("filled_by"),
+  filledAt: timestamp("filled_at", { withTimezone: true }),
   publishedAt: timestamp("published_at", { withTimezone: true }).notNull().defaultNow(),
   closedAt: timestamp("closed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  // One OPEN role call per (project, role). Seeds are untouched by the partial
+  // predicate, and a FILLED/CLOSED role does not block a later reopen.
+  openRoleProjectUnique: uniqueIndex("collaboration_seed_open_role_project_unique")
+    .on(table.sourceProjectId, table.role)
+    .where(sql`${table.kind} = 'ROLE' AND ${table.availability} = 'OPEN'`),
+}));
 
 export const seedApplicationsTable = pgTable(
   "seed_applications",

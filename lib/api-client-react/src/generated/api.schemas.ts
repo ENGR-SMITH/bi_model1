@@ -5,6 +5,14 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+export type CollaborationSeedKind = typeof CollaborationSeedKind[keyof typeof CollaborationSeedKind];
+
+
+export const CollaborationSeedKind = {
+  SEED: 'SEED',
+  ROLE: 'ROLE',
+} as const;
+
 export interface CollaborationSeed {
   id: string;
   creatorId: string;
@@ -30,6 +38,21 @@ export interface CollaborationSeed {
   /** @nullable */
   myApplicationStatus: string | null;
   availability: string;
+  kind: CollaborationSeedKind;
+  /**
+     * WriterArenaRole for ROLE rows; null for seeds
+     * @nullable
+     */
+  role: string | null;
+  /** @nullable */
+  rolePitch: string | null;
+  /**
+     * User id of the accepted writer once a role is filled
+     * @nullable
+     */
+  filledBy: string | null;
+  /** @nullable */
+  filledAt: string | null;
   publishedAt: string;
   createdAt: string;
 }
@@ -2613,6 +2636,155 @@ export interface ArenaWatch {
   updatedAt: string;
 }
 
+/**
+ * The writing roles an author can call for in the Author Den Arena
+ */
+export type WriterArenaRole = typeof WriterArenaRole[keyof typeof WriterArenaRole];
+
+
+export const WriterArenaRole = {
+  CO_WRITER: 'CO_WRITER',
+  EDITOR: 'EDITOR',
+  BETA_READER: 'BETA_READER',
+  GHOSTWRITER: 'GHOSTWRITER',
+  PROOFREADER: 'PROOFREADER',
+} as const;
+
+/**
+ * SEED — a pitch-board post; ROLE — an open writing role call
+ */
+export type WriterArenaPostKind = typeof WriterArenaPostKind[keyof typeof WriterArenaPostKind];
+
+
+export const WriterArenaPostKind = {
+  SEED: 'SEED',
+  ROLE: 'ROLE',
+} as const;
+
+export type WriterArenaPostSummaryAvailability = typeof WriterArenaPostSummaryAvailability[keyof typeof WriterArenaPostSummaryAvailability];
+
+
+export const WriterArenaPostSummaryAvailability = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+} as const;
+
+/**
+ * An Arena post — an open writing role (kind=ROLE) or a seed pitch (kind=SEED)
+ */
+export interface WriterArenaPostSummary {
+  id: string;
+  kind: WriterArenaPostKind;
+  /**
+     * WriterArenaRole for ROLE posts; null for seeds
+     * @nullable
+     */
+  role: string | null;
+  /** @nullable */
+  rolePitch: string | null;
+  creatorId: string;
+  creatorName: string;
+  /** @nullable */
+  creatorImageUrl: string | null;
+  sourceProjectId: string;
+  sourceProjectTitle: string;
+  seedText: string;
+  unitType: string;
+  protocol: string;
+  genre: string;
+  tone: string;
+  language: string;
+  plotConstraints: string;
+  desiredRole: string;
+  availability: WriterArenaPostSummaryAvailability;
+  respondentLimit: number;
+  /** Live open auditions on this post */
+  respondentCount: number;
+  /** Every audition ever received (author-only detail; equal to respondentCount for other viewers) */
+  totalApplications: number;
+  /** @nullable */
+  myApplicationId: string | null;
+  /** @nullable */
+  myApplicationStatus: string | null;
+  /** @nullable */
+  filledBy: string | null;
+  /** @nullable */
+  filledAt: string | null;
+  publishedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Open a writing role on one of the caller's projects (the seed brief plus the typed role and pitch)
+ */
+export type WriterArenaPostInput = CollaborationSeedInput & {
+  role: WriterArenaRole;
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  rolePitch: string;
+};
+
+export type WriterArenaPostUpdateAvailability = typeof WriterArenaPostUpdateAvailability[keyof typeof WriterArenaPostUpdateAvailability];
+
+
+export const WriterArenaPostUpdateAvailability = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+} as const;
+
+/**
+ * Close/reopen a role call or edit its pitch while OPEN (author only)
+ */
+export interface WriterArenaPostUpdate {
+  availability?: WriterArenaPostUpdateAvailability;
+  /**
+     * @minLength 10
+     * @maxLength 2000
+     */
+  rolePitch?: string;
+}
+
+/**
+ * The caller's own audition on an Arena post
+ */
+export interface WriterArenaAudition {
+  id: string;
+  postId: string;
+  kind: WriterArenaPostKind;
+  /** @nullable */
+  role: string | null;
+  /** @nullable */
+  rolePitch: string | null;
+  sourceProjectTitle: string;
+  creatorId: string;
+  creatorName: string;
+  status: string;
+  /** @nullable */
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Watch a writing role — across the whole Arena, or scoped to one author
+ */
+export interface WriterArenaWatchInput {
+  role: WriterArenaRole;
+  creatorId?: string;
+}
+
+export interface WriterArenaWatch {
+  id: string;
+  role: WriterArenaRole;
+  /** @nullable */
+  creatorId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type GenreQueryParameter = string;
 
 export type UnitQueryParameter = string;
@@ -2796,4 +2968,37 @@ export type ListArenaReviewsParams = {
  */
 userId: string;
 };
+
+export type ListWriterArenaPostsParams = {
+/**
+ * Restrict the board to one rail
+ */
+rail?: ListWriterArenaPostsRail;
+role?: WriterArenaRole;
+sort?: ListWriterArenaPostsSort;
+/**
+ * Order posts from authors the caller follows first
+ */
+followed?: boolean;
+/**
+ * Return only the caller's own calls
+ */
+mine?: boolean;
+};
+
+export type ListWriterArenaPostsRail = typeof ListWriterArenaPostsRail[keyof typeof ListWriterArenaPostsRail];
+
+
+export const ListWriterArenaPostsRail = {
+  role: 'role',
+  seed: 'seed',
+} as const;
+
+export type ListWriterArenaPostsSort = typeof ListWriterArenaPostsSort[keyof typeof ListWriterArenaPostsSort];
+
+
+export const ListWriterArenaPostsSort = {
+  newest: 'newest',
+  most_applied: 'most_applied',
+} as const;
 
