@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
-  AlertTriangle, Archive, ArrowLeft, ArrowRight, Bell, BookOpen, Bold, Check, CheckCircle2, ChevronDown, CircleHelp,
+  AlertTriangle, Archive, ArrowLeft, ArrowRight, BookOpen, Bold, Check, CheckCircle2, ChevronDown, CircleHelp,
   ClipboardList, Clock3, Copy, Download, Eraser, ExternalLink, FileDown, FileText, FolderOpen,
   GitFork, Globe2, Heading1, Heading2, Highlighter, ImagePlus,  Italic, Library, Link2, List,
   ListOrdered, Lock, LockOpen, LogOut, MapPin, Menu, Mic, Move, PanelLeft, PenLine, Play, Plus,
@@ -19,6 +19,7 @@ import { ArenaPage } from "@/components/arena";
 import { ArenaPostPage } from "@/components/arena-post";
 import { ArenaMinePage } from "@/components/arena-mine";
 import { ArenaRoleModal, type ArenaRoleBrief } from "@/components/arena-role-modal";
+import { TopAccountChip, TopArenaButton, TopExploreSearch, TopNotificationsBell } from "@/components/top-nav";
 import { WRITER_ROLES, apiErrorText, writerRoleLabel } from "@/lib/arena";
 import { continuityAudit, oracleChat, outlineAssist, transcribeAudio, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
 import {
@@ -234,6 +235,10 @@ function App() {
   const [arenaPostId, setArenaPostId] = useState("");
   const [arenaRoleOpen, setArenaRoleOpen] = useState(false);
   const [arenaRoleProject, setArenaRoleProject] = useState<Project | null>(null);
+  // Top-bar Explore: the query handed to the Explore room, plus a key so a
+  // second search from the same view remounts it with the new query.
+  const [exploreQuery, setExploreQuery] = useState("");
+  const [exploreKey, setExploreKey] = useState(0);
   const [noteProject, setNoteProject] = useState<Project | null>(null);
   const [preview, setPreview] = useState<{ continuationId: string; project: Project } | null>(null);
   const [previewMeta, setPreviewMeta] = useState<{ respondentName: string; title: string } | null>(null);
@@ -866,25 +871,35 @@ function App() {
   };
   const switchToLesson = () => { startTutorial(); };
   const switchToDraft = () => { markLessonComplete(); setMode("draft"); setModal(null); setTutorialOpen(false); if (project?.isTutorial) { setDraftNudge(!hasUserProject); setView("home"); } else { setDraftNudge(false); setEditorSceneId(project?.scenes[0]?.id ?? null); setView(project ? "editor" : "home"); } };
+  // Top-bar chrome: Explore (with the typed query), a seed opened straight
+  // from the live results, and whether the Arena is the room on screen.
+  const openExplore = (query: string) => { setExploreQuery(query); setExploreKey((count) => count + 1); setView("explore"); };
+  const openSeed = (seedId: string) => { window.location.href = `/authors/pitch-board/seed/${seedId}`; };
+  const arenaOpen = view === "arena" || view === "arena-post" || view === "arena-mine";
   const exportFile = async (format: ExportFormat) => { if (!project) return; await exportProject({ ...project, scenes: project.scenes.map((scene) => ({ id: scene.id, title: scene.title, synopsis: scene.synopsis, content: scene.content, status: scene.status, pov: scene.pov })) }, format); notify(format === "print" ? "Print window opened" : `Downloaded ${format.toUpperCase()}`); };
   const importFile = (file: File) => { const reader = new FileReader(); reader.onload = () => { try { const raw = String(reader.result); const parsed = file.name.endsWith(".json") || file.name.endsWith(".msk") ? JSON.parse(raw) : { ...sample(), title: raw.split("\n")[0] || "Imported work", scenes: [{ ...sample().scenes[0], id: uid(), title: "Imported draft", content: textToHtml(raw) }] }; setProjects((items) => [{ ...sample(), ...parsed, id: uid(), isTutorial: false, updated: now() }, ...items]); setModal(null); notify("Import complete"); } catch { notify("That file could not be read"); } }; reader.readAsText(file); };
     return <div className={`app-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
       <Sidebar view={view} setView={setView} project={project} projects={projects} openProject={openProject} openEditor={openEditor} mobile={mobileNav} close={() => setMobileNav(false)} onNew={() => { setDraftNudge(false); setModal("project"); }} onTutorial={startTutorial} workspaceOpen={sidebarWorkspaceOpen} setWorkspaceOpen={setSidebarWorkspaceOpen} mode={mode} hasUserProject={hasUserProject} notify={notify} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
     <main className="main-stage">
       <header className="topbar">
+        <div className="topbar-left">
         <button className="icon-btn mobile-only" aria-label="Open navigation" onClick={() => setMobileNav(true)}><Menu size={19} /></button>
         <div className="top-workspace-wrap" onPointerLeave={() => setTopWorkspaceOpen(false)}><button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)}><span>Workspace</span><ChevronDown size={13} /><b>{project?.title ?? "Your projects"}</b></button>{topWorkspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setTopWorkspaceOpen(false); }} onNew={() => { setModal("project"); setTopWorkspaceOpen(false); }} />}</div>
+        <TopArenaButton active={arenaOpen} onClick={() => setView("arena")} />
+        </div>
+        <div className="topbar-center">
          {/* The Draft/Lesson switch only appears while on the Lesson — in Draft
              mode the lesson stays reachable from the sidebar's "Explore the
              tutorial" button instead of cluttering the top bar. */}
-         {mode === "lesson" && <div className="mode-switch" role="tablist" aria-label="Writing mode"><button className="draft-mode-tab wave-nudge" onClick={switchToDraft} role="tab" aria-selected={false}><PenLine size={13} /> Draft</button><button className="active" onClick={switchToLesson} role="tab" aria-selected={true}><BookOpen size={13} /> Lesson</button></div>}
-         <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><button className="icon-btn bell-wrap" aria-label="Notifications" onClick={() => setView("notifications")}><Bell size={18} />{unreadCount > 0 && <span className="bell-badge" data-testid="bell-unread">{unreadCount}</span>}</button><button className="avatar" aria-label="Open your profile" onClick={() => setView("profile")}>{user?.firstName?.[0] ?? "A"}</button></div>
+         {mode === "lesson" ? <div className="mode-switch mode-switch-inline" role="tablist" aria-label="Writing mode"><button className="draft-mode-tab wave-nudge" onClick={switchToDraft} role="tab" aria-selected={false}><PenLine size={13} /> Draft</button><button className="active" onClick={switchToLesson} role="tab" aria-selected={true}><BookOpen size={13} /> Lesson</button></div> : <TopExploreSearch onOpenExplore={openExplore} onOpenSeed={openSeed} />}
+        </div>
+         <div className="top-actions">{preview && <div className="preview-actions"><button className="preview-btn preview-reject" onClick={rejectPreview} disabled={declineCont.isPending}><XCircle size={15} /> {declineCont.isPending ? "Archiving…" : "Reject"}</button><button className="preview-btn preview-approve" onClick={approvePreview} disabled={acceptCont.isPending}><CheckCircle2 size={15} /> {acceptCont.isPending ? "Merging…" : "Approve & merge"}</button></div>}<button className="icon-btn" aria-label="Help" onClick={() => setModal("help")}><CircleHelp size={18} /></button><TopNotificationsBell unread={unreadCount} onClick={() => setView("notifications")} /><TopAccountChip onOpenProfile={() => setView("profile")} /></div>
       </header>
         {cloneBusy && <div className="den-status-banner"><RefreshCw size={15} className="spin" /> Opening your fork of this seed…</div>}
         {forkError && <div className="den-status-banner error"><XCircle size={15} /> {forkError}</div>}
         {preview && <div className="den-status-banner preview"><GitFork size={15} /> Previewing {previewMeta?.respondentName ? `${previewMeta.respondentName}'s` : "a writer's"} submission of “{previewMeta?.title ?? project.title}” — read only. Approve to merge it into the shared project.</div>}
         {sharedOpenError && <div className="den-status-banner error"><XCircle size={15} /> This shared room has no merged document in your studio yet — shared projects appear here once a submission has been approved and merged.</div>}
-        {view === "profile" ? <ProfilePage projectCount={createdProjectCount} /> : view === "explore" ? <ExplorePage /> : view === "notifications" ? <NotificationsPage /> : view === "arena" ? <ArenaPage hasProjects={hasUserProject} initialRole={arenaRoleIntent} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} onOpenMine={() => setView("arena-mine")} onCallRole={() => openArenaRole(null)} /> : view === "arena-post" ? <ArenaPostPage seedId={arenaPostId} onBack={() => setView("arena")} onAudition={(seedId) => { window.location.href = `/authors-den/?answer=${seedId}`; }} notify={notify} /> : view === "arena-mine" ? <ArenaMinePage onBack={() => setView("arena")} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} notify={notify} /> : view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onCallRole={(item) => openArenaRole(item)} onOpenArena={() => setView("arena")} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
+        {view === "profile" ? <ProfilePage projectCount={createdProjectCount} /> : view === "explore" ? <ExplorePage key={exploreKey} initialQuery={exploreQuery} /> : view === "notifications" ? <NotificationsPage /> : view === "arena" ? <ArenaPage hasProjects={hasUserProject} initialRole={arenaRoleIntent} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} onOpenMine={() => setView("arena-mine")} onCallRole={() => openArenaRole(null)} /> : view === "arena-post" ? <ArenaPostPage seedId={arenaPostId} onBack={() => setView("arena")} onAudition={(seedId) => { window.location.href = `/authors-den/?answer=${seedId}`; }} notify={notify} /> : view === "arena-mine" ? <ArenaMinePage onBack={() => setView("arena")} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} notify={notify} /> : view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onCallRole={(item) => openArenaRole(item)} onOpenArena={() => setView("arena")} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
       {buyProjectsOpen && <BuyProjectsModal onClose={() => setBuyProjectsOpen(false)} />}
       {tutorialOpen && <TutorialDock step={tutorialStep} onNext={nextLesson} onDismiss={() => setTutorialOpen(false)} />}
     </main>
@@ -915,7 +930,9 @@ function WorkspaceMenu({ projects, project, onSelect, onNew }: { projects: Proje
 
 function Sidebar({ view, setView, project, projects, openProject, openEditor, mobile, close, onNew, onTutorial, workspaceOpen, setWorkspaceOpen, mode, hasUserProject, notify, collapsed, setCollapsed }: { view: View; setView: (view: View) => void; project?: Project; projects: Project[]; openProject: (project: Project, view?: View, sceneId?: string) => void; openEditor: (sceneId?: string) => void; mobile: boolean; close: () => void; onNew: () => void; onTutorial: () => void; workspaceOpen: boolean; setWorkspaceOpen: (open: boolean) => void; mode: "lesson" | "draft"; hasUserProject: boolean; notify: (message: string) => void; collapsed: boolean; setCollapsed: (collapsed: boolean) => void }) {
   const nav: [View, string, ReactNode][] = [["general", "General", <PenLine size={17} />], ["characters", "Characters", <Users size={17} />], ["world", "World", <Globe2 size={17} />], ["plots", "Plots", <Sparkles size={17} />], ["outline", "Outline", <ClipboardList size={17} />], ["editor", "Draft", <BookOpen size={17} />]];
-   const aux: [View, string, ReactNode][] = [["search", "Search", <Search size={17} />], ["revisions", "Revisions", <Archive size={17} />], ["oracle", "Oracle", <WandSparkles size={17} />], ["tools", "Tools", <Zap size={17} />], ["settings", "Settings", <Settings size={17} />], ["arena", "Audition Arena", <Mic size={17} />], ["explore", "Explore", <Search size={17} />], ["notifications", "Notifications", <Bell size={17} />], ["profile", "Profile", <Users size={17} />]];
+   // Explore, Notifications, Profile and the Arena now live in the top bar, so
+   // the STUDIO group keeps only the page-level tools.
+   const aux: [View, string, ReactNode][] = [["search", "Search", <Search size={17} />], ["revisions", "Revisions", <Archive size={17} />], ["oracle", "Oracle", <WandSparkles size={17} />], ["tools", "Tools", <Zap size={17} />], ["settings", "Settings", <Settings size={17} />]];
   const gated = mode === "draft" && !hasUserProject;
   // The Arena is a den-level room like Explore: reachable without a project.
   const openRoom = (id: View) => ["profile", "explore", "notifications", "arena", "arena-post", "arena-mine"].includes(id);

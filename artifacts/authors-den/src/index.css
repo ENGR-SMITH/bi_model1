@@ -135,8 +135,8 @@
 .new-project-btn { background: hsl(var(--sidebar-primary)); color: hsl(var(--sidebar-primary-foreground)); border: 0; }
 .tutorial-btn:hover, .new-project-btn:hover { transform: translateY(-1px); }
 .main-stage { flex: 1; min-width: 0; }
-.topbar { height: 70px; border-bottom: 1px solid hsl(var(--border)); display: flex; align-items: center; justify-content: space-between; padding: 0 42px; background: hsl(var(--background) / .82); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 10; }
-.top-actions { display: flex; align-items: center; gap: 12px; }
+.topbar { height: 70px; border-bottom: 1px solid hsl(var(--border)); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; padding: 0 42px; background: hsl(var(--background) / .82); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 10; }
+.top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
 .nexet-back-btn { display: flex; align-items: center; gap: 9px; margin: 0 2px 32px; padding: 9px 12px; border: 1px solid hsl(var(--sidebar-primary) / .35); background: hsl(var(--sidebar-accent)); color: hsl(var(--sidebar-primary)); border-radius: 7px; font: 700 11px var(--app-font-sans); text-decoration: none; transition: border-color .16s, background .16s, transform .16s; white-space: nowrap; overflow: hidden; }
 .nexet-back-btn svg { color: hsl(var(--destructive)); }
 .nexet-back-btn:hover { border-color: hsl(var(--destructive) / .6); background: hsl(var(--sidebar-accent) / .85); transform: translateY(-1px); }
@@ -1632,4 +1632,77 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
 .card-actions .card-action-btn.role-btn:hover { background: hsl(var(--accent) / .12); }
 @media (max-width: 900px) {
   .arena-post-grid { grid-template-columns: 1fr; }
+}
+
+/* --------------------------------------------------------------------------
+   Top-bar chrome — Explore, the inbox bell, the account tile and the Arena
+   notch. Moved out of the sidebar so the STUDIO group stays page-level tools
+   and the den reads like the Creators Den header.
+   -------------------------------------------------------------------------- */
+.topbar-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.topbar-center { display: flex; justify-content: center; min-width: 0; }
+.mode-switch-inline { position: static; transform: none; }
+
+/* Explore — a long live-search field in the centre of the bar. */
+.topnav-search { width: min(520px, 44vw); }
+.topnav-search-wrap { position: relative; }
+.topnav-search-box { display: flex; align-items: center; gap: 8px; border: 1px solid hsl(var(--border)); background: hsl(var(--card) / .8); border-radius: 999px; padding: 5px 14px 5px 6px; transition: border-color .18s, box-shadow .18s; }
+.topnav-search-box:focus-within { border-color: hsl(var(--accent) / .55); box-shadow: 0 0 0 3px hsl(var(--accent) / .12); }
+.topnav-search-icon { border: 0; background: transparent; color: hsl(var(--muted-foreground)); display: inline-grid; place-items: center; padding: 6px; border-radius: 50%; }
+.topnav-search-icon:hover { color: hsl(var(--foreground)); background: hsl(var(--muted)); }
+.topnav-search-input { flex: 1; min-width: 0; border: 0; background: transparent; color: hsl(var(--foreground)); font: 12px var(--app-font-sans); outline: none; }
+.topnav-search-input::placeholder { color: hsl(var(--muted-foreground)); }
+.topnav-search-drop { position: absolute; top: calc(100% + 8px); left: 0; right: 0; z-index: 40; max-height: min(420px, 70vh); overflow-y: auto; border: 1px solid hsl(var(--border)); background: hsl(var(--card)); box-shadow: var(--shadow-xl); border-radius: 8px; }
+.topnav-search-group { padding: 6px; }
+.topnav-search-group + .topnav-search-group { border-top: 1px solid hsl(var(--border)); }
+.topnav-search-label { margin: 4px 8px 6px; color: hsl(var(--muted-foreground)); font: 9px var(--app-font-mono); letter-spacing: .12em; text-transform: uppercase; }
+.topnav-search-item { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: transparent; padding: 8px; border-radius: 5px; text-align: left; color: hsl(var(--foreground)); }
+.topnav-search-item:hover { background: hsl(var(--secondary)); }
+.topnav-search-mark { width: 26px; height: 26px; flex: 0 0 26px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: hsl(var(--accent) / .12); color: hsl(var(--accent)); font: 700 11px var(--app-font-serif); }
+.topnav-search-mark img { width: 100%; height: 100%; object-fit: cover; }
+.topnav-search-copy { display: flex; flex-direction: column; min-width: 0; }
+.topnav-search-copy b, .topnav-search-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topnav-search-copy b { font-size: 12px; font-weight: 600; }
+.topnav-search-copy small { color: hsl(var(--muted-foreground)); font-size: 10px; }
+.topnav-search-all { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; border: 0; border-top: 1px solid hsl(var(--border)); background: hsl(var(--secondary) / .5); color: hsl(var(--accent)); padding: 10px; font-size: 11px; font-weight: 600; }
+.topnav-search-all:hover { background: hsl(var(--secondary)); }
+.topnav-search-empty { margin: 0; padding: 14px; color: hsl(var(--muted-foreground)); font-size: 11px; }
+
+/* Inbox bell — unread badge plus the INBOX caption. */
+.topnav-bell-wrap { position: relative; display: inline-flex; align-items: center; gap: 2px; }
+.topnav-bell { position: relative; border: 0; background: transparent; color: hsl(var(--muted-foreground)); display: inline-grid; place-items: center; padding: 7px; border-radius: 6px; }
+.topnav-bell:hover { color: hsl(var(--foreground)); background: hsl(var(--muted)); }
+.topnav-bell-badge { position: absolute; top: 1px; right: 1px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px; background: hsl(var(--destructive)); color: #fff; font: 700 9px var(--app-font-sans); display: grid; place-items: center; box-shadow: 0 0 0 2px hsl(var(--card)); }
+.topnav-bell-label { color: hsl(var(--muted-foreground)); font: 9px var(--app-font-mono); letter-spacing: .14em; text-transform: uppercase; }
+
+/* Account tile — avatar, name, email; the tile itself opens the profile. */
+.topnav-account { display: flex; align-items: center; gap: 9px; border: 0; background: transparent; padding: 5px 8px; border-radius: 7px; text-align: left; color: hsl(var(--foreground)); }
+.topnav-account:hover { background: hsl(var(--secondary)); }
+.topnav-account-avatar { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); font: 700 12px var(--app-font-serif); }
+.topnav-account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.topnav-account-meta { display: flex; flex-direction: column; min-width: 0; }
+.topnav-account-name, .topnav-account-email { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topnav-account-name { font-size: 12px; font-weight: 600; }
+.topnav-account-email { color: hsl(var(--muted-foreground)); font-size: 10px; }
+
+/* Arena notch — parked beside the workspace switcher. */
+.topnav-arena { display: inline-flex; align-items: center; gap: 6px; border: 1px solid hsl(var(--border)); background: transparent; color: hsl(var(--muted-foreground)); border-radius: 999px; padding: 7px 13px; font: 10px var(--app-font-mono); letter-spacing: .08em; text-transform: uppercase; transition: color .18s, border-color .18s, background .18s; }
+.topnav-arena:hover { color: hsl(var(--foreground)); border-color: hsl(var(--accent) / .5); }
+.topnav-arena.active { color: hsl(var(--accent)); border-color: hsl(var(--accent) / .55); background: hsl(var(--accent) / .1); }
+
+@media (max-width: 1100px) {
+  .topnav-search { width: min(380px, 34vw); }
+  .topnav-bell-label { display: none; }
+}
+@media (max-width: 900px) {
+  /* The field folds down to its telescope button, which still opens Explore. */
+  .topnav-search { width: auto; }
+  .topnav-search-input { display: none; }
+  .topnav-search-box { padding: 3px; }
+  .topnav-account-meta { display: none; }
+}
+@media (max-width: 700px) {
+  .topnav-arena span { display: none; }
+  .topnav-arena { padding: 7px 9px; }
+  .topnav-account { padding: 3px; }
 }

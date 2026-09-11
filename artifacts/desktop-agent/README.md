@@ -45,15 +45,20 @@ or set environment variables:
 
 ```json
 {
-  "apiBaseUrl": "https://your-api.example.com",
+  "apiBaseUrl": "https://nexet.co",
+  "webAppUrl": "https://nexet.co",
   "clerkPublishableKey": "pk_test_...",
-  "updateUrl": "https://media.example.com/desktop-agent"
+  "updateUrl": "https://pub-<hash>.r2.dev/desktop-agent"
 }
 ```
 
+The shipped defaults point at the real deployment (`https://nexet.co`), where
+the API and the web app share one origin. Override them to develop locally.
+
 | Config / env            | Meaning                                |
 | ----------------------- | -------------------------------------- |
-| `NEXET_API_URL`        | API base, no trailing slash. Default `http://localhost:3000` |
+| `NEXET_API_URL`        | API base, no trailing slash. Default `https://nexet.co`; set `http://localhost:3000` to develop |
+| `NEXET_WEB_URL` / `webAppUrl` | Public origin of the Nexet web app whose `/agent-signin` page completes the sign-in. Default `https://nexet.co`; point it at your dev server locally. |
 | `NEXET_CLERK_PUBLISHABLE_KEY` | Your Clerk **publishable** key. |
 | `NEXET_AGENT_WORK_DIR` | Temp dir for staged uploads. |
 | `NEXET_UPDATE_URL` / `updateUrl` | Auto-update feed base URL (`latest.yml` / `latest-mac.yml` location). Overrides the publish URL baked in at build time. |

@@ -9,6 +9,23 @@
 # hence the ./artifacts/... path from /app.
 set -e
 
+# Desktop-agent release feed. The installers are packaged per-OS on GitHub
+# runners and published to Cloudflare R2 (see
+# .github/workflows/build-desktop-agent.yml), so the image ships no copies.
+# When DESKTOP_AGENT_FEED_URL names that public feed base (…/desktop-agent),
+# <this origin>/desktop-agent/… redirects there — the same path the agent's
+# updateUrl defaults to, so an installed agent updates from the real domain.
+# Unset, the path goes to the Node server, which serves a locally built
+# dist-bundle when one exists (dev) and a 404 when it does not.
+FEED_BASE="${DESKTOP_AGENT_FEED_URL%/}"
+if [ -n "$FEED_BASE" ]; then
+  printf 'location /desktop-agent/ { rewrite ^/desktop-agent/(.*)$ %s/$1 redirect; }\n' "$FEED_BASE" \
+    > /etc/nginx/desktop-agent.conf
+else
+  printf 'location /desktop-agent/ { proxy_pass http://127.0.0.1:3000; }\n' \
+    > /etc/nginx/desktop-agent.conf
+fi
+
 PORT=3000 node --enable-source-maps ./artifacts/api-server/dist/index.mjs &
 
 nginx -g 'daemon off;'

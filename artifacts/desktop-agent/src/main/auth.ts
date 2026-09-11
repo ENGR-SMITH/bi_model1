@@ -89,7 +89,7 @@ export async function beginBrowserSignIn(
     webOrigin = new URL(webAppUrl).origin;
   } catch {
     throw new Error(
-      "Invalid web app URL. Set NEXET_WEB_URL to the Nexet web app origin (e.g. https://app.example.com).",
+      "Invalid web app URL. Set NEXET_WEB_URL to the Nexet web app origin (e.g. https://nexet.co).",
     );
   }
 
