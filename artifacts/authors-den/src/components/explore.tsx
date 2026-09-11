@@ -21,7 +21,7 @@ import { normalizeNexetUid, nexetUid } from "@/lib/nexet-uid";
 // Nexet ID, follow them, and browse published seeds (the pitch board work).
 // ---------------------------------------------------------------------------
 
-function matchesQuery(author: ExploreAuthor, query: string): boolean {
+export function matchesAuthorQuery(author: ExploreAuthor, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   const uid = normalizeNexetUid(nexetUid(author.userId));
@@ -31,6 +31,19 @@ function matchesQuery(author: ExploreAuthor, query: string): boolean {
     author.displayName.toLowerCase().includes(q) ||
     author.userId.toLowerCase().includes(q) ||
     author.userId.slice(0, 12).toLowerCase().includes(q)
+  );
+}
+
+/** Published work — the seeds on the pitch board. Shared with the top bar's
+ * live Explore search so both surfaces agree on what a match is. */
+export function matchesSeedQuery(seed: CollaborationSeed, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    seed.sourceProjectTitle.toLowerCase().includes(q) ||
+    seed.creatorName.toLowerCase().includes(q) ||
+    seed.genre.toLowerCase().includes(q) ||
+    seed.seedText.toLowerCase().includes(q)
   );
 }
 
@@ -116,28 +129,20 @@ function WorkCard({ seed }: { seed: CollaborationSeed }) {
   );
 }
 
-export function ExplorePage() {
-  const [query, setQuery] = useState("");
+export function ExplorePage({ initialQuery = "" }: { initialQuery?: string } = {}) {
+  const [query, setQuery] = useState(initialQuery);
   const [tab, setTab] = useState<"authors" | "work">("authors");
   const authors = useListExploreAuthors();
   const seeds = useListCollaborationSeeds();
 
   const filteredAuthors = useMemo(
-    () => (authors.data ?? []).filter((author) => matchesQuery(author, query)),
+    () => (authors.data ?? []).filter((author) => matchesAuthorQuery(author, query)),
     [authors.data, query],
   );
-  const filteredSeeds = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const rows = seeds.data ?? [];
-    if (!q) return rows;
-    return rows.filter(
-      (seed) =>
-        seed.sourceProjectTitle.toLowerCase().includes(q) ||
-        seed.creatorName.toLowerCase().includes(q) ||
-        seed.genre.toLowerCase().includes(q) ||
-        seed.seedText.toLowerCase().includes(q),
-    );
-  }, [seeds.data, query]);
+  const filteredSeeds = useMemo(
+    () => (seeds.data ?? []).filter((seed) => matchesSeedQuery(seed, query)),
+    [seeds.data, query],
+  );
 
   return (
     <div className="page explore-page">
