@@ -52,6 +52,14 @@ export function HouseNav() {
       setLocation('/#how-it-works');
     }
   };
+  const goToUpcoming = () => {
+    setOpen(false);
+    if (window.location.pathname === '/') {
+      document.getElementById('upcoming')?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      setLocation('/#upcoming');
+    }
+  };
 
   return (
     <header className="sticky top-0 z-40">
@@ -66,6 +74,10 @@ export function HouseNav() {
             </button>
             <button type="button" onClick={goToMethod} className="group relative rounded-full px-3.5 py-2 text-sm font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/5 hover:text-white" data-testid="button-nav-method">
               The method
+              <span className="absolute inset-x-4 bottom-1 h-px bg-gradient-to-r from-[#3b82f6]/80 to-[#8b5cf6]/80 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+            </button>
+            <button type="button" onClick={goToUpcoming} className="group relative rounded-full px-3.5 py-2 text-sm font-medium text-zinc-400 transition-colors duration-200 hover:bg-white/5 hover:text-white" data-testid="button-nav-upcoming">
+              Upcoming
               <span className="absolute inset-x-4 bottom-1 h-px bg-gradient-to-r from-[#3b82f6]/80 to-[#8b5cf6]/80 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
             </button>
           </nav>
@@ -108,6 +120,10 @@ export function HouseNav() {
             <button type="button" onClick={goToMethod} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-mobile-method">
               <span className="font-mono-ui text-[10px] tracking-[0.14em] text-[#3b82f6]">02 /</span>
               The method
+            </button>
+            <button type="button" onClick={goToUpcoming} className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium text-zinc-300 transition-colors hover:bg-white/5 hover:text-white" data-testid="button-mobile-upcoming">
+              <span className="font-mono-ui text-[10px] tracking-[0.14em] text-[#3b82f6]">03 /</span>
+              Upcoming features
             </button>
             <div className="my-1 h-px bg-white/5" />
             <Show when="signed-out">

@@ -1,7 +1,7 @@
 import { PiArrowUpRightDuotone, PiCompassRoseDuotone } from 'react-icons/pi';
 import { useUser } from '@clerk/react';
 import { Link } from 'wouter';
-import { nexetDashboardCategories } from '@/data/categories';
+import { nexetDashboardCategories, nexetUpcomingCategories } from '@/data/categories';
 
 // Premium dark theme — Resend/Framer inspired
 const openDoorClass = 'border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent';
@@ -69,6 +69,15 @@ export default function Dashboard() {
                 <div className="mt-14">
                   <h2 className={doorCardTitleClass}>{category.name}</h2>
                   <p className="mt-4 max-w-[19rem] text-sm leading-relaxed text-zinc-400">{category.description}</p>
+                  {category.slug === 'explore' && (
+                    <ul className="mt-5 flex flex-wrap gap-2" data-testid="explore-upcoming-rooms">
+                      {nexetUpcomingCategories.map((upcoming) => (
+                        <li key={upcoming.slug} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[0.12em] text-zinc-400">
+                          {upcoming.shortName}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <span className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-zinc-300 opacity-80 transition-all duration-300 group-hover:rotate-45 group-hover:border-[#3b82f6]/60 group-hover:text-[#60a5fa]">
                   <PiArrowUpRightDuotone className="h-4 w-4" />
