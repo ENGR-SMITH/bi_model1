@@ -1,7 +1,7 @@
 import { PiArrowUpRightDuotone, PiCompassRoseDuotone } from 'react-icons/pi';
 import { useUser } from '@clerk/react';
 import { Link } from 'wouter';
-import { nexetCategories } from '@/data/categories';
+import { nexetDashboardCategories } from '@/data/categories';
 
 // Premium dark theme — Resend/Framer inspired
 const openDoorClass = 'border-[#3b82f6]/40 bg-gradient-to-br from-[#3b82f6]/15 to-transparent';
@@ -41,7 +41,7 @@ export default function Dashboard() {
       </div>
 
       <div className="reveal reveal-1 mt-14 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {nexetCategories.map((category, index) => {
+        {nexetDashboardCategories.map((category, index) => {
           const Icon = category.icon;
           const available = category.status === 'Available';
           return (
@@ -55,7 +55,7 @@ export default function Dashboard() {
               <span className="card-spot" />
               <span className="card-shine" />
               <span className="absolute -right-10 -top-12 h-36 w-36 rounded-full border border-white/5 opacity-20 transition-transform duration-500 group-hover:scale-125" />
-              <span className="absolute right-7 top-7 font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">{String(index + 1).padStart(2, '0')} / {String(nexetCategories.length).padStart(2, '0')}</span>
+              <span className="absolute right-7 top-7 font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">{String(index + 1).padStart(2, '0')} / {String(nexetDashboardCategories.length).padStart(2, '0')}</span>
               <div className="relative flex h-full flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className={`icon-chip h-14 w-14 ${available ? 'text-[#60a5fa]' : doorIconTone[category.accent] ?? 'text-zinc-300'}`}>
@@ -67,7 +67,6 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <div className="mt-14">
-                  <p className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">{available ? 'The first light' : 'On the blueprint'}</p>
                   <h2 className={doorCardTitleClass}>{category.name}</h2>
                   <p className="mt-4 max-w-[19rem] text-sm leading-relaxed text-zinc-400">{category.description}</p>
                 </div>

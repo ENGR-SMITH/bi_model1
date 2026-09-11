@@ -373,58 +373,16 @@
   align-items: center;
   text-align: center;
 }
-.pay-loader-orbit {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 104px;
-  height: 104px;
-}
-.pay-loader-orbit::before {
-  content: "";
-  position: absolute;
-  inset: -10px;
+/* One standard spinner, nothing choreographed — the wait should read as the
+   app working, not as an animation of its own. */
+.pay-loader-spinner {
+  display: block;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.34), transparent 68%);
-  animation: payLoaderGlow 1.9s ease-in-out infinite;
-}
-.pay-loader-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.07);
+  border: 3px solid rgba(255, 255, 255, 0.12);
   border-top-color: #3b82f6;
-  border-right-color: #8b5cf6;
-  animation: payLoaderSpin 900ms linear infinite;
-}
-.pay-loader-icon {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: rgba(59, 130, 246, 0.14);
-  color: #60a5fa;
-  animation: payLoaderBob 2s ease-in-out infinite;
-}
-.pay-loader-bar {
-  position: relative;
-  width: 190px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-.pay-loader-bar > i {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 42%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #34d399);
-  animation: payLoaderSweep 1.4s ease-in-out infinite;
+  animation: payLoaderSpin 700ms linear infinite;
 }
 .pay-loader-chip {
   display: inline-flex;
@@ -446,19 +404,6 @@
 @keyframes payLoaderSpin {
   to { transform: rotate(360deg); }
 }
-@keyframes payLoaderGlow {
-  0%, 100% { opacity: 0.45; transform: scale(0.92); }
-  50% { opacity: 1; transform: scale(1.06); }
-}
-@keyframes payLoaderBob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-@keyframes payLoaderSweep {
-  0% { transform: translateX(-110%); }
-  100% { transform: translateX(310%); }
-}
-
 @keyframes reveal {
   from { opacity: 0; transform: translateY(16px); }
   to { opacity: 1; transform: translateY(0); }
@@ -513,10 +458,9 @@ section[id^="plans-"] { scroll-margin-top: 110px; }
      too, so the two buttons stay in step. */
 }
 @media (prefers-reduced-motion: reduce) {
-  /* The payment overlay still blocks the page, it just stops moving: the ring
-     and sweep freeze, so no one sensitive to motion is spun at. */
-  .pay-loader, .pay-loader-orbit::before, .pay-loader-ring,
-  .pay-loader-icon, .pay-loader-bar > i {
+  /* The payment overlay still blocks the page, it just stops moving: the
+     spinner freezes, so no one sensitive to motion is spun at. */
+  .pay-loader, .pay-loader-spinner {
     animation: none !important;
   }
 }

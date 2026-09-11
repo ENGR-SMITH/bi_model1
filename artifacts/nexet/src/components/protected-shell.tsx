@@ -203,7 +203,3 @@ function PrivateShell({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
-export function SectionEyebrow({ children }: { children: ReactNode }) {
-  return <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">{children}</p>;
-}

@@ -1,7 +1,6 @@
 import { PiArrowRightDuotone, PiChartLineUpDuotone, PiClockCountdownDuotone, PiSparkleDuotone, PiWarningCircleDuotone } from 'react-icons/pi';
 import { Link } from 'wouter';
 import { useListAccountActivity } from '@workspace/api-client-react';
-import { SectionEyebrow } from '@/components/protected-shell';
 
 const eventTone: Record<string, string> = {
   seed_published: 'bg-[#3b82f6]/20 text-[#60a5fa]',
@@ -25,7 +24,6 @@ export default function ActivityPage() {
     <div className="mx-auto max-w-[1320px]">
       <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-10 md:flex-row md:items-end">
         <div>
-          <SectionEyebrow>Your trail / activity</SectionEyebrow>
           <h1 className="mt-5 max-w-[12ch] text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">
             A clear record.
           </h1>

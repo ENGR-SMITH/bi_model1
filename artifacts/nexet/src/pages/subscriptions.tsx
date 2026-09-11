@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PiArrowLeftDuotone, PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiCreditCardDuotone, PiFolderOpenDuotone, PiHardDrivesDuotone, PiLockKeyDuotone, PiSparkleDuotone, PiTicketDuotone, PiWarningCircleDuotone, PiXDuotone } from 'react-icons/pi';
 import type { IconType } from 'react-icons';
 import { Link } from 'wouter';
-import { SectionEyebrow } from '@/components/protected-shell';
 import { PaymentLoadingOverlay } from '@/components/payment-loading';
 import { SuccessCheck } from '@/components/success-check';
 import {
@@ -142,7 +141,6 @@ function ResultOverlayView({ state, onClose }: { state: ResultOverlay; onClose: 
       <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" onClick={onClose}>
         <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-7 text-center text-white shadow-2xl" onClick={(event) => event.stopPropagation()} data-testid="subscription-success">
           <SuccessCheck className="mx-auto" />
-          <p className="mt-4 font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">Subscribed</p>
           <h3 className="mt-1 text-2xl font-extrabold tracking-[-0.04em]">Payment confirmed</h3>
           <p className="mt-3 text-sm text-zinc-400">
             {state.total !== undefined ? (
@@ -167,7 +165,6 @@ function ResultOverlayView({ state, onClose }: { state: ResultOverlay; onClose: 
         <div className="flex items-center gap-3">
           <span className="icon-chip h-14 w-14 text-[#f87171]"><PiWarningCircleDuotone className="h-7 w-7" /></span>
           <div>
-            <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#f87171]">Payment not confirmed</p>
             <h3 className="text-xl font-extrabold tracking-[-0.04em]">Something went wrong</h3>
           </div>
         </div>
@@ -283,7 +280,6 @@ export default function SubscriptionsPage() {
     <div className="mx-auto max-w-[1200px]">
       <div className="reveal flex flex-col justify-between gap-5 border-b border-white/5 pb-10 md:flex-row md:items-end">
         <div>
-          <SectionEyebrow>Billing & passes</SectionEyebrow>
           <h1 className="mt-5 text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-7xl">Yours at a glance.</h1>
           <p className="mt-5 max-w-[34rem] text-base leading-[1.8] text-zinc-400">
             Every subscription on your account — category passes, Creators Den storage, and Author&nbsp;Den projects — in one place. Subscribe here, or on the den itself; your plan follows your account.
@@ -301,7 +297,6 @@ export default function SubscriptionsPage() {
           <span className="card-spot" />
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="font-mono-ui text-[9px] uppercase tracking-[.18em] text-zinc-500">Category passes</p>
               <p className="mt-1 text-2xl font-semibold text-zinc-100">Passes</p>
             </div>
             <span className="icon-chip h-11 w-11 text-[#3b82f6]"><PiTicketDuotone className="h-5 w-5" /></span>
@@ -593,7 +588,6 @@ function PayModal({
                 <PiCreditCardDuotone className="h-5 w-5" />
               </span>
               <div>
-                <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">Subscription</p>
                 <h2 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.04em]">{plan.planLabel}</h2>
               </div>
             </div>

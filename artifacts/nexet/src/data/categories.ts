@@ -85,6 +85,15 @@ export const nexetCategories: NexetCategory[] = [
   },
 ];
 
+// The cards the dashboard shows. Singers, DJs, Artists and Storytellers are
+// still only on the blueprint, so their doors live behind /categories/<slug>
+// (the waitlist page) instead of taking up a card on the front of the atrium.
+const DASHBOARD_SLUGS = ['authors', 'content-creators', 'explore'];
+
+export const nexetDashboardCategories = nexetCategories.filter((category) =>
+  DASHBOARD_SLUGS.includes(category.slug),
+);
+
 export function getNexetCategory(slug?: string) {
   return nexetCategories.find((category) => category.slug === slug);
 }

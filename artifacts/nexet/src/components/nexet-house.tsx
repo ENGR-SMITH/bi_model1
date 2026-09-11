@@ -162,7 +162,6 @@ export function RoomDoor({ room, compact = false }: { room: Room; compact?: bool
           </span>
         </div>
         <div className="mt-9">
-          <p className="mb-2 font-mono-ui text-[10px] uppercase tracking-[0.14em] text-zinc-500">{room.category}</p>
           <h3 className={`${compact ? 'text-xl' : 'text-[1.45rem]'} max-w-[14rem] font-bold leading-[1.05] tracking-[-0.03em] text-zinc-100`}>
             {room.name}
           </h3>

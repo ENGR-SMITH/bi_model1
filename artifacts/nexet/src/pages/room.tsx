@@ -12,7 +12,6 @@ export default function RoomPage() {
       <main className="min-h-[100dvh] bg-[#0a0a0a]">
         <HouseNav />
         <section className="mx-auto flex min-h-[calc(100dvh-88px)] max-w-[650px] flex-col items-center justify-center px-5 py-20 text-center">
-          <span className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">No such room on the plan</span>
           <h1 className="mt-6 text-6xl font-bold leading-[.9] tracking-[-0.04em] text-white sm:text-8xl">The door moved.</h1>
           <p className="mt-6 max-w-[26rem] text-sm leading-relaxed text-zinc-400">That room is not on Nexet's current blueprint. The house is still growing.</p>
           <Link href="/" className="mt-9 inline-flex items-center gap-3 rounded-full bg-[#3b82f6] px-6 py-3.5 text-sm font-semibold text-white transition-all hover:bg-[#2563eb] hover:shadow-[0_0_30px_-5px_rgba(59,130,246,0.5)]" data-testid="link-return-house-missing">
@@ -35,7 +34,6 @@ export default function RoomPage() {
         </Link>
         <div className="relative mt-14 grid items-center gap-14 lg:grid-cols-[1fr_.85fr] lg:gap-20">
           <div className="reveal">
-            <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">{room.category} / {room.eyebrow}</p>
             <h1 className="mt-6 max-w-[10ch] text-[4.5rem] font-bold leading-[.88] tracking-[-0.05em] text-white sm:text-[7rem]">{room.name}</h1>
             <p className="mt-8 max-w-[30rem] text-3xl font-semibold leading-[1.05] tracking-[-0.03em] text-zinc-300 sm:text-4xl">{room.description}</p>
           </div>
@@ -66,7 +64,6 @@ export default function RoomPage() {
       <section className="border-y border-white/5 bg-[#0d0d0d]">
         <div className="mx-auto grid max-w-[1400px] gap-10 px-4 py-16 sm:px-5 lg:grid-cols-[.7fr_1.3fr] lg:px-6 lg:py-24">
           <div>
-            <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">A room can wait</p>
             <h2 className="mt-5 max-w-[12ch] text-4xl font-bold leading-[.94] tracking-[-0.04em] text-white sm:text-5xl">The house is open before every door is.</h2>
           </div>
           <div className="max-w-[38rem]">
@@ -85,7 +82,6 @@ export default function RoomPage() {
       <section className="mx-auto max-w-[1400px] px-4 py-16 sm:px-5 lg:px-6 lg:py-24">
         <div className="flex items-end justify-between gap-5">
           <div>
-            <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#3b82f6]">Keep wandering</p>
             <h2 className="mt-4 text-4xl font-bold tracking-[-0.03em] text-white">Other doors on the plan</h2>
           </div>
           <Link href="/" className="group hidden items-center gap-2 text-sm font-semibold text-zinc-300 sm:flex" data-testid="link-house-plan"><PiArrowLeftDuotone className="h-4 w-4 transition-transform group-hover:-translate-x-1" /> House plan</Link>

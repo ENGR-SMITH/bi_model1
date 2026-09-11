@@ -1,8 +1,7 @@
 import { PiArrowLeftDuotone, PiChatCircleDuotone, PiHardHatDuotone } from 'react-icons/pi';
 import { Link } from 'wouter';
-import { SectionEyebrow } from '@/components/protected-shell';
 
-export default function PhaseTwo({ title, eyebrow, description }: { title: string; eyebrow: string; description: string }) {
+export default function PhaseTwo({ title, description }: { title: string; description: string }) {
   return (
     <div className="mx-auto max-w-[920px]">
       <Link href="/categories/authors" className="focus-house group inline-flex items-center gap-2 rounded-full py-2 text-xs font-bold text-zinc-500 hover:text-white" data-testid="link-phase-two-back">
@@ -11,7 +10,6 @@ export default function PhaseTwo({ title, eyebrow, description }: { title: strin
       </Link>
       <div className="reveal mt-12 max-w-2xl">
         <span className="icon-chip h-14 w-14 text-[#3b82f6]"><PiHardHatDuotone className="h-6 w-6" /></span>
-        <SectionEyebrow>{eyebrow} / phase 2</SectionEyebrow>
         <h1 className="mt-5 text-6xl font-extrabold leading-[.87] tracking-[-0.08em] text-white sm:text-8xl">{title}</h1>
         <p className="mt-7 max-w-xl text-base leading-[1.8] text-zinc-400">{description}</p>
       </div>
