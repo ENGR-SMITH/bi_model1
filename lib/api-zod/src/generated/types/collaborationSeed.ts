@@ -5,6 +5,7 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { CollaborationSeedKind } from './collaborationSeedKind';
 
 export interface CollaborationSeed {
   id: string;
@@ -31,6 +32,21 @@ export interface CollaborationSeed {
   /** @nullable */
   myApplicationStatus: string | null;
   availability: string;
+  kind: CollaborationSeedKind;
+  /**
+     * WriterArenaRole for ROLE rows; null for seeds
+     * @nullable
+     */
+  role: string | null;
+  /** @nullable */
+  rolePitch: string | null;
+  /**
+     * User id of the accepted writer once a role is filled
+     * @nullable
+     */
+  filledBy: string | null;
+  /** @nullable */
+  filledAt: Date | null;
   publishedAt: Date;
   createdAt: Date;
 }

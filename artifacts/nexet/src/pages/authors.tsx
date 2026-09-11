@@ -1,4 +1,4 @@
-import { PiArrowRightDuotone, PiArrowUpRightDuotone, PiBookOpenDuotone, PiLockKeyDuotone, PiMagnifyingGlassDuotone, PiPenNibDuotone, PiTrayDuotone, PiUsersDuotone } from 'react-icons/pi';
+import { PiArrowRightDuotone, PiArrowUpRightDuotone, PiBookOpenDuotone, PiLockKeyDuotone, PiMagnifyingGlassDuotone, PiMicrophoneStageDuotone, PiPenNibDuotone, PiTrayDuotone, PiUsersDuotone } from 'react-icons/pi';
 import { Link } from 'wouter';
 import { useUser } from '@clerk/react';
 
@@ -62,15 +62,21 @@ export default function AuthorsPage() {
               <span className="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-[#3b82f6] px-4 py-2 text-xs font-semibold text-white">Browse seeds <PiArrowRightDuotone className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" /></span>
             </Link>
             <div className="grid gap-4">
+              <Link href="/authors-den/?arena=1" className="soft-lift focus-house group overflow-hidden rounded-[1.25rem] card-surface p-6" data-testid="link-audition-arena">
+                <span className="card-spot" />
+                <div className="flex items-center justify-between"><PiMicrophoneStageDuotone className="h-5 w-5 text-[#8b5cf6]" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-zinc-600">02</span></div>
+                <h2 className="mt-4 font-display text-2xl italic">Writers&apos; Audition Arena</h2>
+                <p className="mt-1.5 text-xs text-zinc-500">Open roles and the pitch board in one room — call for a second voice, or audition for one.</p>
+              </Link>
               <Link href="/authors/collaborations/continuations" className="soft-lift focus-house group overflow-hidden rounded-[1.25rem] card-surface p-6" data-testid="link-review-desk">
                 <span className="card-spot" />
-                <div className="flex items-center justify-between"><PiTrayDuotone className="h-5 w-5 text-[#34d399]" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-zinc-600">02</span></div>
+                <div className="flex items-center justify-between"><PiTrayDuotone className="h-5 w-5 text-[#34d399]" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-zinc-600">03</span></div>
                 <h2 className="mt-4 font-display text-2xl italic">Your review desk</h2>
                 <p className="mt-1.5 text-xs text-zinc-500">Continuations waiting on your eye, side by side with the seed that called them.</p>
               </Link>
               <Link href="/authors/work" className="soft-lift focus-house group overflow-hidden rounded-[1.25rem] border-2 border-[#3b82f6] bg-[#3b82f6] p-6" data-testid="link-work-in-motion">
                 <span className="card-spot" />
-                <div className="flex items-center justify-between"><PiUsersDuotone className="h-5 w-5 text-white" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-white/60">03</span></div>
+                <div className="flex items-center justify-between"><PiUsersDuotone className="h-5 w-5 text-white" /><span className="font-mono-ui text-[10px] uppercase tracking-[.14em] text-white/60">04</span></div>
                 <h2 className="mt-4 font-display text-2xl italic">Work in motion</h2>
                 <p className="mt-1.5 text-xs text-white/80">Solo pieces and Nexet projects, together in one room.</p>
               </Link>

@@ -15,6 +15,11 @@ import { BuyProjectsModal, ProfilePage } from "@/components/profile-page";
 import { WhopReturnGate } from "@/components/whop-return";
 import { ExplorePage } from "@/components/explore";
 import { NotificationsPage } from "@/components/notifications";
+import { ArenaPage } from "@/components/arena";
+import { ArenaPostPage } from "@/components/arena-post";
+import { ArenaMinePage } from "@/components/arena-mine";
+import { ArenaRoleModal, type ArenaRoleBrief } from "@/components/arena-role-modal";
+import { apiErrorText, writerRoleLabel } from "@/lib/arena";
 import { continuityAudit, oracleChat, outlineAssist, transcribeAudio, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
 import {
   acceptContinuation,
@@ -47,9 +52,10 @@ import {
   useSaveCollaborationProjectDocument,
   useSaveSeedApplicationDraft,
   useSubmitSeedApplication,
+  useCreateWriterArenaPost,
 } from "@workspace/api-client-react";
 
-type View = "home" | "profile" | "explore" | "notifications" | "general" | "characters" | "plots" | "world" | "outline" | "editor" | "search" | "revisions" | "oracle" | "tools" | "settings";
+type View = "home" | "profile" | "explore" | "notifications" | "arena" | "arena-post" | "arena-mine" | "general" | "characters" | "plots" | "world" | "outline" | "editor" | "search" | "revisions" | "oracle" | "tools" | "settings";
 type MediaItem = { id: string; name: string; src: string; x: number; y: number; size: number };
 type Scene = { id: string; title: string; synopsis: string; content: string; status: string; compile: boolean; target: number; pov: string; labels: string; notes: string; media?: MediaItem[] };
 type Character = { id: string; name: string; role: string; pov: string; importance: string; color: string; description: string; notes: string; custom: { key: string; value: string }[] };
@@ -217,9 +223,16 @@ function App() {
       openProject: params.get("project") ?? "",
       chat: params.get("chat") === "1",
       notifications: params.get("notifications") === "1",
+      arena: params.get("arena") === "1",
+      arenaPost: params.get("arenaPost") ?? "",
+      arenaMine: params.get("arenaMine") === "1",
     };
   });
   const [publishDraft, setPublishDraft] = useState<Project | null>(null);
+  // The Writers' Audition Arena: which call is open, and the composer state.
+  const [arenaPostId, setArenaPostId] = useState("");
+  const [arenaRoleOpen, setArenaRoleOpen] = useState(false);
+  const [arenaRoleProject, setArenaRoleProject] = useState<Project | null>(null);
   const [noteProject, setNoteProject] = useState<Project | null>(null);
   const [preview, setPreview] = useState<{ continuationId: string; project: Project } | null>(null);
   const [previewMeta, setPreviewMeta] = useState<{ respondentName: string; title: string } | null>(null);
@@ -241,6 +254,7 @@ function App() {
   const [incomingAlert, setIncomingAlert] = useState<string | null>(null);
   const prevUnreadRef = useRef(-1); // -1 = unknown until the first poll for this project
   const createSeed = useCreateCollaborationSeed();
+  const createRole = useCreateWriterArenaPost();
   const createApplication = useCreateSeedApplication();
   const saveDraft = useSaveSeedApplicationDraft();
   const submitApp = useSubmitSeedApplication();
@@ -287,6 +301,15 @@ function App() {
   // The Nexet inbox links its Author Den notices here with ?notifications=1
   // so the studio opens straight on the notifications page.
   useEffect(() => { if (intent.notifications) setView("notifications"); }, [intent.notifications]);
+  // The Arena's deep links: `?arena=1` opens the board, `?arenaPost=<id>` a
+  // single call, `?arenaMine=1` the writer's own auditions.
+  useEffect(() => { if (intent.arena) setView("arena"); }, [intent.arena]);
+  useEffect(() => { if (intent.arenaMine) setView("arena-mine"); }, [intent.arenaMine]);
+  useEffect(() => {
+    if (!intent.arenaPost) return;
+    setArenaPostId(intent.arenaPost);
+    setView("arena-post");
+  }, [intent.arenaPost]);
   // “Publish a seed” from the pitch board lands here with ?publish=1 and
   // triggers the same “A NEW ROOM FOR WORDS” card as clicking New project.
   useEffect(() => { if (intent.publish && !preview) { setDraftNudge(false); setModal("project"); } }, [intent.publish]);
@@ -687,6 +710,45 @@ function App() {
   // opens The Brief (what a collaborator should know, desired role, respondent
   // limit) and publishes the frozen project snapshot straight to the API.
   const postProject = (item: Project) => { setPublishDraft(item); };
+  // "Call for a role": the same frozen snapshot as a seed, plus the typed role
+  // and the pitch describing it. Opened from a project card or the arena board.
+  const openArenaRole = (item: Project | null = null) => { setArenaRoleProject(item); setArenaRoleOpen(true); };
+  const closeArenaRole = () => { setArenaRoleOpen(false); setArenaRoleProject(null); };
+  const publishRole = (brief: ArenaRoleBrief) => {
+    const item = projects.find((candidate) => candidate.id === brief.project.id);
+    if (!item) { notify("That project could not be found in this library"); return; }
+    const posted = item.scenes.find((scene) => scene.content.trim());
+    createRole.mutate({
+      data: {
+        sourceProjectId: item.id,
+        sourceProjectTitle: item.title,
+        creatorName: user?.fullName || user?.username || user?.firstName || item.author || "Author",
+        sourceSceneId: posted?.id ?? null,
+        sourceVersion: posted ? item.revisions.filter((r) => r.sceneId === posted.id).length + 1 : 1,
+        seedText: stripHtml(posted?.content ?? item.premise ?? "").slice(0, 12000),
+        unitType: "scene",
+        protocol: "Continue from the final line",
+        genre: "Literary",
+        tone: "Open and searching",
+        language: "English",
+        plotConstraints: brief.plotConstraints,
+        desiredRole: brief.desiredRole,
+        visibility: "SEED_AND_BRIEF",
+        respondentLimit: brief.respondentLimit,
+        projectDocument: item,
+        role: brief.role,
+        rolePitch: brief.rolePitch,
+      },
+    }, {
+      onSuccess: (post) => {
+        closeArenaRole();
+        notify(`${writerRoleLabel(brief.role)} call opened`);
+        setArenaPostId(post.id);
+        setView("arena-post");
+      },
+      onError: (error) => notify(apiErrorText(error, "The call could not be opened. You may already have an open call for that role.")),
+    });
+  };
   const publishSeed = (item: Project, brief: { plotConstraints: string; desiredRole: string; respondentLimit: 0 | 3 | 5 | 10 }) => {
     const posted = item.scenes.find((scene) => scene.content.trim());
     createSeed.mutate({
@@ -818,7 +880,7 @@ function App() {
         {forkError && <div className="den-status-banner error"><XCircle size={15} /> {forkError}</div>}
         {preview && <div className="den-status-banner preview"><GitFork size={15} /> Previewing {previewMeta?.respondentName ? `${previewMeta.respondentName}'s` : "a writer's"} submission of “{previewMeta?.title ?? project.title}” — read only. Approve to merge it into the shared project.</div>}
         {sharedOpenError && <div className="den-status-banner error"><XCircle size={15} /> This shared room has no merged document in your studio yet — shared projects appear here once a submission has been approved and merged.</div>}
-        {view === "profile" ? <ProfilePage projectCount={createdProjectCount} /> : view === "explore" ? <ExplorePage /> : view === "notifications" ? <NotificationsPage /> : view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
+        {view === "profile" ? <ProfilePage projectCount={createdProjectCount} /> : view === "explore" ? <ExplorePage /> : view === "notifications" ? <NotificationsPage /> : view === "arena" ? <ArenaPage hasProjects={hasUserProject} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} onOpenMine={() => setView("arena-mine")} onCallRole={() => openArenaRole(null)} /> : view === "arena-post" ? <ArenaPostPage seedId={arenaPostId} onBack={() => setView("arena")} onAudition={(seedId) => { window.location.href = `/authors-den/?answer=${seedId}`; }} notify={notify} /> : view === "arena-mine" ? <ArenaMinePage onBack={() => setView("arena")} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} notify={notify} /> : view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onCallRole={(item) => openArenaRole(item)} onOpenArena={() => setView("arena")} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
       {buyProjectsOpen && <BuyProjectsModal onClose={() => setBuyProjectsOpen(false)} />}
       {tutorialOpen && <TutorialDock step={tutorialStep} onNext={nextLesson} onDismiss={() => setTutorialOpen(false)} />}
     </main>
@@ -834,6 +896,7 @@ function App() {
     {modal === "help" && <HelpModal onClose={() => setModal(null)} />}
     {modal === "tutorial" && <TutorialModal step={tutorialStep} onClose={closeTutorial} />}
     {publishDraft && <BriefModal project={publishDraft} onClose={() => setPublishDraft(null)} onPublish={(brief) => publishSeed(publishDraft, brief)} publishing={createSeed.isPending} />}
+    {arenaRoleOpen && <ArenaRoleModal projects={projects.filter((item) => !item.isTutorial)} initialProject={arenaRoleProject} onClose={closeArenaRole} onPublish={publishRole} publishing={createRole.isPending} />}
     {noteProject && <NoteModal project={noteProject} onClose={() => setNoteProject(null)} onSubmit={(note) => submitClone(noteProject, note)} submitting={saveDraft.isPending || submitApp.isPending || createApplication.isPending} />}
     {toast && <div className="toast" role="status"><Check size={16} />{toast}</div>}
     <Toaster />
@@ -848,9 +911,11 @@ function WorkspaceMenu({ projects, project, onSelect, onNew }: { projects: Proje
 
 function Sidebar({ view, setView, project, projects, openProject, openEditor, mobile, close, onNew, onTutorial, workspaceOpen, setWorkspaceOpen, mode, hasUserProject, notify, collapsed, setCollapsed }: { view: View; setView: (view: View) => void; project?: Project; projects: Project[]; openProject: (project: Project, view?: View, sceneId?: string) => void; openEditor: (sceneId?: string) => void; mobile: boolean; close: () => void; onNew: () => void; onTutorial: () => void; workspaceOpen: boolean; setWorkspaceOpen: (open: boolean) => void; mode: "lesson" | "draft"; hasUserProject: boolean; notify: (message: string) => void; collapsed: boolean; setCollapsed: (collapsed: boolean) => void }) {
   const nav: [View, string, ReactNode][] = [["general", "General", <PenLine size={17} />], ["characters", "Characters", <Users size={17} />], ["world", "World", <Globe2 size={17} />], ["plots", "Plots", <Sparkles size={17} />], ["outline", "Outline", <ClipboardList size={17} />], ["editor", "Draft", <BookOpen size={17} />]];
-   const aux: [View, string, ReactNode][] = [["search", "Search", <Search size={17} />], ["revisions", "Revisions", <Archive size={17} />], ["oracle", "Oracle", <WandSparkles size={17} />], ["tools", "Tools", <Zap size={17} />], ["settings", "Settings", <Settings size={17} />], ["explore", "Explore", <Search size={17} />], ["notifications", "Notifications", <Bell size={17} />], ["profile", "Profile", <Users size={17} />]];
+   const aux: [View, string, ReactNode][] = [["search", "Search", <Search size={17} />], ["revisions", "Revisions", <Archive size={17} />], ["oracle", "Oracle", <WandSparkles size={17} />], ["tools", "Tools", <Zap size={17} />], ["settings", "Settings", <Settings size={17} />], ["arena", "Audition Arena", <Mic size={17} />], ["explore", "Explore", <Search size={17} />], ["notifications", "Notifications", <Bell size={17} />], ["profile", "Profile", <Users size={17} />]];
   const gated = mode === "draft" && !hasUserProject;
-  const go = (id: View) => { if (id === "profile" || id === "explore" || id === "notifications") { setView(id); close(); return; } if (gated) { notify("Create a project first to open your current work"); return; } if (id === "editor") openEditor(); else setView(id); close(); };
+  // The Arena is a den-level room like Explore: reachable without a project.
+  const openRoom = (id: View) => ["profile", "explore", "notifications", "arena", "arena-post", "arena-mine"].includes(id);
+  const go = (id: View) => { if (openRoom(id)) { setView(id); close(); return; } if (gated) { notify("Create a project first to open your current work"); return; } if (id === "editor") openEditor(); else setView(id); close(); };
    return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><a className="nexet-back-btn" href="/" title="Back to Nexet"><LogOut size={15} /><span>Back to Nexet</span></a><div className="brand-row"><div className="brand-mark">A</div><div className="brand-copy"><div className="brand-name">Authors Den</div><div className="brand-sub">writing studio</div></div><button className="icon-btn sidebar-close mobile-only" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
      <div className="workspace-switch-wrap" onPointerLeave={() => setWorkspaceOpen(false)}><button className={`workspace-switch ${workspaceOpen ? "open" : ""}`} onClick={() => setWorkspaceOpen(!workspaceOpen)}><span className="workspace-icon"><Library size={14} /></span><span className="workspace-copy"><small>WORKSPACE</small><strong>My writing desk</strong></span><ChevronDown size={14} /></button>{workspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setWorkspaceOpen(false); }} onNew={() => { onNew(); setWorkspaceOpen(false); }} />}</div>
     <button className={`nav-item ${view === "home" ? "active" : ""}`} onClick={() => { setView("home"); close(); }}><FolderOpen size={17} /><span>Projects</span><span className="nav-count">{projects.length}</span></button>
@@ -860,11 +925,12 @@ function Sidebar({ view, setView, project, projects, openProject, openEditor, mo
   </aside>;
 }
 
-function Home({ projects, collaborationClones, openProject, onNew, onDuplicate, onDelete, onImport, onExport, onTutorial, onPost, onSubmitClone, highlightNew }: { projects: Project[]; collaborationClones: CollaborationClone[]; openProject: (project: Project, view?: View) => void; onNew: () => void; onDuplicate: (project: Project) => void; onDelete: (id: string) => void; onImport: () => void;  onExport: (format: ExportFormat) => void; onTutorial: () => void; onPost: (project: Project) => void; onSubmitClone: (project: Project) => void; highlightNew?: boolean }) {
+function Home({ projects, collaborationClones, openProject, onNew, onDuplicate, onDelete, onImport, onExport, onTutorial, onPost, onCallRole, onOpenArena, onSubmitClone, highlightNew }: { projects: Project[]; collaborationClones: CollaborationClone[]; openProject: (project: Project, view?: View) => void; onNew: () => void; onDuplicate: (project: Project) => void; onDelete: (id: string) => void; onImport: () => void;  onExport: (format: ExportFormat) => void; onTutorial: () => void; onPost: (project: Project) => void; onCallRole: (project: Project) => void; onOpenArena: () => void; onSubmitClone: (project: Project) => void; highlightNew?: boolean }) {
   return <div className="page home-page"><PageGuide label="YOUR LIBRARY" text="Every project starts here. Open a project to shape the story." /><div className="home-hero"><div><div className="eyebrow"><span className="eyebrow-line" /> PRIVATE WRITING DESK</div><h1>Keep the whole<br /><em>story</em> in reach.</h1><p>A quiet place for premise, people, plot, and pages.<br />Everything you need to carry a work from first thought to final draft.</p></div><div className="hero-orbit"><div className="orbit-center">A</div><div className="orbit-ring ring-one" /><div className="orbit-ring ring-two" /><span className="orbit-word word-a">PREMISE</span><span className="orbit-word word-b">DRAFT</span><span className="orbit-word word-c">WORLD</span></div></div>
      <div className="section-head"><div><div className="eyebrow">YOUR LIBRARY</div><h2>Recent projects</h2><button className={`new-library-btn ${highlightNew ? "wave-nudge" : ""}`} onClick={onNew}><span className="new-project-plus"><Plus size={25} strokeWidth={3} /></span><span><b>New project</b><small>Create a project to unlock your desk</small></span></button></div></div>
-     {projects.length ? <div className="project-grid">{projects.map((item, index) => <article className={`project-card ${index === 0 ? "featured" : ""}`} key={item.id}><div className="project-card-top">{item.isClone && !item.collaborationProjectId ? <span className="clone-badge"><GitFork size={11} /> Fork of a seed</span> : item.collaborationProjectId ? <span className="sync-badge"><RefreshCw size={11} /> Shared project</span> : <span className="template-tag">{item.template}</span>}</div><button className="project-open" onClick={() => openProject(item)}><h3>{item.title}</h3><p>{item.author}</p>{item.isClone && !item.collaborationProjectId && <p className="clone-source"><GitFork size={11} /> Forked from a seed ad — edit, then submit it to the creator</p>}{item.collaborationProjectId && <p className="clone-source shared"><RefreshCw size={11} /> Synced with your collaborator — edits appear in both studios</p>}<div className="card-rule" /><div className="project-meta"><span><FileText size={13} /> {item.scenes.length} scenes</span><span>{new Date(item.updated).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></div></button><div className="card-actions">{item.isClone && !item.collaborationProjectId && (item.cloneStatus === "SUBMITTED" || item.cloneStatus === "UNDER_REVIEW") ? <span className="clone-status in-review"><Clock3 size={13} /> In review</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "ACCEPTED" ? <span className="clone-status accepted"><Check size={13} /> Accepted</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "DECLINED" ? <span className="clone-status declined"><XCircle size={13} /> Declined — edit and resubmit</span> : null}{!item.isClone && <button className="card-action-btn post-btn" onClick={() => onPost(item)}><Send size={13} /> Post on Pitch Board</button>}{item.isClone && !item.collaborationProjectId && (!item.cloneStatus || item.cloneStatus === "DRAFT" || item.cloneStatus === "DECLINED") && <button className="card-action-btn submit-clone-btn" onClick={() => onSubmitClone(item)}><Send size={13} /> Submit</button>}<button className="card-action-btn duplicate-btn" onClick={() => onDuplicate(item)}><Copy size={13} /> Duplicate</button><button className="card-action-btn delete-btn" onClick={() => onDelete(item.id)}><Trash2 size={13} /> Delete</button></div></article>)}</div> : <Empty icon={<BookOpen size={28} />} title="A blank desk, waiting" text="Create your first project and give the next idea somewhere to land." action={<button className="primary-btn" onClick={onNew}><Plus size={16} /> New project</button>} />}
+     {projects.length ? <div className="project-grid">{projects.map((item, index) => <article className={`project-card ${index === 0 ? "featured" : ""}`} key={item.id}><div className="project-card-top">{item.isClone && !item.collaborationProjectId ? <span className="clone-badge"><GitFork size={11} /> Fork of a seed</span> : item.collaborationProjectId ? <span className="sync-badge"><RefreshCw size={11} /> Shared project</span> : <span className="template-tag">{item.template}</span>}</div><button className="project-open" onClick={() => openProject(item)}><h3>{item.title}</h3><p>{item.author}</p>{item.isClone && !item.collaborationProjectId && <p className="clone-source"><GitFork size={11} /> Forked from a seed ad — edit, then submit it to the creator</p>}{item.collaborationProjectId && <p className="clone-source shared"><RefreshCw size={11} /> Synced with your collaborator — edits appear in both studios</p>}<div className="card-rule" /><div className="project-meta"><span><FileText size={13} /> {item.scenes.length} scenes</span><span>{new Date(item.updated).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span></div></button><div className="card-actions">{item.isClone && !item.collaborationProjectId && (item.cloneStatus === "SUBMITTED" || item.cloneStatus === "UNDER_REVIEW") ? <span className="clone-status in-review"><Clock3 size={13} /> In review</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "ACCEPTED" ? <span className="clone-status accepted"><Check size={13} /> Accepted</span> : item.isClone && !item.collaborationProjectId && item.cloneStatus === "DECLINED" ? <span className="clone-status declined"><XCircle size={13} /> Declined — edit and resubmit</span> : null}{!item.isClone && <button className="card-action-btn post-btn" onClick={() => onPost(item)}><Send size={13} /> Post on Pitch Board</button>}{!item.isClone && <button className="card-action-btn role-btn" onClick={() => onCallRole(item)} data-testid={`call-role-${item.id}`}><Mic size={13} /> Call for a role</button>}{item.isClone && !item.collaborationProjectId && (!item.cloneStatus || item.cloneStatus === "DRAFT" || item.cloneStatus === "DECLINED") && <button className="card-action-btn submit-clone-btn" onClick={() => onSubmitClone(item)}><Send size={13} /> Submit</button>}<button className="card-action-btn duplicate-btn" onClick={() => onDuplicate(item)}><Copy size={13} /> Duplicate</button><button className="card-action-btn delete-btn" onClick={() => onDelete(item.id)}><Trash2 size={13} /> Delete</button></div></article>)}</div> : <Empty icon={<BookOpen size={28} />} title="A blank desk, waiting" text="Create your first project and give the next idea somewhere to land." action={<button className="primary-btn" onClick={onNew}><Plus size={16} /> New project</button>} />}
      {collaborationClones.length > 0 && <section className="home-lower" aria-label="Collaboration clones"><div className="quick-start"><span className="eyebrow">COLLABORATION CLONES</span><h3>Responses you have in motion.</h3><p>These private forks stay linked to their frozen source seeds until you submit or withdraw them.</p><div className="quick-actions">{collaborationClones.slice(0, 3).map((clone) => <a className="secondary-btn" key={clone.applicationId} href={`/authors-den/?answer=${clone.seedId}`}><MessageCircle size={15} /> {clone.sourceProjectTitle}<small>{clone.status.replaceAll("_", " ").toLowerCase()}</small></a>)}</div></div></section>}
+    <section className="home-lower" aria-label="Writers' Audition Arena"><div className="quick-start arena-entry"><span className="eyebrow">THE WRITERS&apos; ROOM</span><h3>Need a second voice?</h3><p>Open a writing role and let other writers audition for it, or answer a call yourself in the Audition Arena.</p><div className="quick-actions"><button className="secondary-btn" onClick={onOpenArena} data-testid="link-open-arena"><Mic size={15} /> Open the Audition Arena</button>{projects.some((item) => !item.isClone) && <button className="link-btn" onClick={() => onCallRole(projects.find((item) => !item.isClone)!)}><Mic size={14} /> Call for a role</button>}</div></div></section>
     <div className="home-lower"><div className="quick-start"><span className="eyebrow">START SOMEWHERE</span><h3>Bring in work from another desk.</h3><p>Import a project or plain text draft, then keep going.</p><div className="quick-actions"><button className="secondary-btn" onClick={onImport}><Upload size={15} /> Import file</button><button className="link-btn" onClick={onTutorial}><Play size={14} /> Take the tutorial</button></div></div><div className="portable"><div><Check size={18} /><b>Local by design</b></div><p>Your projects live in this browser. Export anytime.</p><button className="link-btn" onClick={() => onExport("json")}><Download size={14} /> Export a portable project</button></div></div>
   </div>;
 }

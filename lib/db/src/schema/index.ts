@@ -20,6 +20,7 @@
 export * from "./oracle-providers";
 export * from "./waitlist";
 export * from "./collaborations";
+export * from "./author-arena";
 export * from "./collaboration-threads";
 export * from "./collaboration-work";
 export * from "./video-projects";

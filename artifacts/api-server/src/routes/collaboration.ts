@@ -14,6 +14,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { emitToUser } from "../realtime";
 import {
   collaborationActivityEventsTable,
+  collaborationArenaWatchesTable,
   collaborationGenealogyTable,
   collaborationNotificationsTable,
   collaborationProjectsTable,
@@ -25,7 +26,10 @@ import {
   continuationAnnotationsTable,
   continuationSubmissionsTable,
   db,
+  nexetVideoFollowsTable,
   seedApplicationsTable,
+  WRITER_ROLE_LABELS,
+  WRITER_ROLES,
 } from "@workspace/db";
 import {
   ApproveCollaborationWorkBlockParams,
@@ -66,6 +70,22 @@ import {
   SubmitSeedApplicationParams,
   UpdateCollaborationSeedBody,
   UpdateCollaborationSeedParams,
+  CreateWriterArenaPostBody,
+  CreateWriterArenaPostResponse,
+  CreateWriterArenaWatchBody,
+  CreateWriterArenaWatchResponse,
+  DeleteWriterArenaWatchParams,
+  GetWriterArenaPostParams,
+  GetWriterArenaPostResponse,
+  ListMyWriterArenaAuditionsResponse,
+  ListWriterArenaPostsQueryParams,
+  ListWriterArenaPostsResponse,
+  ListWriterArenaWatchesResponse,
+  UpdateWriterArenaPostBody,
+  UpdateWriterArenaPostParams,
+  UpdateWriterArenaPostResponse,
+  WithdrawWriterArenaAuditionParams,
+  WithdrawWriterArenaAuditionResponse,
 } from "@workspace/api-zod";
 import { observeCollaboration } from "../lib/oracle";
 import { resolveUserProfiles } from "../lib/user-names";
@@ -119,6 +139,15 @@ function seedView(
     myApplicationId: application?.id ?? null,
     myApplicationStatus: application?.status ?? null,
     availability: seed.availability,
+    // Writers' Audition Arena (AUTHOR-DEN-AUDITION-ARENA-PLAN.md): every seed
+    // is a 'SEED' row unless it was opened as an open writing role. Kept on the
+    // shared seed view so the existing pitch-board surfaces carry the same
+    // fields as the Arena board.
+    kind: seed.kind,
+    role: seed.role ?? null,
+    rolePitch: seed.rolePitch ?? null,
+    filledBy: seed.filledBy ?? null,
+    filledAt: value(seed.filledAt),
     publishedAt: seed.publishedAt.toISOString(),
     createdAt: seed.createdAt.toISOString(),
   };
@@ -2281,6 +2310,662 @@ router.get("/collaborations/threads", async (req, res): Promise<void> => {
       updatedAt: thread.updatedAt.toISOString(),
     };
   }));
+});
+
+// ---------------------------------------------------------------------------
+// Writers' Audition Arena (Author Den) — one board over two rails.
+//
+// Both rails are collaboration_seeds rows: kind = 'SEED' is the classic pitch
+// board post, kind = 'ROLE' is an open writing role. Auditions reuse the
+// existing application → submission → selection → contract pipeline, so this
+// section only adds the listing, the role metadata, and role watches.
+// See AUTHOR-DEN-AUDITION-ARENA-PLAN.md (§6, §9).
+// ---------------------------------------------------------------------------
+
+// The statuses that mean "a live audition" — the same set the seed partial
+// unique index and seedCount() use, so the count never drifts from the rules.
+const ACTIVE_AUDITION_STATUSES = [
+  "DRAFT",
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "ACCEPTED_PENDING_CONTRACT",
+];
+
+function isActiveAudition(status: string): boolean {
+  return ACTIVE_AUDITION_STATUSES.includes(status);
+}
+
+function writerArenaLink(seedId: string): string {
+  return `/authors-den/?arenaPost=${seedId}`;
+}
+
+/** Live-open and lifetime audition counts for a batch of posts, in one pass. */
+async function auditionCounts(
+  seedIds: string[],
+): Promise<{ active: Map<string, number>; total: Map<string, number> }> {
+  const active = new Map<string, number>();
+  const total = new Map<string, number>();
+  if (seedIds.length === 0) return { active, total };
+  const rows = await db
+    .select({ seedId: seedApplicationsTable.seedId, status: seedApplicationsTable.status })
+    .from(seedApplicationsTable)
+    .where(inArray(seedApplicationsTable.seedId, seedIds));
+  for (const row of rows) {
+    total.set(row.seedId, (total.get(row.seedId) ?? 0) + 1);
+    if (isActiveAudition(row.status)) {
+      active.set(row.seedId, (active.get(row.seedId) ?? 0) + 1);
+    }
+  }
+  return { active, total };
+}
+
+/** The caller's own unresolved audition per post, for the already-applied state. */
+async function viewerAuditions(
+  viewerId: string,
+  seedIds: string[],
+): Promise<Map<string, ActiveApplication>> {
+  const map = new Map<string, ActiveApplication>();
+  if (seedIds.length === 0) return map;
+  const rows = await db
+    .select({
+      id: seedApplicationsTable.id,
+      seedId: seedApplicationsTable.seedId,
+      status: seedApplicationsTable.status,
+    })
+    .from(seedApplicationsTable)
+    .where(and(
+      eq(seedApplicationsTable.respondentId, viewerId),
+      inArray(seedApplicationsTable.seedId, seedIds),
+    ));
+  for (const row of rows) {
+    if (isActiveAudition(row.status)) map.set(row.seedId, { id: row.id, status: row.status });
+  }
+  return map;
+}
+
+/** The author ids this viewer follows (shared nexet_video_follows model). */
+async function followedAuthorIds(viewerId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ followingId: nexetVideoFollowsTable.followingId })
+    .from(nexetVideoFollowsTable)
+    .where(eq(nexetVideoFollowsTable.followerId, viewerId));
+  return new Set(rows.map((row) => row.followingId));
+}
+
+/**
+ * The arena post view. `totalApplications` is the lifetime count to the author
+ * who posted it and the live count to everyone else, mirroring how the Creator
+ * Den Arena reserves the full history for the Captain (§6.3).
+ */
+function writerArenaPostView(
+  seed: typeof collaborationSeedsTable.$inferSelect,
+  respondentCount: number,
+  totalApplications: number,
+  creator: { name: string | null; imageUrl: string | null } | undefined,
+  application?: ActiveApplication,
+) {
+  return {
+    id: seed.id,
+    kind: seed.kind,
+    role: seed.role ?? null,
+    rolePitch: seed.rolePitch ?? null,
+    creatorId: seed.creatorId,
+    creatorName: creator?.name ?? seed.creatorName ?? "Author",
+    creatorImageUrl: creator?.imageUrl ?? null,
+    sourceProjectId: seed.sourceProjectId,
+    sourceProjectTitle: seed.sourceProjectTitle,
+    seedText: seed.seedText,
+    unitType: seed.unitType,
+    protocol: seed.protocol,
+    genre: seed.genre,
+    tone: seed.tone,
+    language: seed.language,
+    plotConstraints: seed.plotConstraints,
+    desiredRole: seed.desiredRole,
+    availability: seed.availability,
+    respondentLimit: seed.respondentLimit,
+    respondentCount,
+    totalApplications,
+    myApplicationId: application?.id ?? null,
+    myApplicationStatus: application?.status ?? null,
+    filledBy: seed.filledBy ?? null,
+    filledAt: seed.filledAt ?? null,
+    publishedAt: seed.publishedAt,
+    createdAt: seed.createdAt,
+    updatedAt: seed.updatedAt,
+  };
+}
+
+/**
+ * Notify role watchers that a matching open call landed. One notification per
+ * recipient — a watcher holding both a global watch and an author-scoped watch
+ * on the same role gets the more specific one, never two. The author never
+ * notifies themselves.
+ */
+async function fanOutWriterRoleWatches(seed: typeof collaborationSeedsTable.$inferSelect): Promise<void> {
+  if (!seed.role) return;
+  const watches = await db
+    .select()
+    .from(collaborationArenaWatchesTable)
+    .where(and(
+      eq(collaborationArenaWatchesTable.role, seed.role),
+      or(
+        isNull(collaborationArenaWatchesTable.creatorId),
+        eq(collaborationArenaWatchesTable.creatorId, seed.creatorId),
+      ),
+    ));
+  // Anyone who already auditioned already knows about the call.
+  const applicants = new Set(
+    (await db
+      .select({ respondentId: seedApplicationsTable.respondentId })
+      .from(seedApplicationsTable)
+      .where(eq(seedApplicationsTable.seedId, seed.id)))
+      .map((row) => row.respondentId),
+  );
+  const byRecipient = new Map<string, typeof collaborationArenaWatchesTable.$inferSelect>();
+  for (const watch of watches) {
+    if (watch.userId === seed.creatorId || applicants.has(watch.userId)) continue;
+    const existing = byRecipient.get(watch.userId);
+    if (!existing || (existing.creatorId === null && watch.creatorId !== null)) {
+      byRecipient.set(watch.userId, watch);
+    }
+  }
+  const label = WRITER_ROLE_LABELS[seed.role as keyof typeof WRITER_ROLE_LABELS] ?? "writing role";
+  for (const recipientId of byRecipient.keys()) {
+    await notify(
+      recipientId,
+      "writer_arena_role_opened",
+      `New ${label.toLowerCase()} call`,
+      `“${seed.sourceProjectTitle}” is looking for a ${label.toLowerCase()}.`,
+      writerArenaLink(seed.id),
+      seed.id,
+    );
+  }
+}
+
+// GET /collaborations/arena/posts — the board. Two rails over one table:
+// kind=SEED posts are the pitch board, kind=ROLE posts are open writing roles.
+// ?mine=1 returns the caller's own calls (any availability) so an author can
+// manage closed and filled ones.
+router.get("/collaborations/arena/posts", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const parsed = ListWriterArenaPostsQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const filters = parsed.data;
+
+  const conditions = [];
+  if (filters.mine) {
+    conditions.push(eq(collaborationSeedsTable.creatorId, viewerId));
+  } else {
+    conditions.push(eq(collaborationSeedsTable.availability, "OPEN"));
+  }
+  if (filters.rail) {
+    conditions.push(eq(collaborationSeedsTable.kind, filters.rail === "role" ? "ROLE" : "SEED"));
+  }
+  if (filters.role) {
+    conditions.push(eq(collaborationSeedsTable.role, filters.role));
+  }
+
+  const seeds = await db
+    .select()
+    .from(collaborationSeedsTable)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(collaborationSeedsTable.publishedAt));
+
+  const seedIds = seeds.map((seed) => seed.id);
+  const [{ active, total }, mine, profiles, followed] = await Promise.all([
+    auditionCounts(seedIds),
+    viewerAuditions(viewerId, seedIds),
+    resolveUserProfiles([...new Set(seeds.map((seed) => seed.creatorId))]),
+    filters.followed && !filters.mine ? followedAuthorIds(viewerId) : Promise.resolve(new Set<string>()),
+  ]);
+
+  const rows = seeds.map((seed) => {
+    const activeCount = active.get(seed.id) ?? 0;
+    const isAuthor = seed.creatorId === viewerId;
+    return writerArenaPostView(
+      seed,
+      activeCount,
+      isAuthor ? (total.get(seed.id) ?? 0) : activeCount,
+      profiles[seed.creatorId],
+      mine.get(seed.id),
+    );
+  });
+
+  const byNewest = (a: (typeof rows)[number], b: (typeof rows)[number]) =>
+    b.publishedAt.getTime() - a.publishedAt.getTime();
+  const byMostAuditioned = (a: (typeof rows)[number], b: (typeof rows)[number]) =>
+    b.respondentCount - a.respondentCount || byNewest(a, b);
+
+  let ordered = rows;
+  if (filters.followed && !filters.mine) {
+    const fromFollowed = rows.filter((row) => followed.has(row.creatorId));
+    const rest = rows.filter((row) => !followed.has(row.creatorId));
+    const sorter = filters.sort === "most_applied" ? byMostAuditioned : byNewest;
+    fromFollowed.sort(sorter);
+    rest.sort(sorter);
+    ordered = [...fromFollowed, ...rest];
+  } else if (filters.sort === "most_applied") {
+    ordered = [...rows].sort(byMostAuditioned);
+  }
+
+  res.json(ListWriterArenaPostsResponse.parse(ordered));
+});
+
+// POST /collaborations/arena/posts — open a writing role. Creates a seed with
+// kind='ROLE'; only one OPEN call per (project, role) at a time.
+router.post("/collaborations/arena/posts", async (req, res): Promise<void> => {
+  const creatorId = userId(req, res);
+  if (!creatorId) return;
+  const parsed = CreateWriterArenaPostBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  if (!WRITER_ROLES.includes(parsed.data.role)) {
+    res.status(400).json({ error: "Unknown writing role" });
+    return;
+  }
+
+  const [duplicate] = await db
+    .select({ id: collaborationSeedsTable.id })
+    .from(collaborationSeedsTable)
+    .where(and(
+      eq(collaborationSeedsTable.sourceProjectId, parsed.data.sourceProjectId),
+      eq(collaborationSeedsTable.role, parsed.data.role),
+      eq(collaborationSeedsTable.kind, "ROLE"),
+      eq(collaborationSeedsTable.availability, "OPEN"),
+    ))
+    .limit(1);
+  if (duplicate) {
+    const label = WRITER_ROLE_LABELS[parsed.data.role];
+    res.status(409).json({ error: `This project already has an open ${label.toLowerCase()} call` });
+    return;
+  }
+
+  const [seed] = await db
+    .insert(collaborationSeedsTable)
+    .values({
+      id: crypto.randomUUID(),
+      creatorId,
+      ...parsed.data,
+      creatorName: parsed.data.creatorName ?? "Author",
+      kind: "ROLE",
+      rolePitch: parsed.data.rolePitch.trim(),
+      availability: "OPEN",
+    })
+    .returning();
+
+  const label = WRITER_ROLE_LABELS[parsed.data.role];
+  await recordActivity({
+    eventType: "writer_arena_role_opened",
+    summary: `Opened a ${label.toLowerCase()} call on “${seed.sourceProjectTitle}”.`,
+    actorId: creatorId,
+    seedId: seed.id,
+    resourceId: seed.id,
+  });
+  await fanOutWriterRoleWatches(seed);
+
+  const profiles = await resolveUserProfiles([creatorId]);
+  res.status(201).json(
+    CreateWriterArenaPostResponse.parse(writerArenaPostView(seed, 0, 0, profiles[creatorId])),
+  );
+});
+
+// GET /collaborations/arena/posts/:seedId — one post (role call or seed pitch).
+// Any signed-in writer may read it; the author additionally sees the lifetime
+// audition total.
+router.get("/collaborations/arena/posts/:seedId", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const params = GetWriterArenaPostParams.safeParse({ seedId: parseParam(req.params.seedId) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [seed] = await db
+    .select()
+    .from(collaborationSeedsTable)
+    .where(eq(collaborationSeedsTable.id, params.data.seedId));
+  if (!seed) {
+    res.status(404).json({ error: "Arena post not found" });
+    return;
+  }
+
+  const [{ active, total }, mine, profiles] = await Promise.all([
+    auditionCounts([seed.id]),
+    viewerAuditions(viewerId, [seed.id]),
+    resolveUserProfiles([seed.creatorId]),
+  ]);
+  const activeCount = active.get(seed.id) ?? 0;
+  const isAuthor = seed.creatorId === viewerId;
+
+  res.json(
+    GetWriterArenaPostResponse.parse(writerArenaPostView(
+      seed,
+      activeCount,
+      isAuthor ? (total.get(seed.id) ?? 0) : activeCount,
+      profiles[seed.creatorId],
+      mine.get(seed.id),
+    )),
+  );
+});
+
+// PATCH /collaborations/arena/posts/:seedId — the author closes/reopens a call
+// or edits its pitch while open. Closing notifies everyone still auditioning.
+router.patch("/collaborations/arena/posts/:seedId", async (req, res): Promise<void> => {
+  const creatorId = userId(req, res);
+  if (!creatorId) return;
+  const params = UpdateWriterArenaPostParams.safeParse({ seedId: parseParam(req.params.seedId) });
+  const parsed = UpdateWriterArenaPostBody.safeParse(req.body);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  if (parsed.data.availability === undefined && parsed.data.rolePitch === undefined) {
+    res.status(400).json({ error: "Nothing to update — send availability and/or rolePitch" });
+    return;
+  }
+
+  const [seed] = await db
+    .select()
+    .from(collaborationSeedsTable)
+    .where(eq(collaborationSeedsTable.id, params.data.seedId));
+  if (!seed) {
+    res.status(404).json({ error: "Arena post not found" });
+    return;
+  }
+  if (seed.creatorId !== creatorId) {
+    res.status(403).json({ error: "Only the author who posted this call can update it" });
+    return;
+  }
+  if (parsed.data.rolePitch !== undefined && seed.kind !== "ROLE") {
+    res.status(400).json({ error: "Only an open role call has a role pitch" });
+    return;
+  }
+  if (parsed.data.rolePitch !== undefined && seed.availability !== "OPEN") {
+    res.status(409).json({ error: "The pitch can only change while the call is open" });
+    return;
+  }
+  if (parsed.data.availability && seed.filledBy) {
+    res.status(409).json({ error: "This role was already filled and can no longer be changed" });
+    return;
+  }
+
+  const closing = parsed.data.availability === "CLOSED" && seed.availability === "OPEN";
+  const [updated] = await db
+    .update(collaborationSeedsTable)
+    .set({
+      ...(parsed.data.rolePitch !== undefined ? { rolePitch: parsed.data.rolePitch.trim() } : {}),
+      ...(parsed.data.availability !== undefined
+        ? { availability: parsed.data.availability, closedAt: parsed.data.availability === "CLOSED" ? new Date() : null }
+        : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(collaborationSeedsTable.id, seed.id))
+    .returning();
+
+  if (closing) {
+    const pending = await db
+      .select({ respondentId: seedApplicationsTable.respondentId })
+      .from(seedApplicationsTable)
+      .where(and(
+        eq(seedApplicationsTable.seedId, seed.id),
+        inArray(seedApplicationsTable.status, ACTIVE_AUDITION_STATUSES),
+      ));
+    const label = seed.role ? WRITER_ROLE_LABELS[seed.role as keyof typeof WRITER_ROLE_LABELS].toLowerCase() : "writing";
+    for (const row of pending) {
+      await notify(
+        row.respondentId,
+        "writer_arena_role_closed",
+        "Call closed",
+        `The ${label} call you auditioned for on “${seed.sourceProjectTitle}” was closed.`,
+        writerArenaLink(seed.id),
+        seed.id,
+      );
+    }
+    await recordActivity({
+      eventType: "writer_arena_role_closed",
+      summary: `Closed the ${label} call on “${seed.sourceProjectTitle}”.`,
+      actorId: creatorId,
+      seedId: seed.id,
+      resourceId: seed.id,
+    });
+  } else if (parsed.data.availability === "OPEN" && seed.availability === "CLOSED") {
+    await recordActivity({
+      eventType: "writer_arena_role_opened",
+      summary: `Reopened a call on “${seed.sourceProjectTitle}”.`,
+      actorId: creatorId,
+      seedId: seed.id,
+      resourceId: seed.id,
+    });
+  }
+
+  const [{ active, total }, profiles] = await Promise.all([
+    auditionCounts([updated.id]),
+    resolveUserProfiles([updated.creatorId]),
+  ]);
+  const activeCount = active.get(updated.id) ?? 0;
+  res.json(
+    UpdateWriterArenaPostResponse.parse(writerArenaPostView(
+      updated,
+      activeCount,
+      total.get(updated.id) ?? 0,
+      profiles[updated.creatorId],
+    )),
+  );
+});
+
+// GET /collaborations/arena/auditions/mine — the caller's own auditions across
+// both rails, newest first. Never another writer's rows.
+router.get("/collaborations/arena/auditions/mine", async (req, res): Promise<void> => {
+  const respondentId = userId(req, res);
+  if (!respondentId) return;
+
+  const applications = await db
+    .select()
+    .from(seedApplicationsTable)
+    .where(eq(seedApplicationsTable.respondentId, respondentId))
+    .orderBy(desc(seedApplicationsTable.updatedAt));
+
+  const seedIds = [...new Set(applications.map((application) => application.seedId))];
+  const seeds = seedIds.length > 0
+    ? await db.select().from(collaborationSeedsTable).where(inArray(collaborationSeedsTable.id, seedIds))
+    : [];
+  const seedById = new Map(seeds.map((seed) => [seed.id, seed]));
+
+  const rows = applications.flatMap((application) => {
+    const seed = seedById.get(application.seedId);
+    if (!seed) return [];
+    return [{
+      id: application.id,
+      postId: application.seedId,
+      kind: seed.kind,
+      role: seed.role ?? null,
+      rolePitch: seed.rolePitch ?? null,
+      sourceProjectTitle: application.sourceProjectTitle,
+      creatorId: seed.creatorId,
+      creatorName: seed.creatorName ?? "Author",
+      status: application.status,
+      submittedAt: application.submittedAt ?? null,
+      createdAt: application.createdAt,
+      updatedAt: application.updatedAt,
+    }];
+  });
+
+  res.json(ListMyWriterArenaAuditionsResponse.parse(rows));
+});
+
+// POST /collaborations/arena/auditions/:applicationId/withdraw — the applicant
+// retracts an unresolved audition. The live count drops, the author is
+// notified, and the writer can audition again. A decided audition is final.
+router.post("/collaborations/arena/auditions/:applicationId/withdraw", async (req, res): Promise<void> => {
+  const respondentId = userId(req, res);
+  if (!respondentId) return;
+  const params = WithdrawWriterArenaAuditionParams.safeParse({ applicationId: parseParam(req.params.applicationId) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+
+  const [application] = await db
+    .select()
+    .from(seedApplicationsTable)
+    .where(eq(seedApplicationsTable.id, params.data.applicationId));
+  if (!application) {
+    res.status(404).json({ error: "Audition not found" });
+    return;
+  }
+  if (application.respondentId !== respondentId) {
+    res.status(403).json({ error: "Only the applicant can withdraw this audition" });
+    return;
+  }
+  if (!isActiveAudition(application.status)) {
+    res.status(409).json({ error: "This audition was already decided" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(seedApplicationsTable)
+    .set({ status: "WITHDRAWN", updatedAt: new Date() })
+    .where(eq(seedApplicationsTable.id, application.id))
+    .returning();
+  // A submitted continuation is archived with the audition it came from, so
+  // the author's review desk never shows a withdrawn response as live.
+  await db
+    .update(continuationSubmissionsTable)
+    .set({ status: "ARCHIVED" })
+    .where(and(
+      eq(continuationSubmissionsTable.applicationId, application.id),
+      eq(continuationSubmissionsTable.status, "UNDER_REVIEW"),
+    ));
+
+  const [seed] = await db
+    .select({ id: collaborationSeedsTable.id, kind: collaborationSeedsTable.kind, role: collaborationSeedsTable.role, creatorId: collaborationSeedsTable.creatorId, creatorName: collaborationSeedsTable.creatorName, rolePitch: collaborationSeedsTable.rolePitch, sourceProjectTitle: collaborationSeedsTable.sourceProjectTitle })
+    .from(collaborationSeedsTable)
+    .where(eq(collaborationSeedsTable.id, application.seedId));
+  if (seed) {
+    await notify(
+      seed.creatorId,
+      "writer_arena_audition_withdrawn",
+      "Audition withdrawn",
+      `${application.respondentName} withdrew their audition for “${application.sourceProjectTitle}”.`,
+      writerArenaLink(seed.id),
+      seed.id,
+    );
+    await recordActivity({
+      eventType: "writer_arena_audition_withdrawn",
+      summary: `${application.respondentName} withdrew an audition on “${application.sourceProjectTitle}”.`,
+      actorId: respondentId,
+      seedId: seed.id,
+      resourceId: application.id,
+    });
+  }
+
+  res.json(
+    WithdrawWriterArenaAuditionResponse.parse({
+      id: updated.id,
+      postId: updated.seedId,
+      kind: seed?.kind ?? "SEED",
+      role: seed?.role ?? null,
+      rolePitch: seed?.rolePitch ?? null,
+      sourceProjectTitle: updated.sourceProjectTitle,
+      creatorId: seed?.creatorId ?? "",
+      creatorName: seed?.creatorName ?? "Author",
+      status: updated.status,
+      submittedAt: updated.submittedAt ?? null,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+    }),
+  );
+});
+
+// GET /collaborations/arena/watches — the caller's own role watches.
+router.get("/collaborations/arena/watches", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const watches = await db
+    .select()
+    .from(collaborationArenaWatchesTable)
+    .where(eq(collaborationArenaWatchesTable.userId, viewerId))
+    .orderBy(desc(collaborationArenaWatchesTable.createdAt));
+  res.json(ListWriterArenaWatchesResponse.parse(watches));
+});
+
+// POST /collaborations/arena/watches — watch a writing role across the Arena
+// (no creatorId) or on one author's calls. Self-scoped; a duplicate is a 409.
+// NULLs are distinct in SQL, so the at-most-one rule lives here, not in an index.
+router.post("/collaborations/arena/watches", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const parsed = CreateWriterArenaWatchBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  if (!WRITER_ROLES.includes(parsed.data.role)) {
+    res.status(400).json({ error: "Unknown writing role" });
+    return;
+  }
+  const targetCreatorId = parsed.data.creatorId?.trim() || null;
+  if (targetCreatorId && targetCreatorId === viewerId) {
+    res.status(400).json({ error: "You cannot watch your own calls" });
+    return;
+  }
+
+  const mine = await db
+    .select()
+    .from(collaborationArenaWatchesTable)
+    .where(and(
+      eq(collaborationArenaWatchesTable.userId, viewerId),
+      eq(collaborationArenaWatchesTable.role, parsed.data.role),
+    ));
+  if (mine.some((watch) => (watch.creatorId ?? null) === targetCreatorId)) {
+    res.status(409).json({ error: "You are already watching this role here" });
+    return;
+  }
+
+  const [watch] = await db
+    .insert(collaborationArenaWatchesTable)
+    .values({
+      id: crypto.randomUUID(),
+      userId: viewerId,
+      role: parsed.data.role,
+      creatorId: targetCreatorId,
+    })
+    .returning();
+  res.status(201).json(CreateWriterArenaWatchResponse.parse(watch));
+});
+
+// DELETE /collaborations/arena/watches/:watchId — stop watching (own only).
+router.delete("/collaborations/arena/watches/:watchId", async (req, res): Promise<void> => {
+  const viewerId = userId(req, res);
+  if (!viewerId) return;
+  const params = DeleteWriterArenaWatchParams.safeParse({ watchId: parseParam(req.params.watchId) });
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [deleted] = await db
+    .delete(collaborationArenaWatchesTable)
+    .where(and(
+      eq(collaborationArenaWatchesTable.id, params.data.watchId),
+      eq(collaborationArenaWatchesTable.userId, viewerId),
+    ))
+    .returning();
+  if (!deleted) {
+    res.status(404).json({ error: "Watch not found" });
+    return;
+  }
+  res.sendStatus(204);
 });
 
 export default router;

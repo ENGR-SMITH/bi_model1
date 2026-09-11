@@ -3,6 +3,7 @@ import initSqlJs from "sql.js";
 import { drizzle } from "drizzle-orm/sql-js";
 import { sql } from "drizzle-orm";
 import {
+  index,
   integer,
   primaryKey,
   sqliteTable,
@@ -300,11 +301,55 @@ export const collaborationSeedsTable = sqliteTable("collaboration_seeds", {
   // Mirrors pg jsonb: a text column with JSON mode so objects round-trip.
   projectDocument: text("project_document", { mode: "json" }),
   availability: text("availability").notNull().default("OPEN"),
+  // Writers' Audition Arena (AUTHOR-DEN-AUDITION-ARENA-PLAN.md): both rails
+  // share this table. kind = 'SEED' | 'ROLE'; role/role_pitch are set only for
+  // role calls; filled_by/filled_at record the accepted audition.
+  kind: text("kind").notNull().default("SEED"),
+  role: text("role"),
+  rolePitch: text("role_pitch"),
+  filledBy: text("filled_by"),
+  filledAt: integer("filled_at", { mode: "timestamp" }),
   publishedAt: integer("published_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   closedAt: integer("closed_at", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
 });
+
+// Role watch alerts for the Author Den Arena. Mirrors
+// lib/db/src/schema/author-arena.ts.
+// The writing roles and their labels are values (not tables) that the Arena
+// routes import from @workspace/db. Mirrors lib/db/src/schema/author-arena.ts
+// so the in-memory mock exposes the same module surface as the real package.
+export const WRITER_ROLES = [
+  "CO_WRITER",
+  "EDITOR",
+  "BETA_READER",
+  "GHOSTWRITER",
+  "PROOFREADER",
+] as const;
+
+export const WRITER_ROLE_LABELS: Record<(typeof WRITER_ROLES)[number], string> = {
+  CO_WRITER: "Co-writer",
+  EDITOR: "Editor",
+  BETA_READER: "Beta reader",
+  GHOSTWRITER: "Ghostwriter",
+  PROOFREADER: "Proofreader",
+};
+
+export const collaborationArenaWatchesTable = sqliteTable(
+  "collaboration_arena_watches",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    role: text("role").notNull(),
+    creatorId: text("creator_id"),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  },
+  (table) => ({
+    userIdx: index("collaboration_arena_watch_user_idx").on(table.userId),
+  }),
+);
 
 export const seedApplicationsTable = sqliteTable(
   "seed_applications",
@@ -912,9 +957,21 @@ export async function buildInMemoryDb() {
       respondent_limit INTEGER NOT NULL DEFAULT 3,
       project_document TEXT,
       availability TEXT NOT NULL DEFAULT 'OPEN',
+      kind TEXT NOT NULL DEFAULT 'SEED', role TEXT, role_pitch TEXT,
+      filled_by TEXT, filled_at INTEGER,
       published_at INTEGER NOT NULL, closed_at INTEGER,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
+    CREATE UNIQUE INDEX collaboration_seed_open_role_project_unique
+      ON collaboration_seeds (source_project_id, role)
+      WHERE kind = 'ROLE' AND availability = 'OPEN';
+    CREATE TABLE collaboration_arena_watches (
+      id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL,
+      role TEXT NOT NULL, creator_id TEXT,
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX collaboration_arena_watch_user_idx
+      ON collaboration_arena_watches (user_id);
     CREATE TABLE seed_applications (
       id TEXT PRIMARY KEY NOT NULL, seed_id TEXT NOT NULL,
       respondent_id TEXT NOT NULL, respondent_name TEXT NOT NULL,
@@ -1354,6 +1411,7 @@ export async function buildInMemoryDb() {
   };
   const tables = {
     collaborationSeedsTable,
+    collaborationArenaWatchesTable,
     seedApplicationsTable,
     continuationSubmissionsTable,
     collaborationProjectsTable,
@@ -1412,5 +1470,5 @@ export async function buildInMemoryDb() {
     nexetArenaReviewsTable,
     nexetArenaBlocksTable,
   };
-  return { db, tables, exports: { db, ...tables } };
+  return { db, tables, exports: { db, ...tables, WRITER_ROLES, WRITER_ROLE_LABELS } };
 }

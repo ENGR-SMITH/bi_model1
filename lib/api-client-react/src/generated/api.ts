@@ -86,6 +86,7 @@ import type {
   ListCollaborationSeedsParams,
   ListVideoActivityParams,
   ListVideoProjectsParams,
+  ListWriterArenaPostsParams,
   OracleChatInput,
   OracleResult,
   OutlineAssistInput,
@@ -169,6 +170,12 @@ import type {
   WorkBlockInput,
   WorldBibleExtractInput,
   WorldBibleExtractResult,
+  WriterArenaAudition,
+  WriterArenaPostInput,
+  WriterArenaPostSummary,
+  WriterArenaPostUpdate,
+  WriterArenaWatch,
+  WriterArenaWatchInput,
   WriterProfile
 } from './api.schemas';
 
@@ -14029,5 +14036,679 @@ export const useDeleteArenaWatch = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getDeleteArenaWatchMutationOptions(options));
+    }
+
+export const getListWriterArenaPostsUrl = (params?: ListWriterArenaPostsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/collaborations/arena/posts?${stringifiedParams}` : `/api/collaborations/arena/posts`
+}
+
+/**
+ * Open writing roles (kind=ROLE) and seed pitches (kind=SEED) with the author summary, the live open-audition count, and the caller's own audition state. ?mine=1 returns only the caller's own calls.
+ * @summary List Writers' Audition Arena posts across both rails
+ */
+export const listWriterArenaPosts = async (params?: ListWriterArenaPostsParams, options?: Parameters<typeof customFetch>[1]): Promise<WriterArenaPostSummary[]> => {
+
+  return customFetch<WriterArenaPostSummary[]>(getListWriterArenaPostsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWriterArenaPostsQueryKey = (params?: ListWriterArenaPostsParams,) => {
+    return [
+    `/api/collaborations/arena/posts`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListWriterArenaPostsQueryOptions = <TData = Awaited<ReturnType<typeof listWriterArenaPosts>>, TError = ErrorType<ErrorResponse>>(params?: ListWriterArenaPostsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWriterArenaPosts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWriterArenaPostsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWriterArenaPosts>>> = ({ signal }) => listWriterArenaPosts(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWriterArenaPosts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWriterArenaPostsQueryResult = NonNullable<Awaited<ReturnType<typeof listWriterArenaPosts>>>
+export type ListWriterArenaPostsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List Writers' Audition Arena posts across both rails
+ */
+
+export function useListWriterArenaPosts<TData = Awaited<ReturnType<typeof listWriterArenaPosts>>, TError = ErrorType<ErrorResponse>>(
+ params?: ListWriterArenaPostsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWriterArenaPosts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWriterArenaPostsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateWriterArenaPostUrl = () => {
+
+
+
+
+  return `/api/collaborations/arena/posts`
+}
+
+/**
+ * Creates a collaboration_seeds row with kind=ROLE; only one OPEN call per (project, role). The existing seed pipeline then carries the auditions.
+ * @summary Open a writing role on one of the caller's projects
+ */
+export const createWriterArenaPost = async (writerArenaPostInput: WriterArenaPostInput, options?: Parameters<typeof customFetch>[1]): Promise<WriterArenaPostSummary> => {
+
+  return customFetch<WriterArenaPostSummary>(getCreateWriterArenaPostUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(writerArenaPostInput)
+  }
+);}
+
+
+
+
+
+export const getCreateWriterArenaPostMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWriterArenaPost>>, TError,{data: BodyType<WriterArenaPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createWriterArenaPost>>, TError,{data: BodyType<WriterArenaPostInput>}, TContext> => {
+
+const mutationKey = ['createWriterArenaPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWriterArenaPost>>, {data: BodyType<WriterArenaPostInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createWriterArenaPost(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateWriterArenaPostMutationResult = NonNullable<Awaited<ReturnType<typeof createWriterArenaPost>>>
+    export type CreateWriterArenaPostMutationBody = BodyType<WriterArenaPostInput>
+    export type CreateWriterArenaPostMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Open a writing role on one of the caller's projects
+ */
+export const useCreateWriterArenaPost = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWriterArenaPost>>, TError,{data: BodyType<WriterArenaPostInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createWriterArenaPost>>,
+        TError,
+        {data: BodyType<WriterArenaPostInput>},
+        TContext
+      > => {
+      return useMutation(getCreateWriterArenaPostMutationOptions(options));
+    }
+
+export const getGetWriterArenaPostUrl = (seedId: string,) => {
+
+
+
+
+  return `/api/collaborations/arena/posts/${seedId}`
+}
+
+/**
+ * @summary Read an Arena post (role call or seed pitch)
+ */
+export const getWriterArenaPost = async (seedId: string, options?: Parameters<typeof customFetch>[1]): Promise<WriterArenaPostSummary> => {
+
+  return customFetch<WriterArenaPostSummary>(getGetWriterArenaPostUrl(seedId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetWriterArenaPostQueryKey = (seedId: string,) => {
+    return [
+    `/api/collaborations/arena/posts/${seedId}`
+    ] as const;
+    }
+
+
+export const getGetWriterArenaPostQueryOptions = <TData = Awaited<ReturnType<typeof getWriterArenaPost>>, TError = ErrorType<ErrorResponse>>(seedId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWriterArenaPost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetWriterArenaPostQueryKey(seedId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getWriterArenaPost>>> = ({ signal }) => getWriterArenaPost(seedId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: seedId !== null && seedId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getWriterArenaPost>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetWriterArenaPostQueryResult = NonNullable<Awaited<ReturnType<typeof getWriterArenaPost>>>
+export type GetWriterArenaPostQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Read an Arena post (role call or seed pitch)
+ */
+
+export function useGetWriterArenaPost<TData = Awaited<ReturnType<typeof getWriterArenaPost>>, TError = ErrorType<ErrorResponse>>(
+ seedId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getWriterArenaPost>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetWriterArenaPostQueryOptions(seedId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateWriterArenaPostUrl = (seedId: string,) => {
+
+
+
+
+  return `/api/collaborations/arena/posts/${seedId}`
+}
+
+/**
+ * @summary Close/reopen a role call or edit its pitch (author only)
+ */
+export const updateWriterArenaPost = async (seedId: string,
+    writerArenaPostUpdate: WriterArenaPostUpdate, options?: Parameters<typeof customFetch>[1]): Promise<WriterArenaPostSummary> => {
+
+  return customFetch<WriterArenaPostSummary>(getUpdateWriterArenaPostUrl(seedId),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(writerArenaPostUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateWriterArenaPostMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWriterArenaPost>>, TError,{seedId: string;data: BodyType<WriterArenaPostUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateWriterArenaPost>>, TError,{seedId: string;data: BodyType<WriterArenaPostUpdate>}, TContext> => {
+
+const mutationKey = ['updateWriterArenaPost'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateWriterArenaPost>>, {seedId: string;data: BodyType<WriterArenaPostUpdate>}> = (props) => {
+          const {seedId,data} = props ?? {};
+
+          return  updateWriterArenaPost(seedId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateWriterArenaPostMutationResult = NonNullable<Awaited<ReturnType<typeof updateWriterArenaPost>>>
+    export type UpdateWriterArenaPostMutationBody = BodyType<WriterArenaPostUpdate>
+    export type UpdateWriterArenaPostMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Close/reopen a role call or edit its pitch (author only)
+ */
+export const useUpdateWriterArenaPost = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateWriterArenaPost>>, TError,{seedId: string;data: BodyType<WriterArenaPostUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateWriterArenaPost>>,
+        TError,
+        {seedId: string;data: BodyType<WriterArenaPostUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateWriterArenaPostMutationOptions(options));
+    }
+
+export const getListMyWriterArenaAuditionsUrl = () => {
+
+
+
+
+  return `/api/collaborations/arena/auditions/mine`
+}
+
+/**
+ * Every application the caller has made to an Arena post (role call or seed pitch), newest first. Never another writer's rows.
+ * @summary The caller's own auditions across both rails
+ */
+export const listMyWriterArenaAuditions = async ( options?: Parameters<typeof customFetch>[1]): Promise<WriterArenaAudition[]> => {
+
+  return customFetch<WriterArenaAudition[]>(getListMyWriterArenaAuditionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListMyWriterArenaAuditionsQueryKey = () => {
+    return [
+    `/api/collaborations/arena/auditions/mine`
+    ] as const;
+    }
+
+
+export const getListMyWriterArenaAuditionsQueryOptions = <TData = Awaited<ReturnType<typeof listMyWriterArenaAuditions>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyWriterArenaAuditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListMyWriterArenaAuditionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listMyWriterArenaAuditions>>> = ({ signal }) => listMyWriterArenaAuditions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listMyWriterArenaAuditions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListMyWriterArenaAuditionsQueryResult = NonNullable<Awaited<ReturnType<typeof listMyWriterArenaAuditions>>>
+export type ListMyWriterArenaAuditionsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary The caller's own auditions across both rails
+ */
+
+export function useListMyWriterArenaAuditions<TData = Awaited<ReturnType<typeof listMyWriterArenaAuditions>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listMyWriterArenaAuditions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListMyWriterArenaAuditionsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getWithdrawWriterArenaAuditionUrl = (applicationId: string,) => {
+
+
+
+
+  return `/api/collaborations/arena/auditions/${applicationId}/withdraw`
+}
+
+/**
+ * @summary Withdraw an open audition (applicant only)
+ */
+export const withdrawWriterArenaAudition = async (applicationId: string, options?: Parameters<typeof customFetch>[1]): Promise<WriterArenaAudition> => {
+
+  return customFetch<WriterArenaAudition>(getWithdrawWriterArenaAuditionUrl(applicationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getWithdrawWriterArenaAuditionMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawWriterArenaAudition>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof withdrawWriterArenaAudition>>, TError,{applicationId: string}, TContext> => {
+
+const mutationKey = ['withdrawWriterArenaAudition'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof withdrawWriterArenaAudition>>, {applicationId: string}> = (props) => {
+          const {applicationId} = props ?? {};
+
+          return  withdrawWriterArenaAudition(applicationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type WithdrawWriterArenaAuditionMutationResult = NonNullable<Awaited<ReturnType<typeof withdrawWriterArenaAudition>>>
+
+    export type WithdrawWriterArenaAuditionMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Withdraw an open audition (applicant only)
+ */
+export const useWithdrawWriterArenaAudition = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof withdrawWriterArenaAudition>>, TError,{applicationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof withdrawWriterArenaAudition>>,
+        TError,
+        {applicationId: string},
+        TContext
+      > => {
+      return useMutation(getWithdrawWriterArenaAuditionMutationOptions(options));
+    }
+
+export const getListWriterArenaWatchesUrl = () => {
+
+
+
+
+  return `/api/collaborations/arena/watches`
+}
+
+/**
+ * @summary List the caller's role watches
+ */
+export const listWriterArenaWatches = async ( options?: Parameters<typeof customFetch>[1]): Promise<WriterArenaWatch[]> => {
+
+  return customFetch<WriterArenaWatch[]>(getListWriterArenaWatchesUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWriterArenaWatchesQueryKey = () => {
+    return [
+    `/api/collaborations/arena/watches`
+    ] as const;
+    }
+
+
+export const getListWriterArenaWatchesQueryOptions = <TData = Awaited<ReturnType<typeof listWriterArenaWatches>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWriterArenaWatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWriterArenaWatchesQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWriterArenaWatches>>> = ({ signal }) => listWriterArenaWatches({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWriterArenaWatches>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWriterArenaWatchesQueryResult = NonNullable<Awaited<ReturnType<typeof listWriterArenaWatches>>>
+export type ListWriterArenaWatchesQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary List the caller's role watches
+ */
+
+export function useListWriterArenaWatches<TData = Awaited<ReturnType<typeof listWriterArenaWatches>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWriterArenaWatches>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWriterArenaWatchesQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateWriterArenaWatchUrl = () => {
+
+
+
+
+  return `/api/collaborations/arena/watches`
+}
+
+/**
+ * @summary Watch a writing role (optionally one author's calls)
+ */
+export const createWriterArenaWatch = async (writerArenaWatchInput: WriterArenaWatchInput, options?: Parameters<typeof customFetch>[1]): Promise<WriterArenaWatch> => {
+
+  return customFetch<WriterArenaWatch>(getCreateWriterArenaWatchUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(writerArenaWatchInput)
+  }
+);}
+
+
+
+
+
+export const getCreateWriterArenaWatchMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWriterArenaWatch>>, TError,{data: BodyType<WriterArenaWatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createWriterArenaWatch>>, TError,{data: BodyType<WriterArenaWatchInput>}, TContext> => {
+
+const mutationKey = ['createWriterArenaWatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createWriterArenaWatch>>, {data: BodyType<WriterArenaWatchInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createWriterArenaWatch(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateWriterArenaWatchMutationResult = NonNullable<Awaited<ReturnType<typeof createWriterArenaWatch>>>
+    export type CreateWriterArenaWatchMutationBody = BodyType<WriterArenaWatchInput>
+    export type CreateWriterArenaWatchMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Watch a writing role (optionally one author's calls)
+ */
+export const useCreateWriterArenaWatch = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createWriterArenaWatch>>, TError,{data: BodyType<WriterArenaWatchInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createWriterArenaWatch>>,
+        TError,
+        {data: BodyType<WriterArenaWatchInput>},
+        TContext
+      > => {
+      return useMutation(getCreateWriterArenaWatchMutationOptions(options));
+    }
+
+export const getDeleteWriterArenaWatchUrl = (watchId: string,) => {
+
+
+
+
+  return `/api/collaborations/arena/watches/${watchId}`
+}
+
+/**
+ * @summary Stop watching (own watch only)
+ */
+export const deleteWriterArenaWatch = async (watchId: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteWriterArenaWatchUrl(watchId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteWriterArenaWatchMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWriterArenaWatch>>, TError,{watchId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteWriterArenaWatch>>, TError,{watchId: string}, TContext> => {
+
+const mutationKey = ['deleteWriterArenaWatch'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteWriterArenaWatch>>, {watchId: string}> = (props) => {
+          const {watchId} = props ?? {};
+
+          return  deleteWriterArenaWatch(watchId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteWriterArenaWatchMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWriterArenaWatch>>>
+
+    export type DeleteWriterArenaWatchMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Stop watching (own watch only)
+ */
+export const useDeleteWriterArenaWatch = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWriterArenaWatch>>, TError,{watchId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteWriterArenaWatch>>,
+        TError,
+        {watchId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteWriterArenaWatchMutationOptions(options));
     }
 
