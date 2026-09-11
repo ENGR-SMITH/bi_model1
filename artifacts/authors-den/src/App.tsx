@@ -19,7 +19,7 @@ import { ArenaPage } from "@/components/arena";
 import { ArenaPostPage } from "@/components/arena-post";
 import { ArenaMinePage } from "@/components/arena-mine";
 import { ArenaRoleModal, type ArenaRoleBrief } from "@/components/arena-role-modal";
-import { apiErrorText, writerRoleLabel } from "@/lib/arena";
+import { WRITER_ROLES, apiErrorText, writerRoleLabel } from "@/lib/arena";
 import { continuityAudit, oracleChat, outlineAssist, transcribeAudio, voiceConsistencyCheck, worldBibleExtract } from "@workspace/api-client-react";
 import {
   acceptContinuation,
@@ -226,6 +226,7 @@ function App() {
       arena: params.get("arena") === "1",
       arenaPost: params.get("arenaPost") ?? "",
       arenaMine: params.get("arenaMine") === "1",
+      arenaRole: params.get("role") ?? "",
     };
   });
   const [publishDraft, setPublishDraft] = useState<Project | null>(null);
@@ -310,6 +311,9 @@ function App() {
     setArenaPostId(intent.arenaPost);
     setView("arena-post");
   }, [intent.arenaPost]);
+  // `?role=<ROLE>` (from the Nexet category page's seat cards) opens the board
+  // with that writing role already selected. Unknown values fall back to All.
+  const arenaRoleIntent = WRITER_ROLES.find((role) => role === intent.arenaRole) ?? "ALL";
   // “Publish a seed” from the pitch board lands here with ?publish=1 and
   // triggers the same “A NEW ROOM FOR WORDS” card as clicking New project.
   useEffect(() => { if (intent.publish && !preview) { setDraftNudge(false); setModal("project"); } }, [intent.publish]);
@@ -880,7 +884,7 @@ function App() {
         {forkError && <div className="den-status-banner error"><XCircle size={15} /> {forkError}</div>}
         {preview && <div className="den-status-banner preview"><GitFork size={15} /> Previewing {previewMeta?.respondentName ? `${previewMeta.respondentName}'s` : "a writer's"} submission of “{previewMeta?.title ?? project.title}” — read only. Approve to merge it into the shared project.</div>}
         {sharedOpenError && <div className="den-status-banner error"><XCircle size={15} /> This shared room has no merged document in your studio yet — shared projects appear here once a submission has been approved and merged.</div>}
-        {view === "profile" ? <ProfilePage projectCount={createdProjectCount} /> : view === "explore" ? <ExplorePage /> : view === "notifications" ? <NotificationsPage /> : view === "arena" ? <ArenaPage hasProjects={hasUserProject} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} onOpenMine={() => setView("arena-mine")} onCallRole={() => openArenaRole(null)} /> : view === "arena-post" ? <ArenaPostPage seedId={arenaPostId} onBack={() => setView("arena")} onAudition={(seedId) => { window.location.href = `/authors-den/?answer=${seedId}`; }} notify={notify} /> : view === "arena-mine" ? <ArenaMinePage onBack={() => setView("arena")} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} notify={notify} /> : view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onCallRole={(item) => openArenaRole(item)} onOpenArena={() => setView("arena")} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
+        {view === "profile" ? <ProfilePage projectCount={createdProjectCount} /> : view === "explore" ? <ExplorePage /> : view === "notifications" ? <NotificationsPage /> : view === "arena" ? <ArenaPage hasProjects={hasUserProject} initialRole={arenaRoleIntent} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} onOpenMine={() => setView("arena-mine")} onCallRole={() => openArenaRole(null)} /> : view === "arena-post" ? <ArenaPostPage seedId={arenaPostId} onBack={() => setView("arena")} onAudition={(seedId) => { window.location.href = `/authors-den/?answer=${seedId}`; }} notify={notify} /> : view === "arena-mine" ? <ArenaMinePage onBack={() => setView("arena")} onOpenPost={(seedId) => { setArenaPostId(seedId); setView("arena-post"); }} notify={notify} /> : view === "home" || !project ? <Home projects={projects} collaborationClones={collaborationClones} openProject={openProject} onNew={() => { setDraftNudge(false); setModal("project"); }} onDuplicate={duplicateProject} onDelete={deleteProject} onImport={() => setModal("import")} onExport={exportFile} onTutorial={startTutorial} onPost={postProject} onCallRole={(item) => openArenaRole(item)} onOpenArena={() => setView("arena")} onSubmitClone={(item) => setNoteProject(item)} highlightNew={draftNudge} /> : <div className={tutorialProjectActive || previewActive ? "tutorial-readonly" : ""}>{previewActive ? <div className="readonly-badge">Previewing a submitted project · read only</div> : tutorialProjectActive && <div className="readonly-badge">Lesson tutorial · read only</div>}<div className="workspace-content"><Workspace view={view} project={project} editorSceneId={editorSceneId} updateProject={updateProject} setView={setView} openEditor={openEditor} notify={notify} exportFile={exportFile} projects={projects} openProject={openProject} theme={theme} setTheme={setTheme} /></div></div>}
       {buyProjectsOpen && <BuyProjectsModal onClose={() => setBuyProjectsOpen(false)} />}
       {tutorialOpen && <TutorialDock step={tutorialStep} onNext={nextLesson} onDismiss={() => setTutorialOpen(false)} />}
     </main>
