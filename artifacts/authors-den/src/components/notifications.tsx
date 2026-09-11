@@ -14,6 +14,7 @@ import {
   LockKeyhole,
   MessageSquare,
   MessagesSquare,
+  Mic,
   PenLine,
   XCircle,
 } from "lucide-react";
@@ -56,6 +57,12 @@ const CATEGORY_META: Record<string, { icon: typeof Bell; tone: string; label: st
   contract_action_required: { icon: Clock3, tone: "gold", label: "Action required" },
   your_turn: { icon: PenLine, tone: "accent", label: "Your turn" },
   block_approved: { icon: CheckCircle2, tone: "teal", label: "Approved" },
+  // Writers' Audition Arena (AUTHOR-DEN-AUDITION-ARENA-PLAN.md §9.4). Accept
+  // and decline still ride `respondent_accepted` / `continuation_declined`
+  // from the shared seed pipeline, so they need no Arena-specific entry.
+  writer_arena_role_opened: { icon: Mic, tone: "accent", label: "New writing role" },
+  writer_arena_role_closed: { icon: LockKeyhole, tone: "muted", label: "Role closed" },
+  writer_arena_audition_withdrawn: { icon: XCircle, tone: "muted", label: "Audition withdrawn" },
 };
 
 const FALLBACK_META = { icon: Bell, tone: "muted", label: "Update" } as const;

@@ -1,6 +1,6 @@
 # Author Den — Writers' Audition Arena Implementation Plan
 
-**Status:** Plan for review — no code changes made yet
+**Status:** Implemented — Phases 0–3 complete (schema/contract, server, Author Den views, doorways + notice metadata). Remaining: the manual two-account acceptance walkthrough (§12.2).
 **Last updated:** 2026-09-11
 **Primary source:** product request 2026-09-11 — "we are to have a similar audition arena on the author-den like we do for the creator-den … writers audition inside the author-den … properly structured and organized like how the creator-den is, while still maintaining the … seed collaboration logic system."
 **Target apps:** `artifacts/authors-den` (frontend — Arena board, role post, My Auditions, composer, sidebar/Home doorways), `artifacts/api-server` (arena listing + role metadata + watches on the collaboration route module), `lib/db` (seed-model extension + support tables + migration), `lib/api-spec` → `lib/api-zod` + `lib/api-client-react` (contract + codegen), plus the Nexet writers-category doorway (`artifacts/nexet/src/pages/authors.tsx`) and shared notice metadata (`artifacts/nexet/src/lib/notice-meta.ts`).
@@ -220,6 +220,8 @@ New `collaboration_notifications` categories (added to Author Den `CATEGORY_META
 
 Existing `continuation_submitted`, `respondent_accepted`, `continue_declined` notices continue to fire from the shared pipeline; the new categories only name the Arena context. Realtime rides the existing inbox polling + `NotificationCenter`; no new socket channel.
 
+**As built (Phase 1/3 deviation).** Only three of the six rows above are emitted as *new* `writer_arena_*` categories: `writer_arena_role_opened` (watch fan-out), `writer_arena_role_closed` (active auditionees), and `writer_arena_audition_withdrawn` (author). Audition received, accepted, and declined deliberately keep the shared pipeline categories (`continuation_submitted`, `respondent_accepted`, `continuation_declined`) — already labelled in both metadata maps — so no parallel naming was introduced. The maps therefore carry exactly the three live categories; the other three rows remain the spec for a future rename.
+
 ## 10. Authorization and privacy matrix
 
 Every endpoint resolves the actor server-side from `getAuth(req).userId`.
@@ -316,6 +318,6 @@ Loading, empty, error, closed, filled, already-auditioned, own-post, and unautho
 - [x] **Verification:** `pnpm --filter @workspace/authors-den run typecheck` clean, full workspace `pnpm run typecheck` clean, and `PORT=5173 BASE_PATH=/authors-den pnpm --filter @workspace/authors-den run build` succeeds (2064 modules, no errors). Confirmed the reused pipeline resolves role seeds: `GET /collaborations/seeds/:seedId`, `…/project`, and `POST …/applications` do not filter by `kind`, so a role call forks and submits exactly like a seed pitch.
 
 ### Phase 3 — Doorways, notifications, verification
-- [ ] Nexet `/categories/authors` doorway card.
-- [ ] `writer_arena_*` categories in both notice metadata maps; inbox/realtime keep-fresh.
-- [ ] Full route-test pass, workspace typecheck/build, two-account walkthrough (§12.2); checklist updated in this file.
+- [x] Nexet `/categories/authors` doorway card. **Completed:** `artifacts/nexet/src/pages/authors.tsx` gains a "Writers' Audition Arena" card in the collaboration room beside the pitch board, linking to `/authors-den/?arena=1` (the den's `?arena=1` intent); the three existing cards were renumbered 01–04 so the new doorway reads as "02 · The Audition Arena".
+- [x] `writer_arena_*` categories in both notice metadata maps; inbox/realtime keep-fresh. **Completed:** the three live categories (`writer_arena_role_opened`, `writer_arena_role_closed`, `writer_arena_audition_withdrawn`) added to `AUTHORS_META` (`artifacts/nexet/src/lib/notice-meta.ts`, labels/tones per §9.4) and to `CATEGORY_META` (`artifacts/authors-den/src/components/notifications.tsx`, with icons). Accept/decline/received keep the shared pipeline categories, which were already labelled — see the §9.4 deviation note. Realtime needed no change: the Arena rides the existing collaboration inbox polling, with no new socket channel.
+- [x] Full route-test pass, workspace typecheck/build, two-account walkthrough (§12.2); checklist updated in this file. **Completed:** `pnpm --filter @workspace/api-server test` **458/458 across 28 files**; `pnpm run typecheck` clean across all packages; `PORT=5173 BASE_PATH=/authors-den pnpm --filter @workspace/authors-den run build` and `PORT=5174 BASE_PATH=/ pnpm --filter @workspace/nexet run build` both succeed. The **two-account walkthrough (§12.2) is the only item not executed** — it needs two authenticated accounts and a browser, so it remains a manual acceptance pass.

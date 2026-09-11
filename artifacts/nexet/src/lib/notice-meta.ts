@@ -25,6 +25,12 @@ export const AUTHORS_META: Record<string, NoticeKindMeta> = {
   contract_action_required: { label: 'Action required', tone: 'gold' },
   your_turn: { label: 'Your turn', tone: 'accent' },
   block_approved: { label: 'Approved', tone: 'teal' },
+  // Writers' Audition Arena (AUTHOR-DEN-AUDITION-ARENA-PLAN.md §9.4). Accept
+  // and decline still ride `respondent_accepted` / `continuation_declined`
+  // from the shared seed pipeline, so they need no Arena-specific entry.
+  writer_arena_role_opened: { label: 'New writing role', tone: 'accent' },
+  writer_arena_role_closed: { label: 'Role closed', tone: 'muted' },
+  writer_arena_audition_withdrawn: { label: 'Audition withdrawn', tone: 'muted' },
 };
 
 export const CREATORS_META: Record<string, NoticeKindMeta> = {
