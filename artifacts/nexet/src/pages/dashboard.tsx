@@ -70,13 +70,20 @@ export default function Dashboard() {
                   <h2 className={doorCardTitleClass}>{category.name}</h2>
                   <p className="mt-4 max-w-[19rem] text-sm leading-relaxed text-zinc-400">{category.description}</p>
                   {category.slug === 'explore' && (
-                    <ul className="mt-5 flex flex-wrap gap-2" data-testid="explore-upcoming-rooms">
-                      {nexetUpcomingCategories.map((upcoming) => (
-                        <li key={upcoming.slug} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-mono-ui text-[9px] uppercase tracking-[0.12em] text-zinc-400">
-                          {upcoming.shortName}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mt-6 pb-6" data-testid="explore-upcoming-rooms">
+                      <p className="font-mono-ui text-[9px] uppercase tracking-[0.16em] text-zinc-500">Upcoming features</p>
+                      <ul className="mt-3 space-y-2">
+                        {nexetUpcomingCategories.map((upcoming) => {
+                          const UpcomingIcon = upcoming.icon;
+                          return (
+                            <li key={upcoming.slug} className="flex items-center gap-2 text-sm text-zinc-300">
+                              <UpcomingIcon className="h-3.5 w-3.5 shrink-0 text-zinc-500" />
+                              {upcoming.name}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
                   )}
                 </div>
                 <span className="absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 text-zinc-300 opacity-80 transition-all duration-300 group-hover:rotate-45 group-hover:border-[#3b82f6]/60 group-hover:text-[#60a5fa]">
