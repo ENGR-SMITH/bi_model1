@@ -126,11 +126,14 @@ function ArenaCard({ post, onOpen }: { post: WriterArenaPostSummary; onOpen: () 
 
 export function ArenaPage({
   hasProjects,
+  initialRole = "ALL",
   onOpenPost,
   onOpenMine,
   onCallRole,
 }: {
   hasProjects: boolean;
+  /** The role chip to open on — set by the category page's seat cards (`?role=`). */
+  initialRole?: WriterArenaRole | "ALL";
   onOpenPost: (seedId: string) => void;
   onOpenMine: () => void;
   onCallRole: () => void;
@@ -138,7 +141,7 @@ export function ArenaPage({
   const { user } = useUser();
   const queryClient = useQueryClient();
   const [rail, setRail] = useState<Rail>("role");
-  const [roleFilter, setRoleFilter] = useState<WriterArenaRole | "ALL">("ALL");
+  const [roleFilter, setRoleFilter] = useState<WriterArenaRole | "ALL">(initialRole);
   const [sort, setSort] = useState<Sort>("newest");
   const [query, setQuery] = useState("");
 
