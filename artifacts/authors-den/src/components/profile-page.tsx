@@ -14,6 +14,7 @@ import {
   useSubscriptionPlans,
   useUploadUserCv,
 } from "@workspace/api-client-react";
+import { PaymentLoadingOverlay } from "./payment-loading";
 
 // ---------------------------------------------------------------------------
 // Author Den profile — the account's project-count bar (5 free projects,
@@ -144,6 +145,7 @@ export function BuyProjectsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-backdrop" onClick={busy ? undefined : onClose}>
+      <PaymentLoadingOverlay open={busy} />
       <div className="modal small-modal plan-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
         <button type="button" className="modal-close" onClick={onClose} disabled={busy} aria-label="Close"><X size={16} /></button>
         <span className="eyebrow">WORK PROJECTS</span>

@@ -9,6 +9,7 @@ import {
   useGetTicketStatus,
   useTicketCategoryAccess,
 } from '@workspace/api-client-react';
+import { PaymentLoadingOverlay } from './payment-loading';
 
 // ---------------------------------------------------------------------------
 // Ticket gate — the NEXET category paywall. Each available category
@@ -249,6 +250,9 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
   const [stamp, setStamp] = useState<{ expiresAt: string; total: number; cardLast4: string | null; promoCode: string | null } | null>(null);
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
+  // The coupon is a paywall, so dismissing it must not strand the visitor on a
+  // dimmed room with no way back — `dismissed` swaps it for a reopen button.
+  const [dismissed, setDismissed] = useState(false);
 
   const checkout = useCreateWhopCheckout({
     mutation: {
@@ -293,6 +297,21 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
     });
   };
 
+  if (dismissed) {
+    return (
+      <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+        <button
+          type="button"
+          onClick={() => setDismissed(false)}
+          className="focus-house inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] px-5 py-3 text-sm font-bold text-white shadow-[0_16px_36px_-12px_rgba(139,92,246,.9)] transition-all hover:brightness-110"
+          data-testid="button-reopen-pass"
+        >
+          <PiTicketDuotone className="h-4 w-4 text-white/80" /> Unlock {name}
+        </button>
+      </div>
+    );
+  }
+
   if (stamp) {
     return (
       <PassStamp
@@ -312,8 +331,16 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="ticket-gate">
-      <div className="soft-lift group relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#131316]/90 text-white shadow-[0_30px_80px_-20px_rgba(0,0,0,.7)] backdrop-blur-xl">
+    <div
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm"
+      onClick={busy ? undefined : () => setDismissed(true)}
+      data-testid="ticket-gate"
+    >
+      <PaymentLoadingOverlay open={busy} />
+      <div
+        className="soft-lift group relative w-full max-w-md overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#131316]/90 text-white shadow-[0_30px_80px_-20px_rgba(0,0,0,.7)] backdrop-blur-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
         <span className="card-spot" />
         <span className="card-shine" />
 

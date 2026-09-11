@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { PiArrowLeftDuotone, PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiConfettiDuotone, PiCreditCardDuotone, PiFolderOpenDuotone, PiHardDrivesDuotone, PiLockKeyDuotone, PiSparkleDuotone, PiTicketDuotone, PiWarningCircleDuotone, PiXDuotone } from 'react-icons/pi';
+import { PiArrowLeftDuotone, PiCheckCircleDuotone, PiCheckDuotone, PiCircleNotchDuotone, PiCreditCardDuotone, PiFolderOpenDuotone, PiHardDrivesDuotone, PiLockKeyDuotone, PiSparkleDuotone, PiTicketDuotone, PiWarningCircleDuotone, PiXDuotone } from 'react-icons/pi';
 import type { IconType } from 'react-icons';
 import { Link } from 'wouter';
 import { SectionEyebrow } from '@/components/protected-shell';
+import { PaymentLoadingOverlay } from '@/components/payment-loading';
+import { SuccessCheck } from '@/components/success-check';
 import {
   confirmWhopCheckout,
   getSubscriptionPlansQueryKey,
@@ -137,16 +139,12 @@ function ResultOverlayView({ state, onClose }: { state: ResultOverlay; onClose: 
 
   if (state.kind === 'success') {
     return (
-      <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm">
-        <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-6 text-white shadow-2xl" data-testid="subscription-success">
-          <div className="flex items-center gap-3">
-            <span className="icon-chip h-14 w-14 text-[#34d399]"><PiConfettiDuotone className="h-7 w-7" /></span>
-            <div>
-              <p className="font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">Subscribed</p>
-              <h3 className="text-2xl font-extrabold tracking-[-0.04em]">Payment confirmed</h3>
-            </div>
-          </div>
-          <p className="mt-4 text-sm text-zinc-400">
+      <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" onClick={onClose}>
+        <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-7 text-center text-white shadow-2xl" onClick={(event) => event.stopPropagation()} data-testid="subscription-success">
+          <SuccessCheck className="mx-auto" />
+          <p className="mt-4 font-mono-ui text-[10px] uppercase tracking-[0.2em] text-[#34d399]">Subscribed</p>
+          <h3 className="mt-1 text-2xl font-extrabold tracking-[-0.04em]">Payment confirmed</h3>
+          <p className="mt-3 text-sm text-zinc-400">
             {state.total !== undefined ? (
               <>
                 Charged {price(state.total)}
@@ -164,8 +162,8 @@ function ResultOverlayView({ state, onClose }: { state: ResultOverlay; onClose: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="subscription-error">
-      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-6 text-white shadow-2xl">
+    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" onClick={onClose} data-testid="subscription-error">
+      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] p-6 text-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-3">
           <span className="icon-chip h-14 w-14 text-[#f87171]"><PiWarningCircleDuotone className="h-7 w-7" /></span>
           <div>
@@ -561,6 +559,9 @@ function PayModal({
   });
 
   const callbackUrl = `${window.location.origin}${window.location.pathname}`;
+  // `busy` spans the whole hand-off: the checkout request, then the short paint
+  // before Whop redirects. The card must not be dismissible during it.
+  const busy = checkout.isPending || opening;
 
   const pay = () => {
     setError('');
@@ -575,8 +576,16 @@ function PayModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm" data-testid="subscription-pay-gate">
-      <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] text-white shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-[#111111]/60 p-4 backdrop-blur-sm"
+      onClick={busy ? undefined : onClose}
+      data-testid="subscription-pay-gate"
+    >
+      <PaymentLoadingOverlay open={busy} />
+      <div
+        className="relative w-full max-w-md rounded-3xl border border-white/10 bg-[#111111] text-white shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="rounded-t-[1.35rem] p-6 pb-5">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -635,11 +644,11 @@ function PayModal({
           <button
             type="button"
             onClick={pay}
-            disabled={checkout.isPending || opening}
+            disabled={busy}
             className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b82f6] py-3.5 text-sm font-bold text-white transition-colors hover:bg-[#2563eb] disabled:cursor-wait disabled:opacity-60"
             data-testid="sub-button-pay"
           >
-            {checkout.isPending || opening ? (
+            {busy ? (
               <><PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> {opening ? 'Opening secure checkout…' : 'Starting checkout…'}</>
             ) : (
               <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay {price(plan.priceUsd)}</>

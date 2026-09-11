@@ -6,6 +6,7 @@ import {
   getGetAccountQuotaQueryKey,
   getSubscriptionPlansQueryKey,
 } from "@workspace/api-client-react";
+import { SuccessCheck } from "./success-check";
 
 // ---------------------------------------------------------------------------
 // WhopReturnGate — mounted once at the studio root (buy-more projects can be
@@ -69,8 +70,8 @@ export function WhopReturnGate() {
   if (!state) return null;
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal small-modal plan-modal" role="dialog" aria-modal="true" data-testid="whop-return-gate">
+    <div className="modal-backdrop" onClick={() => setState(null)}>
+      <div className="modal small-modal plan-modal" role="dialog" aria-modal="true" data-testid="whop-return-gate" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="modal-close" onClick={() => setState(null)} aria-label="Close"><X size={16} /></button>
         {state.kind === "busy" && (
           <>
@@ -82,7 +83,8 @@ export function WhopReturnGate() {
         )}
         {state.kind === "success" && (
           <>
-            <span className="eyebrow">PAYMENT CONFIRMED</span>
+            <SuccessCheck size="sm" />
+            <span className="eyebrow" style={{ display: "block", marginTop: 12 }}>PAYMENT CONFIRMED</span>
             <h2>More projects — done.</h2>
             <p>
               {state.total !== undefined ? (

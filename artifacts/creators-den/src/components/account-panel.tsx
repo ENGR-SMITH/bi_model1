@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type MouseEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowUpRight, FileText, HardDrive, Loader2, Upload } from 'lucide-react';
 import {
@@ -9,6 +9,7 @@ import {
   useGetUserCv,
   useUploadUserCv,
 } from '@workspace/api-client-react';
+import { PaymentLoadingOverlay } from './payment-loading';
 
 // ---------------------------------------------------------------------------
 // Account panels — the workspace storage card (2 GB free, buy-more on the
@@ -25,12 +26,29 @@ export function formatBytes(bytes: number): string {
   return `${bytes} B`;
 }
 
+// Where storage is actually bought: the Creator Den storage row on the NEXET
+// Subscriptions desk, a separate app under the same origin.
+const STORAGE_DESK_URL = '/subscriptions?focus=storage';
+
 // The workspace storage card — total space the account is limited to, the
 // current space used, and the space left. "Buy more space" goes straight to
 // the Creator Den storage row on the NEXET Subscriptions page, where the
 // account's plans are listed and payable.
 export function StorageBar() {
   const quota = useGetAccountQuota();
+  const [leaving, setLeaving] = useState(false);
+
+  // A plain link would be a bare full-page jump to another app. Flip the
+  // payment loading overlay up first, let it paint, then navigate, so the
+  // hand-off reads as one smooth action. Modified clicks (new tab/window) are
+  // left to the browser like a normal link.
+  const openDesk = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+    event.preventDefault();
+    if (leaving) return;
+    setLeaving(true);
+    window.setTimeout(() => window.location.assign(STORAGE_DESK_URL), 450);
+  };
 
   const used = quota.data?.storageBytes.usedBytes ?? 0;
   const total = quota.data?.storageBytes.totalBytes ?? 0;
@@ -76,14 +94,17 @@ export function StorageBar() {
       <div className="storage-cta">
         <span className="mono-label">Need more room?</span>
         <a
-          href="/subscriptions?focus=storage"
+          href={STORAGE_DESK_URL}
           className="primary-btn"
+          onClick={openDesk}
+          aria-busy={leaving}
           data-testid="btn-buy-space"
         >
           <HardDrive size={14} /> Buy more space
           <ArrowUpRight size={13} className="storage-cta-arrow" />
         </a>
       </div>
+      <PaymentLoadingOverlay open={leaving} />
     </div>
   );
 }
