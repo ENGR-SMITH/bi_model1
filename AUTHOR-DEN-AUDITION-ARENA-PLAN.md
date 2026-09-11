@@ -243,7 +243,7 @@ Additional rules:
 ## 11. Frontend implementation plan
 
 ### 11.1 Contract and data layer
-Regenerate `@workspace/api-zod` / `@workspace/api-client-react` after the OpenAPI additions and use the generated hooks (`useListArenaPosts`, `useGetArenaPost`, `useCreateArenaPost`, `useUpdateArenaPost`, `useListMyArenaAuditions`, `useWithdrawArenaAudition`, `useListArenaWatches` / `useCreateArenaWatch` / `useDeleteArenaWatch`), plus the existing seed/continuation hooks for apply, submit, select, accept, and decline. Add the `writer_arena_*` rows to `CATEGORY_META` (authors-den) and `AUTHORS_META` (nexet).
+Regenerate `@workspace/api-zod` / `@workspace/api-client-react` after the OpenAPI additions and use the generated hooks (`useListWriterArenaPosts`, `useGetWriterArenaPost`, `useCreateWriterArenaPost`, `useUpdateWriterArenaPost`, `useListMyWriterArenaAuditions`, `useWithdrawWriterArenaAudition`, `useListWriterArenaWatches` / `useCreateWriterArenaWatch` / `useDeleteWriterArenaWatch`), plus the existing seed/continuation hooks for apply, submit, select, accept, and decline. Add the `writer_arena_*` rows to `CATEGORY_META` (authors-den) and `AUTHORS_META` (nexet).
 
 ### 11.2 Pages and components
 - `components/arena.tsx` — board with rails, role chips + watch bells, sort, cards, empty/loading/error, already-auditioned state.
@@ -310,9 +310,10 @@ Loading, empty, error, closed, filled, already-auditioned, own-post, and unautho
 - [x] **Regression pass:** the existing collaboration test suite stays green. **Completed:** new `routes/author-arena.test.ts` (25 tests) covers auth, role create/patch, rails/sort/mine, live-count lifecycle, withdraw rules, no-draft-leak, and watches; full api-server suite **458/458 across 28 files**, workspace `pnpm run typecheck` clean. The suite also pins the regression rule: a published seed still reads back as `kind='SEED'` with null role fields through the untouched seed endpoints.
 
 ### Phase 2 — Frontend: Arena views
-- [ ] Board, role detail (audition + author views), My Auditions.
-- [ ] "Call for a role" composer from a project and from the board.
-- [ ] `View` additions, sidebar STUDIO entry, Home card, intent parser, CSS section.
+- [x] Board, role detail (audition + author views), My Auditions. **Completed:** new `artifacts/authors-den/src/components/arena.tsx` (two rails over one table via `kind`, role chips with watch bells, search, `newest`/`most_applied` sort, live counts derived from an unfiltered parallel query, empty/loading/error/already-auditioned states), `arena-post.tsx` (frozen-brief panel, author's live/total stats + close/reopen, everyone else's audition/withdraw/status view), and `arena-mine.tsx` (status tabs All/In review/Accepted/Declined over `GET /collaborations/arena/auditions/mine`, withdraw for unresolved rows). Shared labels/status helpers in `src/lib/arena.ts`.
+- [x] "Call for a role" composer from a project and from the board. **Completed:** `arena-role-modal.tsx` composes the same frozen-brief publish as `BriefModal` plus a role select and pitch field; reachable from the board header, the board's empty state, the Home Arena card, and a new per-project "Call for a role" button. Publishing calls `useCreateWriterArenaPost` and lands on the new call's detail page.
+- [x] `View` additions, sidebar STUDIO entry, Home card, intent parser, CSS section. **Completed:** `App.tsx` gains `arena`/`arena-post`/`arena-mine` views and render branches, an "Audition Arena" sidebar entry opened as a den-level room (like Explore, no project gate), a Home "The Writers' Room" card, and `?arena=1` / `?arenaPost=<id>` / `?arenaMine=1` intents. Auditioning reuses the established `?answer=<seedId>` fork flow, and the author's "Review auditions" link reuses `/authors/pitch-board/seed/<seedId>`. New `.arena-*` CSS section in `index.css` following the Author Den paper theme.
+- [x] **Verification:** `pnpm --filter @workspace/authors-den run typecheck` clean, full workspace `pnpm run typecheck` clean, and `PORT=5173 BASE_PATH=/authors-den pnpm --filter @workspace/authors-den run build` succeeds (2064 modules, no errors). Confirmed the reused pipeline resolves role seeds: `GET /collaborations/seeds/:seedId`, `…/project`, and `POST …/applications` do not filter by `kind`, so a role call forks and submits exactly like a seed pitch.
 
 ### Phase 3 — Doorways, notifications, verification
 - [ ] Nexet `/categories/authors` doorway card.
