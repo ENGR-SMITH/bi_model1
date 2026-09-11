@@ -281,11 +281,12 @@ CF_R2_BUCKET=tandem-media
 CF_R2_ACCESS_KEY=...
 CF_R2_SECRET_KEY=...
 
-# Desktop-agent release feed — optional. The public base URL where the CI
-# workflow publishes latest.yml / latest-mac.yml next to the installers. Set
-# it and <origin>/desktop-agent/… redirects to that feed, which is the path
-# the agent's updater defaults to. Leave it unset and the path 404s instead
-# of answering with index.html.
+# Desktop-agent release feed — optional. <origin>/desktop-agent/… is the path
+# the agent's updater defaults to; by default it redirects to the project's
+# public R2 feed (baked into entrypoint.sh, since the bucket URL is public and
+# already shipped in the web bundle). Set this to use a different bucket or a
+# custom domain, or set it to EMPTY to hand the path back to Node (local
+# dist-bundle in dev, 404 otherwise).
 DESKTOP_AGENT_FEED_URL=https://pub-<hash>.r2.dev/desktop-agent
 
 # Upload staging — optional
@@ -304,10 +305,12 @@ DESKTOP_AGENT_FEED_URL=https://pub-<hash>.r2.dev/desktop-agent
 >
 > `DESKTOP_AGENT_FEED_URL` is optional, and only matters if you ship the
 > desktop agent: installers are built per-OS on GitHub runners and published
-> to R2, so the container holds none. Setting it makes
-> `<origin>/desktop-agent/…` — the update URL the agent defaults to — serve
-> that feed, so installed agents update from the real domain rather than
-> reaching for a path the SPA fallback would answer with HTML.
+> to R2, so the container holds none. `<origin>/desktop-agent/…` — the update
+> URL the agent defaults to — redirects to the published feed, so installed
+> agents update from the real domain rather than reaching for a path the SPA
+> fallback would answer with HTML. The redirect default is the project's public
+> R2 bucket (see `DEFAULT_FEED_BASE` in `artifacts/api-server/entrypoint.sh`),
+> so the route works without setting anything here.
 
 ### Phase 6 — Wire up the third parties
 

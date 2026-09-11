@@ -124,8 +124,20 @@ it directly ($0 egress).
 Set these GitHub secrets: `CF_ACCOUNT_ID`, `CF_R2_ACCESS_KEY`, `CF_R2_SECRET_KEY`
 (and optionally the repo variable `R2_BUCKET`, default `tandem-media`).
 
-The installer lands at:
-`https://<public-domain>/desktop-agent/nexet-desktop-agent-latest.<exe|dmg>`
+The installer lands at (versioned payload **plus** the stable `-latest` alias):
+
+```
+https://<public-domain>/desktop-agent/nexet-desktop-agent-latest.<exe|dmg>
+```
+
+`https://nexet.co/desktop-agent/…` fronts the same bucket (nginx redirects to
+it, see `DESKTOP_AGENT_FEED_URL` in `DEPLOYMENT.md`), so the button can point at
+our own domain instead of the raw `r2.dev` URL.
+
+The workflow also republishes the **legacy `tandem-desktop-agent-latest.<ext>`**
+name, because the deployed web bundle still reads that path from
+`VITE_AGENT_DOWNLOAD_URL`. Point that variable at the `nexet-` name to retire
+the alias.
 
 ## In-app download button
 
@@ -161,9 +173,21 @@ The installed app checks for updates on launch (and via the **Check for updates*
 button in the **Agent updates** card on the right) and downloads them in the
 background; when a new version is ready the button becomes **Restart & update**. Releases are published by the
 `build-desktop-agent` CI workflow (tag `agent-v*`, or a manual dispatch), which
-uploads the installer **plus the `latest*.yml` feed files and blockmaps** next
-to it — point `NEXET_UPDATE_URL` (or the build-time `build.publish.url`) at that
-public directory.
+uploads, next to each other:
+
+1. the **versioned** payloads electron-builder names in `latest*.yml`
+   (`Nexet Desktop Agent Setup <version>.exe`, `…-arm64-mac.zip`),
+2. the `latest*.yml` feeds and `.blockmap` files, and
+3. the stable `-latest` aliases the download button links to.
+
+All three are required. `electron-updater` reads `path` out of the feed and
+fetches that exact object, so a run that publishes only the alias leaves every
+update download 404ing — and a run that publishes only the versioned payload
+leaves the download button serving whatever was uploaded by hand last. Both
+have happened.
+
+The feed lives at `<origin>/desktop-agent`, which is also the agent's
+`updateUrl` default; `NEXET_UPDATE_URL` overrides it per machine.
 
 > `desktop-agent-windows.yml` — the workflow that runs on every push to `main`
 > — is **artifact-only**. Running it does not change the installer users

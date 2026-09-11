@@ -26,16 +26,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # pnpm must exist BEFORE actions/setup-node runs: `cache: pnpm` resolves
+      # the pnpm binary to compute the store path, and without it the step dies
+      # with "Unable to locate executable file: pnpm" — which is what failed
+      # every run of this workflow.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-
-      - name: Enable pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@11.8.0 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
