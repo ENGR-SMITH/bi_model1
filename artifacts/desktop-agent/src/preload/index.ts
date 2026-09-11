@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
-import type { AgentSettings, AppInfo, AuthEvent, JobProgress, LaunchContext, UpdateEvent } from "../shared/types";
+import type {
+  AgentSettings,
+  AppInfo,
+  AuthEvent,
+  ConfigStatus,
+  JobProgress,
+  LaunchContext,
+  UpdateEvent,
+} from "../shared/types";
 
 /** Subscribe helper: returns an unsubscribe function. */
 function on<T>(channel: string, cb: (payload: T) => void): () => void {
@@ -58,7 +66,7 @@ const api = {
 
   // App metadata.
   appInfo: () => ipcRenderer.invoke("agent:app-info") as Promise<AppInfo>,
-  configStatus: () => ipcRenderer.invoke("agent:config-status") as Promise<{ clerkConfigured: boolean }>,
+  configStatus: () => ipcRenderer.invoke("agent:config-status") as Promise<ConfigStatus>,
 
   // Auto-update.
   checkUpdate: () => ipcRenderer.invoke("agent:check-update"),

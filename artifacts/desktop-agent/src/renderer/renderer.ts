@@ -945,6 +945,24 @@ async function checkConfig() {
           "and relaunch before signing in.",
         "err",
       );
+      return;
+    }
+
+    // The sign-in link is built from webAppUrl, and its origin is the one thing
+    // an old env var or config file can silently change. Show it, and name the
+    // override when there is one — otherwise a localhost link looks like a bug
+    // in a build that is actually fine.
+    const origin = $("footer-config");
+    origin.textContent = `sign-in · ${st.webAppUrl}`;
+    origin.title = `API ${st.apiBaseUrl}\nweb app ${st.webAppUrl} (${st.webAppUrlSource})`;
+
+    if (st.overridden) {
+      setAuthNote(
+        `This agent is configured for ${st.webAppUrl} — from ${st.overrideSource}. ` +
+          "The built-in default is https://nexet.co; remove that override (NEXET_WEB_URL / " +
+          "NEXET_API_URL, or the config file) and relaunch to use it.",
+        "err",
+      );
     }
   } catch {
     // preload not available — the global error handler will surface it

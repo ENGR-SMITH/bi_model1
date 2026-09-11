@@ -7,7 +7,7 @@ import type { AppUpdater } from "electron-updater";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { loadConfig } from "./config";
+import { describeConfig, loadConfig } from "./config";
 import { beginBrowserSignIn, type AuthSession, type BrowserSignInAttempt } from "./auth";
 import { ApiClient } from "./api";
 import { makeProxy, resolveFfmpeg } from "./ffmpeg";
@@ -22,7 +22,15 @@ import {
   getLaunchContext,
   isAllowedReturnUrl,
 } from "./control-server";
-import type { AgentSettings, AppInfo, AuthEvent, JobProgress, LaunchContext, UpdateEvent } from "../shared/types";
+import type {
+  AgentSettings,
+  AppInfo,
+  AuthEvent,
+  ConfigStatus,
+  JobProgress,
+  LaunchContext,
+  UpdateEvent,
+} from "../shared/types";
 
 let mainWindow: BrowserWindow | null = null;
 let sessionCache: AuthSession | null = null;
@@ -254,10 +262,23 @@ ipcMain.handle("agent:copy-text", (_e, text: string) => {
 });
 
 // Lets the renderer ask about missing config instead of relying on a one-shot
-// push that can be dropped if it's sent before the page has loaded.
-ipcMain.handle("agent:config-status", (): { clerkConfigured: boolean } => {
+// push that can be dropped if it's sent before the page has loaded. It also
+// reports the resolved origins and which layer chose them, so the UI can show
+// the sign-in domain — and call out a stale env/config-file override.
+ipcMain.handle("agent:config-status", (): ConfigStatus => {
   const cfg = loadConfig();
-  return { clerkConfigured: Boolean(cfg.clerkPublishableKey) };
+  const { sources, file } = describeConfig();
+  const overridden = sources.webAppUrl !== "default" || sources.apiBaseUrl !== "default";
+  return {
+    clerkConfigured: Boolean(cfg.clerkPublishableKey),
+    apiBaseUrl: cfg.apiBaseUrl,
+    webAppUrl: cfg.webAppUrl,
+    apiBaseUrlSource: sources.apiBaseUrl,
+    webAppUrlSource: sources.webAppUrl,
+    overridden,
+    overrideSource: overridden ? (file ?? "environment variables") : null,
+    configFile: file,
+  };
 });
 
 ipcMain.handle("agent:sign-out", () => {
