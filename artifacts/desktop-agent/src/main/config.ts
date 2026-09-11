@@ -38,8 +38,12 @@ export interface AgentConfig {
   controlPort: number;
 }
 
+// The production deployment serves the four SPAs, the API (/api) and Socket.IO
+// (/socket.io) from ONE origin, so both the API base and the web app URL are
+// the real domain. Local development overrides either with NEXET_API_URL /
+// NEXET_WEB_URL (or a config file).
 const DEFAULTS: AgentConfig = {
-  apiBaseUrl: "http://localhost:3000",
+  apiBaseUrl: "https://nexet.co",
   // The hosted Nexet web app. The sign-in link lands on its /agent-signin
   // page, and Clerk only initialises on origins registered for the instance,
   // so the shipped default must be the real domain rather than a dev server.
