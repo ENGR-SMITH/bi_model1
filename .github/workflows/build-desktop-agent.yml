@@ -82,11 +82,27 @@ jobs:
           path: artifacts/desktop-agent/dist-bundle/*
           if-no-files-found: error
 
-      # Publish the installer to Cloudflare R2 ($0 egress) so the in-app
-      # "Desktop agent" button can link straight to it. Requires secrets:
+      # Publish the installers to Cloudflare R2 ($0 egress) so the in-app
+      # "Desktop agent" button can link straight to them. Requires secrets:
       #   CF_ACCOUNT_ID, CF_R2_ACCESS_KEY, CF_R2_SECRET_KEY
       # and a repository variable: R2_BUCKET (defaults to tandem-media).
-      - name: Upload installer to R2
+      #
+      # Three sets of objects are uploaded, and all three matter:
+      #
+      #  1. The VERSIONED payloads electron-builder produced, under exactly the
+      #     names written into latest*.yml ("Nexet Desktop Agent Setup 0.0.137.exe",
+      #     "Nexet Desktop Agent-0.0.137-arm64-mac.zip"). electron-updater reads
+      #     `path` from that file and fetches it verbatim, so uploading only the
+      #     "-latest" alias — which is what this step used to do — left every
+      #     update download 404ing against a build that was never published.
+      #  2. latest*.yml + the .blockmap files, which must sit beside them.
+      #  3. The stable "-latest" aliases the download button links to, under both
+      #     the canonical nexet- name and the legacy tandem- name that is still
+      #     baked into the deployed web bundle (VITE_AGENT_DOWNLOAD_URL). Without
+      #     the alias the button serves whatever was last uploaded by hand —
+      #     which is how a months-old build kept being handed out while every
+      #     re-run of this workflow appeared to change nothing.
+      - name: Upload installers to R2
         if: env.HAS_R2_KEYS == 'true'
         env:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
@@ -100,8 +116,10 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
 
-          files=(artifacts/desktop-agent/dist-bundle/*.{exe,dmg})
-          if [ ${#files[@]} -eq 0 ]; then
+          # exe + dmg are the download-button artifacts; the mac .zip is what
+          # latest-mac.yml names as its `path`, so updates need it too.
+          payloads=(artifacts/desktop-agent/dist-bundle/*.exe artifacts/desktop-agent/dist-bundle/*.dmg artifacts/desktop-agent/dist-bundle/*.zip)
+          if [ ${#payloads[@]} -eq 0 ]; then
             # The secrets are present, so this run was meant to publish — an
             # empty bundle means the download button would keep serving the
             # previous installer. Fail loudly instead of exiting green.
@@ -109,30 +127,37 @@ jobs:
             exit 1
           fi
 
-          FILE="${files[0]}"
-          EXT="${FILE##*.}"
-          DEST="${R2_PREFIX}/nexet-desktop-agent-latest.${EXT}"
+          upload() { # <local-file> <object-key> <content-type>
+            aws s3 cp "$1" "s3://${R2_BUCKET}/$2" \
+              --endpoint-url "https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+              --region auto \
+              --acl public-read \
+              --content-type "$3"
+            echo "Published s3://${R2_BUCKET}/$2"
+          }
 
-          aws s3 cp "$FILE" "s3://${R2_BUCKET}/${DEST}" \
-            --endpoint-url "https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-            --region auto \
-            --acl public-read \
-            --content-type "application/octet-stream"
+          # 1. Versioned payloads — the names latest*.yml points at.
+          for FILE in "${payloads[@]}"; do
+            upload "$FILE" "${R2_PREFIX}/$(basename "$FILE")" application/octet-stream
+          done
 
-          echo "Published to s3://${R2_BUCKET}/${DEST}"
-
-          # Auto-update feeds (latest.yml / latest-mac.yml) + blockmaps must sit
-          # next to the installers for electron-updater to find releases.
+          # 2. Update feeds + blockmaps, beside the payloads.
           for META in artifacts/desktop-agent/dist-bundle/latest*.yml artifacts/desktop-agent/dist-bundle/*.blockmap; do
             [ -f "$META" ] || continue
             CT="application/octet-stream"
             case "$META" in
               *.yml) CT="text/yaml" ;;
             esac
-            aws s3 cp "$META" "s3://${R2_BUCKET}/${R2_PREFIX}/$(basename "$META")" \
-              --endpoint-url "https://${CF_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-              --region auto \
-              --acl public-read \
-              --content-type "$CT"
-            echo "Published update metadata: $(basename "$META")"
+            upload "$META" "${R2_PREFIX}/$(basename "$META")" "$CT"
+          done
+
+          # 3. Stable aliases for the download button, under both names.
+          for FILE in "${payloads[@]}"; do
+            EXT="${FILE##*.}"
+            case "$EXT" in
+              exe|dmg) ;;
+              *) continue ;;
+            esac
+            upload "$FILE" "${R2_PREFIX}/nexet-desktop-agent-latest.${EXT}" application/octet-stream
+            upload "$FILE" "${R2_PREFIX}/tandem-desktop-agent-latest.${EXT}" application/octet-stream
           done
