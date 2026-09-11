@@ -13,6 +13,11 @@ concurrency:
 env:
   R2_BUCKET: ${{ vars.R2_BUCKET || 'tandem-media' }}
   R2_PREFIX: desktop-agent
+  # Workflow-level so a step's `if` can read it: a step's `if` is evaluated
+  # before that step's own `env:` block exists, so `if: env.AWS_ACCESS_KEY_ID`
+  # sitting beside `env: AWS_ACCESS_KEY_ID:` is always empty. That is exactly
+  # how the publish step below stayed silently skipped.
+  HAS_R2_KEYS: ${{ secrets.CF_ACCOUNT_ID != '' && secrets.CF_R2_ACCESS_KEY != '' && secrets.CF_R2_SECRET_KEY != '' }}
 
 jobs:
   build:
@@ -82,7 +87,7 @@ jobs:
       #   CF_ACCOUNT_ID, CF_R2_ACCESS_KEY, CF_R2_SECRET_KEY
       # and a repository variable: R2_BUCKET (defaults to tandem-media).
       - name: Upload installer to R2
-        if: ${{ env.AWS_ACCESS_KEY_ID != '' }}
+        if: env.HAS_R2_KEYS == 'true'
         env:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
           # AWS CLI expects these standard env var names
@@ -97,8 +102,11 @@ jobs:
 
           files=(artifacts/desktop-agent/dist-bundle/*.{exe,dmg})
           if [ ${#files[@]} -eq 0 ]; then
-            echo "no installer found"
-            exit 0
+            # The secrets are present, so this run was meant to publish — an
+            # empty bundle means the download button would keep serving the
+            # previous installer. Fail loudly instead of exiting green.
+            echo "::error::No installer in dist-bundle — nothing published to R2."
+            exit 1
           fi
 
           FILE="${files[0]}"
