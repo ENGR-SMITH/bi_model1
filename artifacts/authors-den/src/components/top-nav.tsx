@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useUser } from "@clerk/react";
-import { ArrowRight, Bell, BookOpen, Megaphone, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, BookOpen, Megaphone, Search } from "lucide-react";
 import {
   getListCollaborationSeedsQueryKey,
   getListExploreAuthorsQueryKey,
@@ -210,6 +210,18 @@ export function TopAccountChip({ onOpenProfile }: { onOpenProfile: () => void })
         <span className="topnav-account-email">{user?.primaryEmailAddress?.emailAddress || "Nexet member"}</span>
       </span>
     </button>
+  );
+}
+
+/** EXIT — leaves the den and lands back in Nexet as a quiet secondary notch,
+ * mirroring the Creators Den header. The account stays signed in; the atrium
+ * handles the routing, so there is no Clerk sign-out here. */
+export function TopExitButton() {
+  return (
+    <a className="topnav-exit" href="/" title="Back to Nexet" data-testid="button-authors-exit">
+      <ArrowLeft size={14} />
+      <span>EXIT</span>
+    </a>
   );
 }
 

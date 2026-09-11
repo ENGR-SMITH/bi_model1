@@ -137,10 +137,6 @@
 .main-stage { flex: 1; min-width: 0; }
 .topbar { height: 70px; border-bottom: 1px solid hsl(var(--border)); display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; padding: 0 42px; background: hsl(var(--background) / .82); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 10; }
 .top-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
-.nexet-back-btn { display: flex; align-items: center; gap: 9px; margin: 0 2px 32px; padding: 9px 12px; border: 1px solid hsl(var(--sidebar-primary) / .35); background: hsl(var(--sidebar-accent)); color: hsl(var(--sidebar-primary)); border-radius: 7px; font: 700 11px var(--app-font-sans); text-decoration: none; transition: border-color .16s, background .16s, transform .16s; white-space: nowrap; overflow: hidden; }
-.nexet-back-btn svg { color: hsl(var(--destructive)); }
-.nexet-back-btn:hover { border-color: hsl(var(--destructive) / .6); background: hsl(var(--sidebar-accent) / .85); transform: translateY(-1px); }
-.nexet-back-btn:hover svg { color: hsl(var(--destructive)); }
 .spin { animation: spin 1.1s linear infinite; }
 
 /* Payment loading overlay — shown the instant a pay button is clicked, while
@@ -689,15 +685,6 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
   gap: 3px;
   padding-left: 0;
   padding-right: 0;
-}
-.sidebar.sidebar-collapsed .nexet-back-btn {
-  justify-content: center;
-  padding: 9px;
-  margin-left: 2px;
-  margin-right: 2px;
-}
-.sidebar.sidebar-collapsed .nexet-back-btn span {
-  display: none;
 }
 .sidebar.sidebar-collapsed .brand-copy,
 .sidebar.sidebar-collapsed .workspace-copy,
@@ -1690,6 +1677,13 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
 .topnav-arena:hover { color: hsl(var(--foreground)); border-color: hsl(var(--accent) / .5); }
 .topnav-arena.active { color: hsl(var(--accent)); border-color: hsl(var(--accent) / .55); background: hsl(var(--accent) / .1); }
 
+/* EXIT — the den's way back to Nexet, moved out of the sidebar and styled as
+   the quiet secondary notch the Creators Den header uses. The account stays
+   signed in; the atrium handles the routing. */
+.topnav-exit { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 10px; border: 1px solid hsl(var(--border)); background: transparent; color: hsl(var(--muted-foreground)); font: 600 12px var(--app-font-sans); text-decoration: none; transition: color .18s ease, background .18s ease, border-color .18s ease; }
+.topnav-exit:hover { color: hsl(var(--foreground)); background: hsl(var(--foreground) / .05); }
+.topnav-exit svg { color: hsl(var(--muted-foreground)); }
+
 @media (max-width: 1100px) {
   .topnav-search { width: min(380px, 34vw); }
   .topnav-bell-label { display: none; }
@@ -1700,6 +1694,9 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
   .topnav-search-input { display: none; }
   .topnav-search-box { padding: 3px; }
   .topnav-account-meta { display: none; }
+  /* EXIT folds to its arrow, like the Creators Den header. */
+  .topnav-exit { padding: 7px 9px; }
+  .topnav-exit span { display: none; }
 }
 @media (max-width: 700px) {
   .topnav-arena span { display: none; }
