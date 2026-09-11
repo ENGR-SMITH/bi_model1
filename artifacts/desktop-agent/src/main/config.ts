@@ -40,9 +40,12 @@ export interface AgentConfig {
 
 const DEFAULTS: AgentConfig = {
   apiBaseUrl: "http://localhost:3000",
-  // Local dev creators-den (replit.md: PORT=5175, BASE_PATH=/creators-den/).
-  // Production installs must set NEXET_WEB_URL to the deployed web app.
-  webAppUrl: "http://localhost:5175",
+  // The hosted Nexet web app. The sign-in link lands on its /agent-signin
+  // page, and Clerk only initialises on origins registered for the instance,
+  // so the shipped default must be the real domain rather than a dev server.
+  // Point NEXET_WEB_URL at the local creators-den
+  // (http://localhost:5175 — PORT=5175, BASE_PATH=/creators-den/) to develop.
+  webAppUrl: "https://nexet.co",
   // Clerk publishable key for the shared Nexet Clerk instance (novel-tortoise-61).
   // Publishable keys are public by design — the web apps embed the same one in
   // their client bundles — so it's safe to ship as the built-in default.

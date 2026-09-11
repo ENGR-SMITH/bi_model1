@@ -54,6 +54,7 @@ or set environment variables:
 | Config / env            | Meaning                                |
 | ----------------------- | -------------------------------------- |
 | `NEXET_API_URL`        | API base, no trailing slash. Default `http://localhost:3000` |
+| `NEXET_WEB_URL` / `webAppUrl` | Public origin of the Nexet web app whose `/agent-signin` page completes the sign-in. Default `https://nexet.co`; point it at your dev server locally. |
 | `NEXET_CLERK_PUBLISHABLE_KEY` | Your Clerk **publishable** key. |
 | `NEXET_AGENT_WORK_DIR` | Temp dir for staged uploads. |
 | `NEXET_UPDATE_URL` / `updateUrl` | Auto-update feed base URL (`latest.yml` / `latest-mac.yml` location). Overrides the publish URL baked in at build time. |
