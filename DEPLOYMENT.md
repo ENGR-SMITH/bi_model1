@@ -281,6 +281,13 @@ CF_R2_BUCKET=tandem-media
 CF_R2_ACCESS_KEY=...
 CF_R2_SECRET_KEY=...
 
+# Desktop-agent release feed — optional. The public base URL where the CI
+# workflow publishes latest.yml / latest-mac.yml next to the installers. Set
+# it and <origin>/desktop-agent/… redirects to that feed, which is the path
+# the agent's updater defaults to. Leave it unset and the path 404s instead
+# of answering with index.html.
+DESKTOP_AGENT_FEED_URL=https://pub-<hash>.r2.dev/desktop-agent
+
 # Upload staging — optional
 # Render's container filesystem is writable but ephemeral (reset on redeploy).
 # The worker restores originals from R2 after restarts, so the default
@@ -294,6 +301,13 @@ CF_R2_SECRET_KEY=...
 > The server **refuses to boot in production** without `CORS_ORIGINS`,
 > `ADMIN_EMAIL`, a strong `SESSION_SECRET`, and `CLERK_SECRET_KEY` — a bad
 > deploy fails loudly, not silently.
+>
+> `DESKTOP_AGENT_FEED_URL` is optional, and only matters if you ship the
+> desktop agent: installers are built per-OS on GitHub runners and published
+> to R2, so the container holds none. Setting it makes
+> `<origin>/desktop-agent/…` — the update URL the agent defaults to — serve
+> that feed, so installed agents update from the real domain rather than
+> reaching for a path the SPA fallback would answer with HTML.
 
 ### Phase 6 — Wire up the third parties
 
@@ -312,7 +326,8 @@ CF_R2_SECRET_KEY=...
    - Live keys only after business activation/KYC; test in the Whop sandbox first.
 3. **Cloudflare R2**: bucket + API token (Object Read & Write) → the four
    `CF_*` vars above. Public bucket URL → `VITE_AGENT_DOWNLOAD_URL` if you ship
-   the desktop agent.
+   the desktop agent, and the `/desktop-agent` prefix of it →
+   `DESKTOP_AGENT_FEED_URL` so the updater feed resolves on your domain.
 4. **DNS + domain**: see the Domain section below — register the domain,
    put DNS at Cloudflare, and add a `CNAME app →` your Render service URL, then
    add the custom domain in the Render dashboard.

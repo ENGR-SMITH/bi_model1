@@ -61,6 +61,11 @@ RUN mkdir -p /srv/nexet/root /srv/nexet/authors-den /srv/nexet/creators-den /srv
  && cp -r artifacts/oracle-admin/dist/public/.  /srv/nexet/oracle-admin/
 
 COPY artifacts/api-server/nginx.conf /etc/nginx/conf.d/default.conf
+# Default desktop-agent feed route, included by nginx.conf. entrypoint.sh
+# rewrites this file from DESKTOP_AGENT_FEED_URL at start-up; the default
+# keeps nginx loadable and hands the path to Node, which serves a locally
+# built dist-bundle when one exists.
+RUN printf 'location /desktop-agent/ { proxy_pass http://127.0.0.1:3000; }\n' > /etc/nginx/desktop-agent.conf
 COPY artifacts/api-server/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
