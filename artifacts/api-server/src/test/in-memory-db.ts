@@ -317,6 +317,25 @@ export const collaborationSeedsTable = sqliteTable("collaboration_seeds", {
 
 // Role watch alerts for the Author Den Arena. Mirrors
 // lib/db/src/schema/author-arena.ts.
+// The writing roles and their labels are values (not tables) that the Arena
+// routes import from @workspace/db. Mirrors lib/db/src/schema/author-arena.ts
+// so the in-memory mock exposes the same module surface as the real package.
+export const WRITER_ROLES = [
+  "CO_WRITER",
+  "EDITOR",
+  "BETA_READER",
+  "GHOSTWRITER",
+  "PROOFREADER",
+] as const;
+
+export const WRITER_ROLE_LABELS: Record<(typeof WRITER_ROLES)[number], string> = {
+  CO_WRITER: "Co-writer",
+  EDITOR: "Editor",
+  BETA_READER: "Beta reader",
+  GHOSTWRITER: "Ghostwriter",
+  PROOFREADER: "Proofreader",
+};
+
 export const collaborationArenaWatchesTable = sqliteTable(
   "collaboration_arena_watches",
   {
@@ -1451,5 +1470,5 @@ export async function buildInMemoryDb() {
     nexetArenaReviewsTable,
     nexetArenaBlocksTable,
   };
-  return { db, tables, exports: { db, ...tables } };
+  return { db, tables, exports: { db, ...tables, WRITER_ROLES, WRITER_ROLE_LABELS } };
 }
