@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useUser } from '@clerk/react';
 import { Link, useParams } from 'wouter';
 import { useCreateWaitlistEntry } from '@workspace/api-client-react';
-import { getNexetCategory } from '@/data/categories';
+import { getNexetCategory, nexetUpcomingCategories } from '@/data/categories';
 import AuthorsPage from '@/pages/authors';
 import ContentCreatorsPage from '@/pages/content-creators';
 import { TicketGate } from '@/components/ticket-gate';
@@ -104,6 +104,45 @@ export default function CategoryUnavailable() {
           )}
         </div>
       </div>
+
+      {/* Explore All is the doorway to the rooms still on the blueprint, so its
+          page lays those rooms out as cards instead of one vague waitlist. */}
+      {category.slug === 'explore' && (
+        <section className="reveal reveal-1 mt-20" data-testid="explore-upcoming-features">
+          <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+            <h2 className="max-w-[14ch] text-4xl font-extrabold leading-[.95] tracking-[-0.05em] text-white sm:text-5xl">The rooms behind this door.</h2>
+            <p className="max-w-[24rem] text-sm leading-relaxed text-zinc-400">Each one is a separate room on the blueprint. Open a card to hold your place in line for it.</p>
+          </div>
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {nexetUpcomingCategories.map((upcoming) => {
+              const UpcomingIcon = upcoming.icon;
+              return (
+                <Link
+                  key={upcoming.slug}
+                  href={`/categories/${upcoming.slug}`}
+                  className="focus-house group relative flex min-h-[220px] flex-col justify-between overflow-hidden rounded-2xl border border-white/10 card-surface card-surface-hover p-6 transition-all hover:-translate-y-1 hover:border-white/20"
+                  data-testid={`card-explore-upcoming-${upcoming.slug}`}
+                >
+                  <span className="card-spot" />
+                  <span className="card-shine" />
+                  <div className="relative flex items-center justify-between">
+                    <span className="icon-chip h-12 w-12 text-zinc-300">
+                      <UpcomingIcon className="h-6 w-6" />
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 font-mono-ui text-[9px] uppercase tracking-[0.13em] text-zinc-400">
+                      Coming soon
+                    </span>
+                  </div>
+                  <div className="relative mt-8">
+                    <h3 className="max-w-[14ch] text-xl font-bold leading-[1.05] tracking-[-0.03em] text-zinc-100">{upcoming.name}</h3>
+                    <p className="mt-3 text-sm leading-relaxed text-zinc-500">{upcoming.description}</p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
