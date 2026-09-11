@@ -23,8 +23,15 @@ ENV NODE_ENV=production
 # into the image; secret keys only need to exist at runtime.
 ARG VITE_CLERK_PUBLISHABLE_KEY
 ARG CLERK_PUBLISHABLE_KEY
+# Public URL of the packaged desktop agent. Vite inlines VITE_* vars at build
+# time, and .dockerignore strips per-app .env files, so the "Desktop agent for
+# large files" button only appears if this ARG is declared here AND the value is
+# set on the Render service. Optional: leave it empty and the button stays
+# hidden (vault.tsx / content-creators.tsx guard on the value).
+ARG VITE_AGENT_DOWNLOAD_URL
 ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY \
-    CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY
+    CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY \
+    VITE_AGENT_DOWNLOAD_URL=$VITE_AGENT_DOWNLOAD_URL
 
 # Fail fast: a build without Clerk keys produces apps that cannot sign in.
 RUN test -n "$VITE_CLERK_PUBLISHABLE_KEY" && test -n "$CLERK_PUBLISHABLE_KEY" \
