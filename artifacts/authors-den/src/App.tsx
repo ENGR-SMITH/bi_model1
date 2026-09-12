@@ -205,7 +205,7 @@ function App() {
   const [mobileNav, setMobileNav] = useState(false);
   // The rail starts collapsed; hovering the sidebar auto-expands it.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const [theme, setTheme] = useState(() => localStorage.getItem("authors-den-theme") ?? "light");
+  const [theme, setTheme] = useState(() => localStorage.getItem("authors-den-theme") ?? "dark");
   const [modal, setModal] = useState<"project" | "import" | "help" | "tutorial" | null>(null);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialOpen, setTutorialOpen] = useState(false);
