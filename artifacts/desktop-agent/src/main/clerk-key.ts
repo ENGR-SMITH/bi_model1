@@ -1,6 +1,6 @@
 // Derives the Clerk Frontend API origin from a publishable key.
 //
-// Clerk publishable keys are `pk_test_<base64url>` where the payload encodes
+// Clerk publishable keys are `pk_test_<base64url>` / `pk_live_<base64url>` where the payload encodes
 // the Frontend API domain. This mirrors Clerk's own `parsePublishableKey`
 // (we keep it dependency-free so the desktop agent has no Clerk JS at runtime).
 export interface ParsedPublishableKey {

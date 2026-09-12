@@ -941,7 +941,7 @@ async function checkConfig() {
     if (!st.clerkConfigured) {
       setAuthNote(
         "Clerk publishable key is not configured. Create nexet-agent.json next to the app " +
-          "with { \"clerkPublishableKey\": \"pk_test_...\" } (or set NEXET_CLERK_PUBLISHABLE_KEY) " +
+          "with { \"clerkPublishableKey\": \"pk_live_...\" } (or set NEXET_CLERK_PUBLISHABLE_KEY) " +
           "and relaunch before signing in.",
         "err",
       );

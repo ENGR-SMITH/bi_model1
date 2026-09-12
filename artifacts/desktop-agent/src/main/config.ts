@@ -70,11 +70,13 @@ const DEFAULTS: AgentConfig = {
   // Point NEXET_WEB_URL at the local creators-den
   // (http://localhost:5175 — PORT=5175, BASE_PATH=/creators-den/) to develop.
   webAppUrl: "https://nexet.co",
-  // Clerk publishable key for the shared Nexet Clerk instance (novel-tortoise-61).
-  // Publishable keys are public by design — the web apps embed the same one in
-  // their client bundles — so it's safe to ship as the built-in default.
-  // Override per-machine with NEXET_CLERK_PUBLISHABLE_KEY or a config file.
-  clerkPublishableKey: "pk_test_bm92ZWwtdG9ydG9pc2UtNjEuY2xlcmsuYWNjb3VudHMuZGV2JA",
+  // Clerk publishable key for the production Nexet instance, whose Frontend API
+  // is the custom domain `clerk.nexet.co` (the live pk_live_ key, matching the
+  // one baked into the deployed web apps). Publishable keys are public by
+  // design — the web apps embed the same one in their client bundles — so it is
+  // safe to ship as the built-in default. Override per-machine with
+  // NEXET_CLERK_PUBLISHABLE_KEY or a config file.
+  clerkPublishableKey: "pk_live_Y2xlcmsubmV4ZXQuY28k",
   ffmpegPath: "",
   workDir: path.join(os.homedir(), ".nexet-agent", "work"),
   updateUrl: "",

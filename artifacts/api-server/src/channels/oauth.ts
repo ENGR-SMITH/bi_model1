@@ -38,24 +38,53 @@ const SCOPES = [
 
 export const OAUTH_SCOPE = SCOPES;
 
+/**
+ * Reads an env var and strips a stray surrounding quote or whitespace. Deploy
+ * dashboards routinely carry one of those when a value is pasted in, and Google
+ * compares the redirect URI byte-for-byte — so `"https://…/callback "` turns a
+ * correctly registered URI into redirect_uri_mismatch.
+ */
+function oauthEnv(name: string): string {
+  return (process.env[name] ?? "").trim().replace(/^["']|["']$/g, "");
+}
+
 /** The registered redirect URI: explicit env override, else derived from the web origin. */
 export function oauthRedirectUri(): string {
-  if (process.env.YOUTUBE_REDIRECT_URI) return process.env.YOUTUBE_REDIRECT_URI;
-  const origin = (process.env.NEXET_WEB_URL ?? "http://localhost:5175").replace(/\/+$/, "");
+  const explicit = oauthEnv("YOUTUBE_REDIRECT_URI");
+  if (explicit) return explicit;
+  // `||`, not `??`: a var that Render set to an empty string must still fall
+  // back, or the derived URI becomes a *relative* path Google can never match.
+  const origin = (oauthEnv("NEXET_WEB_URL") || "http://localhost:5175").replace(/\/+$/, "");
   return `${origin}/creators-den/channels/oauth/callback`;
 }
 
 function oauthClientId(): string {
-  return process.env.YOUTUBE_OAUTH_CLIENT_ID ?? "";
+  return oauthEnv("YOUTUBE_OAUTH_CLIENT_ID");
 }
 
 function oauthClientSecret(): string {
-  return process.env.YOUTUBE_OAUTH_CLIENT_SECRET ?? "";
+  return oauthEnv("YOUTUBE_OAUTH_CLIENT_SECRET");
 }
 
 /** True when Google OAuth credentials are configured (the connect flow works). */
 export function oauthConfigured(): boolean {
   return Boolean(oauthClientId() && oauthClientSecret());
+}
+
+/**
+ * True when a redirect URI points at a local dev origin. Google matches the
+ * redirect URI byte-for-byte against the Authorized redirect URIs registered on
+ * the OAuth client, so a production deploy that still derives the localhost
+ * default only ever gets an opaque "Error 400: redirect_uri_mismatch" page
+ * from Google — with nothing telling the operator which value to register.
+ */
+export function isLoopbackRedirectUri(uri: string): boolean {
+  try {
+    const { hostname } = new URL(uri);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +195,20 @@ export async function startChannelOauth(
     return { error: "YouTube OAuth is not configured on this server yet (missing YOUTUBE_OAUTH_CLIENT_ID / YOUTUBE_OAUTH_CLIENT_SECRET)." };
   }
 
+  const redirectUri = oauthRedirectUri();
+  // Refuse to send Google a redirect URI it can never have registered. The
+  // default is derived from NEXET_WEB_URL; when that is unset on a production
+  // host it silently falls back to the localhost dev origin, and Google answers
+  // with "Error 400: redirect_uri_mismatch" before the user can consent.
+  if (process.env.NODE_ENV === "production" && isLoopbackRedirectUri(redirectUri)) {
+    return {
+      error:
+        `YouTube linking is misconfigured on this server: the OAuth redirect URI resolves to ${redirectUri}. ` +
+        "Set NEXET_WEB_URL to this deployment's public origin (or set YOUTUBE_REDIRECT_URI directly), " +
+        "then register that exact URI as an Authorized redirect URI on the Google OAuth client.",
+    };
+  }
+
   const [channel] = await db
     .select()
     .from(nexetChannelsTable)
@@ -198,7 +241,7 @@ export async function startChannelOauth(
 
   const params = new URLSearchParams({
     client_id: oauthClientId(),
-    redirect_uri: oauthRedirectUri(),
+    redirect_uri: redirectUri,
     response_type: "code",
     scope: SCOPES,
     access_type: "offline",
