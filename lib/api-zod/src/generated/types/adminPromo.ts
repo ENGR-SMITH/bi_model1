@@ -5,10 +5,13 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { AdminPromoCategory } from './adminPromoCategory';
 import type { AdminPromoKind } from './adminPromoKind';
 
 export interface AdminPromo {
   code: string;
+  /** @nullable */
+  category: AdminPromoCategory;
   kind: AdminPromoKind;
   value: number;
   maxUses: number;

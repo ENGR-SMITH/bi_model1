@@ -611,8 +611,17 @@ export interface TicketStatus {
   tickets: TicketPass[];
 }
 
+export type TicketPromoValidateInputCategory = typeof TicketPromoValidateInputCategory[keyof typeof TicketPromoValidateInputCategory];
+
+
+export const TicketPromoValidateInputCategory = {
+  authors: 'authors',
+  'content-creators': 'content-creators',
+} as const;
+
 export interface TicketPromoValidateInput {
   code: string;
+  category: TicketPromoValidateInputCategory;
 }
 
 /**
@@ -772,6 +781,17 @@ export interface ProviderUpdate {
   priority: number;
 }
 
+/**
+ * @nullable
+ */
+export type AdminPromoCategory = typeof AdminPromoCategory[keyof typeof AdminPromoCategory] | null;
+
+
+export const AdminPromoCategory = {
+  authors: 'authors',
+  'content-creators': 'content-creators',
+} as const;
+
 export type AdminPromoKind = typeof AdminPromoKind[keyof typeof AdminPromoKind];
 
 
@@ -783,6 +803,8 @@ export const AdminPromoKind = {
 
 export interface AdminPromo {
   code: string;
+  /** @nullable */
+  category: AdminPromoCategory;
   kind: AdminPromoKind;
   value: number;
   maxUses: number;
@@ -793,6 +815,14 @@ export interface AdminPromo {
   createdAt: string;
 }
 
+export type AdminPromoInputCategory = typeof AdminPromoInputCategory[keyof typeof AdminPromoInputCategory];
+
+
+export const AdminPromoInputCategory = {
+  authors: 'authors',
+  'content-creators': 'content-creators',
+} as const;
+
 export type AdminPromoInputKind = typeof AdminPromoInputKind[keyof typeof AdminPromoInputKind];
 
 
@@ -801,16 +831,25 @@ export const AdminPromoInputKind = {
 } as const;
 
 /**
- * Create a promo code. New codes must be FREE — percent and dollar-off codes don't apply to monthly subscriptions.
+ * Create a promo code dedicated to one category pass. New codes must be FREE and must name the category they apply to.
  */
 export interface AdminPromoInput {
   code: string;
+  category: AdminPromoInputCategory;
   kind: AdminPromoInputKind;
   value: number;
   maxUses: number;
   /** @nullable */
   expiresAt?: string | null;
 }
+
+export type AdminPromoUpdateCategory = typeof AdminPromoUpdateCategory[keyof typeof AdminPromoUpdateCategory];
+
+
+export const AdminPromoUpdateCategory = {
+  authors: 'authors',
+  'content-creators': 'content-creators',
+} as const;
 
 export type AdminPromoUpdateKind = typeof AdminPromoUpdateKind[keyof typeof AdminPromoUpdateKind];
 
@@ -825,6 +864,7 @@ export const AdminPromoUpdateKind = {
  * Update a promo code. Only FREE is accepted for new kinds; legacy PERCENT/FLAT rows keep theirs.
  */
 export interface AdminPromoUpdate {
+  category?: AdminPromoUpdateCategory;
   kind: AdminPromoUpdateKind;
   value: number;
   maxUses: number;

@@ -5,13 +5,15 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { AdminPromoInputCategory } from './adminPromoInputCategory';
 import type { AdminPromoInputKind } from './adminPromoInputKind';
 
 /**
- * Create a promo code. New codes must be FREE — percent and dollar-off codes don't apply to monthly subscriptions.
+ * Create a promo code dedicated to one category pass. New codes must be FREE and must name the category they apply to.
  */
 export interface AdminPromoInput {
   code: string;
+  category: AdminPromoInputCategory;
   kind: AdminPromoInputKind;
   value: number;
   maxUses: number;

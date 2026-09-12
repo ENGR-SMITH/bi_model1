@@ -335,6 +335,7 @@ describe("POST /api/whop/checkout", () => {
     state.userId = "user-1";
     await state.db.insert(state.tables.nexetPromoCodesTable).values({
       code: "SAVE20",
+      category: "authors",
       kind: "PERCENT",
       value: 20,
       maxUses: 0,
@@ -353,6 +354,7 @@ describe("POST /api/whop/checkout", () => {
     state.userId = "user-1";
     await state.db.insert(state.tables.nexetPromoCodesTable).values({
       code: "FREEBIE",
+      category: "authors",
       kind: "FREE",
       value: 0,
       maxUses: 1,
@@ -376,6 +378,29 @@ describe("POST /api/whop/checkout", () => {
     expect(subs[0].whopMembershipId).toBeNull();
     const [promo] = await state.db.select().from(state.tables.nexetPromoCodesTable);
     expect(promo.uses).toBe(1);
+  });
+
+  it("refuses a promo code on a storage plan and on a project plan", async () => {
+    state.userId = "user-1";
+    await state.db.insert(state.tables.nexetPromoCodesTable).values({
+      code: "FREESPACE",
+      category: "authors",
+      kind: "FREE",
+      value: 0,
+      maxUses: 0,
+      uses: 0,
+    });
+
+    // Coupons live on the category pass cards only — the storage/project
+    // checkouts reject one rather than quietly ignoring it.
+    for (const [kind, planId] of [["storage", "g200"], ["projects", "p10"]] as const) {
+      const res = await request(API)
+        .post("/api/whop/checkout")
+        .send({ kind, planId, promoCode: "FREESPACE" });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/passes only/i);
+    }
+    expect(state.whopCalls.some((call) => call.url.endsWith("/checkout_configurations"))).toBe(false);
   });
 
   it("rolls the intent back when Whop cannot open the checkout", async () => {

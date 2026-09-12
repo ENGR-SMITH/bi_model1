@@ -9,7 +9,7 @@ import {
   unknownProductMessage,
   type SubscriptionKind,
 } from "../video/subscriptions";
-import { luhnValid, expiryValid, resolvePromo } from "./tickets";
+import { luhnValid, expiryValid, resolvePromo, type TicketCategory } from "./tickets";
 
 const router: IRouter = Router();
 
@@ -131,8 +131,18 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
     return;
   }
 
-  const promo = await resolvePromo(promoCode, priceUsd, userId);
-  if (promoCode?.trim() && !promo) {
+  // Promo codes belong to the category pass cards only — the storage and
+  // project checkouts reject one rather than quietly ignoring it, so a
+  // customer is never left believing a discount applied.
+  if (kind !== "pass" && promoCode?.trim()) {
+    res.status(400).json({ error: "Promo codes apply to category passes only." });
+    return;
+  }
+  const promo =
+    kind === "pass"
+      ? await resolvePromo(promoCode, priceUsd, userId, planId as TicketCategory)
+      : null;
+  if (kind === "pass" && promoCode?.trim() && !promo) {
     res.status(400).json({ error: "That promo code is not valid" });
     return;
   }

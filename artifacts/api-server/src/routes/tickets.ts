@@ -76,7 +76,8 @@ export async function promoRedeemedByUser(code: string, userId: string): Promise
 export async function resolvePromo(
   raw: string | undefined,
   priceUsd: number,
-  userId?: string | null,
+  userId: string | null | undefined,
+  category: TicketCategory,
 ): Promise<ResolvedPromo | null> {
   if (!raw || !raw.trim()) return null;
   const code = raw.trim().toUpperCase();
@@ -86,6 +87,10 @@ export async function resolvePromo(
     .where(eq(nexetPromoCodesTable.code, code))
     .limit(1);
   if (!promo) return null;
+  // A code is dedicated to one category: it only ever pays for that pass.
+  // Legacy rows with no category stay usable everywhere, so a campaign that
+  // predates scoping is not silently killed.
+  if (promo.category && promo.category !== category) return null;
   // Paused by an admin — keep the row, stop accepting it.
   if (promo.active === false) return null;
   if (promo.expiresAt && promo.expiresAt.getTime() < Date.now()) return null;
@@ -280,8 +285,19 @@ router.post("/tickets/promo/validate", async (req: Request, res: Response): Prom
     res.status(400).json({ error: "A promo code is required" });
     return;
   }
+  // A code belongs to one category, so the check needs to know which pass it
+  // is being spent on before it can say whether it is valid.
+  if (!TICKET_CATEGORIES.includes(body.data.category as TicketCategory)) {
+    res.status(400).json({ error: "A category is required" });
+    return;
+  }
 
-  const promo = await resolvePromo(body.data.code, PASS_PRICE_USD, userId);
+  const promo = await resolvePromo(
+    body.data.code,
+    PASS_PRICE_USD,
+    userId,
+    body.data.category as TicketCategory,
+  );
   if (!promo) {
     res.json(
       ValidateTicketPromoResponse.parse({
@@ -348,7 +364,12 @@ router.post("/tickets/purchase", async (req: Request, res: Response): Promise<vo
     return;
   }
 
-  const promo = await resolvePromo(body.data.promoCode ?? undefined, PASS_PRICE_USD, userId);
+  const promo = await resolvePromo(
+    body.data.promoCode ?? undefined,
+    PASS_PRICE_USD,
+    userId,
+    category as TicketCategory,
+  );
   if ((body.data.promoCode ?? "").trim() && !promo) {
     res.status(400).json({ error: "That promo code is not valid" });
     return;

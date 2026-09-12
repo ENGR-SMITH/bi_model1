@@ -189,13 +189,15 @@ describe("admin promo codes", () => {
     expect(empty.status).toBe(200);
     expect(empty.body).toEqual([]);
 
-    // Create — the code is normalized to uppercase and is FREE-only.
+    // Create — the code is normalized to uppercase, is FREE-only, and is
+    // dedicated to the one category it was created for.
     const created = await request(API)
       .post("/api/admin/promos")
       .set("Cookie", cookie)
-      .send({ code: "halfpass", kind: "FREE", value: 0, maxUses: 0 });
+      .send({ code: "halfpass", category: "authors", kind: "FREE", value: 0, maxUses: 0 });
     expect(created.status).toBe(201);
     expect(created.body.code).toBe("HALFPASS");
+    expect(created.body.category).toBe("authors");
     expect(created.body.kind).toBe("FREE");
     expect(created.body.uses).toBe(0);
     expect(created.body.active).toBe(true);
@@ -205,19 +207,31 @@ describe("admin promo codes", () => {
     const percent = await request(API)
       .post("/api/admin/promos")
       .set("Cookie", cookie)
-      .send({ code: "SAVE20", kind: "PERCENT", value: 20, maxUses: 0 });
+      .send({ code: "SAVE20", category: "authors", kind: "PERCENT", value: 20, maxUses: 0 });
     expect(percent.status).toBe(400);
     const flat = await request(API)
       .post("/api/admin/promos")
       .set("Cookie", cookie)
-      .send({ code: "SAVE2", kind: "FLAT", value: 200, maxUses: 0 });
+      .send({ code: "SAVE2", category: "authors", kind: "FLAT", value: 200, maxUses: 0 });
     expect(flat.status).toBe(400);
+
+    // A code must say which category pass it belongs to.
+    const noCategory = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ code: "NOCAT", kind: "FREE", value: 0, maxUses: 0 });
+    expect(noCategory.status).toBe(400);
+    const bogusCategory = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ code: "BADCAT", category: "storage", kind: "FREE", value: 0, maxUses: 0 });
+    expect(bogusCategory.status).toBe(400);
 
     // Duplicate code → 409.
     const dup = await request(API)
       .post("/api/admin/promos")
       .set("Cookie", cookie)
-      .send({ code: "HALFPASS", kind: "FREE", value: 0, maxUses: 1 });
+      .send({ code: "HALFPASS", category: "authors", kind: "FREE", value: 0, maxUses: 1 });
     expect(dup.status).toBe(409);
 
     // Update — max uses and pause/resume still work; kind stays FREE.
@@ -236,14 +250,39 @@ describe("admin promo codes", () => {
       .send({ kind: "PERCENT", value: 25, maxUses: 5 });
     expect(converted.status).toBe(400);
 
-    // The checkout sees the updated code (valid + free).
+    // The pass card sees the updated code — valid and free on its own
+    // category, refused on the other one.
     state.userId = "user-1";
     const validated = await request(API)
       .post("/api/tickets/promo/validate")
-      .send({ code: "HALFPASS" });
+      .send({ code: "HALFPASS", category: "authors" });
     expect(validated.body.valid).toBe(true);
     expect(validated.body.kind).toBe("FREE");
     expect(validated.body.discountedPriceUsd).toBe(0);
+
+    const wrongPass = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "HALFPASS", category: "content-creators" });
+    expect(wrongPass.body.valid).toBe(false);
+
+    // An admin can re-scope a code to the other pass.
+    signInAsAdmin();
+    const rescoped = await request(API)
+      .patch("/api/admin/promos/HALFPASS")
+      .set("Cookie", cookie)
+      .send({ category: "content-creators", kind: "FREE", value: 0, maxUses: 5 });
+    expect(rescoped.status).toBe(200);
+    expect(rescoped.body.category).toBe("content-creators");
+    const afterRescope = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "HALFPASS", category: "content-creators" });
+    expect(afterRescope.body.valid).toBe(true);
+    // Put it back so the later assertions read the same row.
+    signInAsAdmin();
+    await request(API)
+      .patch("/api/admin/promos/HALFPASS")
+      .set("Cookie", cookie)
+      .send({ category: "authors", kind: "FREE", value: 0, maxUses: 5 });
 
     // List reflects the row.
     signInAsAdmin();
@@ -259,7 +298,9 @@ describe("admin promo codes", () => {
     expect(paused.status).toBe(200);
     expect(paused.body.active).toBe(false);
     state.userId = "user-2";
-    const pausedCheck = await request(API).post("/api/tickets/promo/validate").send({ code: "HALFPASS" });
+    const pausedCheck = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "HALFPASS", category: "authors" });
     expect(pausedCheck.body.valid).toBe(false);
 
     // Resume — valid again.
@@ -270,7 +311,9 @@ describe("admin promo codes", () => {
       .send({ kind: "FREE", value: 0, maxUses: 5, active: true });
     expect(resumed.status).toBe(200);
     expect(resumed.body.active).toBe(true);
-    const resumedCheck = await request(API).post("/api/tickets/promo/validate").send({ code: "HALFPASS" });
+    const resumedCheck = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "HALFPASS", category: "authors" });
     expect(resumedCheck.body.valid).toBe(true);
 
     // Delete.
@@ -288,7 +331,7 @@ describe("admin promo codes", () => {
     const badKind = await request(API)
       .post("/api/admin/promos")
       .set("Cookie", cookie)
-      .send({ code: "X", kind: "BOGUS", value: 10, maxUses: 0 });
+      .send({ code: "X", category: "authors", kind: "BOGUS", value: 10, maxUses: 0 });
     expect(badKind.status).toBe(400);
 
     const missing = await request(API)
