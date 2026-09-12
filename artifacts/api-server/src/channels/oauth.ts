@@ -13,7 +13,7 @@ import { channelMembership } from "../routes/channels";
 // YouTube channel OAuth (Phase 2). A channel owner connects the workspace to
 // their real YouTube channel through Google's OAuth consent screen:
 //
-//   start()     → PKCE consent URL (state stored in memory, 10 min TTL)
+//   start()     → PKCE consent URL (self-contained signed state, 10 min TTL)
 //   exchange()  → code → Google token endpoint → YouTube channel lookup
 //                 (mine=true) → encrypted token vault + CONNECTED branding
 //   getToken()  → decrypts the vault, refreshes the access token when near
@@ -87,48 +87,93 @@ export function isLoopbackRedirectUri(uri: string): boolean {
   }
 }
 
+/**
+ * Best-effort read of Google's OAuth error body (`{"error":"invalid_grant",
+ * "error_description":"…"}`). Google answers a failed token exchange with JSON,
+ * but other paths can return HTML, so this never throws — a missing detail
+ * degrades to the status code rather than masking the failure.
+ */
+async function googleErrorDetail(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    if (!text) return `HTTP ${response.status}`;
+    try {
+      const parsed = JSON.parse(text) as { error?: unknown; error_description?: unknown };
+      const code = typeof parsed.error === "string" ? parsed.error : null;
+      const description = typeof parsed.error_description === "string" ? parsed.error_description : null;
+      if (code && description) return `${code} (${description})`;
+      if (code) return code;
+    } catch {
+      // Not JSON — fall through to a snippet of whatever came back.
+    }
+    return text.slice(0, 200);
+  } catch {
+    return `HTTP ${response.status}`;
+  }
+}
+
 // ---------------------------------------------------------------------------
-// Pending connect state: `state` is a signed token bound to {channelId,
-// verifier}; the verifier itself never leaves the server (PKCE best practice
-// with a client-exchange flow — the callback page only ever sees `state`).
+// Connect state.
+//
+// `state` carries everything the exchange needs — the channel, the account
+// that started the link, and the PKCE verifier — sealed with AES-256-GCM. It
+// is deliberately NOT held in this process's memory: the consent screen can
+// take minutes, and the callback may land on a different instance, or on this
+// one after a deploy or a spin-down. An in-memory Map made every one of those
+// routine events fail with "this link request expired" and no way to tell why.
+//
+// The shape is `<readable payload>.<sealed>`: the payload is the base64url
+// JSON the callback page decodes to learn which channel to land on, and the
+// sealed half is what the server trusts. The two must agree on the channel or
+// the state is rejected, so the readable half can't be tampered with.
 // ---------------------------------------------------------------------------
 
-interface PendingConnect {
+const PENDING_TTL_MS = 10 * 60 * 1000;
+
+interface ConnectState {
   channelId: string;
   // Who started the link (the pending owner). A channel-less Google-first
   // start is bound to the starter, and only they may complete the exchange.
   userId: string;
   codeVerifier: string;
-  expiresAt: number;
+  exp: number;
 }
 
-const pending = new Map<string, PendingConnect>();
-const PENDING_TTL_MS = 10 * 60 * 1000;
-
-function signState(channelId: string): string {
-  const payload = Buffer.from(JSON.stringify({ channelId, exp: Date.now() + PENDING_TTL_MS })).toString("base64url");
-  const secret = process.env.SESSION_SECRET ?? "manuskript-development-key";
-  const digest = crypto.createHmac("sha256", secret).update(payload).digest("base64url");
-  return `${payload}.${digest}`;
+/** Seal {channelId, userId, verifier, exp} into a state token. */
+export function createConnectState(channelId: string, userId: string, codeVerifier: string): string {
+  const exp = Date.now() + PENDING_TTL_MS;
+  const payload = Buffer.from(JSON.stringify({ channelId, exp })).toString("base64url");
+  const sealed = encryptSecret(JSON.stringify({ channelId, userId, codeVerifier, exp } satisfies ConnectState));
+  return `${payload}.${sealed}`;
 }
 
-function verifyState(state: string): { channelId: string } | null {
-  const [payload, digest] = state.split(".");
-  if (!payload || !digest) return null;
-  const secret = process.env.SESSION_SECRET ?? "manuskript-development-key";
-  const expected = Buffer.from(crypto.createHmac("sha256", secret).update(payload).digest("base64url"));
-  // timingSafeEqual throws on length mismatch — a forged state fails the
-  // length check just as hard as a bad digest.
-  if (Buffer.from(digest).length !== expected.length) return null;
-  if (!crypto.timingSafeEqual(Buffer.from(digest), expected)) return null;
+/** Read a state token back, or null when it is forged, tampered with, or stale. */
+export function readConnectState(state: string): ConnectState | null {
+  const dot = state.indexOf(".");
+  if (dot <= 0) return null;
+  const payload = state.slice(0, dot);
+  // AES-GCM authenticates the ciphertext, so a forged or truncated token
+  // throws here rather than yielding attacker-controlled fields.
+  let parsed: ConnectState;
   try {
-    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { channelId?: string; exp?: number };
-    if (typeof parsed.channelId !== "string" || typeof parsed.exp !== "number") return null;
-    if (parsed.exp < Date.now()) return null;
-    return { channelId: parsed.channelId };
+    parsed = JSON.parse(decryptSecret(state.slice(dot + 1))) as ConnectState;
   } catch {
     return null;
   }
+  const { channelId, userId, codeVerifier, exp } = parsed ?? {};
+  if (typeof channelId !== "string" || typeof userId !== "string" || typeof codeVerifier !== "string") {
+    return null;
+  }
+  if (typeof exp !== "number" || exp < Date.now()) return null;
+  // The readable half only chooses where the user lands; it must match the
+  // sealed copy or the link was edited in the address bar.
+  try {
+    const visible = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { channelId?: unknown };
+    if (visible.channelId !== channelId) return null;
+  } catch {
+    return null;
+  }
+  return { channelId, userId, codeVerifier, exp };
 }
 
 function newCodeVerifier(): string {
@@ -231,13 +276,7 @@ export async function startChannelOauth(
   }
 
   const codeVerifier = newCodeVerifier();
-  const state = signState(channelId);
-  pending.set(state, {
-    channelId,
-    userId,
-    codeVerifier,
-    expiresAt: Date.now() + PENDING_TTL_MS,
-  });
+  const state = createConnectState(channelId, userId, codeVerifier);
 
   const params = new URLSearchParams({
     client_id: oauthClientId(),
@@ -267,18 +306,14 @@ export async function exchangeChannelOauth(
   code: string,
   userId: string,
 ): Promise<void> {
-  const signed = verifyState(state);
+  const signed = readConnectState(state);
   if (!signed || signed.channelId !== channelId) {
     throw new Error("This link request expired — start over from the channel card");
   }
-  const entry = pending.get(state);
-  if (!entry || entry.channelId !== channelId || entry.expiresAt < Date.now()) {
-    throw new Error("This link request expired — start over from the channel card");
-  }
-  if (entry.userId !== userId) {
+  if (signed.userId !== userId) {
     throw new Error("This link request belongs to another account — start it again from your channels");
   }
-  pending.delete(state);
+  const codeVerifier = signed.codeVerifier;
 
   if (!oauthConfigured()) {
     throw new Error("YouTube OAuth is not configured on this server yet");
@@ -300,13 +335,20 @@ export async function exchangeChannelOauth(
       client_id: oauthClientId(),
       client_secret: oauthClientSecret(),
       code,
-      code_verifier: entry.codeVerifier,
+      code_verifier: codeVerifier,
       grant_type: "authorization_code",
       redirect_uri: oauthRedirectUri(),
     }),
   });
   if (!tokenResponse.ok) {
-    throw new Error("Google rejected the link — the request may have expired, try again");
+    // Google's own reason (invalid_grant, redirect_uri_mismatch,
+    // invalid_client, …) is the single most useful thing to report here —
+    // without it every failure reads the same.
+    const detail = await googleErrorDetail(tokenResponse);
+    throw new Error(
+      `Google rejected the link${detail ? ` — ${detail}` : ""}. ` +
+        "The authorization code may have expired or already been used; start again from the channel card.",
+    );
   }
   const token = (await tokenResponse.json()) as {
     access_token?: string;

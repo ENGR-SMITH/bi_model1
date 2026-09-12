@@ -177,6 +177,7 @@ export const CheckAdminProviderResponse = zod.object({
  */
 export const ListAdminPromosResponseItem = zod.object({
   "code": zod.string(),
+  "category": zod.union([zod.literal('authors'),zod.literal('content-creators'),zod.literal(null)]).nullable(),
   "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
@@ -193,14 +194,16 @@ export const ListAdminPromosResponse = zod.array(ListAdminPromosResponseItem)
  */
 export const CreateAdminPromoBody = zod.object({
   "code": zod.string(),
+  "category": zod.enum(['authors', 'content-creators']),
   "kind": zod.enum(['FREE']),
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
   "expiresAt": zod.coerce.date().nullish()
-}).describe('Create a promo code. New codes must be FREE — percent and dollar-off codes don\'t apply to monthly subscriptions.')
+}).describe('Create a promo code dedicated to one category pass. New codes must be FREE and must name the category they apply to.')
 
 export const CreateAdminPromoResponse = zod.object({
   "code": zod.string(),
+  "category": zod.union([zod.literal('authors'),zod.literal('content-creators'),zod.literal(null)]).nullable(),
   "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
@@ -219,6 +222,7 @@ export const UpdateAdminPromoParams = zod.object({
 })
 
 export const UpdateAdminPromoBody = zod.object({
+  "category": zod.enum(['authors', 'content-creators']).optional(),
   "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
@@ -228,6 +232,7 @@ export const UpdateAdminPromoBody = zod.object({
 
 export const UpdateAdminPromoResponse = zod.object({
   "code": zod.string(),
+  "category": zod.union([zod.literal('authors'),zod.literal('content-creators'),zod.literal(null)]).nullable(),
   "kind": zod.enum(['FREE', 'PERCENT', 'FLAT']),
   "value": zod.number().int(),
   "maxUses": zod.number().int(),
@@ -2080,7 +2085,8 @@ export const GetTicketStatusResponse = zod.object({
  * @summary Validate a promo code for the ticket checkout
  */
 export const ValidateTicketPromoBody = zod.object({
-  "code": zod.string()
+  "code": zod.string(),
+  "category": zod.enum(['authors', 'content-creators'])
 })
 
 export const ValidateTicketPromoResponse = zod.object({

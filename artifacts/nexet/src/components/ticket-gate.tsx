@@ -8,6 +8,7 @@ import {
   useCreateWhopCheckout,
   useGetTicketStatus,
   useTicketCategoryAccess,
+  useValidateTicketPromo,
 } from '@workspace/api-client-react';
 import { PaymentLoadingOverlay } from './payment-loading';
 
@@ -240,19 +241,61 @@ function FreePreviewStrip({
   );
 }
 
-function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; onPurchased: () => void }) {
+function PassCoupon({ slug, name, onPurchased }: { slug: 'authors' | 'content-creators'; name: string; onPurchased: () => void }) {
   const queryClient = useQueryClient();
   const status = useGetTicketStatus();
   const priceUsd = status.data?.priceUsd ?? 588;
   const months = status.data?.months ?? 1;
 
   const [promoInput, setPromoInput] = useState('');
+  // A code has to be verified before it can be spent. The discount shown and
+  // the code handed to checkout both come from this result — never from the
+  // raw input — so the Pay button is no longer the thing that validates it.
+  const [promoCheck, setPromoCheck] = useState<{ code: string; label: string | null; total: number | null } | null>(null);
+  const [promoError, setPromoError] = useState('');
   const [stamp, setStamp] = useState<{ expiresAt: string; total: number; cardLast4: string | null; promoCode: string | null } | null>(null);
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
   // The coupon is a paywall, so dismissing it must not strand the visitor on a
   // dimmed room with no way back — `dismissed` swaps it for a reopen button.
   const [dismissed, setDismissed] = useState(false);
+
+  const verifiedCode = promoCheck?.code ?? null;
+  // Typing a code without verifying it keeps payment locked, so the promo
+  // field can never double as an implicit submit for the checkout.
+  const awaitingPromoCheck = promoInput.trim().length > 0 && !promoCheck;
+  const payableUsd = promoCheck?.total ?? priceUsd;
+
+  // The code is checked against THIS category — a Content Creators code is
+  // rejected on the Authors pass, which is the whole point of scoping them.
+  const validatePromo = useValidateTicketPromo({
+    mutation: {
+      onSuccess: (res) => {
+        if (!res.valid) {
+          setPromoCheck(null);
+          setPromoError(`“${promoInput.trim()}” isn't valid for the ${name} pass.`);
+          return;
+        }
+        setPromoError('');
+        setPromoCheck({ code: res.code, label: res.label ?? null, total: res.discountedPriceUsd ?? null });
+      },
+      onError: (e: unknown) => {
+        const err = e as { response?: { data?: { error?: string } }; message?: string } | null;
+        setPromoCheck(null);
+        setPromoError(err?.response?.data?.error || err?.message || 'That code could not be checked. Please try again.');
+      },
+    },
+  });
+
+  const verifyPromo = () => {
+    const code = promoInput.trim();
+    if (!code) {
+      setPromoError('Enter a promo code to verify.');
+      return;
+    }
+    setPromoError('');
+    validatePromo.mutate({ data: { code, category: slug } });
+  };
 
   const checkout = useCreateWhopCheckout({
     mutation: {
@@ -263,7 +306,7 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
             expiresAt: new Date(Date.now() + months * 30 * 24 * 60 * 60 * 1000).toISOString(),
             total: 0,
             cardLast4: null,
-            promoCode: promoInput.trim() || null,
+            promoCode: verifiedCode,
           });
           void queryClient.invalidateQueries({ queryKey: getGetTicketStatusQueryKey() });
           return;
@@ -291,7 +334,8 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
       data: {
         kind: 'pass',
         planId: slug,
-        promoCode: promoInput.trim() || undefined,
+        // Only a verified code is spent; an unverified one blocks Pay instead.
+        promoCode: verifiedCode ?? undefined,
         callbackUrl,
       },
     });
@@ -390,14 +434,42 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
 
           <div className="mt-5">
             <span className="font-mono-ui text-[10px] uppercase tracking-[0.18em] text-zinc-500">Promo code (optional)</span>
-            <input
-              value={promoInput}
-              onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
-              placeholder="PROMOCODE"
-              disabled={busy}
-              className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600 transition-colors focus:border-[#3b82f6]/50 disabled:opacity-50"
-              data-testid="input-promo"
-            />
+            <div className="mt-2 flex gap-2">
+              <input
+                value={promoInput}
+                onChange={(event) => {
+                  setPromoInput(event.target.value.toUpperCase());
+                  // Editing the code invalidates the check, so a stale
+                  // "verified" result can never pay for a different code.
+                  setPromoCheck(null);
+                  setPromoError('');
+                }}
+                placeholder="PROMOCODE"
+                disabled={busy}
+                className="focus-house min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[.04] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600 transition-colors focus:border-[#3b82f6]/50 disabled:opacity-50"
+                data-testid="input-promo"
+              />
+              <button
+                type="button"
+                onClick={verifyPromo}
+                disabled={busy || validatePromo.isPending || !promoInput.trim()}
+                className="focus-house shrink-0 rounded-xl border border-[#3b82f6]/40 bg-[#3b82f6]/10 px-4 text-xs font-bold uppercase tracking-[0.12em] text-[#93c5fd] transition-colors hover:bg-[#3b82f6]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                data-testid="button-verify-promo"
+              >
+                {validatePromo.isPending ? 'Checking…' : 'Verify'}
+              </button>
+            </div>
+
+            {promoCheck && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-[#34d399]" data-testid="promo-verified">
+                <PiCheckCircleDuotone className="h-3.5 w-3.5" />
+                {promoCheck.code} verified{promoCheck.label ? ` — ${promoCheck.label}` : ''}
+                {promoCheck.total !== null ? ` · now $${(promoCheck.total / 100).toFixed(2)}` : ''}
+              </p>
+            )}
+            {promoError && (
+              <p className="mt-2 text-xs font-semibold text-red-400" role="alert" data-testid="promo-error">{promoError}</p>
+            )}
           </div>
 
           {error && (
@@ -409,16 +481,23 @@ function PassCoupon({ slug, name, onPurchased }: { slug: string; name: string; o
           <button
             type="button"
             onClick={pay}
-            disabled={checkout.isPending || opening}
+            disabled={busy || awaitingPromoCheck}
             className="focus-house mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#3b82f6] to-[#8b5cf6] py-3.5 text-sm font-bold text-white shadow-[0_12px_28px_-12px_rgba(59,130,246,.8)] transition-all hover:brightness-110 hover:shadow-[0_16px_36px_-12px_rgba(139,92,246,.9)] disabled:cursor-wait disabled:opacity-60"
             data-testid="button-pay"
           >
             {busy ? (
               <><PiCircleNotchDuotone className="h-4 w-4 animate-spin" /> {opening ? 'Opening secure checkout…' : 'Starting checkout…'}</>
+            ) : awaitingPromoCheck ? (
+              <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Verify your promo code first</>
             ) : (
-              <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay ${(priceUsd / 100).toFixed(2)} · {months} {months === 1 ? 'month' : 'months'}</>
+              <><PiLockKeyDuotone className="h-4 w-4 text-white/80" /> Pay ${(payableUsd / 100).toFixed(2)} · {months} {months === 1 ? 'month' : 'months'}</>
             )}
           </button>
+          {awaitingPromoCheck && (
+            <p className="mt-2 text-center text-[11px] leading-5 text-zinc-500" data-testid="promo-hint">
+              Verify your promo code to unlock payment.
+            </p>
+          )}
         </div>
 
         {/* Pass specs — what the ticket covers, replacing the old coupon stub. */}

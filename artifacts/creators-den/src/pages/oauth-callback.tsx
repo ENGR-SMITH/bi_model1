@@ -13,6 +13,22 @@ import { getListChannelsQueryKey, useExchangeChannelOauth } from '@workspace/api
 // — no intermediate success page.
 // ---------------------------------------------------------------------------
 
+/**
+ * The API client throws `ApiError`, which carries the parsed response body on
+ * `.data` (and the message derived from it on `.message`). Reading
+ * `error.response.data` yields the raw `Response` object, so every failure here
+ * used to collapse into the same generic sentence and the server's actual
+ * reason was thrown away.
+ */
+function exchangeErrorMessage(error: unknown): string {
+  const err = error as { data?: { error?: string }; message?: string } | null;
+  return (
+    err?.data?.error ||
+    err?.message ||
+    'The link could not be completed — try again.'
+  );
+}
+
 export default function OauthCallbackPage() {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
@@ -47,6 +63,13 @@ export default function OauthCallbackPage() {
       setMessage('This link request is incomplete — start again from the channel card.');
       return;
     }
+    // The channel rides in the state token. Without it the exchange would POST
+    // to an empty id and come back as a bare 404, so say what is actually wrong.
+    if (!channelId) {
+      setPhase('error');
+      setMessage('This link request is unreadable — start again from the channel card.');
+      return;
+    }
     exchange.mutate(
       { channelId, data: { state, code } },
       {
@@ -56,8 +79,7 @@ export default function OauthCallbackPage() {
           setLocation(channelId ? `/channels/${channelId}` : '/');
         },
         onError: (error) => {
-          const err = error as { response?: { data?: { error?: string } } };
-          setMessage(err?.response?.data?.error || 'The link could not be completed — try again.');
+          setMessage(exchangeErrorMessage(error));
           setPhase('error');
         },
       },

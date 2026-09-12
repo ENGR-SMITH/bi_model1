@@ -504,4 +504,84 @@ describe("channel YouTube OAuth", () => {
       .where(eq(state.tables.nexetChannelsTable.id, provisionalId));
     expect(channel).toBeUndefined();
   });
+
+  it("reports Google's own reason when the token exchange is rejected", async () => {
+    const { id } = await createChannel("Ada Makes Games");
+    const started = await request(API).post(`/api/channels/${id}/oauth/start`);
+    const stateParam = new URL(started.body.url).searchParams.get("state")!;
+
+    // A rejected exchange: Google answers with a JSON error body. Reporting
+    // just "Google rejected the link" leaves the operator guessing between a
+    // used code, a wrong client secret, and an unregistered redirect URI.
+    vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("oauth2.googleapis.com/token")) {
+        return new Response(
+          JSON.stringify({ error: "invalid_grant", error_description: "Bad Request" }),
+          { status: 400, headers: { "content-type": "application/json" } },
+        );
+      }
+      throw new Error(`Unexpected Google URL: ${url}`);
+    });
+
+    const res = await request(API)
+      .post(`/api/channels/${id}/oauth/exchange`)
+      .send({ state: stateParam, code: "already-used-code" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("invalid_grant");
+    expect(res.body.error).toContain("Bad Request");
+  });
+});
+
+// The consent screen can take minutes, and the callback can land on another
+// instance or on this one after a restart. The state token has to carry
+// everything the exchange needs on its own — it used to live in a module-level
+// Map, so any of those routine events failed the link.
+describe("connect state token", () => {
+  it("carries the channel, the starting account, and the PKCE verifier", async () => {
+    const { createConnectState, readConnectState } = await import("../channels/oauth");
+    const token = createConnectState("chan-1", "user-1", "verifier-abc");
+
+    expect(readConnectState(token)).toMatchObject({
+      channelId: "chan-1",
+      userId: "user-1",
+      codeVerifier: "verifier-abc",
+    });
+    // The readable half is only for choosing the landing channel, and the
+    // callback page relies on it being the first dot-separated segment.
+    const visible = JSON.parse(Buffer.from(token.split(".")[0], "base64url").toString("utf8"));
+    expect(visible.channelId).toBe("chan-1");
+  });
+
+  it("rejects a forged or malformed token", async () => {
+    const { readConnectState } = await import("../channels/oauth");
+    expect(readConnectState("forged.invalid")).toBeNull();
+    expect(readConnectState("no-dot-at-all")).toBeNull();
+    expect(readConnectState("")).toBeNull();
+  });
+
+  it("rejects a token whose readable channel was edited", async () => {
+    const { createConnectState, readConnectState } = await import("../channels/oauth");
+    const token = createConnectState("chan-1", "user-1", "verifier-abc");
+    const sealed = token.slice(token.indexOf(".") + 1);
+    const edited = Buffer.from(JSON.stringify({ channelId: "chan-2", exp: Date.now() + 60_000 })).toString("base64url");
+    expect(readConnectState(`${edited}.${sealed}`)).toBeNull();
+  });
+
+  it("rejects a token whose sealed half was altered", async () => {
+    const { createConnectState, readConnectState } = await import("../channels/oauth");
+    const token = createConnectState("chan-1", "user-1", "verifier-abc");
+    const [payload, ...rest] = token.split(".");
+    const sealed = rest.join(".");
+    const flipped = sealed.slice(0, -1) + (sealed.endsWith("A") ? "B" : "A");
+    expect(readConnectState(`${payload}.${flipped}`)).toBeNull();
+  });
+
+  it("rejects an expired token", async () => {
+    const { readConnectState } = await import("../channels/oauth");
+    const exp = Date.now() - 1000;
+    const payload = Buffer.from(JSON.stringify({ channelId: "chan-1", exp })).toString("base64url");
+    const sealed = encryptSecret(JSON.stringify({ channelId: "chan-1", userId: "user-1", codeVerifier: "v", exp }));
+    expect(readConnectState(`${payload}.${sealed}`)).toBeNull();
+  });
 });

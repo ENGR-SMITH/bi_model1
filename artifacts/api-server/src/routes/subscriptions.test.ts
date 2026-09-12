@@ -47,6 +47,7 @@ async function resetDb() {
   await state.db.delete(t.nexetTicketsTable);
   await state.db.delete(t.nexetAccountQuotasTable);
   await state.db.delete(t.nexetPromoRedemptionsTable);
+  await state.db.delete(t.nexetPromoCodesTable);
   await state.db.delete(t.nexetSubscriptionPlanSettingsTable);
   state.userId = null;
 }
@@ -149,6 +150,55 @@ describe("subscription purchase", () => {
     expect(res.body.receipt.total).toBe(PROJECT_PLANS.find((p) => p.id === "p50")!.priceUsd);
     const after = await request(API).get("/api/subscriptions/plans");
     expect(after.body.usage.projects.total).toBe(5 + 50);
+  });
+
+  it("refuses a promo code on storage and project plans", async () => {
+    state.userId = "user-1";
+    await state.db.insert(state.tables.nexetPromoCodesTable).values({
+      code: "FREESPACE",
+      category: "authors",
+      kind: "FREE",
+      value: 0,
+      maxUses: 0,
+      uses: 0,
+    });
+
+    // Coupons are a category-pass feature — the storage/project checkouts
+    // reject one rather than silently charging full price anyway.
+    for (const [kind, planId] of [["storage", "g200"], ["projects", "p50"]] as const) {
+      const res = await request(API)
+        .post("/api/subscriptions/purchase")
+        .send({ kind, planId, card: VALID_CARD, promoCode: "FREESPACE" });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/passes only/i);
+    }
+  });
+
+  it("applies a FREE promo only on the pass category it is dedicated to", async () => {
+    state.userId = "user-1";
+    await state.db.insert(state.tables.nexetPromoCodesTable).values({
+      code: "AUTHORSONLY",
+      category: "authors",
+      kind: "FREE",
+      value: 0,
+      maxUses: 0,
+      uses: 0,
+    });
+
+    // The other pass refuses it outright.
+    const wrongPass = await request(API)
+      .post("/api/subscriptions/purchase")
+      .send({ kind: "pass", planId: "content-creators", card: VALID_CARD, promoCode: "AUTHORSONLY" });
+    expect(wrongPass.status).toBe(400);
+    expect(wrongPass.body.error).toMatch(/promo/i);
+
+    // Its own pass is granted free.
+    const rightPass = await request(API)
+      .post("/api/subscriptions/purchase")
+      .send({ kind: "pass", planId: "authors", card: VALID_CARD, promoCode: "AUTHORSONLY" });
+    expect(rightPass.status).toBe(201);
+    expect(rightPass.body.receipt.discount).toBe(588);
+    expect(rightPass.body.receipt.total).toBe(0);
   });
 
   it("rejects invalid cards and unknown plans", async () => {

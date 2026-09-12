@@ -5474,9 +5474,14 @@ components:
       required: [priceUsd, months, tickets]
     TicketPromoValidateInput:
       type: object
+      # A code is dedicated to one category, so the check must know which pass
+      # it is being spent on.
       properties:
         code: { type: string }
-      required: [code]
+        category:
+          type: string
+          enum: [authors, content-creators]
+      required: [code, category]
     TicketPromoValidateResponse:
       type: object
       properties:
@@ -5637,6 +5642,11 @@ components:
       type: object
       properties:
         code: { type: string }
+        # The one NEXET category pass this code is dedicated to. Null is the
+        # legacy "no category" state: those codes still work on every pass.
+        category:
+          type: ["string", "null"]
+          enum: [authors, content-creators, null]
         kind:
           type: string
           enum: [FREE, PERCENT, FLAT]
@@ -5648,28 +5658,36 @@ components:
         active: { type: boolean }
         expiresAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
-      required: [code, kind, value, maxUses, uses, active, expiresAt, createdAt]
+      required: [code, category, kind, value, maxUses, uses, active, expiresAt, createdAt]
     AdminPromoInput:
       type: object
-      # Only FREE codes are accepted at checkout — every plan bills monthly
-      # through Whop, so percent/dollar-off codes can't discount a
-      # subscription. New codes must be kind=FREE (the API rejects others).
-      description: Create a promo code. New codes must be FREE — percent and dollar-off codes don't apply to monthly subscriptions.
+      # A code is dedicated to exactly one category pass. Only FREE codes are
+      # accepted at checkout — every plan bills monthly through Whop, so
+      # percent/dollar-off codes can't discount a subscription. New codes must
+      # be kind=FREE and name a category (the API rejects others).
+      description: Create a promo code dedicated to one category pass. New codes must be FREE and must name the category they apply to.
       properties:
         code: { type: string }
+        category:
+          type: string
+          enum: [authors, content-creators]
         kind:
           type: string
           enum: [FREE]
         value: { type: integer }
         maxUses: { type: integer }
         expiresAt: { type: ["string", "null"], format: date-time }
-      required: [code, kind, value, maxUses]
+      required: [code, category, kind, value, maxUses]
     AdminPromoUpdate:
       type: object
       # Legacy PERCENT/FLAT rows keep their kind so they can still be paused;
       # a FREE row can't be converted to a kind the checkout would reject.
       description: Update a promo code. Only FREE is accepted for new kinds; legacy PERCENT/FLAT rows keep theirs.
       properties:
+        # Optional re-scope. Omit to leave the code's category alone.
+        category:
+          type: string
+          enum: [authors, content-creators]
         kind:
           type: string
           enum: [FREE, PERCENT, FLAT]

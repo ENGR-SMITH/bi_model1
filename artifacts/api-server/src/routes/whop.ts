@@ -19,7 +19,7 @@ import {
   type SubscriptionEntitlementRef,
   type SubscriptionKind,
 } from "../video/subscriptions";
-import { resolvePromo } from "./tickets";
+import { resolvePromo, type TicketCategory } from "./tickets";
 import {
   createCheckout,
   createPlan,
@@ -775,7 +775,15 @@ router.post("/whop/checkout", async (req: Request, res: Response): Promise<void>
     return;
   }
 
-  const promo = await resolvePromo(promoCode, product.priceUsd, userId);
+  // Promo codes are a category-pass feature. The storage and project
+  // checkouts reject one instead of silently ignoring it.
+  if (kind !== "pass" && promoCode) {
+    res.status(400).json({ error: "Promo codes apply to category passes only." });
+    return;
+  }
+  const promo = promoCode
+    ? await resolvePromo(promoCode, product.priceUsd, userId, planId as TicketCategory)
+    : null;
   if (promoCode && !promo) {
     res.status(400).json({ error: "That promo code is not valid" });
     return;

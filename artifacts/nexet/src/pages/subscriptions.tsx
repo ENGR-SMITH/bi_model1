@@ -528,7 +528,6 @@ function PayModal({
   onClose: () => void;
   onGranted: (total: number, cardLast4: string | null, promoCode: string | null) => void;
 }) {
-  const [promo, setPromo] = useState('');
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
 
@@ -536,8 +535,8 @@ function PayModal({
     mutation: {
       onSuccess: (res) => {
         if (res.granted) {
-          // A FREE promo (or full discount) is granted server-side — no redirect.
-          onGranted(0, null, promo.trim() || null);
+          // A fully-discounted grant happens server-side — no redirect needed.
+          onGranted(0, null, null);
           return;
         }
         setError('');
@@ -564,7 +563,6 @@ function PayModal({
       data: {
         kind: plan.kind,
         planId: plan.planId,
-        promoCode: promo.trim() || undefined,
         callbackUrl,
       },
     });
@@ -621,17 +619,9 @@ function PayModal({
             </div>
           )}
 
-          <div className="mt-4">
-            <span className="font-mono-ui text-[10px] uppercase tracking-[0.16em] text-zinc-500">Promo code (optional)</span>
-            <input
-              value={promo}
-              onChange={(e) => setPromo(e.target.value.toUpperCase())}
-              placeholder="PROMOCODE"
-              disabled={opening}
-              className="focus-house mt-2 w-full rounded-xl border border-white/10 bg-[#111111] px-4 py-3 text-sm uppercase tracking-[0.1em] text-white placeholder:text-zinc-600 disabled:opacity-50"
-              data-testid="sub-input-promo"
-            />
-          </div>
+          {/* No promo field here: coupon codes are dedicated to a single NEXET
+              category pass and are handled on the pass card, not on the
+              storage/project plans. */}
 
           {error && <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs font-semibold text-red-400" role="alert" data-testid="subscription-error">{error}</p>}
 

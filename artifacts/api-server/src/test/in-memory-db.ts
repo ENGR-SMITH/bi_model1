@@ -771,6 +771,7 @@ export const nexetToursTable = sqliteTable("nexet_tours", {
 
 export const nexetPromoCodesTable = sqliteTable("nexet_promo_codes", {
   code: text("code").primaryKey(),
+  category: text("category"),
   kind: text("kind").notNull(),
   value: integer("value").notNull().default(0),
   maxUses: integer("max_uses").notNull().default(0),
@@ -1262,7 +1263,7 @@ export async function buildInMemoryDb() {
       started_at INTEGER NOT NULL, ends_at INTEGER NOT NULL
     );
     CREATE TABLE nexet_promo_codes (
-      code TEXT PRIMARY KEY NOT NULL, kind TEXT NOT NULL,
+      code TEXT PRIMARY KEY NOT NULL, category TEXT, kind TEXT NOT NULL,
       value INTEGER NOT NULL DEFAULT 0, max_uses INTEGER NOT NULL DEFAULT 0,
       uses INTEGER NOT NULL DEFAULT 0,
       active INTEGER NOT NULL DEFAULT 1,

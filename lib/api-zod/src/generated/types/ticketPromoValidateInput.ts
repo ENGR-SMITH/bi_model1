@@ -5,7 +5,9 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { TicketPromoValidateInputCategory } from './ticketPromoValidateInputCategory';
 
 export interface TicketPromoValidateInput {
   code: string;
+  category: TicketPromoValidateInputCategory;
 }

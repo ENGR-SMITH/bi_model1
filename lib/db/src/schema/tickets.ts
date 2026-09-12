@@ -41,6 +41,12 @@ export const nexetToursTable = pgTable("nexet_tours", {
 
 export const nexetPromoCodesTable = pgTable("nexet_promo_codes", {
   code: text("code").primaryKey(),
+  // The NEXET category pass this code is dedicated to (authors |
+  // content-creators). A code only validates against its own category, so a
+  // Content Creators code can't be spent on the Authors pass. NULL is the
+  // legacy "no category" state: those rows keep working everywhere, exactly
+  // as they did before scoping existed.
+  category: text("category"),
   // FREE (waive the fee) | PERCENT (percent off) | FLAT (cents off)
   kind: text("kind").notNull(),
   // PERCENT: percent off (e.g. 50). FLAT: cents off (e.g. 50). FREE: unused.

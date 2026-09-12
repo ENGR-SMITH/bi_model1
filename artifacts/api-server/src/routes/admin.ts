@@ -22,6 +22,7 @@ import {
   UpdateAdminSubscriptionAutoRenewResponse,
 } from "@workspace/api-zod";
 import { checkProvider, listProviderStatuses, updateProvider, type ProviderId } from "../lib/oracle";
+import { TICKET_CATEGORIES, type TicketCategory } from "./tickets";
 import { setMembershipAutoRenew, WhopApiError } from "../lib/whop";
 import { resolveSubscriptionProduct, subscriptionPlans, type SubscriptionKind } from "../video/subscriptions";
 
@@ -164,7 +165,11 @@ router.post("/admin/providers/:providerId/check", requireAdmin, async (req, res)
 
 // ---------------------------------------------------------------------------
 // Ticket promo codes — the admin surface that replaces the seed script. Codes
-// are managed here (create/update/delete); the checkout validates them live.
+// are managed here (create/update/delete); the pass card validates them live.
+//
+// Every code is dedicated to exactly ONE NEXET category: an Authors code can't
+// be spent on the Content Creators pass and vice versa. Rows created before
+// scoping existed carry no category and keep working everywhere.
 // ---------------------------------------------------------------------------
 
 export function normalizePromoCode(raw: string): string {
@@ -174,6 +179,7 @@ export function normalizePromoCode(raw: string): string {
 function promoView(promo: typeof nexetPromoCodesTable.$inferSelect) {
   return {
     code: promo.code,
+    category: promo.category ?? null,
     kind: promo.kind,
     value: promo.value,
     maxUses: promo.maxUses,
@@ -208,6 +214,13 @@ router.post("/admin/promos", requireAdmin, async (req, res): Promise<void> => {
     res.status(400).json({ error: "Only FREE promo codes are accepted — percent and dollar-off codes don't apply to monthly subscriptions." });
     return;
   }
+  // A new code must say which pass it is dedicated to.
+  if (!TICKET_CATEGORIES.includes(body.data.category as TicketCategory)) {
+    res.status(400).json({
+      error: `A category is required — one of: ${TICKET_CATEGORIES.join(", ")}.`,
+    });
+    return;
+  }
 
   const [existing] = await db
     .select({ code: nexetPromoCodesTable.code })
@@ -223,6 +236,7 @@ router.post("/admin/promos", requireAdmin, async (req, res): Promise<void> => {
     .insert(nexetPromoCodesTable)
     .values({
       code,
+      category: body.data.category as TicketCategory,
       kind: body.data.kind,
       value: Math.max(0, body.data.value),
       maxUses: Math.max(0, body.data.maxUses),
@@ -242,6 +256,14 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
   const code = normalizePromoCode(String(req.params.code ?? ""));
   if (!code) {
     res.status(400).json({ error: "A promo code is required" });
+    return;
+  }
+  // Optional re-scoping: a code can be moved to its other category, but never
+  // to something that isn't a real pass.
+  if (body.data.category !== undefined && !TICKET_CATEGORIES.includes(body.data.category as TicketCategory)) {
+    res.status(400).json({
+      error: `A category is required — one of: ${TICKET_CATEGORIES.join(", ")}.`,
+    });
     return;
   }
 
@@ -265,6 +287,9 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
   const [promo] = await db
     .update(nexetPromoCodesTable)
     .set({
+      ...(body.data.category !== undefined
+        ? { category: body.data.category as TicketCategory }
+        : {}),
       kind: body.data.kind,
       value: Math.max(0, body.data.value),
       maxUses: Math.max(0, body.data.maxUses),
@@ -280,6 +305,7 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
 
 router.delete("/admin/promos/:code", requireAdmin, async (req, res): Promise<void> => {
   const code = normalizePromoCode(String(req.params.code ?? ""));
+
   const [existing] = await db
     .select({ code: nexetPromoCodesTable.code })
     .from(nexetPromoCodesTable)

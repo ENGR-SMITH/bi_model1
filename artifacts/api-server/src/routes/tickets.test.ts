@@ -48,8 +48,18 @@ const VALID_CARD = {
   cvc: "123",
 };
 
-async function seedPromo(code: string, kind: "FREE" | "PERCENT" | "FLAT", value: number, maxUses = 0, active = true) {
-  await state.db.insert(state.tables.nexetPromoCodesTable).values({ code, kind, value, maxUses, uses: 0, active });
+async function seedPromo(
+  code: string,
+  kind: "FREE" | "PERCENT" | "FLAT",
+  value: number,
+  maxUses = 0,
+  active = true,
+  // null = a row created before codes were scoped: still valid on every pass.
+  category: "authors" | "content-creators" | null = null,
+) {
+  await state.db
+    .insert(state.tables.nexetPromoCodesTable)
+    .values({ code, category, kind, value, maxUses, uses: 0, active });
 }
 
 async function resetDb() {
@@ -156,10 +166,12 @@ describe("ticket purchase", () => {
 
 describe("promo codes", () => {
   it("validates a code and applies its discount to the purchase", async () => {
-    await seedPromo("HALFPASS", "PERCENT", 50);
+    await seedPromo("HALFPASS", "PERCENT", 50, 0, true, "content-creators");
     state.userId = "user-1";
 
-    const check = await request(API).post("/api/tickets/promo/validate").send({ code: "halfpass" });
+    const check = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "halfpass", category: "content-creators" });
     expect(check.status).toBe(200);
     expect(check.body.valid).toBe(true);
     expect(check.body.kind).toBe("PERCENT");
@@ -179,7 +191,7 @@ describe("promo codes", () => {
   });
 
   it("makes the pass free with a FREE promo", async () => {
-    await seedPromo("FREEPASS", "FREE", 0);
+    await seedPromo("FREEPASS", "FREE", 0, 0, true, "authors");
     state.userId = "user-1";
     const res = await request(API).post("/api/tickets/purchase").send({
       category: "authors",
@@ -191,21 +203,25 @@ describe("promo codes", () => {
   });
 
   it("rejects unknown, expired, and used-up codes", async () => {
-    await seedPromo("LIMITED", "FLAT", 50, 1);
+    await seedPromo("LIMITED", "FLAT", 50, 1, true, "authors");
     state.userId = "user-1";
 
-    const unknown = await request(API).post("/api/tickets/promo/validate").send({ code: "NOPE" });
+    const unknown = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "NOPE", category: "authors" });
     expect(unknown.body.valid).toBe(false);
 
-    // The limited code works once, then is exhausted.
+    // The limited code works once, then is exhausted — checked with a second
+    // person so the one-per-person rule can't be what rejects it.
     const first = await request(API).post("/api/tickets/purchase").send({
       category: "authors",
       card: VALID_CARD,
       promoCode: "LIMITED",
     });
     expect(first.status).toBe(201);
+    state.userId = "user-2";
     const exhausted = await request(API).post("/api/tickets/purchase").send({
-      category: "content-creators",
+      category: "authors",
       card: VALID_CARD,
       promoCode: "LIMITED",
     });
@@ -233,7 +249,9 @@ describe("promo codes", () => {
     });
     expect(again.status).toBe(400);
     expect(again.body.error).toMatch(/promo/i);
-    const check = await request(API).post("/api/tickets/promo/validate").send({ code: "TOGETHER" });
+    const check = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "TOGETHER", category: "content-creators" });
     expect(check.body.valid).toBe(false);
 
     // A second person can still use it.
@@ -248,10 +266,12 @@ describe("promo codes", () => {
   });
 
   it("rejects a code an admin has paused (soft-disable)", async () => {
-    await seedPromo("PAUSEDCODE", "FLAT", 50, 0, false);
+    await seedPromo("PAUSEDCODE", "FLAT", 50, 0, false, "authors");
     state.userId = "user-1";
 
-    const check = await request(API).post("/api/tickets/promo/validate").send({ code: "PAUSEDCODE" });
+    const check = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "PAUSEDCODE", category: "authors" });
     expect(check.status).toBe(200);
     expect(check.body.valid).toBe(false);
 
@@ -264,9 +284,67 @@ describe("promo codes", () => {
     expect(purchase.body.error).toMatch(/promo/i);
   });
 
+  it("dedicates a code to one category and refuses it on the other pass", async () => {
+    await seedPromo("CREATORSONLY", "FREE", 0, 0, true, "content-creators");
+    state.userId = "user-1";
+
+    // Verified against the wrong pass → invalid, so the card stays locked.
+    const wrongCheck = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "CREATORSONLY", category: "authors" });
+    expect(wrongCheck.status).toBe(200);
+    expect(wrongCheck.body.valid).toBe(false);
+
+    // Spending it on the wrong pass is refused outright.
+    const wrongPurchase = await request(API).post("/api/tickets/purchase").send({
+      category: "authors",
+      card: VALID_CARD,
+      promoCode: "CREATORSONLY",
+    });
+    expect(wrongPurchase.status).toBe(400);
+    expect(wrongPurchase.body.error).toMatch(/promo/i);
+
+    // Its own category still accepts it.
+    const rightCheck = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "CREATORSONLY", category: "content-creators" });
+    expect(rightCheck.body.valid).toBe(true);
+    expect(rightCheck.body.discountedPriceUsd).toBe(0);
+
+    const purchase = await request(API).post("/api/tickets/purchase").send({
+      category: "content-creators",
+      card: VALID_CARD,
+      promoCode: "CREATORSONLY",
+    });
+    expect(purchase.status).toBe(201);
+    expect(purchase.body.receipt.total).toBe(0);
+  });
+
+  it("keeps a legacy code with no category valid on every pass", async () => {
+    await seedPromo("LEGACY", "FREE", 0); // pre-scoping row
+    state.userId = "user-1";
+
+    for (const category of ["authors", "content-creators"] as const) {
+      const check = await request(API)
+        .post("/api/tickets/promo/validate")
+        .send({ code: "LEGACY", category });
+      expect(check.body.valid).toBe(true);
+    }
+  });
+
+  it("refuses a validation that names no category", async () => {
+    await seedPromo("NOCHECK", "FREE", 0, 0, true, "authors");
+    state.userId = "user-1";
+    const res = await request(API).post("/api/tickets/promo/validate").send({ code: "NOCHECK" });
+    expect(res.status).toBe(400);
+  });
+
   it("requires authentication for promo validation", async () => {
     state.userId = null;
-    expect((await request(API).post("/api/tickets/promo/validate").send({ code: "HALFPASS" })).status).toBe(401);
+    const res = await request(API)
+      .post("/api/tickets/promo/validate")
+      .send({ code: "HALFPASS", category: "authors" });
+    expect(res.status).toBe(401);
   });
 });
 

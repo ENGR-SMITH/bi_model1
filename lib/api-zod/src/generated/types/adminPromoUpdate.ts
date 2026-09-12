@@ -5,12 +5,14 @@
  * Manuskript authoring and Story Oracle API
  * OpenAPI spec version: 0.2.0
  */
+import type { AdminPromoUpdateCategory } from './adminPromoUpdateCategory';
 import type { AdminPromoUpdateKind } from './adminPromoUpdateKind';
 
 /**
  * Update a promo code. Only FREE is accepted for new kinds; legacy PERCENT/FLAT rows keep theirs.
  */
 export interface AdminPromoUpdate {
+  category?: AdminPromoUpdateCategory;
   kind: AdminPromoUpdateKind;
   value: number;
   maxUses: number;
