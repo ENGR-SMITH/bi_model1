@@ -168,6 +168,21 @@ export default function ChannelAnalyticsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
+  // Auto-sync: pull fresh YouTube data every 10 minutes so the analytics page
+  // stays current without waiting for a manual refresh. The background worker
+  // also syncs on the same cadence, but this gives the foreground an explicit
+  // refresh path when the tab is open and active.
+  useEffect(() => {
+    if (!channelId || !isOwner) return;
+    const intervalMs = 10 * 60 * 1000;
+    const tick = () => {
+      if (!sync.isPending) void runSync();
+    };
+    tick();
+    const id = window.setInterval(tick, intervalMs);
+    return () => window.clearInterval(id);
+  }, [channelId, isOwner, sync.isPending, runSync]);
+
   const chartData = series.map((s) => ({ day: s.day.slice(5), views: s.views ?? 0, watchTime: s.watchTimeMinutes ?? 0 }));
 
   return (
@@ -231,6 +246,13 @@ export default function ChannelAnalyticsPage() {
                 <RefreshCw size={12} className={sync.isPending ? 'spin' : ''} />
                 {sync.isPending ? 'Syncing…' : 'Refresh now'}
               </button>
+            )}
+            {/* Auto-sync indicator: shows when the 10-minute background refresh is running */}
+            {isOwner && sync.isPending && (
+              <span className="cd-freshness-autosync" data-testid="analytics-autosync">
+                <Loader2 size={11} className="spin" />
+                Auto-sync in progress
+              </span>
             )}
           </div>
 

@@ -1,4 +1,4 @@
-import { PiEnvelopeDuotone, PiGearSixDuotone, PiSignOutDuotone, PiUserCircleDuotone } from 'react-icons/pi';
+import { PiEnvelopeDuotone, PiGearSixDuotone, PiSignOutDuotone, PiUserCircleDuotone, PiPencil } from 'react-icons/pi';
 import { useClerk, useUser } from '@clerk/react';
 import {
   getListWaitlistEntriesQueryKey,
@@ -8,7 +8,7 @@ import { nexetCategories } from '@/data/categories';
 
 export default function ProfilePage() {
   const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
+  const clerk = useClerk();
   const name = user?.fullName || user?.username || 'Nexet member';
   const initials = `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}` || name.slice(0, 2);
   const email = user?.primaryEmailAddress?.emailAddress || 'No email on file';
@@ -34,8 +34,32 @@ export default function ProfilePage() {
       <div className="card-surface mt-14 overflow-hidden rounded-3xl">
         <div className="relative border-b border-white/5 bg-gradient-to-br from-[#3b82f6]/10 to-transparent p-7 sm:p-10">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] font-mono-ui text-xl uppercase text-white shadow-[0_0_30px_-6px_rgba(59,130,246,0.8)]">
-              {initials}
+            <div className="profile-avatar-wrap">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-[#3b82f6] to-[#8b5cf6] font-mono-ui text-xl uppercase text-white shadow-[0_0_30px_-6px_rgba(59,130,246,0.8)]">
+                {initials}
+              </div>
+              <label className="avatar-edit-btn" title="Update profile photo">
+                <PiPencil className="h-3.5 w-3.5 text-white drop-shadow" />
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const url = URL.createObjectURL(file);
+                      if (clerk.user) {
+                        await (clerk.user as unknown as { update: (params: { imageUrl: string }) => Promise<void> }).update({ imageUrl: url });
+                      }
+                      URL.revokeObjectURL(url);
+                    } catch {
+                      // Clerk handles the upload; ignore client-side errors.
+                    }
+                    event.target.value = '';
+                  }}
+                />
+              </label>
             </div>
             <div>
               <h2 className="mt-2 text-3xl font-bold tracking-[-0.03em] text-white">{name}</h2>
@@ -65,7 +89,7 @@ export default function ProfilePage() {
             <p className="mt-6 font-semibold text-zinc-100">Settings are being set.</p>
             <p className="mt-2 text-sm leading-relaxed text-zinc-500">Notification controls and account preferences arrive with the next room.</p>
           </div>
-          <button type="button" onClick={() => signOut({ redirectUrl: '/' })} className="focus-house group flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-6 text-left transition-colors hover:border-red-500/30 hover:bg-red-500/5" data-testid="button-profile-logout">
+          <button type="button" onClick={() => clerk.signOut({ redirectUrl: '/' })} className="focus-house group flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-6 text-left transition-colors hover:border-red-500/30 hover:bg-red-500/5" data-testid="button-profile-logout">
             <PiSignOutDuotone className="mt-0.5 h-5 w-5 text-red-400 transition-transform group-hover:-translate-x-0.5 group-hover:translate-y-0.5" />
             <span>
               <span className="block font-semibold text-zinc-100">Sign out</span>

@@ -70,8 +70,11 @@ describe('formatDuration', () => {
 });
 
 describe('pickThumbnailUrl', () => {
-  it('prefers high over default and tolerates garbage input', () => {
+  it('prefers highest available resolution and tolerates garbage input', () => {
+    // standard > medium > high > default
     expect(pickThumbnailUrl({ default: { url: 'https://img/d.jpg' }, high: { url: 'https://img/h.jpg' } })).toBe('https://img/h.jpg');
+    expect(pickThumbnailUrl({ default: { url: 'https://img/d.jpg' }, medium: { url: 'https://img/m.jpg' }, high: { url: 'https://img/h.jpg' } })).toBe('https://img/m.jpg');
+    expect(pickThumbnailUrl({ default: { url: 'https://img/d.jpg' }, standard: { url: 'https://img/s.jpg' }, medium: { url: 'https://img/m.jpg' } })).toBe('https://img/s.jpg');
     expect(pickThumbnailUrl({ default: { url: 'https://img/d.jpg' } })).toBe('https://img/d.jpg');
     expect(pickThumbnailUrl(null)).toBeNull();
     expect(pickThumbnailUrl('nope')).toBeNull();

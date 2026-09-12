@@ -517,3 +517,15 @@ section[id^="plans-"] { scroll-margin-top: 110px; }
   .success-check-circle, .success-check-mark { stroke-dashoffset: 0; animation: none !important; }
   .success-check-burst { display: none; }
 }
+
+/* Profile avatar edit pencil — bottom-right corner on own profile (Nexet). */
+.profile-avatar-wrap { position: relative; display: inline-flex; }
+.profile-avatar-wrap input[type="file"] { display: none; }
+.profile-avatar-wrap .avatar-edit-btn {
+  position: absolute; bottom: 2px; right: 2px;
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: rgba(0,0,0,.55); border: 2px solid rgba(255,255,255,.35);
+  cursor: pointer; transition: transform .15s, border-color .15s;
+}
+.profile-avatar-wrap .avatar-edit-btn:hover { transform: scale(1.1); border-color: #3b82f6; }
