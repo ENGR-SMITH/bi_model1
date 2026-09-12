@@ -1363,7 +1363,7 @@ select optgroup {
   box-shadow: var(--edge-hi);
 }
 .cd-topnav .top-workspace > span { color: hsl(var(--muted-foreground) / .95); font: 600 10px var(--app-font-mono); letter-spacing: .12em; text-transform: uppercase; }
-.cd-topnav .top-workspace b { color: hsl(var(--foreground)); font-size: 13px; font-weight: 600; max-width: 200px; }
+.cd-topnav .top-workspace b { color: hsl(var(--foreground)); font-size: 13px; font-weight: 600; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cd-topnav .top-workspace > svg { color: hsl(var(--muted-foreground) / .85); transition: transform .18s ease; }
 .cd-topnav .top-workspace:hover > svg { transform: translateY(1px); }
 
@@ -1407,7 +1407,7 @@ select optgroup {
   display: grid;
   /* The middle track leans slightly toward the sign-out side so the relay
      deck never crowds the wider channel/project cluster on the left. */
-  grid-template-columns: minmax(auto, 1.15fr) auto minmax(auto, .85fr);
+  grid-template-columns: minmax(0, 1.15fr) auto minmax(0, .85fr);
   align-items: stretch;
   gap: var(--sp-3);
   height: 46px;
@@ -1419,7 +1419,10 @@ select optgroup {
   display: flex; align-items: stretch; justify-content: flex-start;
   gap: var(--sp-1);
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.cd-topnav-workspace-col::-webkit-scrollbar { display: none; }
 
 /* A quiet gap between the channel dropdown and the home icon. */
 .cd-topnav-chip-gap { flex: 0 0 auto; width: var(--sp-5); }
@@ -1590,13 +1593,26 @@ select optgroup {
 @media (max-width: 760px) {
   .cd-topnav-chrome { height: 56px; gap: var(--sp-3); padding-inline: 16px; }
   .cd-brand .brand-sub { display: none; }
-  .cd-topnav .top-workspace b { max-width: 96px; }
+  .cd-topnav .top-workspace b { max-width: 80px; }
   .cd-signout { padding: var(--sp-2); }
   .cd-signout span { display: none; }
   .cd-account { padding: var(--sp-2); }
   .cd-account-meta { display: none; }
-  .cd-topnav-secondary { padding-inline: 16px; gap: var(--sp-2); }
-  .cd-topnav-tabs { -webkit-overflow-scrolling: touch; }
+  .cd-topnav-secondary { padding-inline: 12px; gap: var(--sp-2); height: 44px; }
+  .cd-topnav-workspace-col { gap: var(--sp-1); }
+  .cd-topnav-chip { flex-wrap: nowrap; }
+  .cd-topnav-tabs { -webkit-overflow-scrolling: touch; padding-inline: 0; }
+  .cd-topnav-tabs .cd-tab { padding: 0 var(--sp-2); font-size: 12px; }
+}
+@media (max-width: 480px) {
+  .cd-topnav-chrome { gap: var(--sp-2); padding-inline: 10px; }
+  .cd-topnav .top-workspace b { max-width: 60px; font-size: 12px; }
+  .cd-topnav .top-workspace > span { font-size: 9px; }
+  .cd-topnav-secondary { gap: var(--sp-1); padding-inline: 10px; }
+  .cd-topnav-chip-gap { width: var(--sp-2); }
+  .cd-topnav-tabs { gap: var(--sp-1); }
+  .cd-topnav-tabs .cd-tab { padding: 0 var(--sp-1); font-size: 11px; }
+  .cd-topnav-tabs .cd-tab svg { width: 12px; height: 12px; }
 }
 
 /* ============================================================================
@@ -1719,6 +1735,18 @@ select optgroup {
   box-shadow: var(--shadow-sm), var(--edge-hi);
 }
 .profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+
+/* Profile avatar edit pencil — bottom-right corner, shown on own profile only. */
+.profile-hero .avatar-edit { position: relative; display: inline-block; }
+.profile-hero .avatar-edit input[type="file"] { display: none; }
+.profile-hero .avatar-edit .avatar-edit-btn {
+  position: absolute; bottom: 2px; right: 2px;
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: hsl(0 0% 0% / .55); border: 2px solid hsl(var(--background));
+  cursor: pointer; transition: transform .15s, border-color .15s;
+}
+.profile-hero .avatar-edit .avatar-edit-btn:hover { transform: scale(1.1); border-color: hsl(var(--accent)); }
 
 /* Track-history rows stay inert when browsing someone else's profile — the
    vault is members-only, so there is nowhere to link them to. */
@@ -5820,6 +5848,21 @@ select optgroup {
 }
 .cd-freshness-refresh:hover { border-color: hsl(var(--accent) / .5); }
 .cd-freshness-refresh:disabled { opacity: .55; cursor: default; }
+
+/* Auto-sync indicator — subtle pulse shown when the 10-minute background
+   refresh is actively pulling fresh YouTube data. */
+.cd-freshness-autosync {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 999px;
+  color: hsl(var(--accent)); background: hsl(var(--accent) / .1);
+  border: 1px solid hsl(var(--accent) / .2);
+  font: 10px var(--app-font-mono); letter-spacing: .04em; text-transform: uppercase;
+  animation: autosyncPulse 2s ease-in-out infinite;
+}
+@keyframes autosyncPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .6; }
+}
 
 /* Toolbar ------------------------------------------------------------------ */
 .cd-analytics-toolbar {

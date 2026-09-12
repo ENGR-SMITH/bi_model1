@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useUser } from "@clerk/react";
-import { FileText, FolderOpen, HardDrive, Loader2, Lock, Upload, X } from "lucide-react";
+import { useClerk, useUser } from "@clerk/react";
+import { FileText, FolderOpen, HardDrive, Loader2, Lock, Pencil, Upload, X } from "lucide-react";
 import {
   getGetAccountQuotaQueryKey,
   getGetUserCvQueryKey,
@@ -25,6 +25,7 @@ import { PaymentLoadingOverlay } from "./payment-loading";
 
 export function ProfilePage({ projectCount }: { projectCount: number }) {
   const { user } = useUser();
+  const clerk = useClerk();
   const [buyOpen, setBuyOpen] = useState(false);
   const quota = useGetAccountQuota();
 
@@ -48,11 +49,33 @@ export function ProfilePage({ projectCount }: { projectCount: number }) {
       </div>
 
       <section className="paper-card profile-card">
-        {user?.imageUrl ? (
-          <img src={user.imageUrl} alt="" className="profile-page-avatar" />
-        ) : (
-          <span className="profile-page-avatar profile-page-avatar-initial">{initials}</span>
-        )}
+        <div className="avatar-edit">
+          {user?.imageUrl ? (
+            <img src={user.imageUrl} alt="" className="profile-page-avatar" />
+          ) : (
+            <span className="profile-page-avatar profile-page-avatar-initial">{initials}</span>
+          )}
+          <label className="avatar-edit-btn" title="Update profile photo">
+            <Pencil className="h-3 w-3 text-white drop-shadow" />
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                try {
+                  const url = URL.createObjectURL(file);
+                  await clerk.user?.setProfileImage({ file: url });
+                  URL.revokeObjectURL(url);
+                } catch {
+                  // Upload failed — Clerk-side image stays.
+                }
+                event.target.value = '';
+              }}
+            />
+          </label>
+        </div>
         <div className="min-w-0">
           <h2>{displayName}</h2>
           {email && <p>{email}</p>}

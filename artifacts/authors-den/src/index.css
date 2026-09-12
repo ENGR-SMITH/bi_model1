@@ -1429,7 +1429,17 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
 .brief-modal, .note-modal { width: min(560px, 100%); }.brief-modal textarea, .note-modal textarea { min-height: 120px; }.brief-modal h2, .note-modal h2 { font-size: 25px; }
 /* ---- Profile page: project-count bar + CV card ---- */
 .profile-page { max-width: 760px; }
-.profile-card { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
+.profile-card { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; position: relative; }
+.profile-card .avatar-edit { position: relative; display: inline-block; }
+.profile-card .avatar-edit input[type="file"] { display: none; }
+.profile-card .avatar-edit .avatar-edit-btn {
+  position: absolute; bottom: 2px; right: 2px;
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: hsl(0 0% 0% / .55); border: 2px solid hsl(var(--background));
+  cursor: pointer; transition: transform .15s, border-color .15s;
+}
+.profile-card .avatar-edit .avatar-edit-btn:hover { transform: scale(1.1); border-color: hsl(var(--accent)); }
 .profile-page-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
 .profile-page-avatar-initial { display: grid; place-items: center; background: hsl(var(--accent) / .18); color: hsl(var(--accent)); font: 700 22px var(--app-font-serif); }
 .profile-card h2 { font: 700 24px var(--app-font-serif); letter-spacing: -.03em; margin: 0; }

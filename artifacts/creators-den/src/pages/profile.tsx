@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'wouter';
-import { useUser } from '@clerk/react';
-import { Activity, ArrowLeft, Check, ChevronRight, Copy, Eye, Film, LockKeyhole, UserRound } from 'lucide-react';
+import { useClerk, useUser } from '@clerk/react';
+import { Activity, ArrowLeft, Check, ChevronRight, Copy, Eye, Film, LockKeyhole, Pencil, UserRound } from 'lucide-react';
 import { nexetUid } from '@/lib/nexet-uid';
 import {
   getGetUserProfileQueryKey,
@@ -215,6 +215,7 @@ export default function ProfilePage() {
 
   const viewingSelf = !params.userId || params.userId === user?.id;
   const profileUserId = params.userId ?? user?.id ?? '';
+  const clerk = useClerk();
 
   const profile = useGetUserProfile(params.userId ?? '', {
     query: { queryKey: getGetUserProfileQueryKey(params.userId ?? ''), enabled: Boolean(params.userId) },
@@ -290,13 +291,37 @@ export default function ProfilePage() {
               so the card's content is balanced instead of hugging one side. */}
           <div className="profile-bill-main">
             <div className="profile-hero">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="" className="profile-avatar" data-testid="profile-avatar" />
-              ) : (
-                <span className="profile-avatar" aria-hidden data-testid="profile-avatar">
-                  <UserRound size={24} />
-                </span>
-              )}
+              <div className="avatar-edit">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" className="profile-avatar" data-testid="profile-avatar" />
+                ) : (
+                  <span className="profile-avatar" aria-hidden data-testid="profile-avatar">
+                    <UserRound size={24} />
+                  </span>
+                )}
+                {viewingSelf && (
+                  <label className="avatar-edit-btn" title="Update profile photo">
+                    <Pencil className="h-3 w-3 text-white drop-shadow" />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const url = URL.createObjectURL(file);
+                          await clerk.user?.setProfileImage({ file: url });
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          // Upload failed — Clerk-side image stays.
+                        }
+                        event.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
               <div className="profile-hero-id">
                 <h1>{displayName}</h1>
                 <p className="profile-sub">{email || `@${profileUserId.slice(0, 12)}`}</p>

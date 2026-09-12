@@ -89,8 +89,10 @@ export function isBelowMedian(value: number | null | undefined, median: number |
 /** Pick the best thumbnail URL from a catalog thumbnails object (unknown → null). */
 export function pickThumbnailUrl(thumbnails: unknown): string | null {
   if (!thumbnails || typeof thumbnails !== 'object') return null;
-  const t = thumbnails as Record<string, { url?: string } | undefined>;
-  return t.high?.url ?? t.default?.url ?? null;
+  const t = thumbnails as Record<string, { url?: string; url_c?: string; url_d?: string; url_b?: string; } | undefined>;
+  // YouTube returns: high (120x90), medium (480x360), default (120x90), standard (640x480)
+  // Prefer the highest resolution available.
+  return t.standard?.url ?? t.medium?.url ?? t.high?.url ?? t.default?.url ?? t.high?.url_c ?? t.medium?.url_c ?? t.default?.url_c ?? null;
 }
 
 export const SORT_LABELS: Record<string, string> = {
