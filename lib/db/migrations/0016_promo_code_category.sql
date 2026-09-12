@@ -9,4 +9,6 @@
 -- Storage and project subscriptions no longer accept promo codes at all; that
 -- is enforced in the API, not here.
 
-ALTER TABLE nexet_promo_codes ADD COLUMN category text;
+-- IF NOT EXISTS so re-running against an already-migrated database (or a
+-- Supabase preview branch) is a no-op rather than an error.
+ALTER TABLE nexet_promo_codes ADD COLUMN IF NOT EXISTS category text;
