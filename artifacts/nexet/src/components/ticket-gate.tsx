@@ -93,7 +93,12 @@ export function TicketGate({
         {children}
       </div>
       {!active && canPreview && (
-        <FreePreviewStrip slug={slug} name={name} previewing={access.data?.tourActive === true} />
+        <FreePreviewStrip
+          slug={slug}
+          name={name}
+          previewing={access.data?.tourActive === true}
+          tourMinutes={access.data?.tourMinutes ?? 10}
+        />
       )}
       {!active && !canPreview && <PassCoupon slug={slug} name={name} onPurchased={() => void status.refetch()} />}
 
@@ -203,10 +208,14 @@ function FreePreviewStrip({
   slug,
   name,
   previewing,
+  tourMinutes,
 }: {
   slug: 'authors' | 'content-creators';
   name: string;
   previewing: boolean;
+  /** How long this den's free tour runs — 20 minutes in the Author Den, 10 in
+   * the Creators Den. Comes from the server so the promise is the real one. */
+  tourMinutes: number;
 }) {
   const denPath = slug === 'authors' ? '/authors-den/' : '/creators-den/';
   return (
@@ -220,7 +229,7 @@ function FreePreviewStrip({
         </span>
         <div className="min-w-0">
           <p className="text-xs font-semibold text-white">
-            {previewing ? `You're previewing ${name} free` : `Preview ${name} free for 10 minutes`}
+            {previewing ? `You're previewing ${name} free` : `Preview ${name} free for ${tourMinutes} minutes`}
           </p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
             {previewing

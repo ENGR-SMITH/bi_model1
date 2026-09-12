@@ -52,6 +52,25 @@ function barPercent(used: number, total: number): number {
   return total > 0 ? Math.min(100, (used / total) * 100) : 0;
 }
 
+/**
+ * How much of a subscription period is actually left, in the words a customer
+ * reads. Paired with the exact end date everywhere a subscription is shown so
+ * the truth is never a bare date: a pass granted by a promo code can be as
+ * short as a day or two, and "Active until Oct 12" alone read like a month no
+ * matter what the code really gave.
+ */
+function remainingLabel(periodEnd: string): string {
+  const ms = new Date(periodEnd).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return '';
+  if (ms <= 0) return 'ended';
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 60) return minutes <= 1 ? 'under a minute left' : `${minutes} minutes left`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours === 1 ? '1 hour left' : `${hours} hours left`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? '1 day left' : `${days} days left`;
+}
+
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -309,7 +328,7 @@ export default function SubscriptionsPage() {
             {data?.current.filter((s) => s.active).map((sub) => (
               <span key={sub.id} className="inline-flex items-center gap-1.5 rounded-full bg-[#34d399]/10 px-3 py-1 font-mono-ui text-[10px] uppercase tracking-[.12em] text-[#34d399]">
                 <PiCheckCircleDuotone className="h-3 w-3" />
-                {sub.planLabel.split(' ').slice(0, 2).join(' ')} · until {formatDate(sub.periodEnd)}
+                {sub.planLabel.split(' ').slice(0, 2).join(' ')} · until {formatDate(sub.periodEnd)} · {remainingLabel(sub.periodEnd)}
               </span>
             ))}
           </div>
@@ -431,7 +450,7 @@ export default function SubscriptionsPage() {
                           <div className="space-y-3">
                             <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#34d399]/25 bg-[#34d399]/10 px-4 py-3.5 text-center text-xs font-semibold text-[#34d399]" data-testid={`plan-active-${plan.planId}`}>
                               <PiCheckDuotone className="h-3.5 w-3.5" />
-                              Active until {formatDate(activeSub.periodEnd)}
+                              Active until {formatDate(activeSub.periodEnd)} · {remainingLabel(activeSub.periodEnd)}
                             </span>
                             <AutoRenewNote sub={activeSub} />
                           </div>
@@ -488,7 +507,10 @@ export default function SubscriptionsPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-semibold text-zinc-400">{formatDate(sub.periodStart)} → {formatDate(sub.periodEnd)}</p>
-                    <p className={`font-mono-ui text-[10px] uppercase tracking-[.14em] ${sub.active ? 'text-[#34d399]' : 'text-zinc-500'}`}>{sub.status}</p>
+                    <p className={`font-mono-ui text-[10px] uppercase tracking-[.14em] ${sub.active ? 'text-[#34d399]' : 'text-zinc-500'}`}>
+                      {sub.status}
+                      {sub.active ? ` · ${remainingLabel(sub.periodEnd)}` : ''}
+                    </p>
                   </div>
                 </li>
               ))}
