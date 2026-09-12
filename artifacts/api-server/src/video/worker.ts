@@ -210,12 +210,16 @@ export async function enqueueAssetJobs(
   }
 }
 
-/** Re-queues a single PROXY job for an asset whose file went missing on disk. */
-export async function requeueProxyJob(projectId: string, assetId: string): Promise<void> {
+/**
+ * Re-queues a single PROXY job for an asset whose file went missing on disk.
+ * Returns the new job's id so callers (proxy-recovery) can log what they did.
+ */
+export async function requeueProxyJob(projectId: string, assetId: string): Promise<string> {
   const job = { id: randomUUID(), projectId, assetId, type: "PROXY" as const };
   await db.insert(nexetVideoJobsTable).values(job);
   emitJobProgress({ projectId, jobId: job.id, type: job.type, status: "QUEUED" });
   await enqueueBullMqJob(job);
+  return job.id;
 }
 
 /** Queues a multi-cam waveform sync between `assetId` (primary) and `targetAssetId`. */
@@ -1399,12 +1403,29 @@ export async function runJob(job: NexetVideoJob): Promise<void> {
   }
 }
 
+/**
+ * Job ids this process is executing right now. The polling fallback is the only
+ * thing that runs jobs in-process, so a RUNNING row that is NOT in this set is
+ * a leftover from a process that died mid-job (a restart/deploy): nothing will
+ * ever finish it, and the asset it belongs to stays at UPLOADED forever.
+ * proxy-recovery.ts uses this to tell a live encode apart from a corpse.
+ */
+const inFlightJobIds = new Set<string>();
+
+/** True while this process is executing `jobId` (see `inFlightJobIds`). */
+export function isJobInFlight(jobId: string): boolean {
+  return inFlightJobIds.has(jobId);
+}
+
 /** Polling-loop entry: run a job but never throw (the loop keeps going). */
 async function claimAndRun(job: NexetVideoJob): Promise<void> {
+  inFlightJobIds.add(job.id);
   try {
     await runJob(job);
   } catch (error) {
     logger.error({ jobId: job.id, err: error }, "Worker cycle error");
+  } finally {
+    inFlightJobIds.delete(job.id);
   }
 }
 

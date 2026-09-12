@@ -98,6 +98,7 @@ import {
   uploadDir,
 } from "../video/worker";
 import { ensureLocalCopy, getStore, r2Configured } from "../video/object-storage";
+import { recoverStuckProxy } from "../video/proxy-recovery";
 import {
   parseTimelineEdl,
   resolveEdlEvents,
@@ -275,7 +276,8 @@ router.get(
       return;
     }
 
-    if (!(await resolveProjectAccess(params.data.projectId, userId))) {
+    const access = await resolveProjectAccess(params.data.projectId, userId);
+    if (!access) {
       res.status(403).json({ error: "You are not a member of this project" });
       return;
     }
@@ -288,6 +290,15 @@ router.get(
     if (!asset || asset.projectId !== params.data.projectId) {
       res.status(404).json({ error: "Asset not found" });
       return;
+    }
+
+    // Self-healing proxy recovery (video/proxy-recovery.ts): this is the route
+    // the player polls while the proxy is still being built, so an asset left
+    // stuck by a dead PROXY job gets one more chance here instead of showing
+    // "Building the proxy…" forever. Fire-and-forget and bounded; members only
+    // (a public read-only viewer must not nudge the queue).
+    if (access.kind === "member") {
+      void recoverStuckProxy(asset);
     }
 
     const files = await db

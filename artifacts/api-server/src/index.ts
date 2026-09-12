@@ -5,6 +5,7 @@ import { logger } from "./lib/logger";
 import { initRealtime } from "./realtime";
 import { startVideoWorker } from "./video/worker";
 import { startStorageMaintenance } from "./video/storage-maintenance-runner";
+import { startProxyRecovery } from "./video/proxy-recovery-runner";
 import { startChannelAnalyticsSync } from "./youtube/analytics-runner";
 import { startWhopReconciliation } from "./whop/reconcile-runner";
 import { isLoopbackRedirectUri, oauthConfigured, oauthRedirectUri } from "./channels/oauth";
@@ -55,6 +56,10 @@ server.listen(port, () => {
   initRealtime(server);
   startVideoWorker();
   startStorageMaintenance();
+  // Re-queues PROXY jobs that died (failed, or RUNNING under a process that
+  // stopped mid-encode) so an asset can never sit at "Building the proxy…"
+  // forever — see video/proxy-recovery.ts.
+  startProxyRecovery();
   startChannelAnalyticsSync();
   // Settles PENDING Whop checkout intents against Whop's API, so a missed
   // payment.succeeded webhook can never leave a paying customer without their
