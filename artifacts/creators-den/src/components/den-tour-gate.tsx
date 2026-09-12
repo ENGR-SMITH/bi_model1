@@ -188,7 +188,7 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
               Your tour has ended
             </h2>
             <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: '#a1a1a1' }}>
-              The 10-minute preview of the {TOUR_LABEL[category]} is over. Buy the{' '}
+              The {data?.tourMinutes ?? 10}-minute preview of the {TOUR_LABEL[category]} is over. Buy the{' '}
               {category === 'authors' ? 'Authors &amp; Writers' : 'Content Creators'} pass to come back — you&apos;re
               being returned to Nexet to get it.
             </p>

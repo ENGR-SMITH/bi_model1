@@ -4,7 +4,7 @@ import {
   AlertTriangle, Archive, ArrowLeft, ArrowRight, BookOpen, Bold, Check, CheckCircle2, ChevronDown, CircleHelp,
   ClipboardList, Clock3, Copy, Download, Eraser, ExternalLink, FileDown, FileText, FolderOpen,
   GitFork, Globe2, Heading1, Heading2, Highlighter, ImagePlus,  Italic, Library, Link2, List,
-  ListOrdered, Lock, LockOpen, MapPin, Menu, Mic, Move, PanelLeft, PenLine, Play, Plus,
+  ListOrdered, Lock, LockOpen, MapPin, Megaphone, Menu, Mic, Move, PanelLeft, PenLine, Play, Plus,
   Printer, Quote, Redo2, RefreshCw, RotateCcw, Save, Search, Send, Settings, ShieldCheck, Sparkles, Strikethrough, Trash2,
   Type, Undo2, Upload, Users, WandSparkles, X, XCircle, Zap, MessageCircle
 } from "lucide-react";
@@ -203,9 +203,9 @@ function App() {
   );
   const [editorSceneId, setEditorSceneId] = useState<string | null>(null);
   const [mobileNav, setMobileNav] = useState(false);
-  // The rail starts collapsed; hovering the sidebar auto-expands it.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const [theme, setTheme] = useState(() => localStorage.getItem("authors-den-theme") ?? "dark");
+  // The desk opens on the light room — vellum and brass. Anyone who has picked
+  // a room of their own keeps it (the choice is stored per device).
+  const [theme, setTheme] = useState(() => localStorage.getItem("authors-den-theme") ?? "light");
   const [modal, setModal] = useState<"project" | "import" | "help" | "tutorial" | null>(null);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -758,6 +758,10 @@ function App() {
       onError: (error) => notify(apiErrorText(error, "The call could not be opened. You may already have an open call for that role.")),
     });
   };
+  // "Post on Pitch Board" publishes to the den's OWN arena, exactly like
+  // "Call for a role" does: the frozen seed opens in the Arena post room, here
+  // in the Author Den. It used to bounce the author out to the Nexet pitch
+  // board page, which is a different app with a different board.
   const publishSeed = (item: Project, brief: { plotConstraints: string; desiredRole: string; respondentLimit: 0 | 3 | 5 | 10 }) => {
     const posted = item.scenes.find((scene) => scene.content.trim());
     createSeed.mutate({
@@ -782,8 +786,9 @@ function App() {
     }, {
       onSuccess: (seed) => {
         setPublishDraft(null);
-        notify("Seed published to the pitch board");
-        window.location.href = `/authors/pitch-board/seed/${seed.id}`;
+        notify("Seed published to the Arena");
+        setArenaPostId(seed.id);
+        setView("arena-post");
       },
       onError: () => notify("The seed could not be published. Check that you are signed in and try again."),
     });
@@ -878,8 +883,8 @@ function App() {
   const arenaOpen = view === "arena" || view === "arena-post" || view === "arena-mine";
   const exportFile = async (format: ExportFormat) => { if (!project) return; await exportProject({ ...project, scenes: project.scenes.map((scene) => ({ id: scene.id, title: scene.title, synopsis: scene.synopsis, content: scene.content, status: scene.status, pov: scene.pov })) }, format); notify(format === "print" ? "Print window opened" : `Downloaded ${format.toUpperCase()}`); };
   const importFile = (file: File) => { const reader = new FileReader(); reader.onload = () => { try { const raw = String(reader.result); const parsed = file.name.endsWith(".json") || file.name.endsWith(".msk") ? JSON.parse(raw) : { ...sample(), title: raw.split("\n")[0] || "Imported work", scenes: [{ ...sample().scenes[0], id: uid(), title: "Imported draft", content: textToHtml(raw) }] }; setProjects((items) => [{ ...sample(), ...parsed, id: uid(), isTutorial: false, updated: now() }, ...items]); setModal(null); notify("Import complete"); } catch { notify("That file could not be read"); } }; reader.readAsText(file); };
-    return <div className={`app-shell ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
-      <Sidebar view={view} setView={setView} project={project} projects={projects} openProject={openProject} openEditor={openEditor} mobile={mobileNav} close={() => setMobileNav(false)} onNew={() => { setDraftNudge(false); setModal("project"); }} onTutorial={startTutorial} workspaceOpen={sidebarWorkspaceOpen} setWorkspaceOpen={setSidebarWorkspaceOpen} mode={mode} hasUserProject={hasUserProject} notify={notify} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
+    return <div className="app-shell">
+      <Sidebar view={view} setView={setView} project={project} projects={projects} openProject={openProject} openEditor={openEditor} mobile={mobileNav} close={() => setMobileNav(false)} onNew={() => { setDraftNudge(false); setModal("project"); }} onTutorial={startTutorial} workspaceOpen={sidebarWorkspaceOpen} setWorkspaceOpen={setSidebarWorkspaceOpen} mode={mode} hasUserProject={hasUserProject} notify={notify} />
     <main className="main-stage">
       <header className="topbar">
         <div className="topbar-chrome">
@@ -901,9 +906,13 @@ function App() {
             <div className="topnav-chip">
               <div className="top-workspace-wrap" onPointerLeave={() => setTopWorkspaceOpen(false)}><button className="top-workspace" onClick={() => setTopWorkspaceOpen((open) => !open)}><span>Workspace</span><b>{project?.title ?? "Your projects"}</b><ChevronDown size={13} /></button>{topWorkspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setTopWorkspaceOpen(false); }} onNew={() => { setModal("project"); setTopWorkspaceOpen(false); }} />}</div>
             </div>
-            <div className="topnav-chip">
-              <TopArenaButton active={arenaOpen} onClick={() => setView("arena")} />
-            </div>
+            {/* The Arena notch appears in the top bar only while the Arena is
+                open — its permanent home is the top of the sidebar. */}
+            {arenaOpen && (
+              <div className="topnav-chip">
+                <TopArenaButton active onClick={() => setView("arena")} />
+              </div>
+            )}
           </div>
           {/* The Draft/Lesson switch sits on the second row with the workspace
               chips, so the Explore search keeps the main bar's centre. */}
@@ -948,7 +957,8 @@ function WorkspaceMenu({ projects, project, onSelect, onNew }: { projects: Proje
   return <div className="workspace-menu" onPointerLeave={(event) => event.stopPropagation()}><span className="menu-caption">MY PROJECTS</span>{projects.map((item) => <button key={item.id} className={item.id === project?.id ? "selected" : ""} onClick={() => onSelect(item)}><span className="menu-project-mark">{item.title.slice(0, 1)}</span><span>{item.title}<small>{item.template}</small></span><Check size={14} /></button>)}<button className="menu-new" onClick={onNew}><Plus size={14} /> New project</button></div>;
 }
 
-function Sidebar({ view, setView, project, projects, openProject, openEditor, mobile, close, onNew, onTutorial, workspaceOpen, setWorkspaceOpen, mode, hasUserProject, notify, collapsed, setCollapsed }: { view: View; setView: (view: View) => void; project?: Project; projects: Project[]; openProject: (project: Project, view?: View, sceneId?: string) => void; openEditor: (sceneId?: string) => void; mobile: boolean; close: () => void; onNew: () => void; onTutorial: () => void; workspaceOpen: boolean; setWorkspaceOpen: (open: boolean) => void; mode: "lesson" | "draft"; hasUserProject: boolean; notify: (message: string) => void; collapsed: boolean; setCollapsed: (collapsed: boolean) => void }) {
+function Sidebar({ view, setView, project, projects, openProject, openEditor, mobile, close, onNew, onTutorial, workspaceOpen, setWorkspaceOpen, mode, hasUserProject, notify }: { view: View; setView: (view: View) => void; project?: Project; projects: Project[]; openProject: (project: Project, view?: View, sceneId?: string) => void; openEditor: (sceneId?: string) => void; mobile: boolean; close: () => void; onNew: () => void; onTutorial: () => void; workspaceOpen: boolean; setWorkspaceOpen: (open: boolean) => void; mode: "lesson" | "draft"; hasUserProject: boolean; notify: (message: string) => void }) {
+  const arenaOpen = view === "arena" || view === "arena-post" || view === "arena-mine";
   const nav: [View, string, ReactNode][] = [["general", "General", <PenLine size={17} />], ["characters", "Characters", <Users size={17} />], ["world", "World", <Globe2 size={17} />], ["plots", "Plots", <Sparkles size={17} />], ["outline", "Outline", <ClipboardList size={17} />], ["editor", "Draft", <BookOpen size={17} />]];
    // Explore, Notifications, Profile and the Arena now live in the top bar, so
    // the STUDIO group keeps only the page-level tools.
@@ -957,8 +967,11 @@ function Sidebar({ view, setView, project, projects, openProject, openEditor, mo
   // The Arena is a den-level room like Explore: reachable without a project.
   const openRoom = (id: View) => ["profile", "explore", "notifications", "arena", "arena-post", "arena-mine"].includes(id);
   const go = (id: View) => { if (openRoom(id)) { setView(id); close(); return; } if (gated) { notify("Create a project first to open your current work"); return; } if (id === "editor") openEditor(); else setView(id); close(); };
-   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""} ${collapsed ? "sidebar-collapsed" : ""}`} onMouseEnter={() => !mobile && setCollapsed(false)} onMouseLeave={() => !mobile && setCollapsed(true)}><div className="sidebar-mobile-head"><button className="icon-btn sidebar-close" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
+   return <aside className={`sidebar ${mobile ? "sidebar-open" : ""}`}><div className="sidebar-mobile-head"><button className="icon-btn sidebar-close" onClick={close} aria-label="Close navigation"><X size={17} /></button></div>
      <div className="workspace-switch-wrap" onPointerLeave={() => setWorkspaceOpen(false)}><button className={`workspace-switch ${workspaceOpen ? "open" : ""}`} onClick={() => setWorkspaceOpen(!workspaceOpen)}><span className="workspace-icon"><Library size={14} /></span><span className="workspace-copy"><small>WORKSPACE</small><strong>My writing desk</strong></span><ChevronDown size={14} /></button>{workspaceOpen && <WorkspaceMenu projects={projects} project={project} onSelect={(item) => { openProject(item); setWorkspaceOpen(false); }} onNew={() => { onNew(); setWorkspaceOpen(false); }} />}</div>
+    {/* The Arena sits at the top of the rail — it is a den-level room like
+        Explore, reachable with or without a project open. */}
+    <button className={`nav-item nav-item-arena ${arenaOpen ? "active" : ""}`} onClick={() => go("arena")} data-testid="sidebar-arena"><Megaphone size={17} /><span>Arena</span></button>
     <button className={`nav-item ${view === "home" ? "active" : ""}`} onClick={() => { setView("home"); close(); }}><FolderOpen size={17} /><span>Projects</span><span className="nav-count">{projects.length}</span></button>
      <div className="nav-label">CURRENT WORK</div>{project ? nav.map(([id, label, icon]) => <button key={id} className={`nav-item ${view === id ? "active" : ""} ${gated ? "nav-item-gated" : ""}`} onClick={() => go(id)} disabled={gated} title={gated ? "Create a project first before opening current work" : undefined}>{icon}<span>{label}</span>{id === "outline" && <span className="nav-count">{project.scenes.length}</span>}{gated && <span className="nav-lock">Create first</span>}</button>) : <div className="empty-sidebar">Open a project to begin.</div>}
     <div className="nav-label nav-label-spaced">STUDIO</div>{aux.map(([id, label, icon]) => <button key={id} className={`nav-item ${view === id ? "active" : ""}`} onClick={() => go(id)}>{icon}<span>{label}</span></button>)}
@@ -1969,8 +1982,12 @@ function SettingsPage({ project, update, notify, exportFile, theme, setTheme }: 
   const { user } = useUser();
   const applyTheme = (value: string) => { setTheme(value); notify(`${value === "dark" ? "Night" : "Light"} desk applied`); };
   const themes = [{ id: "light", label: "Light desk", detail: "Vellum & brass", swatch: "light-swatch" }, { id: "dark", label: "Night desk", detail: "Ink & amber", swatch: "dark-swatch" }, { id: "sage", label: "Sage room", detail: "Moss & paper", swatch: "sage-swatch" }, { id: "rose", label: "Rose studio", detail: "Blush & ink", swatch: "rose-swatch" }];
+  // The Clerk account's own picture, with the name initial as the fallback for
+  // an account that has none (this is the identity the desk is signed in as,
+  // so it should look like that person).
   const initial = (user?.fullName || user?.username || user?.firstName || "W").slice(0, 1).toUpperCase();
-  return <div className="page"><PageHeader eyebrow="THE DESK" title="Settings" description="Tune the room around the way you think." guide="Settings keeps the desk portable, personal, and yours." /><div className="settings-layout"><section className="paper-card settings-card account-card"><div className="card-heading"><div><span className="eyebrow">YOUR ACCOUNT</span><h2>Who is at this desk</h2></div><span className="account-avatar">{initial}</span></div><p className="setting-copy">This is the identity shared with your Nexet account — the name creators see when you answer their seed, and the studio both of you keep in sync after a fork is accepted.</p><div className="account-row"><span>Display name</span><b>{user?.fullName || user?.username || user?.firstName || "Writer"}</b></div><div className="account-row"><span>Email</span><b>{user?.primaryEmailAddress?.emailAddress ?? "—"}</b></div><div className="account-row"><span>Author on projects</span><b>{project?.author || "—"}</b></div></section><section className="paper-card settings-card"><div className="card-heading"><div><span className="eyebrow">APPEARANCE</span><h2>Choose your room</h2></div></div><p className="setting-copy">Pick a color combination for the writing desk. Your choice stays saved on this device.</p><div className="theme-grid">{themes.map((item) => <button key={item.id} className={`theme-choice ${theme === item.id ? "selected" : ""}`} onClick={() => applyTheme(item.id)}><span className={`theme-preview ${item.swatch}`}><i /><i /><i /></span><span><b>{item.label}</b><small>{item.detail}</small></span>{theme === item.id && <Check size={15} />}</button>)}</div><div className="setting-row"><div><b>Autosave snapshots</b><small>Keep a revision when a scene changes.</small></div><input type="checkbox" defaultChecked /></div></section><section className="paper-card settings-card"><div className="card-heading"><div><span className="eyebrow">PORTABILITY</span><h2>Take it with you</h2></div><Download size={18} /></div><p className="setting-copy">Authors Den never locks your words away. Download the project as a portable file or finished document.</p><div className="export-grid"><button onClick={() => exportFile("json")}><FileDown size={15} /> Project JSON</button><button onClick={() => exportFile("docx")}><FileText size={15} /> Word (.docx)</button><button onClick={() => exportFile("pdf")}><FileText size={15} /> PDF</button><button onClick={() => exportFile("epub")}><BookOpen size={15} /> EPUB</button><button onClick={() => exportFile("rtf")}><FileText size={15} /> Rich text (.rtf)</button><button onClick={() => exportFile("txt")}><FileText size={15} /> Plain text</button><button onClick={() => exportFile("html")}><Globe2 size={15} /> HTML document</button><button onClick={() => exportFile("fdx")}><FileText size={15} /> Final Draft (.fdx)</button><button onClick={() => exportFile("md")}><FileText size={15} /> Markdown</button><button onClick={() => exportFile("odt")}><FileText size={15} /> OpenDocument (.odt)</button><button onClick={() => exportFile("doc")}><FileText size={15} /> Word 97 (.doc)</button><button onClick={() => exportFile("print")}><Printer size={15} /> Print</button></div></section><section className="paper-card settings-card danger-card"><div className="card-heading"><div><span className="eyebrow">LOCAL DATA</span><h2>Your browser desk</h2></div></div><p className="setting-copy">Changes save automatically in this browser. Export a copy whenever you move between devices.</p><button className="secondary-btn" onClick={() => { update({ updated: now() }); notify("Desk saved locally"); }}><Save size={15} /> Confirm local save</button></section></div></div>;
+  const accountAvatar = user?.imageUrl ? <img src={user.imageUrl} alt="" referrerPolicy="no-referrer" /> : initial;
+  return <div className="page"><PageHeader eyebrow="THE DESK" title="Settings" description="Tune the room around the way you think." guide="Settings keeps the desk portable, personal, and yours." /><div className="settings-layout"><section className="paper-card settings-card account-card"><div className="card-heading"><div><span className="eyebrow">YOUR ACCOUNT</span><h2>Who is at this desk</h2></div><span className="account-avatar" data-testid="settings-account-avatar">{accountAvatar}</span></div><p className="setting-copy">This is the identity shared with your Nexet account — the name creators see when you answer their seed, and the studio both of you keep in sync after a fork is accepted.</p><div className="account-row"><span>Display name</span><b>{user?.fullName || user?.username || user?.firstName || "Writer"}</b></div><div className="account-row"><span>Email</span><b>{user?.primaryEmailAddress?.emailAddress ?? "—"}</b></div><div className="account-row"><span>Author on projects</span><b>{project?.author || "—"}</b></div></section><section className="paper-card settings-card"><div className="card-heading"><div><span className="eyebrow">APPEARANCE</span><h2>Choose your room</h2></div></div><p className="setting-copy">Pick a color combination for the writing desk. Your choice stays saved on this device.</p><div className="theme-grid">{themes.map((item) => <button key={item.id} className={`theme-choice ${theme === item.id ? "selected" : ""}`} onClick={() => applyTheme(item.id)}><span className={`theme-preview ${item.swatch}`}><i /><i /><i /></span><span><b>{item.label}</b><small>{item.detail}</small></span>{theme === item.id && <Check size={15} />}</button>)}</div><div className="setting-row"><div><b>Autosave snapshots</b><small>Keep a revision when a scene changes.</small></div><input type="checkbox" defaultChecked /></div></section><section className="paper-card settings-card"><div className="card-heading"><div><span className="eyebrow">PORTABILITY</span><h2>Take it with you</h2></div><Download size={18} /></div><p className="setting-copy">Authors Den never locks your words away. Download the project as a portable file or finished document.</p><div className="export-grid"><button onClick={() => exportFile("json")}><FileDown size={15} /> Project JSON</button><button onClick={() => exportFile("docx")}><FileText size={15} /> Word (.docx)</button><button onClick={() => exportFile("pdf")}><FileText size={15} /> PDF</button><button onClick={() => exportFile("epub")}><BookOpen size={15} /> EPUB</button><button onClick={() => exportFile("rtf")}><FileText size={15} /> Rich text (.rtf)</button><button onClick={() => exportFile("txt")}><FileText size={15} /> Plain text</button><button onClick={() => exportFile("html")}><Globe2 size={15} /> HTML document</button><button onClick={() => exportFile("fdx")}><FileText size={15} /> Final Draft (.fdx)</button><button onClick={() => exportFile("md")}><FileText size={15} /> Markdown</button><button onClick={() => exportFile("odt")}><FileText size={15} /> OpenDocument (.odt)</button><button onClick={() => exportFile("doc")}><FileText size={15} /> Word 97 (.doc)</button><button onClick={() => exportFile("print")}><Printer size={15} /> Print</button></div></section><section className="paper-card settings-card danger-card"><div className="card-heading"><div><span className="eyebrow">LOCAL DATA</span><h2>Your browser desk</h2></div></div><p className="setting-copy">Changes save automatically in this browser. Export a copy whenever you move between devices.</p><button className="secondary-btn" onClick={() => { update({ updated: now() }); notify("Desk saved locally"); }}><Save size={15} /> Confirm local save</button></section></div></div>;
 }
 
 function TutorialDock({ step, onNext, onDismiss }: { step: number; onNext: () => void; onDismiss: () => void }) { const labels = ["Project shape", "Outline", "Draft", "Settings"]; return <div className="tutorial-dock"><span className="dock-arrow" /><div><span className="eyebrow">NEXT LESSON · {String(step + 1).padStart(2, "0")} / 04</span><b>{labels[step]}</b><small>Close the lesson above, explore this page, then continue when ready.</small></div><button className="primary-btn" onClick={onNext}>{step === labels.length - 1 ? "Finish tutorial" : "Next lesson"} <ArrowRight size={15} /></button><button className="icon-btn" onClick={onDismiss} aria-label="Dismiss lesson"><X size={15} /></button></div>; }
