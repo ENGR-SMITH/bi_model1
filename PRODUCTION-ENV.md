@@ -27,6 +27,7 @@ for, where to get the value, and what happens if it's missing.
 | 7 | `ADMIN_EMAIL` | Your own email | Yes — server **refuses to boot** without it |
 | 8 | `SESSION_SECRET` | Generate with `openssl rand -hex 32` | Yes — must be strong, **non-default** |
 | 9 | `WHOP_API_KEY` + `WHOP_ACCOUNT_ID` + `WHOP_PRODUCT_ID` + `WHOP_WEBHOOK_SECRET` | Whop dashboard (see §8) | Required for real payments (simulated checkouts are disabled in production) |
+| 10 | `YOUTUBE_OAUTH_CLIENT_ID` + `YOUTUBE_OAUTH_CLIENT_SECRET` (+ `NEXET_WEB_URL`) | Google Cloud Console (see §9) | Required for Creator Den channel linking |
 
 Plus a frontend key for three of the apps: `VITE_CLERK_PUBLISHABLE_KEY`
 (section 4). The **Oracle Admin** reads `CLERK_PUBLISHABLE_KEY` from the
@@ -249,6 +250,65 @@ keys) so no real money moves; swap in live keys for production.
 
 ---
 
+## 9. YouTube channel linking — Google Cloud setup (Creator Den)
+
+**What it is:** a Creator Den channel owner links their own YouTube channel,
+and the API syncs channel + per-video analytics using the stored (encrypted)
+refresh token. These are server-only credentials — never put them in a
+frontend `.env`.
+
+**Where to get them:** https://console.cloud.google.com → the **same project
+that owns the OAuth client** (check the project selector, top left):
+
+1. **Enable both APIs** — **APIs & Services → Library**, search and **Enable**:
+   - **YouTube Data API v3** — used by `youtube/v3/channels`,
+     `/playlistItems`, `/videos`
+   - **YouTube Analytics API** — used by `youtubeAnalytics/v2/reports`
+
+   Enabling them on a *different* project than the OAuth client is the classic
+   miss: they look enabled, but not where it counts. While the OAuth consent
+   screen is in **Testing**, also make sure the Google account you sign in with
+   is listed under **OAuth consent screen → Test users**.
+2. **Credentials → Create credentials → OAuth client ID → Web application**:
+   - **Authorized redirect URI** (byte-for-byte, no trailing slash):
+     `https://<your-domain>/creators-den/channels/oauth/callback`
+     (local dev: `http://localhost:5175/creators-den/channels/oauth/callback`)
+   - **Authorized JavaScript origin**: your web origin, e.g. `https://nexet.co`
+
+```env
+YOUTUBE_OAUTH_CLIENT_ID=...apps.googleusercontent.com
+YOUTUBE_OAUTH_CLIENT_SECRET=GOCSPX-...
+YOUTUBE_REDIRECT_URI=https://nexet.co/creators-den/channels/oauth/callback
+NEXET_WEB_URL=https://nexet.co            # derives the redirect URI when it is unset
+```
+
+**Gotchas:**
+- `YOUTUBE_REDIRECT_URI` falls back to
+  `${NEXET_WEB_URL}/creators-den/channels/oauth/callback`. In production a
+  loopback fallback is **refused at start** rather than sending Google a URI it
+  can never have registered (`redirect_uri_mismatch`).
+- Stray surrounding quotes and whitespace are stripped from the env values, but
+  Google still matches the rest **byte-for-byte**.
+- Linking is bound to `mine=true`, so the consenting Google account must
+  **own** the channel — a brand channel has to be selected on the consent
+  screen.
+- The PKCE verifier travels inside the sealed `state` token, so the callback
+  survives a restart, a spin-down, or landing on a second instance.
+
+**Error reasons → what to do.** The connect card (and the API logs) show
+Google's own `errors[0].reason`:
+
+| Google reason | Meaning / fix |
+|---|---|
+| `accessNotConfigured`, `SERVICE_DISABLED` | **YouTube Data API v3** is not enabled on the project the OAuth client belongs to. Enable it under APIs & Services → Library. |
+| `youtubeSignupRequired` | That Google account has no YouTube channel. Sign in with the account — or its brand channel — that owns the channel you want to link. |
+| `quotaExceeded`, `dailyLimitExceeded`, `rateLimitExceeded` | The project's Data API quota is spent. Wait for the reset, or raise it under APIs & Services → Quotas. |
+| `insufficientPermissions`, `ACCESS_TOKEN_SCOPE_INSUFFICIENT` | YouTube access was not granted on the consent screen. Disconnect, then reconnect and accept the permission. |
+| `invalid_grant` (token endpoint) | The stored refresh token is dead — the link is marked `REVOKED` and the UI offers Reconnect. |
+| `redirect_uri_mismatch` (token endpoint) | The URI sent is not registered on the OAuth client — compare `YOUTUBE_REDIRECT_URI` character by character. |
+
+---
+
 ## Before you flip the switch — checklist
 
 ```env
@@ -271,6 +331,7 @@ WHOP_WEBHOOK_SECRET=ws_...
 - [ ] DB schema pushed (`pnpm --filter db run push-force`)
 - [ ] Whop webhook URL points at `/api/whop/webhook`
 - [ ] Clerk dashboard: email verification link enabled + redirect URLs added
+- [ ] Google Cloud: **YouTube Data API v3** + **YouTube Analytics API** enabled on the OAuth client's project, and the redirect URI registered (section 9)
 - [ ] Deployed origins all listed in `CORS_ORIGINS`
 
 **If anything required is missing, the server tells you at boot** — it exits
