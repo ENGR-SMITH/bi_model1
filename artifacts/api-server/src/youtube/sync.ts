@@ -50,9 +50,20 @@ function reportTtlMs(): number {
   return (Number.isFinite(raw) && raw >= 1 ? raw : 360) * 60 * 1000;
 }
 
+/**
+ * How many videos one sync cycle refreshes. Each video costs one Analytics
+ * report query, so this is the per-cycle quota bound: the default is sized for
+ * the 10-minute cadence (144 cycles/day) to stay inside a 10k/day Analytics
+ * budget with room to spare for the channel + report calls.
+ *
+ * It is a WINDOW, not a slice of the newest videos: `syncVideoMetrics` orders
+ * by how stale a video's stored metrics are, so a channel with more videos
+ * than this still has every one of them refreshed in turn. Raise it for a
+ * small channel, lower it for a big one.
+ */
 function maxVideoQueries(): number {
   const raw = Number(process.env.YT_SYNC_MAX_VIDEO_QUERIES);
-  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 100;
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : 60;
 }
 
 // ---------------------------------------------------------------------------
@@ -329,18 +340,32 @@ export async function syncChannelMetrics(
   return stored;
 }
 
-/** Per-video daily snapshots for the most recent videos (quota-bounded). */
+/**
+ * Per-video daily snapshots, newest data first but every video in turn.
+ *
+ * Ordering is by how stale a video's stored metrics are (its latest snapshot
+ * day), not by publish date: each cycle refreshes the videos that have gone
+ * longest without one, so the window rotates through the whole catalog and a
+ * channel with hundreds of uploads still sees all of them updated instead of
+ * only the newest slice. Never-synced videos (no metrics at all) come first.
+ */
 export async function syncVideoMetrics(
   channelId: string,
   token: string,
   channelYoutubeId: string,
 ): Promise<number> {
   const videos = await db
-    .select()
+    .select({ video: nexetChannelVideosTable })
     .from(nexetChannelVideosTable)
+    .leftJoin(
+      nexetVideoDailyMetricsTable,
+      eq(nexetVideoDailyMetricsTable.videoRowId, nexetChannelVideosTable.id),
+    )
     .where(eq(nexetChannelVideosTable.channelId, channelId))
-    .orderBy(desc(nexetChannelVideosTable.publishedAt))
-    .limit(maxVideoQueries());
+    .groupBy(nexetChannelVideosTable.id)
+    .orderBy(sql`max(${nexetVideoDailyMetricsTable.day}) asc nulls first`)
+    .limit(maxVideoQueries())
+    .then((rows) => rows.map((row) => row.video));
 
   let stored = 0;
   for (const video of videos) {
