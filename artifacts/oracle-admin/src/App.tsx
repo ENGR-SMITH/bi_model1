@@ -214,6 +214,28 @@ function LoadingScreen() {
   );
 }
 
+/**
+ * Pull the reason out of a Clerk SDK error so a failed request says *why* —
+ * `form_identifier_not_found` (no such user on this instance) reads very
+ * differently from email-link sign-in being disabled, or the verification URL
+ * not being an allowed redirect URL. Without this the login screen collapses
+ * every one of those into the same sentence.
+ * ClerkAPIResponseError nests the detail in `.errors[]`; runtime errors carry
+ * a `code` on the error itself.
+ */
+function clerkErrorReason(error: unknown): string {
+  const err = error as {
+    errors?: Array<{ code?: string; longMessage?: string; message?: string }>;
+    code?: string;
+    message?: string;
+  };
+  const first = err?.errors?.[0];
+  const code = first?.code ?? err?.code;
+  const text = first?.longMessage ?? first?.message ?? err?.message;
+  if (code && text) return `${code} — ${text}`;
+  return code ?? text ?? 'unknown error';
+}
+
 function LoginScreen() {
   const { signIn } = useSignIn();
   const [email, setEmail] = useState('');
@@ -239,7 +261,9 @@ function LoginScreen() {
       });
       if (sendError) {
         setVerifying(false);
-        setMessage('That email could not receive a sign-in link. Check it and try again.');
+        setMessage(
+          `That email could not receive a sign-in link (${clerkErrorReason(sendError)}). Check it and try again.`,
+        );
         return;
       }
       // Resolves once the user clicks the link in the email (or it expires).
