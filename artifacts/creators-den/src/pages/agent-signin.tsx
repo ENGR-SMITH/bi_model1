@@ -136,10 +136,19 @@ export default function AgentSignInPage() {
           // app instead of leaving them stranded on this tab.
           summonDesktopApp();
         } else {
+          // The loopback receiver explains exactly which check failed (stale
+          // attempt, wrong instance, expired token) — show it instead of a
+          // generic dead end.
+          let detail = '';
+          try {
+            detail = ((await res.json()) as { error?: string }).error ?? '';
+          } catch {
+            // non-JSON body — fall back to the generic message
+          }
           setPhase('error');
           setError(
-            'The desktop app did not accept this sign-in (the link may have expired). ' +
-              'Close this tab and click “Sign up” again in Nexet Desktop Agent.',
+            (detail || 'The desktop app did not accept this sign-in (the link may have expired).') +
+              ' Close this tab and click “Sign up” again in Nexet Desktop Agent.',
           );
         }
       } catch {

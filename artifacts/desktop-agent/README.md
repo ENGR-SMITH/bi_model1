@@ -53,7 +53,7 @@ Values are resolved in this order — first one wins, per field:
 {
   "apiBaseUrl": "https://nexet.co",
   "webAppUrl": "https://nexet.co",
-  "clerkPublishableKey": "pk_test_...",
+  "clerkPublishableKey": "pk_live_...",
   "updateUrl": "https://pub-<hash>.r2.dev/desktop-agent"
 }
 ```
@@ -72,7 +72,7 @@ relaunch to fall back to the built-in default.
 | ----------------------- | -------------------------------------- |
 | `NEXET_API_URL`        | API base, no trailing slash. Default `https://nexet.co`; set `http://localhost:3000` to develop |
 | `NEXET_WEB_URL` / `webAppUrl` | Public origin of the Nexet web app whose `/agent-signin` page completes the sign-in. Default `https://nexet.co`; point it at your dev server locally. |
-| `NEXET_CLERK_PUBLISHABLE_KEY` | Your Clerk **publishable** key. |
+| `NEXET_CLERK_PUBLISHABLE_KEY` | Your Clerk **publishable** key. The sign-in page runs on the web app and the agent accepts the session it hands back based on that page's origin, so this key does **not** have to match the deployment's Clerk instance (dev vs. live, or a custom Frontend API domain) — it only has to be a valid key. |
 | `NEXET_AGENT_WORK_DIR` | Temp dir for staged uploads. |
 | `NEXET_UPDATE_URL` / `updateUrl` | Auto-update feed base URL (`latest.yml` / `latest-mac.yml` location). Overrides the publish URL baked in at build time. |
 

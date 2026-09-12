@@ -32,8 +32,12 @@
 //
 // Security notes: the server binds 127.0.0.1 only; `state` is 32 random bytes;
 // the link expires after SIGN_IN_TTL_MS; the reported token must be a Clerk
-// session JWT for this instance's Frontend API origin (or the web app origin
-// when Clerk is proxied through the app's domain) and not yet expired.
+// session JWT that was issued for this web app's origin (its `iss` Frontend
+// API, its `azp` authorized party, or the web origin when Clerk is proxied
+// through the app's domain) and not yet expired. The token is not tied to the
+// agent's own publishable key, because a shipped build's baked-in key can
+// legitimately differ from the deployed web app's instance (dev vs. live, or
+// a custom Frontend API domain) — the API server verifies the signature.
 import { randomBytes } from "node:crypto";
 import http from "node:http";
 
@@ -156,15 +160,15 @@ export async function beginBrowserSignIn(
           res.end(JSON.stringify({ ok: false, error: "Invalid request body." }));
           return;
         }
-        const session = completeFromPost(parsed, state, origin, webOrigin);
-        if (!session) {
+        const result = completeFromPost(parsed, state, origin, webOrigin);
+        if ("error" in result) {
           res.writeHead(400, { ...corsHeaders, "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: false, error: "This sign-in link is no longer valid." }));
+          res.end(JSON.stringify({ ok: false, error: result.error }));
           return;
         }
         res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true }));
-        settle(session);
+        settle(result.session);
       });
       return;
     }
@@ -194,10 +198,25 @@ function completeFromPost(
   expectedState: string,
   expectedIss: string,
   webOrigin: string,
-): AuthSession | null {
-  if (body.state !== expectedState || typeof body.token !== "string") return null;
+): { session: AuthSession } | { error: string } {
+  if (body.state !== expectedState) {
+    return {
+      error:
+        "This sign-in link was superseded by a newer attempt (or opened from an old tab). " +
+        "Start sign-in again from the app.",
+    };
+  }
+  if (typeof body.token !== "string") {
+    return { error: "The browser did not return a session token. Start sign-in again from the app." };
+  }
   const claims = decodeSessionJwt(body.token, expectedIss, webOrigin);
-  if (!claims) return null;
+  if (!claims) {
+    return {
+      error:
+        "The app did not accept this session token — it is not a valid, unexpired Clerk token for " +
+        `this sign-in page (${webOrigin}). Start sign-in again from the app.`,
+    };
+  }
   const name =
     typeof body.name === "string" && body.name.trim().length > 0 ? body.name.trim().slice(0, 120) : null;
   const imageUrl =
@@ -219,11 +238,13 @@ function completeFromPost(
         ? claims.email_address
         : null);
   return {
-    token: body.token,
-    userId: typeof claims.sub === "string" ? claims.sub : "unknown",
-    email,
-    name,
-    imageUrl,
+    session: {
+      token: body.token,
+      userId: typeof claims.sub === "string" ? claims.sub : "unknown",
+      email,
+      name,
+      imageUrl,
+    },
   };
 }
 
@@ -241,13 +262,27 @@ function decodeSessionJwt(
 ): Record<string, unknown> | null {
   const claims = decodeJwt(token);
   if (!claims) return null;
-  const iss = claims.iss;
-  if (typeof iss !== "string") return null;
-  // The web app may serve Clerk through its own domain (CLERK_PROXY_PATH),
-  // which makes Clerk issue tokens with iss = the proxied origin.
-  if (iss !== expectedIss && iss !== webOrigin) return null;
+  // A Clerk session token always carries the user as `sub` (user_…) and the
+  // session as `sid` (sess_…) — cheap proof this is a Clerk token at all.
+  if (typeof claims.sub !== "string" || !claims.sub.startsWith("user_")) return null;
+  if (typeof claims.sid !== "string" || !claims.sid.startsWith("sess_")) return null;
   const exp = claims.exp;
   if (typeof exp === "number" && exp * 1000 < Date.now()) return null;
+  const iss = claims.iss;
+  const azp = claims.azp;
+  // `iss` is the instance's Frontend API URL; `azp` is the origin the token
+  // was minted for. Accept either: the issuer must be a real https origin (so
+  // a non-Clerk token can't slip through), and the authorized party must be
+  // this sign-in page's origin. The agent's baked-in key is only a hint — a
+  // shipped build must not reject the deployment's real instance (live key or
+  // custom Frontend API domain) just because its default key differs.
+  const issuerMatches = typeof iss === "string" && (iss === expectedIss || iss === webOrigin);
+  const partyMatches =
+    typeof azp === "string" &&
+    azp === webOrigin &&
+    typeof iss === "string" &&
+    iss.startsWith("https://");
+  if (!issuerMatches && !partyMatches) return null;
   return claims;
 }
 
