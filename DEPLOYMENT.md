@@ -81,7 +81,7 @@ else to this app").
 
 | # | Platform | What it provides | When you need it |
 |---|----------|------------------|------------------|
-| 9 | **Upstash Redis** (or Redis Cloud) | `REDIS_URL` for BullMQ | When video volume outgrows the in-process polling loop (`worker.ts`): Redis turns BullMQ into the claim layer and lets you run a separate worker fleet with `pnpm run workers`. Without it, the API server processes jobs in-process — fine for small loads. **Until Redis is in, keep the Render service at exactly 1 instance** — a second instance would run a second poller and duplicate jobs (see §3). |
+| 9 | **Upstash Redis** (or Redis Cloud) | `REDIS_URL` for BullMQ | When video volume outgrows the in-process polling loop (`worker.ts`): Redis turns BullMQ into the claim layer and lets you run a separate worker fleet with `pnpm run workers`. Without it, the API server processes jobs in-process — fine for small loads. **Until Redis is in, keep the Render service at exactly 1 instance** — a second instance would run a second poller and duplicate jobs (see §3). Setting `REDIS_URL` **without** running the worker fleet makes the API stop processing jobs itself, so uploads sit at `UPLOADED` (`Building the proxy…`) forever — the server logs a warning naming the fix when that happens. |
 | 10 | **faster-whisper** (Python) | Real transcription | The API server runs `faster_whisper` via Python for real transcripts. Without it, transcripts are clearly-marked **demo** placeholders. If you need real transcription, the API image must also ship Python + `faster-whisper`. |
 
 > **What you do *not* need:** an email provider (Clerk sends the magic links),

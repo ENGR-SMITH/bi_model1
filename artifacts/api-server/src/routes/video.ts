@@ -58,6 +58,7 @@ import { channelMembership, ensureChannelEditor, syncChannelEditors } from "../c
 import { visibleChannelProjectRows } from "./channels";
 import { upload } from "../video/upload";
 import { createAssetFromUpload } from "../video/content-address";
+import { recoverStuckProxies } from "../video/proxy-recovery";
 import { normalizeDubbingLanguage } from "../video/dubbing";
 import { ensureUploadFits } from "../video/quota";
 import { uploadBlockReason } from "../video/roles";
@@ -348,6 +349,17 @@ router.get("/video/projects/:projectId", async (req: Request, res): Promise<void
       ),
     )
     .orderBy(desc(nexetVideoAssetsTable.createdAt));
+
+  // Self-healing proxy recovery (video/proxy-recovery.ts): the vault refetches
+  // this route every 3 s while anything is still processing, so an asset left
+  // stuck by a failed (or interrupted) PROXY job is handed back to the queue
+  // as soon as a member is looking at it. Deliberately after the response data
+  // is gathered, fire-and-forget, and bounded — a read must not wait on it, and
+  // it never duplicates a live job. Members only: the write-ish nudge should
+  // not fire for a public read-only preview.
+  if (access.kind === "member") {
+    void recoverStuckProxies(assets);
+  }
 
   // Resolve member ids to Clerk display names + avatar urls (cached,
   // best-effort) so the vault roster, the commit log, and the timeline cards
