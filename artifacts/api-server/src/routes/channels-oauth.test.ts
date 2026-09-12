@@ -531,6 +531,62 @@ describe("channel YouTube OAuth", () => {
     expect(res.body.error).toContain("invalid_grant");
     expect(res.body.error).toContain("Bad Request");
   });
+
+  it("explains a failed YouTube channel lookup instead of one generic sentence", async () => {
+    const { id } = await createChannel("Ada Makes Games");
+    const started = await request(API).post(`/api/channels/${id}/oauth/start`);
+    const stateParam = new URL(started.body.url).searchParams.get("state")!;
+
+    // The token exchange succeeds; channels.list?mine=true is what fails. All
+    // three of these failures read identically without Google's `reason`.
+    const stubLookupFailure = (reason: string, message: string) => {
+      vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes("oauth2.googleapis.com/token")) {
+          return new Response(JSON.stringify({ access_token: "ya29.stub", refresh_token: "1//stub", expires_in: 3600 }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url.includes("youtube/v3/channels")) {
+          return new Response(JSON.stringify({ error: { code: 403, message, errors: [{ reason, message }] } }), {
+            status: 403,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        throw new Error(`Unexpected Google URL: ${url}`);
+      });
+    };
+
+    const cases: Array<[string, string, RegExp]> = [
+      ["youtubeSignupRequired", "Channel not found.", /has no YouTube channel/i],
+      ["accessNotConfigured", "YouTube Data API v3 has not been used in project 123 before or it is disabled.", /not enabled/i],
+      ["quotaExceeded", "Quota exceeded for quota metric 'Queries'.", /quota/i],
+    ];
+
+    for (const [reason, message, expected] of cases) {
+      stubLookupFailure(reason, message);
+      const res = await request(API)
+        .post(`/api/channels/${id}/oauth/exchange`)
+        .send({ state: stateParam, code: "auth-code-from-google" });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(expected);
+      // The raw reason rides along, so the log line is searchable too.
+      expect(res.body.error).toContain(reason);
+    }
+
+    // Nothing was linked along the way.
+    const [channel] = await state.db
+      .select()
+      .from(state.tables.nexetChannelsTable)
+      .where(eq(state.tables.nexetChannelsTable.id, id));
+    expect(channel.status).toBe("CREATED");
+    const vault = await state.db
+      .select()
+      .from(state.tables.nexetChannelOauthTable)
+      .where(eq(state.tables.nexetChannelOauthTable.channelId, id));
+    expect(vault).toEqual([]);
+  });
 });
 
 // The consent screen can take minutes, and the callback can land on another
