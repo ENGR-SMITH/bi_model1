@@ -380,6 +380,37 @@ describe("POST /api/whop/checkout", () => {
     expect(promo.uses).toBe(1);
   });
 
+  it("grants the pass length the FREE promo carries, not a default month", async () => {
+    state.userId = "user-1";
+    await state.db.insert(state.tables.nexetPromoCodesTable).values({
+      code: "TWODAY",
+      category: "authors",
+      kind: "FREE",
+      value: 0,
+      durationDays: 2,
+      maxUses: 0,
+      uses: 0,
+    });
+
+    const res = await request(API)
+      .post("/api/whop/checkout")
+      .send({ kind: "pass", planId: "authors", promoCode: "TWODAY" });
+
+    expect(res.status).toBe(201);
+    expect(res.body.granted).toBe(true);
+
+    const [ticket] = await state.db.select().from(state.tables.nexetTicketsTable);
+    const grantedDays = (ticket.expiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+    expect(grantedDays).toBeGreaterThan(1.9);
+    expect(grantedDays).toBeLessThan(2.1);
+
+    // The record of the purchase says two days too — this is what the
+    // subscriptions page reads back.
+    const [sub] = await state.db.select().from(state.tables.nexetSubscriptionsTable);
+    expect(sub.intervalLabel).toBe("2 days");
+    expect((sub.periodEnd.getTime() - sub.periodStart.getTime()) / (24 * 60 * 60 * 1000)).toBeCloseTo(2, 3);
+  });
+
   it("refuses a promo code on a storage plan and on a project plan", async () => {
     state.userId = "user-1";
     await state.db.insert(state.tables.nexetPromoCodesTable).values({

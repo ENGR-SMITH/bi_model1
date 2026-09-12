@@ -4,9 +4,11 @@
 // "authors" category, independently of the Creators Den tour).
 //
 //   · active pass            → the den opens normally, nothing is shown
-//   · first visit, no pass   → the 10-minute tour auto-starts with no banner;
-//                              the expiry notice is the only moment anything
-//                              is shown while access is restricted
+//   · first visit, no pass   → the den's tour (20 minutes here, the length the
+//                              server grants — see TOUR_MINUTES_BY_CATEGORY)
+//                              auto-starts with no banner; the expiry notice is
+//                              the only moment anything is shown while access is
+//                              restricted
 //   · tour running           → the app works normally during the countdown
 //   · tour expired           → "Your tour has ended" notice pops up — the only
 //                              moment the ticket appears, since access is now
@@ -20,7 +22,7 @@
 // it.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useAuth } from '@clerk/react';
 import { Clock3, Ticket } from 'lucide-react';
 import {
@@ -118,6 +120,9 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
   }, [phase, endsAt]);
 
   const remainingMs = phase === 'tour' && endsAt != null ? Math.max(0, endsAt - nowMs) : 0;
+  // The server owns the tour length; the copy reads it back so the notice can
+  // never claim a length the den did not actually grant.
+  const tourMinutes = data?.tourMinutes ?? 10;
 
   // The countdown hit zero — flip to the "tour over" notice and start the
   // auto-redirect back to the Nexet category page.
@@ -148,74 +153,34 @@ export function DenTourGate({ category, children }: { category: TicketCategory; 
       {/* The "tour is over" notice — then straight back to the Nexet paywall. */}
       {phase === 'expired' && (
         <div
+          className="tour-over-backdrop"
           role="dialog"
           aria-modal="true"
           aria-label="Your preview tour has ended"
           data-testid="den-tour-over"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 10001,
-            display: 'grid',
-            placeItems: 'center',
-            padding: 24,
-            background: 'rgba(30,28,44,.8)',
-            backdropFilter: 'blur(6px)',
-          }}
         >
-          <div
-            style={{
-              width: '100%',
-              maxWidth: 430,
-              padding: '30px 28px',
-              borderRadius: 22,
-              background: '#fdf8f1',
-              border: '1px solid rgba(41,43,69,.12)',
-              color: '#292b45',
-              textAlign: 'center',
-              boxShadow: '0 30px 80px rgba(41,43,69,.35)',
-              fontFamily: 'DM Sans, system-ui, sans-serif',
-            }}
-          >
-            <Clock3 size={26} style={{ color: '#b7791f' }} />
-            <h2
-              style={{
-                margin: '14px 0 6px',
-                fontSize: 26,
-                fontWeight: 800,
-                letterSpacing: '-0.03em',
-              }}
-            >
-              Your tour has ended
-            </h2>
-            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.6, color: '#625f6d' }}>
-              The 10-minute preview of the {TOUR_LABEL[category]} is over. Buy the{' '}
-              {category === 'authors' ? 'Authors &amp; Writers' : 'Content Creators'} pass to come back — you&apos;re
-              being returned to Nexet to get it.
+          <div className="tour-over-card">
+            <span className="tour-over-rule" aria-hidden />
+            <span className="tour-over-badge" aria-hidden>
+              <Clock3 size={22} />
+            </span>
+            <p className="tour-over-eyebrow">PREVIEW TOUR · {TOUR_LABEL[category].toUpperCase()}</p>
+            <h2>Your tour has ended</h2>
+            <p className="tour-over-copy">
+              The {tourMinutes}-minute preview is over, so the desk is closing. Take the{' '}
+              {category === 'authors' ? 'Authors &amp; Writers' : 'Content Creators'} pass and the room
+              opens again right where you left it.
             </p>
-            <a
-              href={PAYWALL_PATH[category]}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                width: '100%',
-                marginTop: 20,
-                padding: '12px 16px',
-                borderRadius: 12,
-                background: '#3b82f6',
-                color: '#fff',
-                textDecoration: 'none',
-                fontWeight: 700,
-                fontSize: 14,
-              }}
-              data-testid="den-tour-over-buy"
-            >
+
+            <div className="tour-over-ring" style={{ '--countdown': String((redirectIn / 6) * 100) } as CSSProperties}>
+              <span>{redirectIn}</span>
+            </div>
+
+            <a className="tour-over-cta" href={PAYWALL_PATH[category]} data-testid="den-tour-over-buy">
               <Ticket size={15} /> Get the pass
             </a>
-            <p style={{ margin: '14px 0 0', fontSize: 11.5, color: '#8d8a99' }} data-testid="den-tour-over-redirect">
-              Redirecting to Nexet in {redirectIn}s…
+            <p className="tour-over-note" data-testid="den-tour-over-redirect">
+              Returning to Nexet in {redirectIn}s — the pass works in every den.
             </p>
           </div>
         </div>

@@ -1,8 +1,14 @@
 // ---------------------------------------------------------------------------
 // Background channel analytics sync (§9.1). On a configurable cadence
-// (YT_SYNC_INTERVAL_MINUTES, default 60) sync every CONNECTED channel with an
+// (YT_SYNC_INTERVAL_MINUTES, default 10) sync every CONNECTED channel with an
 // ACTIVE oauth link — the same in-process pattern as the storage metering /
 // retention loop; no separate worker process in v1.
+//
+// Ten minutes is the product promise for the Creator Den analytics page: the
+// numbers it shows for the channel and for each video are at most one cycle
+// old. The per-cycle work is bounded by YT_SYNC_MAX_VIDEO_QUERIES (see
+// sync.ts), which rotates through the catalog so every video is refreshed in
+// turn instead of only the newest ones.
 // ---------------------------------------------------------------------------
 
 import { and, eq, inArray } from "drizzle-orm";
@@ -55,7 +61,7 @@ export async function syncConnectedChannels(): Promise<void> {
  * `syncConnectedChannels` directly).
  */
 export function startChannelAnalyticsSync(): () => void {
-  const intervalMs = intervalMinutes("YT_SYNC_INTERVAL_MINUTES", 60) * MINUTE_MS;
+  const intervalMs = intervalMinutes("YT_SYNC_INTERVAL_MINUTES", 10) * MINUTE_MS;
   if (!_timer) {
     // First pass shortly after boot, then on the cadence.
     const first = setTimeout(() => void syncConnectedChannels().catch((error) => logger.error({ err: error }, "Channel analytics first sync failed")), 60_000);

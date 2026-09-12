@@ -51,6 +51,11 @@ export const nexetPromoCodesTable = pgTable("nexet_promo_codes", {
   kind: text("kind").notNull(),
   // PERCENT: percent off (e.g. 50). FLAT: cents off (e.g. 50). FREE: unused.
   value: integer("value").notNull().default(0),
+  // How long the pass this code grants lasts, in days. A FREE code grants a
+  // pass of exactly this length: 2 → the pass ends two days after redemption.
+  // 30 is the normal monthly rhythm. Independent of `expiresAt`, which only
+  // decides when the code itself can no longer be redeemed.
+  durationDays: integer("duration_days").notNull().default(30),
   // 0 = unlimited uses.
   maxUses: integer("max_uses").notNull().default(0),
   uses: integer("uses").notNull().default(0),

@@ -14,6 +14,11 @@ export interface AdminPromo {
   category: AdminPromoCategory;
   kind: AdminPromoKind;
   value: number;
+  /**
+     * @minimum 1
+     * @maximum 365
+     */
+  durationDays: number;
   maxUses: number;
   uses: number;
   active: boolean;

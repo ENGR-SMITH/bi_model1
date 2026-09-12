@@ -1,0 +1,14 @@
+-- Promo codes get their own pass length.
+--
+-- Until now every FREE code granted a hard-coded 30-day pass, so a code an
+-- admin created for a short promo (say a 2-day launch window) still handed out
+-- a month — the code's own `expires_at` only decided how long the CODE could
+-- be redeemed, never how long the pass it granted would last.
+--
+-- `duration_days` is the number of days the pass lasts from redemption.
+-- Existing rows default to 30 so a live campaign keeps behaving exactly as it
+-- did until an admin edits the code.
+--
+-- IF NOT EXISTS so re-running against an already-migrated database (or a
+-- Supabase preview branch) is a no-op rather than an error.
+ALTER TABLE nexet_promo_codes ADD COLUMN IF NOT EXISTS duration_days integer NOT NULL DEFAULT 30;

@@ -187,10 +187,10 @@ YOUTUBE_OAUTH_CLIENT_ID=
 YOUTUBE_OAUTH_CLIENT_SECRET=
 YOUTUBE_DATA_API_KEY=
 YOUTUBE_REDIRECT_URI=            # default derived from NEXET_WEB_URL + /creators-den/channels/oauth/callback
-YT_SYNC_INTERVAL_MINUTES=60      # background analytics refresh cadence
+YT_SYNC_INTERVAL_MINUTES=10      # background analytics refresh cadence (10 min = the analytics page's freshness promise)
 YT_REPORT_TTL_MINUTES=360        # on-demand report cache freshness
 YT_ANALYTICS_DAYS=90             # metric snapshot horizon (days back)
-YT_SYNC_MAX_VIDEO_QUERIES=100    # per-sync cap on per-video report queries (quota guard)
+YT_SYNC_MAX_VIDEO_QUERIES=60     # per-sync cap on per-video report queries (quota guard; rotates through the catalog)
 ```
 
 No credentials are hard-coded. Missing credentials degrade gracefully: the CMS still works, connect shows a clear "YouTube integration is not configured" state, and analytics pages render empty-with-explanation states.

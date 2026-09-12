@@ -56,6 +56,7 @@ import { isNexetUid, normalizeNexetUid, nexetUid } from '@/lib/nexet-uid';
 import {
   ALL_ROLES,
   CONTENT_ROLES,
+  displayRoleEntries,
   GRANT_ROLES,
   ROLE_LABELS,
   isCaptain,
@@ -379,9 +380,9 @@ function MemberRow({
           {(member.roles ?? []).includes('CAPTAIN') ? (
             <span className="den-tag danger">Captain</span>
           ) : (
-            (member.roles ?? []).map((role) => (
-              <span key={role} className="den-tag accent" data-testid={`role-${role.toLowerCase()}`}>
-                {ROLE_LABELS[role] ?? role}
+            displayRoleEntries(member.roles).map((entry) => (
+              <span key={entry.key} className="den-tag accent" data-testid={`role-${entry.key.toLowerCase()}`}>
+                {entry.label}
               </span>
             ))
           )}

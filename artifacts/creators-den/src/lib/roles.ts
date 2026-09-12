@@ -50,8 +50,31 @@ export function isCaptain(myRoles: string[] | null | undefined): boolean {
   return myRoles?.includes('CAPTAIN') ?? false;
 }
 
+/**
+ * A member's roles as the roster shows them.
+ *
+ * Video and Audio are the one craft on a crew list — an editor who also
+ * handles the sound is one teammate, not two — so a member holding both reads
+ * as a single "Video & Audio" entry instead of two tags sitting side by side.
+ * Every other role stays its own entry.
+ */
+export function displayRoleEntries(
+  roles: string[] | null | undefined,
+): Array<{ key: string; label: string }> {
+  const held = roles ?? [];
+  if (held.length === 0) return [];
+  const both = held.includes('VIDEO') && held.includes('AUDIO');
+  return held
+    .filter((role) => !(both && role === 'AUDIO'))
+    .map((role) => {
+      if (both && role === 'VIDEO') return { key: 'VIDEO_AUDIO', label: 'Video & Audio' };
+      return { key: role, label: ROLE_LABELS[role] ?? role };
+    });
+}
+
 /** Human labels for a member's roles, joined for a tooltip. */
 export function rolesLabel(roles: string[] | null | undefined): string {
-  if (!roles || roles.length === 0) return 'Viewer';
-  return roles.map((role) => ROLE_LABELS[role] ?? role).join(', ');
+  const entries = displayRoleEntries(roles);
+  if (entries.length === 0) return 'Viewer';
+  return entries.map((entry) => entry.label).join(', ');
 }

@@ -750,7 +750,7 @@ function formatDate(value: string) {
 // ---------------------------------------------------------------------------
 
 const PROMO_KIND_META: Record<string, { label: string; tone: string }> = {
-  FREE: { label: 'Free month', tone: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/25' },
+  FREE: { label: 'Free pass', tone: 'text-emerald-600 bg-emerald-500/10 border-emerald-500/25' },
   PERCENT: { label: '% off · legacy', tone: 'text-amber-600 bg-amber-500/10 border-amber-500/25' },
   FLAT: { label: '$ off · legacy', tone: 'text-sky-600 bg-sky-500/10 border-sky-500/25' },
 };
@@ -768,8 +768,16 @@ function promoCategoryLabel(category: string | null): string {
   return PROMO_CATEGORIES.find((entry) => entry.value === category)?.label ?? 'Any pass · legacy';
 }
 
+/** How long a pass a code grants lasts, in the words the admin reads. */
+function promoDurationLabel(days: number): string {
+  if (days === 30) return 'one free month';
+  if (days === 1) return 'a one-day pass';
+  if (days === 7) return 'a one-week pass';
+  return `a ${days}-day pass`;
+}
+
 function PromoValueLabel(promo: AdminPromo): string {
-  if (promo.kind === 'FREE') return 'Grants one free month';
+  if (promo.kind === 'FREE') return `Grants ${promoDurationLabel(promo.durationDays)}`;
   if (promo.kind === 'PERCENT') return `${promo.value}% off — no longer accepted`;
   return `$${(promo.value / 100).toFixed(2)} off — no longer accepted`;
 }
@@ -783,7 +791,7 @@ function PromosSection({ session }: { session: boolean }) {
         <PageHeading
           eyebrow="Control room / ticket passes"
           title="Manage the promo codes."
-          description="Create and retire the codes the pass checkout accepts. Every code is dedicated to ONE category pass — an Author & Writer code is refused on the Content Creators pass and vice versa. Only FREE codes apply — every plan bills monthly through Whop, so percent and dollar-off codes can't discount a subscription. A FREE code grants one free month with no card charge; every code can be shared by many people — each person may redeem it once — and a code that is paused stops working immediately without losing its history."
+          description="Create and retire the codes the pass checkout accepts. Every code is dedicated to ONE category pass — an Author & Writer code is refused on the Content Creators pass and vice versa. Only FREE codes apply — every plan bills monthly through Whop, so percent and dollar-off codes can't discount a subscription. A FREE code grants a pass as long as the code says (30 days by default) with no card charge; every code can be shared by many people — each person may redeem it once — and a code that is paused stops working immediately without losing its history."
           action={
             <div data-testid="status-authenticated" className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.1em] text-primary">
               <ShieldCheck className="h-3.5 w-3.5" /> {session ? 'Session verified' : 'Session pending'}
@@ -835,6 +843,7 @@ function CreatePromoForm() {
         setCode('');
         setUsage('multi-unlimited');
         setCap('10');
+        setDurationDays('30');
         setExpiry('');
         setNotice('');
       },
@@ -848,6 +857,9 @@ function CreatePromoForm() {
   const [category, setCategory] = useState<PromoCategory>('authors');
   const [usage, setUsage] = useState<'single' | 'multi-unlimited' | 'multi-capped'>('multi-unlimited');
   const [cap, setCap] = useState('10');
+  // How long the pass this code grants lasts. 30 = the normal month; a short
+  // promo (a 2-day launch window) sets exactly what it promises.
+  const [durationDays, setDurationDays] = useState('30');
   const [expiry, setExpiry] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -864,12 +876,18 @@ function CreatePromoForm() {
       setNotice('Give the code a name, e.g. EARLYBIRD.');
       return;
     }
+    const days = Number(durationDays);
+    if (!Number.isFinite(days) || days < 1 || days > 365) {
+      setNotice('Pass length must be between 1 and 365 days — 30 is one month.');
+      return;
+    }
     create.mutate({
       data: {
         code: code.trim(),
         category,
         kind: 'FREE',
         value: 0,
+        durationDays: Math.floor(days),
         maxUses: maxUsesOf(),
         expiresAt: expiry ? new Date(expiry).toISOString() : undefined,
       },
@@ -884,10 +902,10 @@ function CreatePromoForm() {
         <span className="grid h-8 w-8 place-items-center rounded-lg bg-secondary text-foreground"><Plus className="h-4 w-4" /></span>
         <div>
           <h3 className="text-sm font-semibold">New promo code</h3>
-          <p className="text-xs text-muted-foreground">Every code is a FREE code — it grants one free month with no card charge — and is dedicated to the one pass category you pick. Codes are stored uppercase and the checkout matches them exactly.</p>
+          <p className="text-xs text-muted-foreground">Every code is a FREE code — it grants a pass as long as the length you set (30 days = one month) with no card charge — and is dedicated to the one pass category you pick. Codes are stored uppercase and the checkout matches them exactly.</p>
         </div>
       </div>
-      <form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-[1.1fr_1.1fr_.8fr_1fr_auto]">
+      <form onSubmit={submit} className="mt-4 grid gap-4 md:grid-cols-[1fr_1fr_.9fr_.7fr_.9fr_auto]">
         <label className="block">
           <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Code</span>
           <input value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="EARLYBIRD" className={inputClass} data-testid="input-promo-code" />
@@ -912,7 +930,11 @@ function CreatePromoForm() {
           )}
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Expires (optional)</span>
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pass length (days)</span>
+          <input type="number" min="1" max="365" value={durationDays} onChange={(event) => setDurationDays(event.target.value)} className={inputClass} aria-label="Pass length in days" data-testid="input-promo-duration" />
+        </label>
+        <label className="block">
+          <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Code expires (optional)</span>
           <input type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} className={inputClass} data-testid="input-promo-expiry" />
         </label>
         <button type="submit" disabled={create.isPending} className="mt-6 h-11 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:brightness-105 disabled:cursor-wait disabled:opacity-60" data-testid="button-create-promo">
@@ -942,6 +964,7 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
   const [category, setCategory] = useState<string>(promo.category ?? 'authors');
   const [usage, setUsage] = useState<PromoUsage>(usageForMaxUses(promo.maxUses));
   const [cap, setCap] = useState(String(promo.maxUses > 1 ? promo.maxUses : 10));
+  const [durationDays, setDurationDays] = useState(String(promo.durationDays ?? 30));
   const [expiry, setExpiry] = useState(promo.expiresAt ? new Date(promo.expiresAt).toISOString().slice(0, 10) : '');
 
   const meta = PROMO_KIND_META[promo.kind] ?? PROMO_KIND_META.PERCENT;
@@ -965,6 +988,7 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
         // Re-scoping is allowed here so a mis-assigned code can be corrected.
         category: category as PromoCategory,
         value: promo.value,
+        durationDays: Math.min(365, Math.max(1, Math.floor(Number(durationDays) || 30))),
         maxUses: maxUsesOf(),
         active: promo.active,
         expiresAt: expiry ? new Date(expiry).toISOString() : undefined,
@@ -989,7 +1013,7 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
   return (
     <div data-testid={`promo-${promo.code}`} className="rounded-2xl border border-border bg-card p-5">
       {editing ? (
-        <form onSubmit={save} className="grid gap-4 md:grid-cols-[1fr_.8fr_1fr_auto]">
+        <form onSubmit={save} className="grid gap-4 md:grid-cols-[1fr_.8fr_.7fr_1fr_auto]">
           <label className="block">
             <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Category</span>
             <select value={category} onChange={(event) => setCategory(event.target.value)} className={inputClass} data-testid={`select-category-${promo.code}`}>
@@ -1010,7 +1034,11 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
             )}
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Expires (optional)</span>
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Pass length (days)</span>
+            <input type="number" min="1" max="365" value={durationDays} onChange={(event) => setDurationDays(event.target.value)} className={inputClass} aria-label="Pass length in days" data-testid={`input-duration-${promo.code}`} />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Code expires (optional)</span>
             <input type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} className={inputClass} />
           </label>
           <div className="flex items-end gap-2">
@@ -1029,10 +1057,10 @@ function PromoRow({ promo }: { promo: AdminPromo }) {
                 {promo.maxUses > 0 ? ` of ${promo.maxUses} ${promo.maxUses === 1 ? 'person' : 'people'}` : ' · unlimited people'}
               </span>
               {exhausted && promo.active && <span className="ml-2 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">all uses taken</span>}
-              {promo.expiresAt && <span className="ml-2">· expires {formatDate(promo.expiresAt)}</span>}
+              {promo.expiresAt && <span className="ml-2">· code expires {formatDate(promo.expiresAt)}</span>}
             </p>
             <p className="mt-1 text-[11px] text-muted-foreground/80">
-              {promoCategoryLabel(promo.category)} · each person can redeem this code once.
+              {promoCategoryLabel(promo.category)} · pass lasts {promo.durationDays} {promo.durationDays === 1 ? 'day' : 'days'} · each person can redeem this code once.
             </p>
           </div>
           <button data-testid={`button-edit-${promo.code}`} type="button" onClick={() => setEditing(true)} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold hover:bg-secondary"><Pencil className="h-3.5 w-3.5" /> Edit</button>
