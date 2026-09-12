@@ -112,6 +112,62 @@ async function googleErrorDetail(response: Response): Promise<string> {
   }
 }
 
+/**
+ * Google API errors carry a machine-readable `errors[0].reason` alongside a
+ * human message. Reading it is the difference between an operator knowing to
+ * enable an API, pick a different Google account, or wait out a quota — and
+ * seeing one sentence that fits all three.
+ */
+interface GoogleApiError {
+  reason: string | null;
+  message: string | null;
+  status: number;
+}
+
+async function googleApiError(response: Response): Promise<GoogleApiError> {
+  const status = response.status;
+  let reason: string | null = null;
+  let message: string | null = null;
+  try {
+    const payload = (await response.json()) as {
+      error?: { message?: unknown; status?: unknown; errors?: Array<{ reason?: unknown; message?: unknown }> };
+    };
+    const first = payload?.error?.errors?.[0];
+    if (typeof first?.reason === "string") reason = first.reason;
+    if (typeof first?.message === "string") message = first.message;
+    else if (typeof payload?.error?.message === "string") message = payload.error.message;
+  } catch {
+    // Not JSON (an HTML error page in front of the API) — status alone still helps.
+  }
+  return { reason, message, status };
+}
+
+/**
+ * Turn a failed channels.list call into something an operator can act on. The
+ * three failures here look identical without the reason: YouTube Data API v3
+ * not enabled, the account has no channel, and the quota is spent.
+ */
+function youtubeLookupFailureMessage({ reason, message, status }: GoogleApiError): string {
+  const detail = [reason, message].filter(Boolean).join(" — ");
+  const said = detail ? `Google said: ${detail}.` : `Google answered HTTP ${status}.`;
+  switch (reason) {
+    case "youtubeSignupRequired":
+      return `That Google account has no YouTube channel. ${said} Sign in with the account — or its brand channel — that owns the channel you want to link.`;
+    case "quotaExceeded":
+    case "dailyLimitExceeded":
+    case "rateLimitExceeded":
+      return `The YouTube Data API quota for this Google Cloud project is spent. ${said} Wait for it to reset, or raise it under APIs & Services → Quotas.`;
+    case "accessNotConfigured":
+    case "SERVICE_DISABLED":
+      return `YouTube Data API v3 is not enabled on this Google Cloud project. ${said} Enable it under APIs & Services → Library.`;
+    case "insufficientPermissions":
+    case "ACCESS_TOKEN_SCOPE_INSUFFICIENT":
+      return `YouTube access was not granted on the consent screen. ${said} Disconnect, then reconnect and accept the YouTube permission.`;
+    default:
+      return `Google could not identify your YouTube channel. ${said} Check that YouTube Data API v3 is enabled on the project and that the account you signed in with owns a channel.`;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Connect state.
 //
@@ -368,7 +424,7 @@ export async function exchangeChannelOauth(
     { headers: { authorization: `Bearer ${accessToken}` } },
   );
   if (!channelResponse.ok) {
-    throw new Error("Google could not identify your YouTube channel — make sure the channel exists and YouTube Data API v3 is enabled");
+    throw new Error(youtubeLookupFailureMessage(await googleApiError(channelResponse)));
   }
   const channelPayload = (await channelResponse.json()) as { items?: YoutubeChannelItem[] };
   const branding = parseYoutubeChannelBranding(channelPayload.items ?? []);
