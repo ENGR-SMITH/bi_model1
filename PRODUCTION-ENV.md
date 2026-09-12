@@ -130,6 +130,23 @@ CLERK_SECRET_KEY=sk_test_...
   opened in the exact browser profile that requested it), and add your
   deployed app origins (including `/oracle-admin/verify`) under **Redirect
   URLs**.
+- **Which instance?** Every setting above is per-instance. A freshly created
+  instance (or a new production instance you switched to) defaults to **Email
+  verification code** only, so the link settings must be enabled again there
+  even if the old instance had them.
+- **Magic-link error codes.** The admin login now shows Clerk's own error code
+  in its message; read that first.
+  - `factor_not_found` (“Email link factor not found”) — **Email verification
+    link** is not enabled under **Sign-in with email**. The admin page calls
+    `signIn.emailLink.sendLink()` directly, so the *link* factor is required;
+    the OTP factor alone will not satisfy it.
+  - `form_identifier_not_found` — no user with that address on **this**
+    instance. Common right after switching instances: the admin account still
+    lives on the old one. Create it under **Users**.
+  - `client_mismatch` — **Require the same device and browser** is on and the
+    link was opened elsewhere.
+  - `redirect_url_invalid`, or a link that verifies but never signs in —
+    `${origin}/oracle-admin/verify` is missing from the allowed redirect URLs.
 
 ---
 
