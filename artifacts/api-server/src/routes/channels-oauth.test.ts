@@ -139,9 +139,11 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   delete process.env.YOUTUBE_OAUTH_CLIENT_ID;
   delete process.env.YOUTUBE_OAUTH_CLIENT_SECRET;
   delete process.env.YOUTUBE_REDIRECT_URI;
+  delete process.env.NEXET_WEB_URL;
 });
 
 async function createChannel(name: string) {
@@ -189,6 +191,60 @@ describe("channel YouTube OAuth", () => {
     const res = await request(API).post(`/api/channels/${id}/oauth/start`);
     expect(res.status).toBe(400);
     expect(res.body.error).toContain("not configured");
+  });
+
+  it("in production, refuses to send Google a redirect URI that is still the localhost default", async () => {
+    // YOUTUBE_REDIRECT_URI unset + NEXET_WEB_URL unset → the derived default is
+    // http://localhost:5175/…, which Google can only answer with an opaque
+    // redirect_uri_mismatch. The route must explain exactly what to configure
+    // instead of bouncing the user to Google's error page.
+    delete process.env.YOUTUBE_REDIRECT_URI;
+    delete process.env.NEXET_WEB_URL;
+    vi.stubEnv("NODE_ENV", "production");
+
+    const { id } = await createChannel("Misconfigured");
+    const res = await request(API).post(`/api/channels/${id}/oauth/start`);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("NEXET_WEB_URL");
+    expect(res.body.error).toContain("localhost");
+  });
+
+  it("falls back to the localhost default when NEXET_WEB_URL is set to an empty string", async () => {
+    // A deploy dashboard can leave the var present but empty; `??` would treat
+    // that as authoritative and produce a relative (unmatchable) redirect URI.
+    delete process.env.YOUTUBE_REDIRECT_URI;
+    vi.stubEnv("NEXET_WEB_URL", "");
+
+    const { id } = await createChannel("Empty origin");
+    const res = await request(API).post(`/api/channels/${id}/oauth/start`);
+    expect(res.status).toBe(200);
+    expect(new URL(res.body.url).searchParams.get("redirect_uri")).toBe(
+      "http://localhost:5175/creators-den/channels/oauth/callback",
+    );
+  });
+
+  it("strips a stray quote/whitespace around the configured redirect URI", async () => {
+    vi.stubEnv("YOUTUBE_REDIRECT_URI", ' "https://nexet.co/creators-den/channels/oauth/callback" ');
+
+    const { id } = await createChannel("Quoted");
+    const res = await request(API).post(`/api/channels/${id}/oauth/start`);
+    expect(res.status).toBe(200);
+    expect(new URL(res.body.url).searchParams.get("redirect_uri")).toBe(
+      "https://nexet.co/creators-den/channels/oauth/callback",
+    );
+  });
+
+  it("accepts the derived redirect URI in production when NEXET_WEB_URL is the real origin", async () => {
+    delete process.env.YOUTUBE_REDIRECT_URI;
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXET_WEB_URL", "https://nexet.co");
+
+    const { id } = await createChannel("Configured");
+    const res = await request(API).post(`/api/channels/${id}/oauth/start`);
+    expect(res.status).toBe(200);
+    expect(new URL(res.body.url).searchParams.get("redirect_uri")).toBe(
+      "https://nexet.co/creators-den/channels/oauth/callback",
+    );
   });
 
   it("only the channel owner can start the link", async () => {
