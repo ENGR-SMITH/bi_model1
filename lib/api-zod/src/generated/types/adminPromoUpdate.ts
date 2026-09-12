@@ -15,6 +15,11 @@ export interface AdminPromoUpdate {
   category?: AdminPromoUpdateCategory;
   kind: AdminPromoUpdateKind;
   value: number;
+  /**
+     * @minimum 1
+     * @maximum 365
+     */
+  durationDays?: number;
   maxUses: number;
   active?: boolean;
   /** @nullable */

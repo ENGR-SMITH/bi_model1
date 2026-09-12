@@ -800,7 +800,10 @@ router.post("/whop/checkout", async (req: Request, res: Response): Promise<void>
   }
   const total = Math.max(0, product.priceUsd - (promo?.discount ?? 0));
 
-  // A FREE promo needs no charge — grant a free month with no subscription.
+  // A FREE promo needs no charge — grant the pass the code promises, with no
+  // subscription. The code carries its own length (a 2-day code grants 2 days,
+  // not the default month), so what the subscriptions page shows is what the
+  // customer actually got.
   if (total === 0) {
     await applySubscriptionPurchase({
       userId,
@@ -810,6 +813,7 @@ router.post("/whop/checkout", async (req: Request, res: Response): Promise<void>
       priceUsd: 0,
       intervalLabel: product.intervalLabel,
       promoCode: promo?.code ?? null,
+      promoDurationDays: promo?.kind === "FREE" ? promo.durationDays : null,
       cardLast4: null,
       source: "checkout",
     });

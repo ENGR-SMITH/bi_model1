@@ -16,6 +16,11 @@ export interface AdminPromoInput {
   category: AdminPromoInputCategory;
   kind: AdminPromoInputKind;
   value: number;
+  /**
+     * @minimum 1
+     * @maximum 365
+     */
+  durationDays?: number;
   maxUses: number;
   /** @nullable */
   expiresAt?: Date | null;

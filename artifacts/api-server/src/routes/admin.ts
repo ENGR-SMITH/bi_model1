@@ -176,12 +176,31 @@ export function normalizePromoCode(raw: string): string {
   return raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
 
+/** Pass length bounds for a promo code, in days. */
+export const PROMO_MIN_DURATION_DAYS = 1;
+export const PROMO_MAX_DURATION_DAYS = 365;
+const PROMO_DEFAULT_DURATION_DAYS = 30;
+
+/**
+ * A promo code's pass length in days. A FREE code grants a pass of exactly
+ * this length, so it is clamped to something a pass can meaningfully be
+ * (1 day .. 1 year) instead of accepted blind — a 0 would grant a pass that
+ * expires the instant it is created.
+ */
+export function clampPromoDurationDays(raw: unknown): number {
+  const days = Number(raw);
+  if (!Number.isFinite(days)) return PROMO_DEFAULT_DURATION_DAYS;
+  return Math.min(PROMO_MAX_DURATION_DAYS, Math.max(PROMO_MIN_DURATION_DAYS, Math.floor(days)));
+}
+
 function promoView(promo: typeof nexetPromoCodesTable.$inferSelect) {
   return {
     code: promo.code,
     category: promo.category ?? null,
     kind: promo.kind,
     value: promo.value,
+    // How many days of pass this code grants (30 = one month).
+    durationDays: promo.durationDays,
     maxUses: promo.maxUses,
     uses: promo.uses,
     // false = paused by an admin; the code stops validating immediately.
@@ -239,6 +258,7 @@ router.post("/admin/promos", requireAdmin, async (req, res): Promise<void> => {
       category: body.data.category as TicketCategory,
       kind: body.data.kind,
       value: Math.max(0, body.data.value),
+      durationDays: clampPromoDurationDays(body.data.durationDays),
       maxUses: Math.max(0, body.data.maxUses),
       uses: 0,
       expiresAt: body.data.expiresAt ? new Date(body.data.expiresAt) : null,
@@ -293,6 +313,11 @@ router.patch("/admin/promos/:code", requireAdmin, async (req, res): Promise<void
       kind: body.data.kind,
       value: Math.max(0, body.data.value),
       maxUses: Math.max(0, body.data.maxUses),
+      // An absent duration leaves the code's pass length alone, so pausing or
+      // re-scoping a live campaign can't silently rewrite what it grants.
+      ...(body.data.durationDays !== undefined
+        ? { durationDays: clampPromoDurationDays(body.data.durationDays) }
+        : {}),
       // An absent `active` leaves the code exactly as it is (pause/resume is
       // a separate admin action from editing a code's discount).
       ...(typeof body.data.active === "boolean" ? { active: body.data.active } : {}),

@@ -68,6 +68,7 @@ async function resetDb() {
   await state.db.delete(t.nexetToursTable);
   await state.db.delete(t.nexetPromoRedemptionsTable);
   await state.db.delete(t.nexetPromoCodesTable);
+  await state.db.delete(t.nexetSubscriptionsTable);
   state.userId = null;
 }
 
@@ -200,6 +201,53 @@ describe("promo codes", () => {
     });
     expect(res.status).toBe(201);
     expect(res.body.receipt.total).toBe(0);
+  });
+
+  it("grants exactly the pass length a FREE code carries", async () => {
+    await seedPromo("TWODAY", "FREE", 0, 0, true, "authors");
+    // The pass length set on the code in the admin app: two days, not the
+    // month every coupon used to grant silently.
+    await state.db
+      .update(state.tables.nexetPromoCodesTable)
+      .set({ durationDays: 2 })
+      .where(eq(state.tables.nexetPromoCodesTable.code, "TWODAY"));
+    state.userId = "user-1";
+
+    const res = await request(API).post("/api/tickets/purchase").send({
+      category: "authors",
+      card: VALID_CARD,
+      promoCode: "TWODAY",
+    });
+
+    expect(res.status).toBe(201);
+    const grantedDays =
+      (new Date(res.body.ticket.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+    expect(grantedDays).toBeGreaterThan(1.9);
+    expect(grantedDays).toBeLessThan(2.1);
+
+    // The subscription row records the length that was actually granted, so
+    // the subscriptions page can't say "1 month" about a two-day pass.
+    const [sub] = await state.db.select().from(state.tables.nexetSubscriptionsTable);
+    expect(sub.intervalLabel).toBe("2 days");
+  });
+
+  it("defaults a code with no stated length to the normal month", async () => {
+    await seedPromo("MONTHLY", "FREE", 0, 0, true, "authors");
+    state.userId = "user-1";
+
+    const res = await request(API).post("/api/tickets/purchase").send({
+      category: "authors",
+      card: VALID_CARD,
+      promoCode: "MONTHLY",
+    });
+
+    expect(res.status).toBe(201);
+    const grantedDays =
+      (new Date(res.body.ticket.expiresAt).getTime() - Date.now()) / (24 * 60 * 60 * 1000);
+    expect(grantedDays).toBeGreaterThan(29.9);
+    expect(grantedDays).toBeLessThan(30.1);
+    const [sub] = await state.db.select().from(state.tables.nexetSubscriptionsTable);
+    expect(sub.intervalLabel).toBe("1 month");
   });
 
   it("rejects unknown, expired, and used-up codes", async () => {
@@ -362,15 +410,18 @@ describe("den access tours", () => {
     expect(res.body.canStartTour).toBe(true);
   });
 
-  it("starts a 10-minute tour, reports it active, and refuses a second one", async () => {
+  it("starts the Author Den's 20-minute tour, reports it active, and refuses a second one", async () => {
     state.userId = "user-1";
     const start = await request(API).post("/api/tickets/tour/start").send({ category: "authors" });
     expect(start.status).toBe(201);
+    expect(start.body.tour.tourMinutes).toBe(20);
     const endsAt = new Date(start.body.tour.endsAt).getTime();
-    expect(endsAt).toBeGreaterThan(Date.now() + 10 * 60 * 1000 - 5000);
-    expect(endsAt).toBeLessThanOrEqual(Date.now() + 10 * 60 * 1000 + 5000);
+    expect(endsAt).toBeGreaterThan(Date.now() + 20 * 60 * 1000 - 5000);
+    expect(endsAt).toBeLessThanOrEqual(Date.now() + 20 * 60 * 1000 + 5000);
 
     const access = await request(API).get("/api/tickets/access/authors");
+    // The gate reads this to word the countdown, so it must match the grant.
+    expect(access.body.tourMinutes).toBe(20);
     expect(access.body.passActive).toBe(false);
     expect(access.body.tourActive).toBe(true);
     expect(access.body.tourUsed).toBe(false);
@@ -413,12 +464,19 @@ describe("den access tours", () => {
     expect(start.body.error).toMatch(/active pass/i);
   });
 
-  it("tours are independent per category", async () => {
+  it("tours are independent per category, and keep their own length", async () => {
     state.userId = "user-1";
     await request(API).post("/api/tickets/tour/start").send({ category: "authors" });
     const creators = await request(API).get("/api/tickets/access/content-creators");
     expect(creators.body.canStartTour).toBe(true);
     expect(creators.body.tourUsed).toBe(false);
+    // The Creators Den keeps the original ten minutes.
+    expect(creators.body.tourMinutes).toBe(10);
+
+    const started = await request(API).post("/api/tickets/tour/start").send({ category: "content-creators" });
+    expect(started.body.tour.tourMinutes).toBe(10);
+    const endsAt = new Date(started.body.tour.endsAt).getTime();
+    expect(endsAt).toBeLessThanOrEqual(Date.now() + 10 * 60 * 1000 + 5000);
   });
 
   it("requires authentication for access and start", async () => {

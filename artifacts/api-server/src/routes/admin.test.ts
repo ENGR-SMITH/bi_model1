@@ -42,7 +42,7 @@ vi.mock("@workspace/db", async () => {
   return built.exports;
 });
 
-import adminRouter from "./admin";
+import adminRouter, { clampPromoDurationDays } from "./admin";
 import ticketsRouter from "./tickets";
 
 // The admin gates on the Clerk user's email matching ADMIN_EMAIL; tests
@@ -323,6 +323,62 @@ describe("admin promo codes", () => {
     expect(deleted.body.deleted).toBe(true);
     const after = await request(API).get("/api/admin/promos").set("Cookie", cookie);
     expect(after.body).toEqual([]);
+  });
+
+  it("carries the pass length the admin sets, and clamps a silly one", async () => {
+    const cookie = await login();
+
+    // A short campaign: a code that grants two days of pass.
+    const created = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ code: "TWODAY", category: "authors", kind: "FREE", value: 0, durationDays: 2, maxUses: 0 });
+    expect(created.status).toBe(201);
+    expect(created.body.durationDays).toBe(2);
+
+    // A code with no stated length keeps the normal month.
+    const defaulted = await request(API)
+      .post("/api/admin/promos")
+      .set("Cookie", cookie)
+      .send({ code: "PLAIN", category: "authors", kind: "FREE", value: 0, maxUses: 0 });
+    expect(defaulted.body.durationDays).toBe(30);
+
+    // Editing without the field leaves the length alone (pause/resume must
+    // never silently rewrite what a live campaign grants).
+    const paused = await request(API)
+      .patch("/api/admin/promos/TWODAY")
+      .set("Cookie", cookie)
+      .send({ kind: "FREE", value: 0, maxUses: 0, active: false });
+    expect(paused.body.durationDays).toBe(2);
+
+    // An explicit length is honoured, and an absurd one is clamped into the
+    // range a pass can actually be (1 day .. 1 year).
+    const lengthened = await request(API)
+      .patch("/api/admin/promos/TWODAY")
+      .set("Cookie", cookie)
+      .send({ kind: "FREE", value: 0, maxUses: 0, durationDays: 7 });
+    expect(lengthened.body.durationDays).toBe(7);
+
+    // A length outside what a pass can be is refused rather than stored, so
+    // a typo can never mint a year-long or zero-length pass.
+    const tooLong = await request(API)
+      .patch("/api/admin/promos/TWODAY")
+      .set("Cookie", cookie)
+      .send({ kind: "FREE", value: 0, maxUses: 0, durationDays: 9999 });
+    expect(tooLong.status).toBe(400);
+
+    const tooShort = await request(API)
+      .patch("/api/admin/promos/TWODAY")
+      .set("Cookie", cookie)
+      .send({ kind: "FREE", value: 0, maxUses: 0, durationDays: 0 });
+    expect(tooShort.status).toBe(400);
+
+    // The store-level guard sits behind that: anything that reaches it is
+    // clamped into the same range (legacy rows, direct writes).
+    expect(clampPromoDurationDays(0)).toBe(1);
+    expect(clampPromoDurationDays(9999)).toBe(365);
+    expect(clampPromoDurationDays("7")).toBe(7);
+    expect(clampPromoDurationDays(undefined)).toBe(30);
   });
 
   it("rejects invalid input and unknown codes", async () => {

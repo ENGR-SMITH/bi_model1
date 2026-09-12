@@ -19,12 +19,28 @@ const router: IRouter = Router();
 // through a Whop subscription plan.
 export const PASS_PRICE_USD = 588; // $5.88 in cents
 export const PASS_MONTHS = 1;
-// A visitor without a pass gets ONE 10-minute preview tour per den (a row in
+// A visitor without a pass gets ONE preview tour per den (a row in
 // nexet_tours). Each den tours independently, matching its own pass.
 export const TOUR_MINUTES = 10;
 export const TOUR_MS = TOUR_MINUTES * 60 * 1000;
 export const TICKET_CATEGORIES = ["authors", "content-creators"] as const;
 export type TicketCategory = (typeof TICKET_CATEGORIES)[number];
+
+/**
+ * The preview tour is per den, and so is its length: the Author Den gets a
+ * longer look (writing takes longer to judge than watching), the Creators Den
+ * keeps the original ten minutes. Every response that mentions the tour reads
+ * this map, so no surface can promise a length the server doesn't grant.
+ */
+export const TOUR_MINUTES_BY_CATEGORY: Record<TicketCategory, number> = {
+  authors: 20,
+  "content-creators": TOUR_MINUTES,
+};
+
+/** Preview-tour length for one den, in minutes (10 for anything unknown). */
+export function tourMinutesFor(category: string): number {
+  return TOUR_MINUTES_BY_CATEGORY[category as TicketCategory] ?? TOUR_MINUTES;
+}
 
 export function luhnValid(number: string): boolean {
   const digits = number.replace(/\s+/g, "");
@@ -59,7 +75,20 @@ interface ResolvedPromo {
   value: number;
   discount: number; // cents off
   label: string;
+  /** How many days of pass this code grants (the code's own pass length).
+   * 30 = the normal monthly rhythm. Only a FREE code's length can differ,
+   * because only a FREE code waives the charge. */
+  durationDays: number;
 }
+
+/** The pass length a promo code grants, in days (30 when unset/legacy). */
+export function promoDurationDays(promo: { durationDays?: number | null }): number {
+  const days = Number(promo.durationDays);
+  return Number.isFinite(days) && days >= 1 ? Math.floor(days) : DEFAULT_PROMO_DURATION_DAYS;
+}
+
+/** Fallback pass length for a code with no explicit duration (legacy rows). */
+export const DEFAULT_PROMO_DURATION_DAYS = 30;
 
 /** True when this user has already redeemed the code (one per person). */
 export async function promoRedeemedByUser(code: string, userId: string): Promise<boolean> {
@@ -98,16 +127,17 @@ export async function resolvePromo(
   // A shared code is still one per person — this caller already used it.
   if (userId && (await promoRedeemedByUser(code, userId))) return null;
 
+  const durationDays = promoDurationDays(promo);
   if (promo.kind === "FREE") {
-    return { code, kind: "FREE", value: 0, discount: priceUsd, label: "Free pass" };
+    return { code, kind: "FREE", value: 0, discount: priceUsd, label: "Free pass", durationDays };
   }
   if (promo.kind === "PERCENT") {
     const discount = Math.round((priceUsd * Math.min(100, Math.max(0, promo.value))) / 100);
-    return { code, kind: "PERCENT", value: promo.value, discount, label: `${promo.value}% off` };
+    return { code, kind: "PERCENT", value: promo.value, discount, label: `${promo.value}% off`, durationDays };
   }
   // FLAT — cents off.
   const discount = Math.min(priceUsd, Math.max(0, promo.value));
-  return { code, kind: "FLAT", value: promo.value, discount, label: `$${(promo.value / 100).toFixed(2)} off` };
+  return { code, kind: "FLAT", value: promo.value, discount, label: `$${(promo.value / 100).toFixed(2)} off`, durationDays };
 }
 
 // GET /tickets/access/:category — the den entry state for one category:
@@ -154,7 +184,7 @@ router.get("/tickets/access/:category", async (req: Request, res: Response): Pro
 
   res.json({
     category,
-    tourMinutes: TOUR_MINUTES,
+    tourMinutes: tourMinutesFor(category),
     passActive,
     tourActive,
     tourEndsAt: tourActive && tour ? tour.endsAt.toISOString() : null,
@@ -163,10 +193,11 @@ router.get("/tickets/access/:category", async (req: Request, res: Response): Pro
   });
 });
 
-// POST /tickets/tour/start — grant the viewer's one-time 10-minute preview
-// tour of a den. Refuses when they already hold an active pass (none needed)
-// or when the tour has already been granted (it is one per user per den —
-// after it ends, an active pass is the only way back in).
+// POST /tickets/tour/start — grant the viewer's one-time preview tour of a den
+// (20 minutes in the Author Den, 10 in the Creators Den — see
+// TOUR_MINUTES_BY_CATEGORY). Refuses when they already hold an active pass
+// (none needed) or when the tour has already been granted (it is one per user
+// per den — after it ends, an active pass is the only way back in).
 router.post("/tickets/tour/start", async (req: Request, res: Response): Promise<void> => {
   const userId = getAuth(req).userId;
   if (!userId) {
@@ -209,13 +240,13 @@ router.post("/tickets/tour/start", async (req: Request, res: Response): Promise<
       error:
         existing.endsAt.getTime() > Date.now()
           ? "Your preview tour is already running."
-          : "Your 10-minute tour has already been used — buy a pass to come back.",
+          : `Your ${tourMinutesFor(category as string)}-minute tour has already been used — buy a pass to come back.`,
     });
     return;
   }
 
   const startedAt = new Date();
-  const endsAt = new Date(startedAt.getTime() + TOUR_MS);
+  const endsAt = new Date(startedAt.getTime() + tourMinutesFor(category as string) * 60 * 1000);
   const [tour] = await db
     .insert(nexetToursTable)
     .values({
@@ -230,7 +261,7 @@ router.post("/tickets/tour/start", async (req: Request, res: Response): Promise<
   res.status(201).json({
     tour: {
       category: tour.category,
-      tourMinutes: TOUR_MINUTES,
+      tourMinutes: tourMinutesFor(tour.category),
       startedAt: tour.startedAt.toISOString(),
       endsAt: tour.endsAt.toISOString(),
     },
@@ -388,6 +419,8 @@ router.post("/tickets/purchase", async (req: Request, res: Response): Promise<vo
     priceUsd: total,
     intervalLabel: "1 month",
     promoCode: promo?.code ?? null,
+    // A FREE code grants the pass length it carries (2 days for a 2-day code).
+    promoDurationDays: promo?.kind === "FREE" ? promo.durationDays : null,
     cardLast4,
     source: "checkout",
   });

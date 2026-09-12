@@ -774,6 +774,8 @@ export const nexetPromoCodesTable = sqliteTable("nexet_promo_codes", {
   category: text("category"),
   kind: text("kind").notNull(),
   value: integer("value").notNull().default(0),
+  // How long the pass this code grants lasts, in days (30 = one month).
+  durationDays: integer("duration_days").notNull().default(30),
   maxUses: integer("max_uses").notNull().default(0),
   uses: integer("uses").notNull().default(0),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
@@ -1264,7 +1266,9 @@ export async function buildInMemoryDb() {
     );
     CREATE TABLE nexet_promo_codes (
       code TEXT PRIMARY KEY NOT NULL, category TEXT, kind TEXT NOT NULL,
-      value INTEGER NOT NULL DEFAULT 0, max_uses INTEGER NOT NULL DEFAULT 0,
+      value INTEGER NOT NULL DEFAULT 0,
+      duration_days INTEGER NOT NULL DEFAULT 30,
+      max_uses INTEGER NOT NULL DEFAULT 0,
       uses INTEGER NOT NULL DEFAULT 0,
       active INTEGER NOT NULL DEFAULT 1,
       expires_at INTEGER, created_at INTEGER NOT NULL

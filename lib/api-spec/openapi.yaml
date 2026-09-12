@@ -5651,6 +5651,12 @@ components:
           type: string
           enum: [FREE, PERCENT, FLAT]
         value: { type: integer }
+        # How many days of pass this code grants (30 = one month). Independent
+        # of expiresAt, which only decides when the CODE can be redeemed.
+        durationDays:
+          type: integer
+          minimum: 1
+          maximum: 365
         maxUses: { type: integer }
         uses: { type: integer }
         # false = paused by an admin — the code stops validating immediately
@@ -5658,7 +5664,7 @@ components:
         active: { type: boolean }
         expiresAt: { type: ["string", "null"], format: date-time }
         createdAt: { type: string, format: date-time }
-      required: [code, category, kind, value, maxUses, uses, active, expiresAt, createdAt]
+      required: [code, category, kind, value, durationDays, maxUses, uses, active, expiresAt, createdAt]
     AdminPromoInput:
       type: object
       # A code is dedicated to exactly one category pass. Only FREE codes are
@@ -5675,6 +5681,11 @@ components:
           type: string
           enum: [FREE]
         value: { type: integer }
+        # How many days of pass the code grants. Omit for the normal month.
+        durationDays:
+          type: integer
+          minimum: 1
+          maximum: 365
         maxUses: { type: integer }
         expiresAt: { type: ["string", "null"], format: date-time }
       required: [code, category, kind, value, maxUses]
@@ -5692,6 +5703,11 @@ components:
           type: string
           enum: [FREE, PERCENT, FLAT]
         value: { type: integer }
+        # Optional new pass length, in days. Omit to leave it untouched.
+        durationDays:
+          type: integer
+          minimum: 1
+          maximum: 365
         maxUses: { type: integer }
         # Optional pause/resume flag. Editing a code's discount without this
         # field leaves its enabled state untouched.

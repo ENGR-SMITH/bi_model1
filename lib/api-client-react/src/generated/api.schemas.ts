@@ -807,6 +807,11 @@ export interface AdminPromo {
   category: AdminPromoCategory;
   kind: AdminPromoKind;
   value: number;
+  /**
+     * @minimum 1
+     * @maximum 365
+     */
+  durationDays: number;
   maxUses: number;
   uses: number;
   active: boolean;
@@ -838,6 +843,11 @@ export interface AdminPromoInput {
   category: AdminPromoInputCategory;
   kind: AdminPromoInputKind;
   value: number;
+  /**
+     * @minimum 1
+     * @maximum 365
+     */
+  durationDays?: number;
   maxUses: number;
   /** @nullable */
   expiresAt?: string | null;
@@ -867,6 +877,11 @@ export interface AdminPromoUpdate {
   category?: AdminPromoUpdateCategory;
   kind: AdminPromoUpdateKind;
   value: number;
+  /**
+     * @minimum 1
+     * @maximum 365
+     */
+  durationDays?: number;
   maxUses: number;
   active?: boolean;
   /** @nullable */

@@ -34,6 +34,19 @@ export const SUBSCRIPTION_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 /** The billing rhythm every plan shares. */
 export const SUBSCRIPTION_INTERVAL_LABEL = "1 month";
 
+/** One day — the unit a promo code's pass length is expressed in. */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Human label for a pass length in days, stored on the subscription row the
+ * grant records — so the subscriptions page reads the real length ("2 days")
+ * instead of the plan's monthly rhythm ("1 month"), which is what made a
+ * short promo look like a whole month.
+ */
+export function passIntervalLabel(days: number): string {
+  return days === 1 ? "1 day" : `${days} days`;
+}
+
 /** One purchasable subscription product shown on the payments page. */
 export interface SubscriptionPlan {
   kind: SubscriptionKind;
@@ -250,6 +263,11 @@ export interface ApplySubscriptionPurchaseInput {
       row being renewed — cleared of auto-renew so only the newest record is
       the live renewal (one charge chain per pass). */
   renewsSubscriptionId?: string | null;
+  /** How many days of pass this purchase grants — the pass length of the
+      promo code that waived the charge. Omitted (or null) means the plan's
+      normal monthly period. Ignored for storage/projects plans, which have
+      no promo codes. */
+  promoDurationDays?: number | null;
 }
 
 export interface AppliedSubscription {
@@ -290,6 +308,9 @@ export async function applySubscriptionPurchase(
   const now = new Date();
   let periodStart: Date = now;
   let periodEnd: Date;
+  // Stored on the subscription row; a promo-granted pass overrides it with
+  // its own length (see the pass branch below).
+  let recordedIntervalLabel = input.intervalLabel;
 
   if (input.kind === "pass") {
     const category = input.planId as TicketCategory;
@@ -308,7 +329,19 @@ export async function applySubscriptionPurchase(
       .limit(1);
     const base = existing && existing.expiresAt.getTime() > Date.now() ? existing.expiresAt : now;
     periodStart = base;
-    periodEnd = new Date(base.getTime() + SUBSCRIPTION_PERIOD_MS);
+    // A promo code can carry its own pass length, so a short campaign grants
+    // exactly what it promises ("2 days") rather than a default month.
+    const promoDays =
+      input.promoDurationDays && input.promoDurationDays >= 1
+        ? Math.floor(input.promoDurationDays)
+        : null;
+    periodEnd = new Date(base.getTime() + (promoDays ? promoDays * DAY_MS : SUBSCRIPTION_PERIOD_MS));
+    // Only a length that differs from the normal month needs its own label —
+    // a plain 30-day code still reads as the plan's "1 month".
+    recordedIntervalLabel =
+      promoDays && promoDays * DAY_MS !== SUBSCRIPTION_PERIOD_MS
+        ? passIntervalLabel(promoDays)
+        : input.intervalLabel;
     await db.insert(nexetTicketsTable).values({
       id: randomUUID(),
       userId: input.userId,
@@ -352,7 +385,7 @@ export async function applySubscriptionPurchase(
     planId: input.planId,
     planLabel: input.planLabel,
     priceUsd: input.priceUsd,
-    intervalLabel: input.intervalLabel,
+    intervalLabel: recordedIntervalLabel,
     periodStart,
     periodEnd,
     source: input.source ?? "checkout",

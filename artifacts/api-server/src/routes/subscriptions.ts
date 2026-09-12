@@ -158,6 +158,8 @@ router.post("/subscriptions/purchase", async (req: Request, res: Response): Prom
     priceUsd: total,
     intervalLabel,
     promoCode: promo?.code ?? null,
+    // A FREE code grants the pass length it carries (2 days for a 2-day code).
+    promoDurationDays: promo?.kind === "FREE" ? promo.durationDays : null,
     cardLast4,
     source: "checkout",
   });
